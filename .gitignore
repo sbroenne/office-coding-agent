@@ -34,8 +34,6 @@ playwright-report/
 # Local skills (domain-specific, not published)
 src/skills/*/
 !src/skills/
-!src/skills/xa2/
-!src/skills/xa2/SKILL.md
 
 # OS generated files
 .DS_Store

@@ -14,34 +14,14 @@ import {
 } from '@/services/skills/skillService';
 
 describe('buildSkillContext', () => {
-  it('returns a non-empty string', () => {
+  it('returns empty string when no bundled skills exist', () => {
     const ctx = buildSkillContext();
-    expect(ctx.length).toBeGreaterThan(0);
+    expect(ctx).toBe('');
   });
 
-  it('starts with the Agent Skills heading', () => {
-    const ctx = buildSkillContext();
-    expect(ctx).toContain('# Agent Skills');
-  });
-
-  it('includes the xa2 skill name', () => {
-    const ctx = buildSkillContext();
-    // The xa2 SKILL.md frontmatter defines a name — whatever it is,
-    // it should appear in the context after "## Agent Skill:"
-    expect(ctx).toMatch(/## Agent Skill: .+/);
-  });
-
-  it('includes domain-specific knowledge blurb', () => {
-    const ctx = buildSkillContext();
-    expect(ctx).toContain('domain-specific knowledge');
-  });
-
-  it('filters to only active skill names when provided', () => {
-    const skills = getSkills();
-    const name = skills[0].metadata.name;
-    const ctx = buildSkillContext([name]);
-    expect(ctx).toContain(name);
-    expect(ctx).toContain('# Agent Skills');
+  it('returns empty string when activeNames provided but no skills are bundled', () => {
+    const ctx = buildSkillContext(['any-skill']);
+    expect(ctx).toBe('');
   });
 
   it('returns empty string when activeNames is an empty array', () => {
@@ -62,9 +42,9 @@ describe('buildSkillContext', () => {
 });
 
 describe('getSkills', () => {
-  it('returns at least one bundled skill', () => {
+  it('returns empty list when no bundled skills are configured', () => {
     const skills = getSkills();
-    expect(skills.length).toBeGreaterThanOrEqual(1);
+    expect(skills).toEqual([]);
   });
 
   it('each skill has metadata with a name', () => {
@@ -85,12 +65,8 @@ describe('getSkill', () => {
     expect(getSkill('nonexistent-skill-xyz')).toBeUndefined();
   });
 
-  it('finds the xa2 skill by its metadata name', () => {
-    const skills = getSkills();
-    const name = skills[0].metadata.name;
-    const found = getSkill(name);
-    expect(found).toBeDefined();
-    expect(found!.metadata.name).toBe(name);
+  it('returns undefined when no skills are bundled', () => {
+    expect(getSkill('any-skill')).toBeUndefined();
   });
 });
 

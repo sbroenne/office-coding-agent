@@ -1,8 +1,5 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
 
-// Import bundled skill files as raw strings (via webpack asset/source)
-import xa2SkillRaw from '@/skills/xa2/SKILL.md';
-
 /**
  * Parse YAML frontmatter from a skill markdown file.
  * Handles the `---` delimited block at the top of the file.
@@ -113,7 +110,7 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
 }
 
 /** All bundled skills, parsed at module load time. */
-const bundledSkills: AgentSkill[] = [parseFrontmatter(xa2SkillRaw)];
+const bundledSkills: AgentSkill[] = [];
 
 /**
  * Get all loaded agent skills.
