@@ -1,0 +1,498 @@
+import React, { useState, useCallback } from 'react';
+import {
+  Settings,
+  Plus,
+  Trash2,
+  Pencil,
+  Check,
+  X,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  Globe,
+  Loader2,
+} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import * as Popover from '@radix-ui/react-popover';
+import { useSettingsStore } from '@/stores';
+import { validateModelDeployment } from '@/services/ai';
+import { ModelManager } from './ModelManager';
+import type { FoundryEndpoint } from '@/types';
+
+/** Extract hostname from a resource URL for display */
+function extractHost(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+interface EndpointFormData {
+  displayName: string;
+  resourceUrl: string;
+  apiKey: string;
+}
+
+// ─── Connection Form (shared for add / edit) ───
+
+interface ConnectionFormProps {
+  title: string;
+  formData: EndpointFormData;
+  onChange: (data: EndpointFormData) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saveDisabled?: boolean;
+  saveLabel?: string;
+  placeholders?: boolean;
+  testEndpoint?: FoundryEndpoint;
+}
+
+const ConnectionForm: React.FC<ConnectionFormProps> = ({
+  title,
+  formData,
+  onChange,
+  onSave,
+  onCancel,
+  saveDisabled,
+  saveLabel = 'Save',
+  placeholders = false,
+  testEndpoint,
+}) => {
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = useCallback(async () => {
+    const url = formData.resourceUrl.trim().replace(/\/+$/, '');
+    const key = formData.apiKey.trim();
+    if (!url || !key || !formData.displayName.trim()) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const epConfig: FoundryEndpoint = {
+        id: testEndpoint?.id ?? '__test_connection__',
+        displayName: formData.displayName || 'Test',
+        resourceUrl: url,
+        authMethod: 'apiKey',
+        apiKey: key,
+      };
+
+      // Try to validate with an existing model on this endpoint, falling back to the default.
+      // This avoids failing validation when the default model isn't deployed.
+      const state = useSettingsStore.getState();
+      const existingModels = testEndpoint ? (state.endpointModels[testEndpoint.id] ?? []) : [];
+      const testModelId = existingModels[0]?.id ?? state.defaultModelId;
+      const ok = await validateModelDeployment(epConfig, testModelId);
+
+      if (ok) {
+        onSave();
+      } else {
+        setError('Could not connect. Check the URL and API key.');
+      }
+    } catch {
+      setError('Could not connect. Check the URL and API key.');
+    } finally {
+      setSaving(false);
+    }
+  }, [formData, testEndpoint, onSave]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold">{title}</h3>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="conn-name">Display Name</Label>
+        <Input
+          id="conn-name"
+          value={formData.displayName}
+          onChange={e => {
+            onChange({ ...formData, displayName: e.target.value });
+            setError(null);
+          }}
+          placeholder={placeholders ? 'My AI Foundry Resource' : undefined}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="conn-url">Resource URL</Label>
+        <Input
+          id="conn-url"
+          value={formData.resourceUrl}
+          onChange={e => {
+            onChange({ ...formData, resourceUrl: e.target.value });
+            setError(null);
+          }}
+          placeholder={placeholders ? 'https://your-resource.openai.azure.com' : undefined}
+        />
+        <p className="text-xs text-muted-foreground">e.g., https://my-resource.openai.azure.com</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="conn-key">API Key</Label>
+        <div className="relative">
+          <Input
+            id="conn-key"
+            type={showApiKey ? 'text' : 'password'}
+            value={formData.apiKey}
+            onChange={e => {
+              onChange({ ...formData, apiKey: e.target.value });
+              setError(null);
+            }}
+            placeholder={placeholders ? 'Enter API key' : undefined}
+            className="pr-9"
+          />
+          <button
+            type="button"
+            onClick={() => setShowApiKey(prev => !prev)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+          >
+            {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-700 dark:bg-red-900/30 dark:text-red-200">
+          {error}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" size="sm" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={() => void handleSave()} disabled={(saveDisabled ?? false) || saving}>
+          {saving && <Loader2 className="size-4 animate-spin" />}
+          {saving ? 'Saving…' : saveLabel}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main SettingsDialog ───
+
+interface SettingsDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export const SettingsDialog: React.FC<SettingsDialogProps> = ({
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = useCallback(
+    (value: boolean) => {
+      setInternalOpen(value);
+      controlledOnOpenChange?.(value);
+    },
+    [controlledOnOpenChange]
+  );
+
+  // Form state
+  const [editingNew, setEditingNew] = useState(false);
+  const [editingConnection, setEditingConnection] = useState(false);
+  const [formData, setFormData] = useState<EndpointFormData>({
+    displayName: '',
+    resourceUrl: '',
+    apiKey: '',
+  });
+
+  // Delete confirmation
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // Endpoint switcher
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+
+  const {
+    endpoints,
+    activeEndpointId,
+    addEndpoint,
+    updateEndpoint,
+    removeEndpoint,
+    setActiveEndpoint,
+  } = useSettingsStore();
+
+  const activeEndpoint = endpoints.find(ep => ep.id === activeEndpointId);
+  const hasMultipleEndpoints = endpoints.length > 1;
+
+  // ── Handlers ──
+
+  const handleStartAdd = useCallback(() => {
+    setEditingNew(true);
+    setEditingConnection(false);
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+  }, []);
+
+  const handleSaveNew = useCallback(() => {
+    if (!formData.displayName || !formData.resourceUrl) return;
+    addEndpoint({
+      displayName: formData.displayName,
+      resourceUrl: formData.resourceUrl.replace(/\/+$/, ''),
+      authMethod: 'apiKey',
+      apiKey: formData.apiKey,
+    });
+    setEditingNew(false);
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+  }, [formData, addEndpoint]);
+
+  const handleCancelAdd = useCallback(() => {
+    setEditingNew(false);
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+  }, []);
+
+  const handleStartEditConnection = useCallback(() => {
+    if (!activeEndpoint) return;
+    setEditingConnection(true);
+    setEditingNew(false);
+    setFormData({
+      displayName: activeEndpoint.displayName,
+      resourceUrl: activeEndpoint.resourceUrl,
+      apiKey: activeEndpoint.apiKey ?? '',
+    });
+  }, [activeEndpoint]);
+
+  const handleSaveConnection = useCallback(() => {
+    if (!activeEndpointId || !formData.displayName || !formData.resourceUrl) return;
+    updateEndpoint(activeEndpointId, {
+      displayName: formData.displayName,
+      resourceUrl: formData.resourceUrl.replace(/\/+$/, ''),
+      apiKey: formData.apiKey,
+    });
+    setEditingConnection(false);
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+  }, [activeEndpointId, formData, updateEndpoint]);
+
+  const handleCancelEditConnection = useCallback(() => {
+    setEditingConnection(false);
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+  }, []);
+
+  const handleDeleteRequest = useCallback(() => {
+    setConfirmingDelete(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (activeEndpointId) {
+      removeEndpoint(activeEndpointId);
+      setEditingConnection(false);
+      setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+    }
+    setConfirmingDelete(false);
+  }, [activeEndpointId, removeEndpoint]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setConfirmingDelete(false);
+  }, []);
+
+  const showConnectionSummary = activeEndpoint && !editingConnection && !editingNew;
+  const showConnectionForm = editingConnection && activeEndpoint;
+  const showAddForm = editingNew;
+  const showModels = activeEndpoint && !editingNew;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <Settings className="size-4" />
+        </button>
+      </DialogTrigger>
+
+      <DialogContent className="max-w-[480px] max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {/* ── Endpoint Switcher (only when multiple endpoints) ── */}
+          {hasMultipleEndpoints && !editingNew && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Endpoint:</span>
+              <Popover.Root open={switcherOpen} onOpenChange={setSwitcherOpen}>
+                <Popover.Trigger asChild>
+                  <Button variant="ghost" size="sm" className="min-w-0 justify-between gap-1">
+                    <span className="truncate">{activeEndpoint?.displayName ?? 'Select'}</span>
+                    <ChevronDown className="size-3.5 shrink-0 opacity-50" />
+                  </Button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    align="start"
+                    sideOffset={4}
+                    className="z-50 min-w-[160px] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+                  >
+                    {endpoints.map(ep => (
+                      <button
+                        key={ep.id}
+                        onClick={() => {
+                          setActiveEndpoint(ep.id);
+                          setEditingConnection(false);
+                          setSwitcherOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                      >
+                        {ep.id === activeEndpointId && <Check className="size-3.5" />}
+                        {ep.id !== activeEndpointId && <span className="w-3.5" />}
+                        {ep.displayName}
+                      </button>
+                    ))}
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+            </div>
+          )}
+
+          {/* ── No endpoints yet ── */}
+          {endpoints.length === 0 && !editingNew && (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              <p>No endpoints configured.</p>
+              <Button className="mt-2" onClick={handleStartAdd}>
+                <Plus className="size-4" />
+                Add Endpoint
+              </Button>
+            </div>
+          )}
+
+          {/* ── Connection Summary (read-only view) ── */}
+          {showConnectionSummary && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className="text-sm font-semibold">{activeEndpoint.displayName}</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleStartEditConnection}
+                  aria-label="Edit endpoint"
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </Button>
+              </div>
+              <button
+                className="flex w-full flex-col gap-0.5 rounded-md bg-secondary p-2.5 text-left transition-colors hover:bg-secondary/80"
+                onClick={handleStartEditConnection}
+                title="Click to edit connection"
+              >
+                <div className="flex items-center gap-2">
+                  <Globe className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-sm" title={activeEndpoint.resourceUrl}>
+                    {extractHost(activeEndpoint.resourceUrl)}
+                  </span>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* ── Edit Connection Form ── */}
+          {showConnectionForm && (
+            <div>
+              <ConnectionForm
+                title="Edit Connection"
+                formData={formData}
+                onChange={setFormData}
+                onSave={handleSaveConnection}
+                onCancel={handleCancelEditConnection}
+                saveDisabled={!formData.displayName || !formData.resourceUrl}
+                testEndpoint={activeEndpoint}
+              />
+
+              {/* Delete option */}
+              {confirmingDelete ? (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span className="text-xs text-destructive">
+                    Delete this endpoint and all its models?
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-destructive hover:text-destructive"
+                    onClick={handleDeleteConfirm}
+                    aria-label="Confirm delete"
+                  >
+                    <Check className="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6"
+                    onClick={handleDeleteCancel}
+                    aria-label="Cancel delete"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 text-destructive hover:text-destructive"
+                  onClick={handleDeleteRequest}
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete endpoint
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* ── Add New Endpoint Form ── */}
+          {showAddForm && (
+            <ConnectionForm
+              title="Add Endpoint"
+              formData={formData}
+              onChange={setFormData}
+              onSave={handleSaveNew}
+              onCancel={handleCancelAdd}
+              saveDisabled={!formData.displayName || !formData.resourceUrl}
+              placeholders
+            />
+          )}
+
+          {/* ── Models Section ── */}
+          {showModels && (
+            <>
+              <Separator className="my-3" />
+              <ModelManager endpointId={activeEndpointId ?? ''} />
+            </>
+          )}
+        </div>
+
+        <DialogFooter className="mt-2">
+          <div className="flex flex-1 items-center">
+            {endpoints.length > 0 && !editingNew && (
+              <Button variant="ghost" size="sm" onClick={handleStartAdd}>
+                <Plus className="size-3.5" />
+                Add another endpoint
+              </Button>
+            )}
+          </div>
+          <Button variant="secondary" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

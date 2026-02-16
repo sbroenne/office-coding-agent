@@ -1,0 +1,15 @@
+{
+  "allowCustomDataForDataTypeAny": true,
+  "allowErrorForDataTypeAny": true,
+  "functions": [
+    {
+      "description": "Returns the E2E test add-in version.",
+      "id": "E2E_VERSION",
+      "name": "E2E_VERSION",
+      "parameters": [],
+      "result": {
+        "type": "string"
+      }
+    }
+  ]
+}

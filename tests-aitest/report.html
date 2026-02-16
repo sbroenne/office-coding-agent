@@ -1,0 +1,1369 @@
+<!doctype html><html lang="en" class="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>pytest-aitest - Test Report</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;family=Roboto+Mono&amp;display=swap" rel="stylesheet"><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script><style>/* ============================================================
+   pytest-aitest Report Styles
+   Hand-written CSS — replaces Tailwind CSS build pipeline
+   Matches mkdocs-material slate/indigo theme
+   ============================================================ */
+
+/* ==================== Design Tokens ==================== */
+:root {
+  /* Primary (Material Indigo) */
+  --color-primary: #4051b5;
+  --color-primary-50: #e8eaf6;
+  --color-primary-100: #c5cae9;
+  --color-primary-200: #9fa8da;
+  --color-primary-300: #7986cb;
+  --color-primary-400: #5c6bc0;
+  --color-primary-500: #4051b5;
+  --color-primary-600: #3949ab;
+  --color-primary-700: #303f9f;
+  --color-primary-800: #283593;
+  --color-primary-900: #1a237e;
+
+  /* Surfaces (Slate dark) */
+  --color-surface: #1e2129;
+  --color-surface-card: #282c34;
+  --color-surface-elevated: #2d323c;
+  --color-surface-code: #1c1f26;
+
+  /* Text */
+  --color-text: #bfc7d5;
+  --color-text-muted: #8b949e;
+  --color-text-light: #c9d1d9;
+
+  /* Accent */
+  --color-accent: #526cfe;
+  --color-accent-hover: #6b7eff;
+
+  /* Semantic colors */
+  --color-green: #4ade80;
+  --color-yellow: #facc15;
+  --color-red: #f87171;
+  --color-blue: #60a5fa;
+
+  /* Shadows (Material Design) */
+  --shadow-material: 0 2px 4px -1px rgba(0,0,0,.2), 0 4px 5px 0 rgba(0,0,0,.14), 0 1px 10px 0 rgba(0,0,0,.12);
+  --shadow-material-lg: 0 5px 5px -3px rgba(0,0,0,.2), 0 8px 10px 1px rgba(0,0,0,.14), 0 3px 14px 2px rgba(0,0,0,.12);
+
+  /* Border radius */
+  --radius-material: 4px;
+
+  /* Fonts */
+  --font-sans: 'Roboto', system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+}
+
+/* ==================== Preflight Reset ==================== */
+/* Matches Tailwind CSS v3.4 preflight — do NOT remove or simplify */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+::before, ::after {
+  --tw-content: '';
+}
+
+html {
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -moz-tab-size: 4;
+  tab-size: 4;
+  font-family: var(--font-sans);
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  line-height: inherit;
+}
+
+hr {
+  height: 0;
+  color: inherit;
+  border-top-width: 1px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+b, strong {
+  font-weight: bolder;
+}
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+  font-size: 1em;
+}
+
+small {
+  font-size: 80%;
+}
+
+sub, sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+sub { bottom: -0.25em; }
+sup { top: -0.5em; }
+
+table {
+  text-indent: 0;
+  border-color: inherit;
+  border-collapse: collapse;
+}
+
+button, input, optgroup, select, textarea {
+  font-family: inherit;
+  font-feature-settings: inherit;
+  font-variation-settings: inherit;
+  font-size: 100%;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+}
+
+button, select {
+  text-transform: none;
+}
+
+button,
+input[type="button"],
+input[type="reset"],
+input[type="submit"] {
+  -webkit-appearance: button;
+  background-color: transparent;
+  background-image: none;
+}
+
+:-moz-focusring {
+  outline: auto;
+}
+
+:-moz-ui-invalid {
+  box-shadow: none;
+}
+
+progress {
+  vertical-align: baseline;
+}
+
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
+  height: auto;
+}
+
+[type="search"] {
+  -webkit-appearance: textfield;
+  outline-offset: -2px;
+}
+
+::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+::-webkit-file-upload-button {
+  -webkit-appearance: button;
+  font: inherit;
+}
+
+summary {
+  display: list-item;
+}
+
+blockquote, dd, dl, figure, h1, h2, h3, h4, h5, h6, hr, p, pre {
+  margin: 0;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+ol, ul, menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+dialog {
+  padding: 0;
+}
+
+textarea {
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+  color: var(--color-text-muted);
+}
+
+button, [role="button"] {
+  cursor: pointer;
+}
+
+:disabled {
+  cursor: default;
+}
+
+img, svg, video, canvas, audio, iframe, embed, object {
+  display: block;
+  vertical-align: middle;
+}
+
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
+[hidden]:where(:not([hidden="until-found"])) {
+  display: none;
+}
+
+/* ==================== Base Styles ==================== */
+body {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  line-height: 1.625;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text-light);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+a {
+  color: var(--color-primary);
+  transition: color 150ms;
+}
+a:hover {
+  color: var(--color-accent);
+}
+
+/* ==================== Layout Utilities ==================== */
+.flex { display: flex; }
+.grid { display: grid; }
+.hidden { display: none; }
+.inline-flex { display: inline-flex; }
+.fixed { position: fixed; }
+.absolute { position: absolute; }
+.inset-0 { inset: 0; }
+
+.flex-1 { flex: 1 1 0%; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.min-w-0 { min-width: 0; }
+
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.gap-x-6 { column-gap: 1.5rem; }
+.gap-y-1 { row-gap: 0.25rem; }
+
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* ==================== Spacing Utilities ==================== */
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 0.75rem; }
+.p-4 { padding: 1rem; }
+.p-5 { padding: 1.25rem; }
+.p-6 { padding: 1.5rem; }
+.p-8 { padding: 2rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.pl-4 { padding-left: 1rem; }
+.pl-5 { padding-left: 1.25rem; }
+.pl-8 { padding-left: 2rem; }
+
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mb-5 { margin-bottom: 1.25rem; }
+.mb-6 { margin-bottom: 1.5rem; }
+.mb-8 { margin-bottom: 2rem; }
+.ml-2 { margin-left: 0.5rem; }
+.ml-auto { margin-left: auto; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-6 { margin-top: 1.5rem; }
+.mt-8 { margin-top: 2rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.pb-2 { padding-bottom: 0.5rem; }
+
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+
+/* ==================== Sizing ==================== */
+.w-10 { width: 2.5rem; }
+.h-10 { height: 2.5rem; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+.max-w-none { max-width: none; }
+.max-w-xl { max-width: 36rem; }
+.max-w-6xl { max-width: 72rem; }
+.w-\[90vw\] { width: 90vw; }
+.h-\[85vh\] { height: 85vh; }
+
+/* ==================== Typography ==================== */
+.text-xs { font-size: 0.75rem; line-height: 1rem; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-base { font-size: 1rem; line-height: 1.5rem; }
+.text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+.text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+.text-2xl { font-size: 1.5rem; line-height: 2rem; }
+
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-mono { font-family: var(--font-mono); }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.uppercase { text-transform: uppercase; }
+.italic { font-style: italic; }
+.tracking-tight { letter-spacing: -0.025em; }
+.tracking-wider { letter-spacing: 0.05em; }
+.leading-relaxed { line-height: 1.625; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line-through { text-decoration: line-through; }
+.underline { text-decoration: underline; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.list-disc { list-style-type: disc; }
+
+/* ==================== Text Colors ==================== */
+.text-white { color: #fff; }
+.text-text { color: var(--color-text); }
+.text-text-light { color: var(--color-text-light); }
+.text-text-muted { color: var(--color-text-muted); }
+.text-primary { color: var(--color-primary); }
+.text-primary-300 { color: var(--color-primary-300); }
+.text-accent { color: var(--color-accent); }
+.text-green-400 { color: var(--color-green); }
+.text-yellow-400 { color: var(--color-yellow); }
+.text-red-400 { color: var(--color-red); }
+.text-blue-400 { color: var(--color-blue); }
+
+/* ==================== Background Colors ==================== */
+.bg-surface { background-color: var(--color-surface); }
+.bg-surface-card { background-color: var(--color-surface-card); }
+.bg-surface-elevated { background-color: var(--color-surface-elevated); }
+.bg-surface-code { background-color: var(--color-surface-code); }
+.bg-primary { background-color: var(--color-primary); }
+.bg-primary\/10 { background-color: rgba(64, 81, 181, 0.1); }
+.bg-primary\/15 { background-color: rgba(64, 81, 181, 0.15); }
+.bg-primary\/20 { background-color: rgba(64, 81, 181, 0.2); }
+.bg-green-500\/5 { background-color: rgba(34, 197, 94, 0.05); }
+.bg-green-500\/10 { background-color: rgba(34, 197, 94, 0.1); }
+.bg-green-500\/15 { background-color: rgba(34, 197, 94, 0.15); }
+.bg-red-500\/5 { background-color: rgba(239, 68, 68, 0.05); }
+.bg-red-500\/10 { background-color: rgba(239, 68, 68, 0.1); }
+.bg-red-500\/15 { background-color: rgba(239, 68, 68, 0.15); }
+.bg-yellow-500\/5 { background-color: rgba(234, 179, 8, 0.05); }
+.bg-white\/5 { background-color: rgba(255, 255, 255, 0.05); }
+.bg-white\/10 { background-color: rgba(255, 255, 255, 0.1); }
+.bg-black\/80 { background-color: rgba(0, 0, 0, 0.8); }
+.bg-transparent { background-color: transparent; }
+
+/* ==================== Borders ==================== */
+.border { border-width: 1px; }
+.border-0 { border-width: 0; }
+.border-t { border-top-width: 1px; }
+.border-b { border-bottom-width: 1px; }
+.border-l-4 { border-left-width: 4px; }
+.border-l-\[3px\] { border-left-width: 3px; }
+
+.border-white\/5 { border-color: rgba(255, 255, 255, 0.05); }
+.border-white\/10 { border-color: rgba(255, 255, 255, 0.1); }
+.border-white\/20 { border-color: rgba(255, 255, 255, 0.2); }
+.border-primary { border-color: var(--color-primary); }
+.border-primary\/30 { border-color: rgba(64, 81, 181, 0.3); }
+.border-primary\/50 { border-color: rgba(64, 81, 181, 0.5); }
+.border-green-500 { border-color: #22c55e; }
+.border-green-500\/30 { border-color: rgba(34, 197, 94, 0.3); }
+.border-red-500 { border-color: #ef4444; }
+.border-red-500\/30 { border-color: rgba(239, 68, 68, 0.3); }
+.border-yellow-500\/30 { border-color: rgba(234, 179, 8, 0.3); }
+
+.rounded { border-radius: 0.25rem; }
+.rounded-full { border-radius: 9999px; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-material { border-radius: var(--radius-material); }
+
+/* ==================== Effects ==================== */
+.shadow-material { box-shadow: var(--shadow-material); }
+.shadow-material-lg { box-shadow: var(--shadow-material-lg); }
+.opacity-50 { opacity: 0.5; }
+.opacity-70 { opacity: 0.7; }
+.backdrop-blur-sm { backdrop-filter: blur(4px); }
+
+.transition-colors { transition-property: color, background-color, border-color; transition-duration: 150ms; transition-timing-function: ease; }
+.transition-all { transition-property: all; transition-duration: 150ms; transition-timing-function: ease; }
+.transition-transform { transition-property: transform; transition-timing-function: ease; }
+.duration-150 { transition-duration: 150ms; }
+.duration-200 { transition-duration: 200ms; }
+.ease-out { transition-timing-function: ease-out; }
+
+/* ==================== Positioning ==================== */
+.top-4 { top: 1rem; }
+.right-4 { right: 1rem; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+
+/* ==================== Overflow & Cursor ==================== */
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.overflow-y-auto { overflow-y: auto; }
+.cursor-pointer { cursor: pointer; }
+
+/* ==================== Misc Utilities ==================== */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+}
+
+/* ==================== Hover States ==================== */
+.hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(255, 255, 255, 0.02); }
+.hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(255, 255, 255, 0.03); }
+.hover\:border-white\/20:hover { border-color: rgba(255, 255, 255, 0.2); }
+.hover\:border-primary\/30:hover { border-color: rgba(64, 81, 181, 0.3); }
+.hover\:border-primary\/50:hover { border-color: rgba(64, 81, 181, 0.5); }
+.hover\:text-text-light:hover { color: var(--color-text-light); }
+.hover\:text-blue-400:hover { color: var(--color-blue); }
+.hover\:text-accent:hover { color: var(--color-accent); }
+.hover\:decoration-accent\/50:hover { text-decoration-color: rgba(82, 108, 254, 0.5); }
+.decoration-primary\/30 { text-decoration-color: rgba(64, 81, 181, 0.3); }
+
+/* ==================== Gradient ==================== */
+.bg-gradient-to-r { background-image: linear-gradient(to right, var(--tw-gradient-stops)); }
+.from-purple-500\/10 { --tw-gradient-from: rgba(168, 85, 247, 0.1); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent); }
+.via-primary\/10 { --tw-gradient-stops: var(--tw-gradient-from), rgba(64, 81, 181, 0.1), var(--tw-gradient-to, transparent); }
+.to-transparent { --tw-gradient-to: transparent; }
+
+/* ============================================================
+   Component Classes
+   ============================================================ */
+
+/* ==================== Report Header ==================== */
+.report-header {
+  background-color: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-material);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-material);
+}
+.report-header h1 {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.025em;
+}
+
+/* ==================== Status Badges ==================== */
+.status-passed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background-color: rgba(34, 197, 94, 0.15);
+  color: var(--color-green);
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.status-failed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-red);
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ==================== Cards ==================== */
+.card {
+  background-color: var(--color-surface-card);
+  border-radius: var(--radius-material);
+  box-shadow: var(--shadow-material);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.card-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 500;
+  color: var(--color-text-light);
+}
+.card-body {
+  padding: 1.25rem;
+}
+
+/* ==================== Section Title ==================== */
+.section-title {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-text-light);
+}
+
+/* ==================== Tool Name ==================== */
+.tool-name {
+  font-family: var(--font-mono);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+/* ==================== AI Insights ==================== */
+.ai-insights {
+  background-color: var(--color-surface-card);
+  border-radius: var(--radius-material);
+  box-shadow: var(--shadow-material);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 2.5rem;
+  overflow: hidden;
+}
+.ai-insights-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 500;
+  background-image: linear-gradient(to right, rgba(168, 85, 247, 0.1), rgba(64, 81, 181, 0.1), transparent);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--color-text-light);
+}
+
+/* ==================== Leaderboard Table ==================== */
+.leaderboard-table {
+  width: 100%;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-collapse: collapse;
+}
+.leaderboard-table th {
+  padding: 0.75rem 1.25rem;
+  text-align: left;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  letter-spacing: 0.05em;
+  background-color: var(--color-surface-elevated);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.leaderboard-table td {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+}
+.leaderboard-table tbody tr {
+  transition: background-color 150ms;
+}
+.leaderboard-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+.winner-row {
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+/* ==================== Markdown Content ==================== */
+.markdown-content {
+  max-width: none;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.markdown-content h2 {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 500;
+  color: var(--color-text-light);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.markdown-content h3 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 500;
+  color: var(--color-text-light);
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.markdown-content p {
+  color: var(--color-text);
+  line-height: 1.625;
+  margin-bottom: 1rem;
+}
+.markdown-content ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  color: var(--color-text);
+  margin-bottom: 1rem;
+}
+.markdown-content ul > li + li { margin-top: 0.375rem; }
+.markdown-content li {
+  color: var(--color-text);
+}
+.markdown-content li::marker {
+  color: var(--color-text-muted);
+}
+.markdown-content code {
+  background-color: var(--color-surface-code);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.markdown-content pre {
+  background-color: var(--color-surface-code);
+  border-radius: var(--radius-material);
+  padding: 1rem;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 1rem;
+}
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  border: 0;
+  color: var(--color-text);
+  font-size: inherit;
+}
+.markdown-content strong {
+  color: var(--color-text-light);
+  font-weight: 600;
+}
+.markdown-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(64, 81, 181, 0.3);
+  transition: color 150ms, text-decoration-color 150ms;
+}
+.markdown-content a:hover {
+  color: var(--color-accent);
+  text-decoration-color: rgba(82, 108, 254, 0.5);
+}
+.markdown-content blockquote {
+  border-left: 4px solid rgba(64, 81, 181, 0.5);
+  padding-left: 1rem;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.markdown-content th,
+.markdown-content td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+}
+.markdown-content th {
+  background-color: var(--color-surface-elevated);
+  font-weight: 500;
+  color: var(--color-text-light);
+}
+
+/* ==================== AI Summary Visualizations ==================== */
+
+/* --- Winner Spotlight Card --- */
+.winner-card {
+  position: relative;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(64, 81, 181, 0.10) 50%, rgba(82, 108, 254, 0.08) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.winner-card::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  right: -20%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.10) 0%, transparent 70%);
+  pointer-events: none;
+}
+.winner-card::after {
+  content: '🏆';
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  font-size: 1.4rem;
+  opacity: 0.7;
+}
+.winner-title {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-green);
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.winner-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+.winner-summary {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  line-height: 1.4;
+  max-width: 88%;
+}
+.winner-stats {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.winner-stat {
+  display: flex;
+  flex-direction: column;
+}
+.winner-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.winner-stat-value.green { color: var(--color-green); }
+.winner-stat-value.blue { color: var(--color-blue); }
+.winner-stat-value.amber { color: var(--color-yellow); }
+.winner-stat-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+
+/* --- Metric Cards (compact dashboard) --- */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+.metric-card {
+  background-color: var(--color-surface-elevated);
+  border-radius: 6px;
+  padding: 12px 10px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+.metric-card.green { border-color: rgba(34, 197, 94, 0.25); }
+.metric-card.green::before { background: linear-gradient(90deg, var(--color-green), rgba(34, 197, 94, 0.3)); }
+.metric-card.blue { border-color: rgba(96, 165, 250, 0.25); }
+.metric-card.blue::before { background: linear-gradient(90deg, var(--color-blue), rgba(96, 165, 250, 0.3)); }
+.metric-card.red { border-color: rgba(248, 113, 113, 0.25); }
+.metric-card.red::before { background: linear-gradient(90deg, var(--color-red), rgba(248, 113, 113, 0.3)); }
+.metric-card.amber { border-color: rgba(250, 204, 21, 0.25); }
+.metric-card.amber::before { background: linear-gradient(90deg, var(--color-yellow), rgba(250, 204, 21, 0.3)); }
+.metric-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+.metric-value.green { color: var(--color-green); }
+.metric-value.blue  { color: var(--color-blue); }
+.metric-value.red   { color: var(--color-red); }
+.metric-value.amber { color: var(--color-yellow); }
+.metric-label {
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* --- Pass Rate Bars (compact) --- */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
+}
+.progress-agent {
+  width: 100px;
+  font-size: 0.75rem;
+  color: var(--color-text-light);
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.progress-track {
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  height: 18px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
+  border-radius: 4px 4px 0 0;
+}
+.progress-fill.green { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.progress-fill.blue  { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.progress-fill.amber { background: linear-gradient(90deg, #d97706, #facc15); }
+.progress-fill.red   { background: linear-gradient(90deg, #dc2626, #f87171); }
+.progress-pct {
+  width: 42px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-light);
+  text-align: right;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Constrain Mermaid chart size inside AI insights */
+.markdown-content pre.mermaid {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  max-width: 500px;
+  margin-bottom: 0.75rem;
+}
+
+/* ==================== Agent Selector ==================== */
+.agent-chip {
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-material);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-surface-card);
+  transition: all 150ms;
+}
+.agent-chip:hover {
+  border-color: rgba(64, 81, 181, 0.5);
+}
+.agent-chip.selected {
+  border-color: var(--color-primary);
+  background-color: rgba(64, 81, 181, 0.1);
+}
+
+/* ==================== Filter Buttons ==================== */
+.filter-btn {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-surface-card);
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms, border-color 150ms;
+}
+.filter-btn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.filter-btn.active {
+  border-color: var(--color-primary);
+  background-color: rgba(64, 81, 181, 0.2);
+  color: var(--color-text-light);
+}
+
+/* ==================== Group / Expand ==================== */
+.test-group.collapsed .group-content { display: none; }
+.test-group.collapsed .expand-icon { transform: rotate(-90deg); }
+.test-row.hidden { display: none; }
+.test-detail.hidden { display: none; }
+
+/* ==================== Overlay ==================== */
+#overlay.active { display: flex !important; }
+#diagram-hover-popup.active { display: block !important; }
+#overlay-mermaid svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  min-height: 60vh;
+}
+</style></head><body class="bg-surface text-text min-h-screen"><div class="max-w-6xl mx-auto px-6 py-8"><header class="report-header mb-8"><div class="flex justify-between items-start gap-4 mb-4"><div class="flex-1"><h1 class="text-2xl font-medium mb-1">Test tool responses with larger datasets.</h1></div><div class="status-passed"><span>✓</span><span>All Passed</span></div></div><div class="flex flex-wrap gap-x-6 gap-y-1 py-3 border-t border-white/10 text-sm"><span class="opacity-70">February 14, 2026 at 03:40 PM</span><span>📄 <span class="text-text-light hover:text-blue-400 cursor-pointer" title="tests-aitest/test_excel_tools.py">test_excel_tools.py</span></span><span class="tabular-nums">1 tests</span><span class="tabular-nums">29.0s</span><span class="tabular-nums" title="Tokens per test">9,403 tok</span><span class="tabular-nums" title="Test execution cost">🧪 $-0.012084</span><span class="tabular-nums" title="AI analysis cost">🤖 $0.0184</span><span class="tabular-nums font-semibold" title="Total cost">💰 $0.006325</span></div></header><section class="mb-8"><div class="ai-insights"><div class="ai-insights-header"><span>🤖</span><span>AI Analysis</span><button class="ml-auto text-text-muted hover:text-text-light text-sm" onclick="this.closest(&#39;.ai-insights&#39;).querySelector(&#39;.card-body&#39;).classList.toggle(&#39;hidden&#39;)">Toggle</button></div><div class="card-body"><div class="markdown-content"><div class="winner-card">
+<div class="winner-title">Recommended for Deploy</div>
+<div class="winner-name">large-data</div>
+<div class="winner-summary">Delivers a clean end-to-end workflow for large spreadsheet interactions, successfully writing and re-reading a 20-row dataset with correct summarization at minimal cost.</div>
+<div class="winner-stats">
+<div class="winner-stat"><span class="winner-stat-value green">100%</span><span class="winner-stat-label">Pass Rate</span></div>
+<div class="winner-stat"><span class="winner-stat-value blue">$0.006325</span><span class="winner-stat-label">Total Cost</span></div>
+<div class="winner-stat"><span class="winner-stat-value amber">9,403</span><span class="winner-stat-label">Tokens</span></div>
+</div>
+</div>
+
+<div class="metric-grid">
+<div class="metric-card green">
+<div class="metric-value green">1</div>
+<div class="metric-label">Total Tests</div>
+</div>
+<div class="metric-card red">
+<div class="metric-value red">0</div>
+<div class="metric-label">Failures</div>
+</div>
+<div class="metric-card blue">
+<div class="metric-value blue">1</div>
+<div class="metric-label">Agents</div>
+</div>
+<div class="metric-card amber">
+<div class="metric-value amber">5.0</div>
+<div class="metric-label">Avg Turns</div>
+</div>
+</div>
+
+<h2>✅ Execution Analysis</h2>
+<ul>
+<li>The agent followed the <strong>discover → write → read → summarize</strong> workflow exactly as instructed.</li>
+<li>It used <code>get_used_range(maxRows=5)</code> to confirm sheet state before mutation, minimizing unnecessary token usage.</li>
+<li>After writing the full dataset with <code>set_range_values</code>, it re-read the complete range to ground the summary in actual workbook data.</li>
+<li>The final response clearly distinguished between <strong>aggregate totals by product</strong> and <strong>single-row maximum</strong>, showing correct reasoning over the dataset.</li>
+</ul>
+<h2>🔧 MCP Tool Feedback</h2>
+<h3>excel-ai-addin</h3>
+<p>Overall, tool discoverability and descriptions are strong. The agent selected the correct tools without hesitation and used optional parameters (<code>maxRows</code>) appropriately to balance cost and completeness.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Status</th>
+<th>Calls</th>
+<th>Issues</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>get_used_range</td>
+<td>✅</td>
+<td>2</td>
+<td>Working well; <code>maxRows</code> guidance clearly influenced efficient usage</td>
+</tr>
+<tr>
+<td>set_range_values</td>
+<td>✅</td>
+<td>1</td>
+<td>Working well; schema matches real-world Excel usage</td>
+</tr>
+</tbody>
+</table>
+<h2>📦 Tool Response Optimization</h2>
+<h3>get_used_range (from excel-ai-addin)</h3>
+<ul>
+<li><strong>Current response size:</strong> ~large (full 21×7 values returned on second call)</li>
+<li><strong>Issues found:</strong> For summarization tasks, the agent only needed headers + numeric columns, not the full text of all cells.</li>
+<li><strong>Suggested optimization:</strong> Allow an optional <code>columns</code> filter (e.g., numeric-only or named columns) to reduce payload size.</li>
+<li><strong>Estimated savings:</strong> ~30–40% token reduction on large sheets</li>
+</ul>
+<p><strong>Example current vs optimized:</strong></p>
+<pre><code class="language-json">// Current (full rows × columns)
+{&quot;address&quot;:&quot;A1:G21&quot;,&quot;rowCount&quot;:21,&quot;columnCount&quot;:7,&quot;values&quot;:[[&quot;Product&quot;,&quot;Region&quot;,&quot;Q1 Sales&quot;,...]]}
+
+// Optimized (numeric columns only)
+{&quot;address&quot;:&quot;A1:G21&quot;,&quot;values&quot;:[[&quot;Q1 Sales&quot;,&quot;Q2 Sales&quot;,&quot;Q3 Sales&quot;,&quot;Q4 Sales&quot;,&quot;Total&quot;],[1000,1200,900,1100,4200],...]}
+</code></pre>
+<h2>💡 Optimizations</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Optimization</th>
+<th>Priority</th>
+<th>Estimated Savings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Column-filtered reads for summaries</td>
+<td>recommended</td>
+<td>~30% cost reduction</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Skip initial preview on empty sheets</td>
+<td>info</td>
+<td>~5–10% fewer tokens</td>
+</tr>
+</tbody>
+</table>
+<h4>1. Column-filtered reads for summaries (recommended)</h4>
+<ul>
+<li>Current: The agent re-reads the entire used range, including text columns not required for aggregation.</li>
+<li>Change: Extend <code>get_used_range</code> with optional column selection or a <code>numericOnly=true</code> flag.</li>
+<li>Impact: ~30% cost reduction on large datasets, proportional token savings.</li>
+</ul>
+<h4>2. Skip initial preview on empty sheets (info)</h4>
+<ul>
+<li>Current: The agent correctly previews with <code>maxRows=5</code> even when the sheet is empty.</li>
+<li>Change: Short-circuit when <code>rowCount=1</code> and the only cell is empty.</li>
+<li>Impact: Small but consistent token savings (~5–10%).</li>
+</ul></div></div></div></section><section class="mb-8"><h2 class="section-title">📋 Test Results</h2><div class="mb-4 flex items-center justify-between"><div class="flex gap-2"><button class="filter-btn active" data-filter="all" onclick="filterTests(&#39;all&#39;)">All</button><button class="filter-btn " data-filter="failed" onclick="filterTests(&#39;failed&#39;)">Failed ❌</button></div><div class="text-sm text-text-muted"><span id="visible-count">1</span> / 1 tests</div></div><div class="space-y-4" id="test-groups"><div class="card overflow-hidden test-group" data-group-type="standalone"><div class="group-header px-5 py-3 bg-surface-elevated border-b border-white/10 flex justify-between items-center cursor-pointer" onclick="toggleGroup(this.parentElement)"><div class="flex items-center gap-3"><span class="text-lg">📋</span><span class="font-medium text-text-light">Test tool responses with larger datasets.</span><span class="text-sm text-text-muted">(1 tests)</span></div><div class="flex items-center gap-4"><span class="text-text-muted transition-transform duration-200 expand-icon">▼</span></div></div><div class="group-content"><div class="test-row border-b border-white/5" data-test-id="test_populate_and_summarize" data-has-diff="false" data-has-failed="false"><div class="px-5 py-3 hover:bg-white/[0.02] cursor-pointer transition-colors" onclick="toggleTestDetail(this.parentElement)"><div class="flex items-center justify-between"><div class="flex items-center gap-3 min-w-0 flex-1"><span class="text-green-400">✅</span><span class="text-text-light truncate">Write a 20-row dataset, then ask the LLM to read and summari…</span></div><div class="flex items-center gap-4 text-sm text-text-muted"><span class="tabular-nums">29.0s</span><span class="text-text-muted">·</span><span class="tabular-nums">3🔧</span><span class="text-text-muted">·</span><span class="tabular-nums">9,403 tok</span><span class="text-text-muted">·</span><span class="tabular-nums">$0.006325</span></div></div></div><div class="test-detail hidden border-t border-white/10 bg-surface-elevated"><div class="comparison-grid grid gap-4 p-5" style="grid-template-columns: repeat(1, 1fr);"><div class="comparison-column  border-l-[3px] border-green-500" data-agent-id="61fe9e65-9942-4985-8119-66da70b808d4"><div class="flex items-center justify-between mb-4"><div class="font-medium text-text-light">large-data</div><span class="px-2 py-0.5 rounded text-xs font-medium bg-green-500/15 text-green-400">passed</span></div><div class="space-y-2 mb-4"><div class="grid grid-cols-4 gap-2 p-3 bg-surface-elevated rounded-material text-center"><div><div class="text-sm font-medium text-text-light tabular-nums">28.99s</div><div class="text-xs text-text-muted">duration</div></div><div><div class="text-sm font-medium text-text-light tabular-nums">5</div><div class="text-xs text-text-muted">turns</div></div><div><div class="text-sm font-medium text-text-light tabular-nums">3</div><div class="text-xs text-text-muted">tools</div></div><div><div class="text-sm font-medium text-text-light tabular-nums">9,403</div><div class="text-xs text-text-muted">tokens</div></div></div><div class="grid grid-cols-4 gap-2 p-3 bg-surface-elevated rounded-material text-center"><div><div class="text-sm font-medium text-text-light tabular-nums">$0.006325</div><div class="text-xs text-text-muted">cost</div></div></div></div><div class="mb-4"><div class="text-sm font-medium text-text-light mb-3 flex items-center gap-2"><span>📊</span><span>Sequence</span></div><div class="p-3 bg-surface-code rounded-material border border-white/5 cursor-pointer hover:border-primary/30 transition-colors" onclick="event.stopPropagation(); showDiagram(this.dataset.mermaidCode);" data-mermaid-code="sequenceDiagram
+    participant User
+    participant Agent
+    participant Tools
+
+    User-&gt;&gt;Agent: &#34;Write this data to A1:G21: [[&#39;Product&#39;, &#39;Region&#39;, &#39;Q1 Sales&#39;, &#39;Q2 Sales&#39;, &#39;Q3 Sa&#34;
+    Agent-&gt;&gt;Tools: &#34;get_used_range({&#39;maxRows&#39;: 5})&#34;
+    Tools--&gt;&gt;Agent: &#34;{&#39;address&#39;: &#39;A1&#39;, &#39;rowCount&#39;: 1, &#39;columnCount&#39;: 1, &#39;values&#39;:&#34;
+    Agent-&gt;&gt;Tools: &#34;set_range_values({&#39;address&#39;: &#39;A1:G21&#39;, &#39;values&#39;: [[&#39;Product&#39;, &#39;Region&#39;, &#39;Q1 S)&#34;
+    Tools--&gt;&gt;Agent: &#34;{&#39;address&#39;: &#39;A1:G21&#39;, &#39;rowsWritten&#39;: 21, &#39;columnsWritten&#39;: 7&#34;
+    Agent-&gt;&gt;Tools: &#34;get_used_range({&#39;maxRows&#39;: 1000})&#34;
+    Tools--&gt;&gt;Agent: &#34;{&#39;address&#39;: &#39;A1:G21&#39;, &#39;rowCount&#39;: 21, &#39;columnCount&#39;: 7, &#39;val&#34;
+    Agent-&gt;&gt;User: &#34;Done — I wrote the provided table to A1:G21 (21 rows × 7 columns) and then read &#34;"><div class="mermaid text-xs">sequenceDiagram
+    participant User
+    participant Agent
+    participant Tools
+
+    User->>Agent: "Write this data to A1:G21: [['Product', 'Region', 'Q1 Sales', 'Q2 Sales', 'Q3 Sa"
+    Agent->>Tools: "get_used_range({'maxRows': 5})"
+    Tools-->>Agent: "{'address': 'A1', 'rowCount': 1, 'columnCount': 1, 'values':"
+    Agent->>Tools: "set_range_values({'address': 'A1:G21', 'values': [['Product', 'Region', 'Q1 S)"
+    Tools-->>Agent: "{'address': 'A1:G21', 'rowsWritten': 21, 'columnsWritten': 7"
+    Agent->>Tools: "get_used_range({'maxRows': 1000})"
+    Tools-->>Agent: "{'address': 'A1:G21', 'rowCount': 21, 'columnCount': 7, 'val"
+    Agent->>User: "Done — I wrote the provided table to A1:G21 (21 rows × 7 columns) and then read "</div></div></div><div class="mb-4"><div class="text-sm font-medium text-text-light mb-3 flex items-center gap-2"><span>🔧</span><span>Tool Calls</span></div><div class="space-y-1"><div class="flex items-center gap-2 text-sm p-2 rounded bg-green-500/5"><span class="text-green-400">✅</span><code class="tool-name">get_used_range</code></div><div class="flex items-center gap-2 text-sm p-2 rounded bg-green-500/5"><span class="text-green-400">✅</span><code class="tool-name">set_range_values</code></div><div class="flex items-center gap-2 text-sm p-2 rounded bg-green-500/5"><span class="text-green-400">✅</span><code class="tool-name">get_used_range</code></div></div></div><div class="mb-4"><div class="text-sm font-medium text-text-light mb-3 flex items-center gap-2"><span>💬</span><span>Response</span></div><div style="padding: 1rem; background-color: var(--color-surface-elevated); border-radius: 0.5rem; color: var(--color-text); white-space: pre-wrap; word-wrap: break-word; line-height: 1.625;">Done — I wrote the provided table to A1:G21 (21 rows × 7 columns) and then read the sheet.
+
+Aggregating Total by product, Module Z has the highest combined total sales: 35,430.  
+(If you meant the single row with the largest Total, that&#39;s Module Z — West with 11,895.)</div></div></div></div></div></div></div></div></div><style>
+.test-group.collapsed .group-content {
+    display: none;
+}
+.test-group.collapsed .expand-icon {
+    transform: rotate(-90deg);
+}
+.test-row.hidden {
+    display: none;
+}
+.test-detail.hidden {
+    display: none;
+}
+</style></section></div><div id="overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-8" onclick="hideOverlay()"><button class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-2xl text-text-muted hover:text-text-light bg-surface-card rounded-full border border-white/10 transition-colors" onclick="hideOverlay()">✕</button><div class="w-[90vw] h-[85vh] overflow-auto bg-surface-card rounded-lg p-6 shadow-material-lg flex items-center justify-center" onclick="event.stopPropagation()"><div class="mermaid w-full h-full" id="overlay-mermaid"></div></div></div><div id="diagram-hover-popup" class="fixed z-40 bg-surface-card rounded-lg shadow-material-lg border border-white/10 p-4 hidden max-w-xl" onmouseenter="keepDiagramHover()" onmouseleave="hideDiagramHover()" onclick="hideOverlay(); this.classList.add(&#39;hidden&#39;); showDiagram(document.getElementById(&#39;hover-mermaid&#39;).innerHTML);"><div class="mermaid" id="hover-mermaid"></div></div><style>
+#overlay.active { display: flex !important; }
+#diagram-hover-popup.active { display: block !important; }
+
+/* Scale the mermaid SVG in overlay to fill available space */
+#overlay-mermaid svg {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    min-height: 60vh;
+}
+</style><script>
+// pytest-aitest Report Scripts
+
+// Initialize Mermaid with dark theme
+mermaid.initialize({ 
+    startOnLoad: true,
+    theme: 'dark',
+    securityLevel: 'loose',
+    themeVariables: {
+        primaryColor: '#4051b5',
+        primaryTextColor: '#c9d1d9',
+        primaryBorderColor: '#4051b5',
+        lineColor: '#8b949e',
+        secondaryColor: '#282c34',
+        tertiaryColor: '#1e2129',
+        background: '#282c34',
+        mainBkg: '#282c34',
+        noteBkgColor: '#2d333b',
+        noteTextColor: '#c9d1d9',
+        actorTextColor: '#c9d1d9',
+        actorBkg: '#2d323c',
+        actorBorder: '#4051b5',
+        signalColor: '#c9d1d9',
+        signalTextColor: '#c9d1d9',
+    }
+});
+
+// Copy to clipboard for suggestions
+function copyToClipboard(button, text) {
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = button.textContent;
+        button.textContent = '✓ Copied!';
+        button.classList.add('copied');
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.classList.remove('copied');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        button.textContent = '❌ Error';
+        setTimeout(() => {
+            button.textContent = '📋 Copy';
+        }, 2000);
+    });
+}
+
+// Fullscreen diagram viewer
+function showDiagram(mermaidCode) {
+    const overlay = document.getElementById('overlay');
+    const content = document.getElementById('overlay-mermaid');
+    
+    // Set the raw mermaid code as text content (not innerHTML to avoid escaping issues)
+    content.textContent = mermaidCode;
+    
+    // Remove any previous rendering attributes
+    content.removeAttribute('data-processed');
+    
+    overlay.classList.add('active');
+    
+    // Run mermaid on this element
+    mermaid.run({ nodes: [content] }).catch(err => {
+        console.error('Mermaid render error:', err);
+        // Show the raw code if rendering fails
+        content.textContent = 'Error rendering diagram:\n' + mermaidCode;
+    });
+}
+
+function hideOverlay() {
+    document.getElementById('overlay').classList.remove('active');
+}
+
+// Close overlay on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideOverlay();
+});
+
+// Hover popup for side-by-side diagrams
+let hoverTimeout = null;
+function showDiagramHover(element, mermaidCode) {
+    clearTimeout(hoverTimeout);
+    const popup = document.getElementById('diagram-hover-popup');
+    const content = document.getElementById('hover-mermaid');
+    content.innerHTML = mermaidCode;
+    popup.classList.add('active');
+    mermaid.run({ nodes: [content] });
+}
+
+function hideDiagramHover() {
+    hoverTimeout = setTimeout(() => {
+        document.getElementById('diagram-hover-popup').classList.remove('active');
+    }, 100);
+}
+
+function keepDiagramHover() {
+    clearTimeout(hoverTimeout);
+}
+
+// Side-by-side test selector
+function showSideBySideTest(testId) {
+    // Hide all groups
+    document.querySelectorAll('.side-by-side-group').forEach(group => {
+        group.classList.remove('active');
+    });
+    // Show selected group
+    const selected = document.getElementById(testId);
+    if (selected) {
+        selected.classList.add('active');
+        // Re-render mermaid diagrams in the newly visible group
+        mermaid.run({ nodes: selected.querySelectorAll('.mermaid') });
+    }
+}
+
+
+// All agent data for client-side filtering
+const allAgents = [{"id": "61fe9e65-9942-4985-8119-66da70b808d4", "name": "large-data", "pass_rate": 100.0}];
+const allAgentsById = {"61fe9e65-9942-4985-8119-66da70b808d4": {"id": "61fe9e65-9942-4985-8119-66da70b808d4", "name": "large-data"}};
+
+// Track selected agents (exactly 2)
+let selectedAgentIds = ["61fe9e65-9942-4985-8119-66da70b808d4"];
+
+// Agent comparison logic - always keep exactly 2 selected
+function updateAgentComparison(clickedAgentId) {
+    const checkboxes = document.querySelectorAll('input[name="compare-agent"]');
+    
+    // If clicking an already-selected agent, do nothing (keep 2 selected)
+    if (selectedAgentIds.includes(clickedAgentId)) {
+        // Re-check it to prevent unchecking
+        checkboxes.forEach(cb => {
+            if (cb.value === clickedAgentId) {
+                cb.checked = true;
+            }
+        });
+        return;
+    }
+    
+    // Replace the oldest selection with the new one
+    selectedAgentIds.shift();  // Remove first (oldest)
+    selectedAgentIds.push(clickedAgentId);  // Add new one
+    
+    // Update all checkboxes to match selectedAgentIds
+    checkboxes.forEach(cb => {
+        cb.checked = selectedAgentIds.includes(cb.value);
+        cb.closest('.agent-chip').classList.toggle('selected', cb.checked);
+    });
+    
+    // Update visible columns in test comparison
+    document.querySelectorAll('.comparison-column').forEach(col => {
+        const agentId = col.dataset.agentId;
+        if (agentId) {
+            const shouldShow = selectedAgentIds.includes(agentId);
+            col.classList.toggle('hidden', !shouldShow);
+            
+            // Render mermaid diagrams in newly visible columns
+            if (shouldShow) {
+                const diagrams = col.querySelectorAll('.mermaid:not([data-processed])');
+                if (diagrams.length > 0) {
+                    mermaid.run({ nodes: diagrams });
+                }
+            }
+        }
+    });
+    
+    // Update comparison grid layout based on visible columns
+    document.querySelectorAll('.comparison-grid').forEach(grid => {
+        const visibleCols = grid.querySelectorAll('.comparison-column:not(.hidden)').length;
+        grid.style.gridTemplateColumns = `repeat(${visibleCols}, 1fr)`;
+    });
+    
+    // Update agent cards visibility
+    document.querySelectorAll('.agent-card[data-card-id]').forEach(card => {
+        const agentId = card.dataset.cardId;
+        card.classList.toggle('hidden', !selectedAgentIds.includes(agentId));
+    });
+    
+    // Update comparison row agent results
+    document.querySelectorAll('.agent-result-item').forEach(item => {
+        const agentId = item.dataset.agentId;
+        item.classList.toggle('hidden', !selectedAgentIds.includes(agentId));
+    });
+    
+    console.log('Selected agents:', selectedAgentIds);
+}
+
+// Test filtering
+function filterTests(filter) {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    
+    let visibleCount = 0;
+    document.querySelectorAll('.test-row').forEach(row => {
+        let show = true;
+        if (filter === 'diff') {
+            show = row.dataset.hasDiff === 'true';
+        } else if (filter === 'failed') {
+            show = row.dataset.hasFailed === 'true';
+        }
+        row.classList.toggle('hidden', !show);
+        if (show) visibleCount++;
+    });
+    
+    document.getElementById('visible-count').textContent = visibleCount;
+}
+
+// Group toggle
+function toggleGroup(group) {
+    group.classList.toggle('collapsed');
+}
+
+// Test detail toggle - also renders mermaid diagrams when expanded
+function toggleTestDetail(row) {
+    const detail = row.querySelector('.test-detail');
+    const wasHidden = detail.classList.contains('hidden');
+    detail.classList.toggle('hidden');
+    
+    // If we're showing the detail, render any mermaid diagrams
+    if (wasHidden) {
+        const diagrams = detail.querySelectorAll('.mermaid:not([data-processed])');
+        if (diagrams.length > 0) {
+            mermaid.run({ nodes: diagrams });
+        }
+    }
+}
+
+// Initialize on page load - process visible mermaid diagrams
+document.addEventListener('DOMContentLoaded', () => {
+    // Mermaid should auto-process with startOnLoad, but just in case
+    const visibleDiagrams = document.querySelectorAll('.mermaid:not(.hidden .mermaid)');
+    if (visibleDiagrams.length > 0) {
+        mermaid.run({ nodes: visibleDiagrams });
+    }
+});
+</script></body></html>

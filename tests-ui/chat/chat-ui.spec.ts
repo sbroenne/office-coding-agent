@@ -1,0 +1,38 @@
+import { test, expect } from '../fixtures';
+
+test.describe('Chat UI (configured state)', () => {
+  test('renders the chat header with title and controls', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByText('AI Chat')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
+  });
+
+  test('shows the settings gear that opens the dialog', async ({ configuredTaskpane: page }) => {
+    // SettingsDialog renders its own trigger button with a gear icon
+    // Find the gear button — it's in the header, after the "New conversation" button and divider
+    const header = page.locator('div.flex.items-center.justify-between');
+    const buttons = header.locator('button');
+    // The last button in the header is the settings gear
+    await buttons.last().click();
+
+    // Settings dialog should open — check for the heading
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 3000 });
+  });
+
+  test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
+    // The model picker shows the active model name
+    await expect(page.getByText('gpt-4.1')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('displays the agent picker', async ({ configuredTaskpane: page }) => {
+    // The agent picker should show the active agent
+    await expect(page.getByText('Excel')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('new conversation button is clickable', async ({ configuredTaskpane: page }) => {
+    const btn = page.getByRole('button', { name: 'New conversation' });
+    await expect(btn).toBeVisible();
+    await btn.click();
+    // No crash — page should still be functional
+    await expect(page.getByText('AI Chat')).toBeVisible();
+  });
+});

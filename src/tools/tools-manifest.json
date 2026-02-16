@@ -1,0 +1,1944 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-02-14T15:50:25.208Z",
+  "tools": [
+    {
+      "name": "get_range_values",
+      "description": "Read cell values from a specified range. Returns a 2D array of the displayed values (not formulas). Use get_range_formulas instead if you need to inspect formulas.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"A1:C10\", \"Sheet1!B2:D5\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name. Uses active sheet if omitted."
+        }
+      }
+    },
+    {
+      "name": "set_range_values",
+      "description": "Write values to a specified range, overwriting any existing content. Values must be a 2D array matching the range dimensions. Use set_range_formulas for formulas.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"A1:C3\")"
+        },
+        "values": {
+          "type": "any[][]",
+          "required": true,
+          "description": "2D array of values to write (rows × columns)"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_used_range",
+      "description": "Get the bounding rectangle of all non-empty cells on a worksheet. By default returns only the address and dimensions (rowCount, columnCount) — no cell values. Set maxRows to include values for the first N rows (e.g., maxRows=5 to preview headers and a few data rows). Use get_range_values to read a specific sub-range when you already know the address.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name. Uses active sheet if omitted."
+        },
+        "maxRows": {
+          "type": "number",
+          "required": false,
+          "description": "How many rows of cell values to include in the response. Omit to get dimensions only (no values). Set to a small number like 5 to preview headers + a few data rows, saving tokens on large sheets."
+        }
+      }
+    },
+    {
+      "name": "clear_range",
+      "description": "Clear all content (values, formulas, and formatting) from a specified range. The cells remain but become empty.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to clear"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "format_range",
+      "description": "Apply visual formatting to a range of cells. Only set the properties you want to change — omitted properties are left unchanged. Supports bold, italic, underline, font size, font color, fill/background color, horizontal alignment, and text wrapping. For number display formats (currency, dates, percent), use set_number_format instead.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to format (e.g., \"A1:C1\")"
+        },
+        "bold": {
+          "type": "boolean",
+          "required": false,
+          "description": "Make text bold"
+        },
+        "italic": {
+          "type": "boolean",
+          "required": false,
+          "description": "Make text italic"
+        },
+        "underline": {
+          "type": "boolean",
+          "required": false,
+          "description": "Underline text"
+        },
+        "fontSize": {
+          "type": "number",
+          "required": false,
+          "description": "Font size in points (e.g., 12, 14, 18)"
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color as hex (e.g., \"#FF0000\" for red) or named color"
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Cell background/fill color as hex (e.g., \"#FFFF00\" for yellow)"
+        },
+        "horizontalAlignment": {
+          "type": "string",
+          "required": false,
+          "description": "Horizontal text alignment",
+          "enum": [
+            "General",
+            "Left",
+            "Center",
+            "Right",
+            "Fill",
+            "Justify",
+            "Distributed"
+          ]
+        },
+        "wrapText": {
+          "type": "boolean",
+          "required": false,
+          "description": "Enable text wrapping in cells"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_number_format",
+      "description": "Apply a number format to a range. Common formats: \"#,##0.00\" (number), \"$#,##0.00\" (currency), \"0.00%\" (percent), \"yyyy-mm-dd\" (date), \"0\" (integer).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"B2:B10\")"
+        },
+        "format": {
+          "type": "string",
+          "required": true,
+          "description": "Excel number format string. Examples: \"#,##0.00\", \"$#,##0.00\", \"0.00%\", \"yyyy-mm-dd\", \"hh:mm:ss\", \"0\", \"@\" (text)"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "auto_fit_columns",
+      "description": "Auto-fit column widths to fit their content. If no address is specified, fits all used columns.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Optional range address. Columns in this range will be auto-fitted."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "auto_fit_rows",
+      "description": "Auto-fit row heights to fit their content. If no address is specified, fits all used rows.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Optional range address. Rows in this range will be auto-fitted."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_range_formulas",
+      "description": "Write Excel formulas to cells. Formulas must start with \"=\" (e.g., \"=SUM(A1:A10)\").",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"D1\")"
+        },
+        "formulas": {
+          "type": "string[][]",
+          "required": true,
+          "description": "2D array of formula strings (e.g., [[\"=SUM(A1:A10)\"]])"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_range_formulas",
+      "description": "Read the formulas from a range. Returns formulas as strings (cells without formulas return their value).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"A1:D10\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "sort_range",
+      "description": "Sort a range of cells in-place by a specified column. Best for ad-hoc data ranges. For structured Excel tables, use sort_table instead.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to sort (e.g., \"A1:D20\")"
+        },
+        "column": {
+          "type": "number",
+          "required": true,
+          "description": "Zero-based column index to sort by (0 = first column)"
+        },
+        "ascending": {
+          "type": "boolean",
+          "required": false,
+          "description": "Sort ascending (true) or descending (false). Default true."
+        },
+        "hasHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "First row is a header row. Default true."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "copy_range",
+      "description": "Copy values, formulas, and formatting from a source range to a destination range. Supports copying across worksheets by specifying sourceSheet and destinationSheet.",
+      "params": {
+        "sourceAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Source range address (e.g., \"A1:C10\")"
+        },
+        "destinationAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Destination range address (e.g., \"E1\")"
+        },
+        "sourceSheet": {
+          "type": "string",
+          "required": false,
+          "description": "Source worksheet name. Uses active sheet if omitted."
+        },
+        "destinationSheet": {
+          "type": "string",
+          "required": false,
+          "description": "Destination worksheet name. Uses active sheet if omitted."
+        }
+      }
+    },
+    {
+      "name": "find_values",
+      "description": "Search for text or a value across all cells in a worksheet. Returns the cell address and value of the first match, or a \"not found\" message if no match exists.",
+      "params": {
+        "searchText": {
+          "type": "string",
+          "required": true,
+          "description": "The text or value to search for"
+        },
+        "matchCase": {
+          "type": "boolean",
+          "required": false,
+          "description": "Case-sensitive search. Default false."
+        },
+        "matchEntireCell": {
+          "type": "boolean",
+          "required": false,
+          "description": "Match the entire cell content. Default false."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "insert_range",
+      "description": "Insert blank cells at the specified address, shifting existing cells down or right to make room. Use row notation (e.g., \"3:5\") to insert entire rows, column notation (e.g., \"B:D\") for entire columns, or a cell range for a block.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address where blank cells will be inserted (e.g., \"3:5\" for rows 3-5, \"B:D\" for columns B-D, \"A1:C3\" for a block)"
+        },
+        "shift": {
+          "type": "string",
+          "required": false,
+          "description": "Direction to shift existing cells. Default \"down\".",
+          "enum": [
+            "down",
+            "right"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "delete_range",
+      "description": "Delete cells at the specified address, shifting remaining cells up or left to fill the gap. Use row notation (e.g., \"3:5\") to delete entire rows, column notation (e.g., \"B:D\") for entire columns, or a cell range for a block. Data in deleted cells is permanently removed.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address to delete (e.g., \"3:5\" for rows 3-5, \"B:D\" for columns, \"A1:C3\" for a block)"
+        },
+        "shift": {
+          "type": "string",
+          "required": false,
+          "description": "Direction to shift remaining cells. Default \"up\".",
+          "enum": [
+            "up",
+            "left"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "merge_cells",
+      "description": "Merge a range of cells into a single cell. WARNING: Only the upper-left cell's value is preserved; values in all other cells are discarded. Use the \"across\" option to merge each row separately (e.g., for header rows that span columns).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to merge (e.g., \"A1:D1\")"
+        },
+        "across": {
+          "type": "boolean",
+          "required": false,
+          "description": "Merge each row independently (merge across). Default false."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "unmerge_cells",
+      "description": "Unmerge a previously merged range of cells.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to unmerge"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "replace_values",
+      "description": "Find and replace text across a range or the entire used range on a sheet. Returns the number of replacements made.",
+      "params": {
+        "find": {
+          "type": "string",
+          "required": true,
+          "description": "The text to search for"
+        },
+        "replace": {
+          "type": "string",
+          "required": true,
+          "description": "The replacement text"
+        },
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Range to search in (e.g., \"A1:C10\"). If omitted, searches the entire used range."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "remove_duplicates",
+      "description": "Remove duplicate rows from a range based on specified columns. Returns the number of rows removed and remaining.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address containing data (e.g., \"A1:D100\")"
+        },
+        "columns": {
+          "type": "string[]",
+          "required": true,
+          "description": "Zero-based column indices to compare for duplicates (e.g., [\"0\",\"2\"] for columns A and C). Pass all column indices to check entire rows."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_hyperlink",
+      "description": "Set or remove a hyperlink on a single cell. Supports web URLs, email addresses, and links to other cells within the workbook.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The cell address (e.g., \"A1\")"
+        },
+        "url": {
+          "type": "string",
+          "required": true,
+          "description": "The hyperlink URL or cell reference (e.g., \"https://example.com\", \"mailto:x@y.com\", \"Sheet2!A1\"). Use \"\" to remove."
+        },
+        "textToDisplay": {
+          "type": "string",
+          "required": false,
+          "description": "Display text for the hyperlink. If omitted, the URL is shown."
+        },
+        "tooltip": {
+          "type": "string",
+          "required": false,
+          "description": "Tooltip shown on hover"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "toggle_row_column_visibility",
+      "description": "Hide or show rows and/or columns in a range. Hidden rows/columns are not visible in the UI but their data is preserved.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range specifying which rows/columns to affect (e.g., \"A:C\" for columns A-C, \"3:5\" for rows 3-5, \"B2:D10\" for specific rows and columns)"
+        },
+        "hidden": {
+          "type": "boolean",
+          "required": true,
+          "description": "True to hide, false to show"
+        },
+        "target": {
+          "type": "string",
+          "required": true,
+          "description": "What to hide/show",
+          "enum": [
+            "rows",
+            "columns"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "group_rows_columns",
+      "description": "Group rows or columns to create an outline for expanding/collapsing sections.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range of rows or columns to group (e.g., \"3:5\" for rows 3-5, \"B:D\" for columns B-D)"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "ungroup_rows_columns",
+      "description": "Remove a grouping from rows or columns.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range of grouped rows or columns to ungroup"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_cell_borders",
+      "description": "Apply borders to a range. Specify which sides to apply borders to and the style.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to apply borders to"
+        },
+        "borderStyle": {
+          "type": "string",
+          "required": true,
+          "description": "Border style (e.g., \"Thin\", \"Medium\", \"Thick\", \"Dotted\")",
+          "enum": [
+            "Thin",
+            "Medium",
+            "Thick",
+            "Double",
+            "Dotted",
+            "Dashed",
+            "DashDot"
+          ]
+        },
+        "borderColor": {
+          "type": "string",
+          "required": false,
+          "description": "Border color as hex (e.g., \"#000000\" for black)"
+        },
+        "side": {
+          "type": "string",
+          "required": true,
+          "description": "Which side(s) to apply border to",
+          "enum": [
+            "EdgeLeft",
+            "EdgeRight",
+            "EdgeTop",
+            "EdgeBottom",
+            "EdgeAll"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "list_tables",
+      "description": "List all structured Excel tables. Returns each table's name, address range, worksheet name, column names, and row count. Optionally filter to a specific sheet.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional: filter to tables on a specific sheet."
+        }
+      }
+    },
+    {
+      "name": "create_table",
+      "description": "Convert a data range into a structured Excel table with sorting, filtering, and styled formatting. The range should include a header row by default.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address for the table (e.g., \"A1:D10\")"
+        },
+        "hasHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the first row contains headers. Default true."
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "description": "Optional name for the table."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_table_rows",
+      "description": "Append new rows to the bottom of an existing Excel table. Each row must have the same number of columns as the table.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to add rows to"
+        },
+        "values": {
+          "type": "any[][]",
+          "required": true,
+          "description": "2D array of row data to add"
+        }
+      }
+    },
+    {
+      "name": "get_table_data",
+      "description": "Read all data from an Excel table. Returns the column headers and all row values as a 2D array. Use list_tables first to discover available table names.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to read"
+        }
+      }
+    },
+    {
+      "name": "delete_table",
+      "description": "Remove the Excel table structure (sorting, filtering, styling) from a range. The underlying cell data is preserved — only the table object is removed.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to delete"
+        }
+      }
+    },
+    {
+      "name": "sort_table",
+      "description": "Sort a structured Excel table by a column in ascending or descending order. For ad-hoc data ranges that are not tables, use sort_range instead.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to sort"
+        },
+        "column": {
+          "type": "number",
+          "required": true,
+          "description": "Zero-based column index to sort by (0 = first column)"
+        },
+        "ascending": {
+          "type": "boolean",
+          "required": false,
+          "description": "Sort ascending (true) or descending (false). Default true."
+        }
+      }
+    },
+    {
+      "name": "filter_table",
+      "description": "Apply a values filter to a table column, hiding rows that don't match. Only rows with values matching any of the specified filter values will be visible. Use clear_table_filters to remove all filters.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to filter"
+        },
+        "column": {
+          "type": "number",
+          "required": true,
+          "description": "Zero-based column index to filter (0 = first column)"
+        },
+        "values": {
+          "type": "string[]",
+          "required": true,
+          "description": "Array of values to show (rows matching any of these are kept)"
+        }
+      }
+    },
+    {
+      "name": "clear_table_filters",
+      "description": "Clear all filters from an Excel table, showing all rows.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to clear filters from"
+        }
+      }
+    },
+    {
+      "name": "add_table_column",
+      "description": "Add a new column to the end of a table.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table"
+        },
+        "columnName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional column header name. If omitted, Excel generates a default name."
+        },
+        "columnData": {
+          "type": "string[]",
+          "required": false,
+          "description": "Optional array of values for the new column (one per data row)"
+        }
+      }
+    },
+    {
+      "name": "delete_table_column",
+      "description": "Delete a column from a table.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table"
+        },
+        "columnName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the column to delete"
+        }
+      }
+    },
+    {
+      "name": "convert_table_to_range",
+      "description": "Convert a structured table back to a plain range (removes table formatting).",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to convert"
+        }
+      }
+    },
+    {
+      "name": "list_charts",
+      "description": "List all charts on a worksheet. Returns each chart's name, type, and title. Uses the active sheet if no sheet is specified.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Worksheet name. Uses active sheet if omitted."
+        }
+      }
+    },
+    {
+      "name": "create_chart",
+      "description": "Create a new chart from a data range and place it on the same worksheet. The data range should include headers for proper axis labels and legend.",
+      "params": {
+        "dataRange": {
+          "type": "string",
+          "required": true,
+          "description": "Range address of the source data (e.g., \"A1:D10\")"
+        },
+        "chartType": {
+          "type": "string",
+          "required": true,
+          "description": "Type of chart to create",
+          "enum": [
+            "ColumnClustered",
+            "ColumnStacked",
+            "BarClustered",
+            "BarStacked",
+            "Line",
+            "LineMarkers",
+            "Pie",
+            "Doughnut",
+            "Area",
+            "XYScatter"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "description": "Optional chart title"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name for the source data."
+        }
+      }
+    },
+    {
+      "name": "delete_chart",
+      "description": "Delete a chart from the worksheet.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart to delete (from list_charts)"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name where the chart is located."
+        }
+      }
+    },
+    {
+      "name": "set_chart_title",
+      "description": "Set or change the title of a chart.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "New title text"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_type",
+      "description": "Change the chart type (e.g., from column to pie).",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "chartType": {
+          "type": "string",
+          "required": true,
+          "description": "New chart type",
+          "enum": [
+            "ColumnClustered",
+            "ColumnStacked",
+            "BarClustered",
+            "BarStacked",
+            "Line",
+            "LineMarkers",
+            "Pie",
+            "Doughnut",
+            "Area",
+            "XYScatter"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_data_source",
+      "description": "Change the data range that a chart is based on.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "dataRange": {
+          "type": "string",
+          "required": true,
+          "description": "New data range address (e.g., \"B1:D20\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "list_sheets",
+      "description": "List all worksheets in the workbook. Returns each sheet's name, position, visibility status, and whether it is the active sheet.",
+      "params": {}
+    },
+    {
+      "name": "create_sheet",
+      "description": "Create a new blank worksheet and add it to the workbook. The sheet becomes the active sheet.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name for the new worksheet"
+        }
+      }
+    },
+    {
+      "name": "rename_sheet",
+      "description": "Rename an existing worksheet.",
+      "params": {
+        "currentName": {
+          "type": "string",
+          "required": true,
+          "description": "Current name of the worksheet"
+        },
+        "newName": {
+          "type": "string",
+          "required": true,
+          "description": "New name for the worksheet"
+        }
+      }
+    },
+    {
+      "name": "delete_sheet",
+      "description": "Permanently delete a worksheet and all its data from the workbook. This cannot be undone.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet to delete"
+        }
+      }
+    },
+    {
+      "name": "activate_sheet",
+      "description": "Activate (switch to) a specific worksheet.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet to activate"
+        }
+      }
+    },
+    {
+      "name": "freeze_panes",
+      "description": "Freeze rows and/or columns on a worksheet so they remain visible when scrolling. Specify a cell address to freeze all rows above and columns to the left of that cell. Use \"unfreeze\" to remove all frozen panes.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet"
+        },
+        "freezeAt": {
+          "type": "string",
+          "required": false,
+          "description": "Cell address to freeze at (e.g., \"B3\" freezes row 1-2 and column A). Omit to unfreeze all panes."
+        }
+      }
+    },
+    {
+      "name": "protect_sheet",
+      "description": "Protect a worksheet to prevent editing. Optionally provide a password. Protected sheets block cell edits, row/column insertions, and other modifications.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet to protect"
+        },
+        "password": {
+          "type": "string",
+          "required": false,
+          "description": "Optional password to protect the sheet with"
+        }
+      }
+    },
+    {
+      "name": "unprotect_sheet",
+      "description": "Remove protection from a worksheet. Provide the password if one was set.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet to unprotect"
+        },
+        "password": {
+          "type": "string",
+          "required": false,
+          "description": "Password used when protecting (if any)"
+        }
+      }
+    },
+    {
+      "name": "set_sheet_visibility",
+      "description": "Set sheet visibility (visible, hidden, or very hidden) and/or tab color. Very hidden sheets cannot be unhidden from the Excel UI — only via code.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet"
+        },
+        "visibility": {
+          "type": "string",
+          "required": false,
+          "description": "Visibility state for the sheet",
+          "enum": [
+            "Visible",
+            "Hidden",
+            "VeryHidden"
+          ]
+        },
+        "tabColor": {
+          "type": "string",
+          "required": false,
+          "description": "Tab color as a hex string (e.g., \"#FF0000\" for red). Use \"\" to clear."
+        }
+      }
+    },
+    {
+      "name": "copy_sheet",
+      "description": "Create a copy of a worksheet. The copy is placed after the source sheet by default.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet to copy"
+        },
+        "newName": {
+          "type": "string",
+          "required": false,
+          "description": "Name for the copied sheet. If omitted, Excel generates a default name."
+        }
+      }
+    },
+    {
+      "name": "move_sheet",
+      "description": "Move a worksheet to a new position in the workbook. Position is 0-based (0 = first).",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet to move"
+        },
+        "position": {
+          "type": "number",
+          "required": true,
+          "description": "New 0-based position index"
+        }
+      }
+    },
+    {
+      "name": "set_page_layout",
+      "description": "Configure page layout settings for printing: orientation (portrait/landscape), margins, paper size.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet"
+        },
+        "orientation": {
+          "type": "string",
+          "required": false,
+          "description": "Page orientation",
+          "enum": [
+            "Portrait",
+            "Landscape"
+          ]
+        },
+        "paperSize": {
+          "type": "string",
+          "required": false,
+          "description": "Paper size (letter, legal, A4, etc.)",
+          "enum": [
+            "Letter",
+            "LetterSmall",
+            "Tabloid",
+            "Ledger",
+            "Legal",
+            "Statement",
+            "Executive",
+            "A3",
+            "A4",
+            "A4Small",
+            "A5"
+          ]
+        },
+        "leftMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Left margin in inches"
+        },
+        "rightMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Right margin in inches"
+        },
+        "topMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Top margin in inches"
+        },
+        "bottomMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Bottom margin in inches"
+        }
+      }
+    },
+    {
+      "name": "get_workbook_info",
+      "description": "Get a high-level overview of the entire workbook. Returns all sheet names, the active sheet, the used range dimensions of the active sheet, a list of all table names, and counts. This is the best starting point to understand what data exists before performing operations.",
+      "params": {}
+    },
+    {
+      "name": "get_selected_range",
+      "description": "Get the address and values of the range the user currently has selected (highlighted) in Excel. Useful when the user says \"this data\", \"selected cells\", or \"what I have highlighted\".",
+      "params": {}
+    },
+    {
+      "name": "define_named_range",
+      "description": "Create a named range — a human-readable alias for a cell range (e.g., \"SalesData\" → Sheet1!A1:D100). Named ranges make formulas more readable and can be used in formulas across the workbook.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name for the range (e.g., \"SalesData\")"
+        },
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"A1:D100\")"
+        },
+        "comment": {
+          "type": "string",
+          "required": false,
+          "description": "Optional comment describing the named range."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "list_named_ranges",
+      "description": "List all named ranges defined in the workbook. Returns each name, the range address it refers to, and any comment.",
+      "params": {}
+    },
+    {
+      "name": "recalculate_workbook",
+      "description": "Force a full recalculation of all formulas in the entire workbook.",
+      "params": {
+        "recalcType": {
+          "type": "string",
+          "required": false,
+          "description": "Recalculation type",
+          "enum": [
+            "Recalculate",
+            "Full"
+          ]
+        }
+      }
+    },
+    {
+      "name": "add_comment",
+      "description": "Add a threaded comment to a specific cell. The comment appears in the Comments pane and is attributed to the current user. Only one comment thread per cell is allowed.",
+      "params": {
+        "cellAddress": {
+          "type": "string",
+          "required": true,
+          "description": "The single cell address to attach the comment to (e.g., \"A1\", \"B5\")"
+        },
+        "text": {
+          "type": "string",
+          "required": true,
+          "description": "The comment text content"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "list_comments",
+      "description": "List all comments on a worksheet. Returns each comment's text, author, creation date, and cell address.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name. Uses active sheet if omitted."
+        }
+      }
+    },
+    {
+      "name": "edit_comment",
+      "description": "Edit the text of an existing comment on a specific cell. Replaces the entire comment content.",
+      "params": {
+        "cellAddress": {
+          "type": "string",
+          "required": true,
+          "description": "The cell address of the comment to edit (e.g., \"A1\")"
+        },
+        "newText": {
+          "type": "string",
+          "required": true,
+          "description": "The new text for the comment"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "delete_comment",
+      "description": "Delete a comment and all its replies from a specific cell.",
+      "params": {
+        "cellAddress": {
+          "type": "string",
+          "required": true,
+          "description": "The cell address of the comment to delete (e.g., \"A1\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_color_scale",
+      "description": "Add a color scale (gradient) conditional format to a range. Cells are colored on a gradient from minColor (lowest value) through optional midColor to maxColor (highest value).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"B2:B100\")"
+        },
+        "minColor": {
+          "type": "string",
+          "required": false,
+          "description": "Color for lowest values (e.g., \"blue\"). Default \"blue\"."
+        },
+        "midColor": {
+          "type": "string",
+          "required": false,
+          "description": "Optional color for midpoint values (e.g., \"yellow\")."
+        },
+        "maxColor": {
+          "type": "string",
+          "required": false,
+          "description": "Color for highest values (e.g., \"red\"). Default \"red\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_data_bar",
+      "description": "Add data bars to cells, showing a horizontal bar whose length represents the cell value relative to other cells in the range.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"C2:C50\")"
+        },
+        "barColor": {
+          "type": "string",
+          "required": false,
+          "description": "Bar fill color (e.g., \"#638EC6\"). Default \"#638EC6\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_cell_value_format",
+      "description": "Add conditional formatting based on cell numeric values. Highlight cells that meet a condition (e.g., greater than 100, between 0 and 50).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"B2:B100\")"
+        },
+        "operator": {
+          "type": "string",
+          "required": true,
+          "description": "Comparison operator",
+          "enum": [
+            "GreaterThan",
+            "GreaterThanOrEqual",
+            "LessThan",
+            "LessThanOrEqual",
+            "EqualTo",
+            "NotEqualTo",
+            "Between",
+            "NotBetween"
+          ]
+        },
+        "formula1": {
+          "type": "string",
+          "required": true,
+          "description": "First comparison value (e.g., \"100\", \"=0\")"
+        },
+        "formula2": {
+          "type": "string",
+          "required": false,
+          "description": "Second value for Between/NotBetween operators."
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color when condition is met (e.g., \"#FF0000\")."
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Fill color when condition is met (e.g., \"#00FF00\")."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_top_bottom_format",
+      "description": "Highlight the top or bottom N items (or percent) in a range. For example, highlight the top 10 values or the bottom 25%.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"B2:B100\")"
+        },
+        "rank": {
+          "type": "number",
+          "required": false,
+          "description": "Number of top/bottom items. Default 10."
+        },
+        "topOrBottom": {
+          "type": "string",
+          "required": false,
+          "description": "Which items to highlight. Default \"TopItems\".",
+          "enum": [
+            "TopItems",
+            "BottomItems",
+            "TopPercent",
+            "BottomPercent"
+          ]
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color for highlighted items."
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Fill color for highlighted items. Default \"green\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_contains_text_format",
+      "description": "Highlight cells that contain specific text. For example, highlight all cells containing \"Error\" in red.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"A1:D100\")"
+        },
+        "text": {
+          "type": "string",
+          "required": true,
+          "description": "The text to search for in cells"
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color for matching cells. Default \"red\"."
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Fill color for matching cells."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "add_custom_format",
+      "description": "Add a custom formula-based conditional format. The formula must evaluate to TRUE for the formatting to apply. For example, \"=A1>B1\" to highlight cells where column A exceeds column B.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"A1:D20\")"
+        },
+        "formula": {
+          "type": "string",
+          "required": true,
+          "description": "Excel formula that evaluates to TRUE/FALSE (e.g., \"=A1>B1\")"
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color when formula is TRUE."
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Fill color when formula is TRUE."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "list_conditional_formats",
+      "description": "List all conditional formatting rules applied to a range. Returns each rule's type, priority, and stopIfTrue setting.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to inspect (e.g., \"A1:D20\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "clear_conditional_formats",
+      "description": "Remove all conditional formatting rules from a range, or from the entire sheet if no address is specified.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Optional range address. If omitted, clears the entire sheet."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_list_validation",
+      "description": "Set a dropdown list validation on a range. Users will see a dropdown with the specified values. Use comma-separated values or a range reference as the source.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"B2:B100\")"
+        },
+        "source": {
+          "type": "string",
+          "required": true,
+          "description": "Comma-separated values or a range reference (e.g., \"Yes,No,Maybe\" or \"=Sheet2!A1:A5\")"
+        },
+        "inCellDropDown": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show a dropdown in the cell. Default true."
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Error message shown when invalid data is entered."
+        },
+        "errorTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the error alert dialog. Default \"Invalid Input\"."
+        },
+        "promptMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Help message shown when the cell is selected."
+        },
+        "promptTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the input prompt. Default \"Input Help\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_number_validation",
+      "description": "Restrict cell input to whole numbers or decimals matching a condition (e.g., greater than 0, between 1 and 100).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"C2:C50\")"
+        },
+        "numberType": {
+          "type": "string",
+          "required": true,
+          "description": "Whether to allow whole numbers or decimals.",
+          "enum": [
+            "wholeNumber",
+            "decimal"
+          ]
+        },
+        "operator": {
+          "type": "string",
+          "required": true,
+          "description": "Comparison operator",
+          "enum": [
+            "Between",
+            "NotBetween",
+            "EqualTo",
+            "NotEqualTo",
+            "GreaterThan",
+            "LessThan",
+            "GreaterThanOrEqualTo",
+            "LessThanOrEqualTo"
+          ]
+        },
+        "formula1": {
+          "type": "string",
+          "required": true,
+          "description": "First value or formula (e.g., \"0\", \"=A1\")"
+        },
+        "formula2": {
+          "type": "string",
+          "required": false,
+          "description": "Second value for Between/NotBetween operators."
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Error message shown when invalid data is entered."
+        },
+        "errorTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the error alert dialog. Default \"Invalid Input\"."
+        },
+        "promptMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Help message shown when the cell is selected."
+        },
+        "promptTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the input prompt. Default \"Input Help\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_date_validation",
+      "description": "Restrict cell input to dates matching a condition (e.g., after 2024-01-01, between two dates).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"D2:D50\")"
+        },
+        "operator": {
+          "type": "string",
+          "required": true,
+          "description": "Comparison operator",
+          "enum": [
+            "Between",
+            "NotBetween",
+            "EqualTo",
+            "NotEqualTo",
+            "GreaterThan",
+            "LessThan",
+            "GreaterThanOrEqualTo",
+            "LessThanOrEqualTo"
+          ]
+        },
+        "formula1": {
+          "type": "string",
+          "required": true,
+          "description": "First date or formula (e.g., \"2024-01-01\")"
+        },
+        "formula2": {
+          "type": "string",
+          "required": false,
+          "description": "Second date for Between/NotBetween operators."
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Error message shown when invalid data is entered."
+        },
+        "errorTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the error alert dialog. Default \"Invalid Input\"."
+        },
+        "promptMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Help message shown when the cell is selected."
+        },
+        "promptTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the input prompt. Default \"Input Help\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_text_length_validation",
+      "description": "Restrict cell input based on text length (e.g., maximum 100 characters, between 5 and 50 characters).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"E2:E100\")"
+        },
+        "operator": {
+          "type": "string",
+          "required": true,
+          "description": "Comparison operator",
+          "enum": [
+            "Between",
+            "NotBetween",
+            "EqualTo",
+            "NotEqualTo",
+            "GreaterThan",
+            "LessThan",
+            "GreaterThanOrEqualTo",
+            "LessThanOrEqualTo"
+          ]
+        },
+        "formula1": {
+          "type": "string",
+          "required": true,
+          "description": "First value (e.g., \"0\", \"5\")"
+        },
+        "formula2": {
+          "type": "string",
+          "required": false,
+          "description": "Second value for Between/NotBetween operators."
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Error message shown when invalid data is entered."
+        },
+        "errorTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the error alert dialog. Default \"Invalid Input\"."
+        },
+        "promptMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Help message shown when the cell is selected."
+        },
+        "promptTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the input prompt. Default \"Input Help\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_custom_validation",
+      "description": "Set a custom formula-based validation rule. The formula must evaluate to TRUE for the input to be accepted (e.g., \"=LEN(A1)<=100\").",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address (e.g., \"F2:F50\")"
+        },
+        "formula": {
+          "type": "string",
+          "required": true,
+          "description": "Excel formula that must evaluate to TRUE (e.g., \"=LEN(A1)<=100\")"
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Error message shown when invalid data is entered."
+        },
+        "errorTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the error alert dialog. Default \"Invalid Input\"."
+        },
+        "promptMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Help message shown when the cell is selected."
+        },
+        "promptTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Title of the input prompt. Default \"Input Help\"."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_data_validation",
+      "description": "Get the data validation rule currently applied to a range. Returns the rule type, rule details, error alert, and prompt configuration.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to inspect (e.g., \"B2\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "clear_data_validation",
+      "description": "Remove all data validation rules from a range, allowing any input.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "The range address to clear validation from (e.g., \"B2:B100\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "list_pivot_tables",
+      "description": "List all PivotTables on a worksheet. Returns each PivotTable's name, row hierarchies, and data hierarchies.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name. Uses active sheet if omitted."
+        }
+      }
+    },
+    {
+      "name": "refresh_pivot_table",
+      "description": "Refresh a PivotTable to reflect changes in its source data.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable to refresh"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "delete_pivot_table",
+      "description": "Delete a PivotTable from the worksheet.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable to delete"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "create_pivot_table",
+      "description": "Create a new PivotTable from a data range. Specify which fields go into rows and values. Value fields default to SUM aggregation.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name for the new PivotTable"
+        },
+        "sourceAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Source data range with headers (e.g., \"Sheet1!A1:D100\"). Must include column headers in the first row."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Top-left cell where the PivotTable should be placed (e.g., \"Sheet2!A1\"). Must be on a different area from the source."
+        },
+        "rowFields": {
+          "type": "string[]",
+          "required": true,
+          "description": "Column names to use as row labels (e.g., [\"Region\", \"Category\"])"
+        },
+        "valueFields": {
+          "type": "string[]",
+          "required": true,
+          "description": "Column names to aggregate as values (e.g., [\"Sales\", \"Quantity\"])"
+        },
+        "sourceSheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Sheet containing the source data. Uses active sheet if omitted."
+        },
+        "destinationSheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Sheet for the PivotTable output. Uses active sheet if omitted."
+        }
+      }
+    },
+    {
+      "name": "add_pivot_field",
+      "description": "Add a field to a pivot table as a row field, column field, data field, or filter field.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the source data column to add as a field"
+        },
+        "fieldType": {
+          "type": "string",
+          "required": true,
+          "description": "Where to add the field in the pivot layout",
+          "enum": [
+            "row",
+            "column",
+            "data",
+            "filter"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "remove_pivot_field",
+      "description": "Remove a field from a pivot table.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the field to remove"
+        },
+        "fieldType": {
+          "type": "string",
+          "required": true,
+          "description": "Location of the field in the pivot layout",
+          "enum": [
+            "row",
+            "column",
+            "data",
+            "filter"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    }
+  ]
+}

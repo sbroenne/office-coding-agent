@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage and testing
+coverage/
+*.lcov
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cache directories
+.cache/
+.webpack-cache/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Local skills (domain-specific, not published)
+src/skills/*/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/settings.json
+*.js.map
+__pycache__/
+aitest-reports/

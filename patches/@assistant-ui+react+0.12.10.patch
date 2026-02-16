@@ -1,0 +1,25 @@
+diff --git a/node_modules/@assistant-ui/react/dist/legacy-runtime/runtime-cores/assistant-transport/useToolInvocations.js b/node_modules/@assistant-ui/react/dist/legacy-runtime/runtime-cores/assistant-transport/useToolInvocations.js
+index e83f52f..546bfa3 100644
+--- a/node_modules/@assistant-ui/react/dist/legacy-runtime/runtime-cores/assistant-transport/useToolInvocations.js
++++ b/node_modules/@assistant-ui/react/dist/legacy-runtime/runtime-cores/assistant-transport/useToolInvocations.js
+@@ -117,12 +117,14 @@ export function useToolInvocations({ state, getTools, onResult, setToolStatuses,
+                                 }
+                                 else {
+                                     if (!content.argsText.startsWith(lastState.argsText)) {
+-                                        // Check if this is key reordering (both are complete JSON)
+-                                        // This happens when transitioning from streaming to complete state
+-                                        // and the provider returns keys in a different order
+-                                        if (isArgsTextComplete(lastState.argsText) &&
+-                                            isArgsTextComplete(content.argsText)) {
+-                                            lastState.controller.argsText.close();
++                                        // Accept if the new argsText is complete JSON.
++                                        // This handles key reordering when transitioning from
++                                        // streaming (incomplete) to complete state, or between
++                                        // two complete JSON texts with different key order.
++                                        if (isArgsTextComplete(content.argsText)) {
++                                            if (!lastState.argsComplete) {
++                                                lastState.controller.argsText.close();
++                                            }
+                                             lastToolStates.current[content.toolCallId] = {
+                                                 argsText: content.argsText,
+                                                 hasResult: lastState.hasResult,

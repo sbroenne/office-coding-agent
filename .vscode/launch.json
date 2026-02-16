@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Excel Desktop (Edge Chromium)",
+            "type": "msedge",
+            "request": "attach",
+            "port": 9229,
+            "timeout": 600000,
+            "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "Debug: Excel Desktop",
+            "postDebugTask": "Stop Debug"
+        },
+        {
+            "name": "Debug Tests",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceRoot}/node_modules/vitest/vitest.mjs",
+            "args": [
+                "run"
+            ],
+            "internalConsoleOptions": "openOnSessionStart"
+        }
+    ]
+}

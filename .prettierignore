@@ -1,0 +1,28 @@
+# Prettier ignore patterns
+# Logs
+*.log
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Generated files
+*.d.ts
+
+# Package files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Configuration files that should not be formatted
+.prettierrc*
+.eslintrc*
+tsconfig*.json
+
+# Markdown files with specific formatting
+CHANGELOG.md
+LICENSE
