@@ -106,14 +106,10 @@ export const ModelManager: React.FC<ModelManagerProps> = ({ endpointId }) => {
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Models</h3>
         {!adding && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-7" onClick={handleStartAdd}>
-                <Plus className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Add model</TooltipContent>
-          </Tooltip>
+          <Button variant="secondary" size="sm" onClick={handleStartAdd}>
+            <Plus className="size-4" />
+            Add model
+          </Button>
         )}
       </div>
 
@@ -243,7 +239,10 @@ export const ModelManager: React.FC<ModelManagerProps> = ({ endpointId }) => {
             </Button>
           </div>
           {validationError && (
-            <div className="rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs text-red-800 dark:border-red-700 dark:bg-red-900/30 dark:text-red-200">
+            <div
+              className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-xs text-destructive"
+              role="alert"
+            >
               {validationError}
             </div>
           )}

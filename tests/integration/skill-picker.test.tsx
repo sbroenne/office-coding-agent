@@ -22,12 +22,13 @@ describe('Integration: SkillPicker', () => {
     expect(screen.getByLabelText('Agent skills')).toBeInTheDocument();
   });
 
-  it('shows empty state and manage action in popover', async () => {
+  it('shows skills content and manage action in popover', async () => {
     renderWithProviders(<SkillPicker />);
 
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
-    expect(screen.getByText('No skills available yet.')).toBeInTheDocument();
+    expect(screen.getByText('Skills')).toBeInTheDocument();
+    expect(screen.getByText('Bundled')).toBeInTheDocument();
     expect(screen.getByText('Manage skills…')).toBeInTheDocument();
   });
 

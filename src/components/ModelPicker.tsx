@@ -65,7 +65,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onOpenSettings }) => {
 
       <Popover.Portal>
         <Popover.Content
-          className="z-50 w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+          className="z-50 w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
           sideOffset={4}
           align="start"
         >

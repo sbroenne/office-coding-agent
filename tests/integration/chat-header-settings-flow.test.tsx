@@ -71,7 +71,7 @@ describe('Integration: ChatHeader', () => {
 
     // Dialog should open
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     });
   });
 
@@ -91,6 +91,6 @@ describe('Integration: ChatHeader', () => {
       />
     );
 
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   });
 });
