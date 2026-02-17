@@ -41,22 +41,22 @@ xml = xml.replace(/<Id>[\s\S]*?<\/Id>/, `<Id>${addinId}</Id>`);
 
 xml = xml.replace(
   /<DisplayName\s+DefaultValue="[^"]*"\s*\/>/,
-  `<DisplayName DefaultValue="${displayName}" />`,
+  `<DisplayName DefaultValue="${displayName}" />`
 );
 
 xml = xml.replace(
   /<bt:String\s+id="GetStarted.Title"\s+DefaultValue="[^"]*"\s*\/>/,
-  `<bt:String id="GetStarted.Title" DefaultValue="${displayName}" />`,
+  `<bt:String id="GetStarted.Title" DefaultValue="${displayName}" />`
 );
 
 xml = xml.replace(
   /<bt:String\s+id="CommandsGroup.Label"\s+DefaultValue="[^"]*"\s*\/>/,
-  `<bt:String id="CommandsGroup.Label" DefaultValue="${commandsGroupLabel}" />`,
+  `<bt:String id="CommandsGroup.Label" DefaultValue="${commandsGroupLabel}" />`
 );
 
 xml = xml.replace(
   /<bt:String\s+id="TaskpaneButton.Label"\s+DefaultValue="[^"]*"\s*\/>/,
-  `<bt:String id="TaskpaneButton.Label" DefaultValue="${chatButtonLabel}" />`,
+  `<bt:String id="TaskpaneButton.Label" DefaultValue="${chatButtonLabel}" />`
 );
 
 xml = xml.replaceAll('https://localhost:3000', baseUrl);
