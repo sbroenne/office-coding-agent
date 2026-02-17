@@ -110,28 +110,29 @@ On subsequent launches, the wizard is skipped — you go straight to the chat in
 
 ## Available Scripts
 
-| Script                           | Description                                        |
-| -------------------------------- | -------------------------------------------------- |
-| `npm run dev`                    | Start webpack dev server (hot reload)              |
-| `npm run build`                  | Production build to `dist/`                        |
-| `npm run build:dev`              | Development build to `dist/`                       |
-| `npm run start:desktop`          | Build and sideload into Excel Desktop              |
-| `npm run stop`                   | Stop debugging / unload the add-in                 |
-| `npm run manifest:staging`       | Generate staging manifest pointing to GitHub Pages |
-| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files    |
-| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows      |
-| `npm run sideload:share:trust`   | Register local share as trusted Office catalog     |
-| `npm run sideload:share:publish` | Copy staging manifest into local shared folder     |
-| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup       |
-| `npm run lint`                   | Run ESLint                                         |
-| `npm run lint:fix`               | Auto-fix ESLint issues                             |
-| `npm run format`                 | Format code with Prettier                          |
-| `npm run typecheck`              | Type-check without emitting                        |
-| `npm test`                       | Run all Vitest tests                               |
-| `npm run test:watch`             | Run tests in watch mode                            |
-| `npm run test:coverage`          | Run tests with coverage                            |
-| `npm run test:e2e`               | Run E2E tests in Excel Desktop (~187)              |
-| `npm run validate`               | Validate `manifest.xml`                            |
+| Script                           | Description                                     |
+| -------------------------------- | ----------------------------------------------- |
+| `npm run dev`                    | Start webpack dev server (hot reload)           |
+| `npm run build`                  | Production build to `dist/`                     |
+| `npm run build:dev`              | Development build to `dist/`                    |
+| `npm run start:desktop`          | Build and sideload into Excel Desktop           |
+| `npm run stop`                   | Stop debugging / unload the add-in              |
+| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files |
+| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows   |
+| `npm run sideload:share:trust`   | Register local share as trusted Office catalog  |
+| `npm run sideload:share:publish` | Copy staging manifest into local shared folder  |
+| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup    |
+| `npm run lint`                   | Run ESLint                                      |
+| `npm run lint:fix`               | Auto-fix ESLint issues                          |
+| `npm run format`                 | Format code with Prettier                       |
+| `npm run typecheck`              | Type-check without emitting                     |
+| `npm test`                       | Run all Vitest tests                            |
+| `npm run test:watch`             | Run tests in watch mode                         |
+| `npm run test:coverage`          | Run tests with coverage                         |
+| `npm run test:e2e`               | Run E2E tests in Excel Desktop (~187)           |
+| `npm run validate`               | Validate `manifests/manifest.dev.xml`           |
+| `npm run validate:staging`       | Validate `manifests/manifest.staging.xml`       |
+| `npm run validate:prod`          | Validate `manifests/manifest.prod.xml`          |
 
 ## Testing
 

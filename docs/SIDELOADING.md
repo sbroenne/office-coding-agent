@@ -6,6 +6,12 @@ This project supports three sideloading lanes:
 2. **Local shared folder catalog** (Windows testing flow)
 3. **Staging manifest** that points to **GitHub Pages**
 
+Main environment manifests are stored in `manifests/`:
+
+- `manifests/manifest.dev.xml`
+- `manifests/manifest.staging.xml`
+- `manifests/manifest.prod.xml`
+
 ## Important Model
 
 A shared folder catalog distributes the **manifest only**.
@@ -57,7 +63,6 @@ Restart Excel after trust registration.
 ### 3) Publish staging manifest into share
 
 ```bash
-npm run manifest:staging
 npm run sideload:share:publish
 ```
 
@@ -77,15 +82,9 @@ Staging manifest target base URL:
 
 - `https://sbroenne.github.io/office-coding-agent`
 
-Generated file:
+Committed file:
 
 - `manifests/manifest.staging.xml`
-
-Regenerate anytime:
-
-```bash
-npm run manifest:staging
-```
 
 ## Import Checklist (Skills & Agents)
 

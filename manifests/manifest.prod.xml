@@ -6,14 +6,14 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <Id>a1b2c3d4-e5f6-7890-abcd-ef1234567890</Id>
+  <Id>9c7f9e72-0a7c-4ef4-8f6d-4a8cf692f6f3</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>sbroenne</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Office Coding Agent" />
   <Description DefaultValue="AI-powered Office coding assistant with host-routed tool execution" />
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png" />
+  <IconUrl DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://github.com/sbroenne/office-coding-agent" />
 
   <AppDomains>
@@ -32,7 +32,7 @@
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html" />
+    <SourceLocation DefaultValue="https://sbroenne.github.io/office-coding-agent/taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -83,13 +83,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://sbroenne.github.io/office-coding-agent/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Office Coding Agent" />
