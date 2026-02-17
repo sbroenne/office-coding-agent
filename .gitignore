@@ -37,6 +37,7 @@ local/extensions/
 # OS generated files
 .DS_Store
 Thumbs.db
+*.xlsx
 
 # Editor files
 .vscode/settings.json

@@ -959,7 +959,12 @@ async function testRangeToolVariants(): Promise<void> {
   try {
     await Excel.run(async context => {
       const sheet = context.workbook.worksheets.getItem(MAIN);
-      sheet.getRange('M1:M4').values = [['Alice Smith'], ['Bob Jones'], ['Cara Lane'], ['Dana Ray']];
+      sheet.getRange('M1:M4').values = [
+        ['Alice Smith'],
+        ['Bob Jones'],
+        ['Cara Lane'],
+        ['Dana Ray'],
+      ];
       sheet.getRange('N1:N2').values = [['Alice'], ['Bob']];
       await context.sync();
     });
@@ -2965,10 +2970,10 @@ async function testDataValidationToolVariants(): Promise<void> {
   }
 }
 
-// ─── Pivot Table Tools (16) ───────────────────────────────────────
+// ─── Pivot Table Tools (28) ───────────────────────────────────────
 
 async function testPivotTableTools(): Promise<void> {
-  log('── Pivot Table Tools (16) ──');
+  log('── Pivot Table Tools (28) ──');
 
   const PT_NAME = 'E2E_Pivot';
 
@@ -3002,7 +3007,37 @@ async function testPivotTableTools(): Promise<void> {
     return d.count >= 1 ? null : `Expected ≥1 PT, got ${d.count}`;
   });
 
-  // 3. refresh_pivot_table
+  // 3. get_pivot_table_count
+  await runTool(pivotTableConfigs, 'get_pivot_table_count', { sheetName: PIVOT_DST }, r => {
+    const d = r as { count: number };
+    return d.count >= 1 ? null : `Expected count >= 1, got ${d.count}`;
+  });
+
+  // 4. pivot_table_exists
+  await runTool(
+    pivotTableConfigs,
+    'pivot_table_exists',
+    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { exists: boolean };
+      return d.exists === true ? null : 'Expected exists === true';
+    }
+  );
+
+  // 5. get_pivot_table_location
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_table_location',
+    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { worksheetName?: string; rangeAddress?: string };
+      return d.worksheetName === PIVOT_DST && !!d.rangeAddress
+        ? null
+        : 'Expected worksheetName and rangeAddress';
+    }
+  );
+
+  // 6. refresh_pivot_table
   await runTool(
     pivotTableConfigs,
     'refresh_pivot_table',
@@ -3013,7 +3048,13 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 4. get_pivot_table_source_info
+  // 7. refresh_all_pivot_tables
+  await runTool(pivotTableConfigs, 'refresh_all_pivot_tables', { sheetName: PIVOT_DST }, r => {
+    const d = r as { refreshed: boolean };
+    return d.refreshed ? null : 'Expected all pivots refreshed';
+  });
+
+  // 8. get_pivot_table_source_info
   await runTool(
     pivotTableConfigs,
     'get_pivot_table_source_info',
@@ -3024,7 +3065,33 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 5. set_pivot_table_options
+  // 9. get_pivot_hierarchy_counts
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_hierarchy_counts',
+    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { rowHierarchyCount?: number; dataHierarchyCount?: number };
+      return typeof d.rowHierarchyCount === 'number' && typeof d.dataHierarchyCount === 'number'
+        ? null
+        : 'Expected numeric rowHierarchyCount and dataHierarchyCount';
+    }
+  );
+
+  // 10. get_pivot_hierarchies
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_hierarchies',
+    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { rowHierarchies?: unknown[]; dataHierarchies?: unknown[] };
+      return Array.isArray(d.rowHierarchies) && Array.isArray(d.dataHierarchies)
+        ? null
+        : 'Expected rowHierarchies and dataHierarchies arrays';
+    }
+  );
+
+  // 11. set_pivot_table_options
   await runTool(
     pivotTableConfigs,
     'set_pivot_table_options',
@@ -3048,7 +3115,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 6. add_pivot_field
+  // 12. add_pivot_field
   await runTool(
     pivotTableConfigs,
     'add_pivot_field',
@@ -3059,7 +3126,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 7. set_pivot_layout
+  // 13. set_pivot_layout
   await runTool(
     pivotTableConfigs,
     'set_pivot_layout',
@@ -3078,7 +3145,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 8. get_pivot_field_filters (before apply)
+  // 14. get_pivot_field_filters (before apply)
   await runTool(
     pivotTableConfigs,
     'get_pivot_field_filters',
@@ -3089,7 +3156,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 9. apply_pivot_label_filter
+  // 15. apply_pivot_label_filter
   await runTool(
     pivotTableConfigs,
     'apply_pivot_label_filter',
@@ -3106,7 +3173,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 10. sort_pivot_field_labels
+  // 16. sort_pivot_field_labels
   await runTool(
     pivotTableConfigs,
     'sort_pivot_field_labels',
@@ -3117,7 +3184,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 11. apply_pivot_manual_filter
+  // 17. apply_pivot_manual_filter
   await runTool(
     pivotTableConfigs,
     'apply_pivot_manual_filter',
@@ -3133,7 +3200,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 12. sort_pivot_field_values
+  // 18. sort_pivot_field_values
   await runTool(
     pivotTableConfigs,
     'sort_pivot_field_values',
@@ -3152,7 +3219,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 13. set_pivot_field_show_all_items
+  // 19. set_pivot_field_show_all_items
   await runTool(
     pivotTableConfigs,
     'set_pivot_field_show_all_items',
@@ -3163,7 +3230,102 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 14. clear_pivot_field_filters
+  // 20. get_pivot_layout_ranges
+  const layoutRangesResult = await runTool(
+    pivotTableConfigs,
+    'get_pivot_layout_ranges',
+    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { tableRangeAddress?: string; dataBodyRangeAddress?: string };
+      return d.tableRangeAddress && d.dataBodyRangeAddress
+        ? null
+        : 'Expected pivot layout range addresses';
+    }
+  );
+
+  // 21. set_pivot_layout_display_options
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_layout_display_options',
+    {
+      pivotTableName: PT_NAME,
+      repeatAllItemLabels: true,
+      displayBlankLineAfterEachItem: false,
+      autoFormat: true,
+      preserveFormatting: true,
+      fillEmptyCells: true,
+      emptyCellText: '-',
+      enableFieldList: true,
+      altTextTitle: 'E2E Pivot',
+      altTextDescription: 'E2E pivot layout options',
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { updated: boolean; autoFormat: boolean; fillEmptyCells: boolean };
+      return d.updated && d.autoFormat && d.fillEmptyCells
+        ? null
+        : 'Expected pivot layout display options updated';
+    }
+  );
+
+  // 22. get_pivot_data_hierarchy_for_cell
+  const rawDataBodyAddress =
+    ((layoutRangesResult as { dataBodyRangeAddress?: string } | null)?.dataBodyRangeAddress ?? '') ||
+    '';
+  const dataBodyAddress = rawDataBodyAddress.includes('!')
+    ? rawDataBodyAddress.split('!')[1]
+    : rawDataBodyAddress;
+  const dataCellAddress = (dataBodyAddress.split(':')[0] ?? 'B3').replace(/\$/g, '');
+
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_data_hierarchy_for_cell',
+    { pivotTableName: PT_NAME, cellAddress: dataCellAddress, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { dataHierarchyName?: string };
+      return d.dataHierarchyName ? null : 'Expected data hierarchy for pivot data cell';
+    }
+  );
+
+  // 23. get_pivot_items_for_cell
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_items_for_cell',
+    { pivotTableName: PT_NAME, axis: 'Row', cellAddress: dataCellAddress, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { count?: number };
+      return typeof d.count === 'number' ? null : 'Expected pivot items for row axis';
+    }
+  );
+
+  // 24. set_pivot_layout_auto_sort_on_cell
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_layout_auto_sort_on_cell',
+    {
+      pivotTableName: PT_NAME,
+      cellAddress: dataCellAddress,
+      sortBy: 'Descending',
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { sorted: boolean; sortBy: string };
+      return d.sorted && d.sortBy === 'Descending' ? null : 'Expected pivot autosort by cell';
+    }
+  );
+
+  // 25. get_pivot_field_items
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_field_items',
+    { pivotTableName: PT_NAME, fieldName: 'Region', sheetName: PIVOT_DST },
+    r => {
+      const d = r as { count?: number };
+      return typeof d.count === 'number' ? null : 'Expected numeric count of pivot field items';
+    }
+  );
+
+  // 26. clear_pivot_field_filters
   await runTool(
     pivotTableConfigs,
     'clear_pivot_field_filters',
@@ -3174,7 +3336,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 15. remove_pivot_field
+  // 27. remove_pivot_field
   await runTool(
     pivotTableConfigs,
     'remove_pivot_field',
@@ -3185,7 +3347,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 16. delete_pivot_table
+  // 28. delete_pivot_table
   await runTool(
     pivotTableConfigs,
     'delete_pivot_table',

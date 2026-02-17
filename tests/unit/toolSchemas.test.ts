@@ -139,22 +139,34 @@ const ALL_TOOL_NAMES = [
   'set_custom_validation',
   'get_data_validation',
   'clear_data_validation',
-  // pivot table (16)
+  // pivot table (28)
   'list_pivot_tables',
   'refresh_pivot_table',
+  'refresh_all_pivot_tables',
+  'get_pivot_table_count',
+  'pivot_table_exists',
   'get_pivot_table_source_info',
+  'get_pivot_table_location',
+  'get_pivot_hierarchy_counts',
+  'get_pivot_hierarchies',
   'set_pivot_table_options',
   'delete_pivot_table',
   'create_pivot_table',
   'add_pivot_field',
   'set_pivot_layout',
   'get_pivot_field_filters',
+  'get_pivot_field_items',
   'clear_pivot_field_filters',
   'apply_pivot_label_filter',
   'sort_pivot_field_labels',
   'apply_pivot_manual_filter',
   'sort_pivot_field_values',
   'set_pivot_field_show_all_items',
+  'get_pivot_layout_ranges',
+  'set_pivot_layout_display_options',
+  'get_pivot_data_hierarchy_for_cell',
+  'get_pivot_items_for_cell',
+  'set_pivot_layout_auto_sort_on_cell',
   'remove_pivot_field',
 ] as const;
 
@@ -728,8 +740,26 @@ describe('tool schemas — data validation tools (decomposed)', () => {
 });
 
 describe('tool schemas — pivot table tools', () => {
+  it('get_pivot_table_count accepts optional sheetName', () => {
+    const schema = excelTools.get_pivot_table_count.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+    expect(asZod(schema).safeParse({ sheetName: 'Data' }).success).toBe(true);
+  });
+
+  it('pivot_table_exists requires pivotTableName', () => {
+    const schema = excelTools.pivot_table_exists.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
   it('get_pivot_table_source_info requires pivotTableName', () => {
     const schema = excelTools.get_pivot_table_source_info.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_pivot_table_location requires pivotTableName', () => {
+    const schema = excelTools.get_pivot_table_location.inputSchema;
     expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
     expect(asZod(schema).safeParse({}).success).toBe(false);
   });
@@ -791,6 +821,14 @@ describe('tool schemas — pivot table tools', () => {
 
   it('get_pivot_field_filters requires pivotTableName + fieldName', () => {
     const schema = excelTools.get_pivot_field_filters.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      true
+    );
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(false);
+  });
+
+  it('get_pivot_field_items requires pivotTableName + fieldName', () => {
+    const schema = excelTools.get_pivot_field_items.inputSchema;
     expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
       true
     );
@@ -896,6 +934,68 @@ describe('tool schemas — pivot table tools', () => {
       false
     );
   });
+
+  it('get_pivot_layout_ranges requires pivotTableName', () => {
+    const schema = excelTools.get_pivot_layout_ranges.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('set_pivot_layout_display_options requires pivotTableName and accepts optional display/formatting args', () => {
+    const schema = excelTools.set_pivot_layout_display_options.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        repeatAllItemLabels: true,
+        displayBlankLineAfterEachItem: false,
+        autoFormat: true,
+        preserveFormatting: true,
+        fillEmptyCells: true,
+        emptyCellText: '-',
+        enableFieldList: false,
+        altTextTitle: 'Sales Pivot',
+        altTextDescription: 'Quarterly sales by region',
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ repeatAllItemLabels: true }).success).toBe(false);
+  });
+
+  it('get_pivot_data_hierarchy_for_cell requires pivotTableName + cellAddress', () => {
+    const schema = excelTools.get_pivot_data_hierarchy_for_cell.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', cellAddress: 'B5' }).success).toBe(
+      true
+    );
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(false);
+  });
+
+  it('get_pivot_items_for_cell requires pivotTableName + axis + cellAddress', () => {
+    const schema = excelTools.get_pivot_items_for_cell.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        axis: 'Row',
+        cellAddress: 'B5',
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', cellAddress: 'B5' }).success).toBe(
+      false
+    );
+  });
+
+  it('set_pivot_layout_auto_sort_on_cell requires pivotTableName + cellAddress + sortBy', () => {
+    const schema = excelTools.set_pivot_layout_auto_sort_on_cell.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        cellAddress: 'B5',
+        sortBy: 'Ascending',
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', sortBy: 'Ascending' }).success).toBe(
+      false
+    );
+  });
 });
 
 describe('tool schemas — workbook tools', () => {
@@ -915,6 +1015,24 @@ describe('tool schemas — pivot table tools', () => {
 
   it('refresh_pivot_table requires pivotTableName', () => {
     const schema = excelTools.refresh_pivot_table.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('refresh_all_pivot_tables accepts optional sheetName', () => {
+    const schema = excelTools.refresh_all_pivot_tables.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+    expect(asZod(schema).safeParse({ sheetName: 'PivotSheet' }).success).toBe(true);
+  });
+
+  it('get_pivot_hierarchy_counts requires pivotTableName', () => {
+    const schema = excelTools.get_pivot_hierarchy_counts.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_pivot_hierarchies requires pivotTableName', () => {
+    const schema = excelTools.get_pivot_hierarchies.inputSchema;
     expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
     expect(asZod(schema).safeParse({}).success).toBe(false);
   });
