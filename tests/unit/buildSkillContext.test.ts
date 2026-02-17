@@ -5,13 +5,23 @@
  * bundled `.md` skill files via the rawMarkdownPlugin in vitest.config.ts.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { AgentSkill } from '@/types/skill';
 import {
   buildSkillContext,
   getSkills,
   getSkill,
   parseFrontmatter,
+  setImportedSkills,
 } from '@/services/skills/skillService';
+
+beforeEach(() => {
+  setImportedSkills([]);
+});
+
+afterEach(() => {
+  setImportedSkills([]);
+});
 
 describe('buildSkillContext', () => {
   it('includes bundled skills when available', () => {
@@ -39,6 +49,25 @@ describe('buildSkillContext', () => {
     const all = buildSkillContext();
     const explicit = buildSkillContext(undefined);
     expect(explicit).toBe(all);
+  });
+
+  it('resolves @references directives to internal skill and agent content', () => {
+    const importedSkill: AgentSkill = {
+      metadata: {
+        name: 'Ref Tester',
+        description: 'Skill that references internal context.',
+        version: '1.0.0',
+        tags: [],
+      },
+      content: `Intro for references\n@references skill:excel, agent:Excel\nEnd of skill`,
+    };
+
+    setImportedSkills([importedSkill]);
+
+    const context = buildSkillContext(['Ref Tester']);
+    expect(context).toContain('Reference: skill:excel');
+    expect(context).toContain('Reference: agent:Excel');
+    expect(context).toContain('You are an AI assistant running inside a Microsoft Excel add-in.');
   });
 });
 
@@ -110,5 +139,17 @@ tags:
 Content`;
     const { metadata } = parseFrontmatter(raw);
     expect(metadata.tags).toEqual(['azure', 'excel']);
+  });
+
+  it('parses references array', () => {
+    const raw = `---
+name: with-refs
+references:
+  - skill:excel
+  - agent:Excel
+---
+Content`;
+    const { metadata } = parseFrontmatter(raw);
+    expect(metadata.references).toEqual(['skill:excel', 'agent:Excel']);
   });
 });

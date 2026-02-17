@@ -1,4 +1,5 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
+import { getAllAgents } from '@/services/agents';
 import excelSkillRaw from '@/skills/excel/SKILL.md';
 
 /**
@@ -10,7 +11,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
 
   if (!trimmed.startsWith('---')) {
     return {
-      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [] },
+      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [], references: [] },
       content: trimmed,
     };
   }
@@ -18,7 +19,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
   const endIndex = trimmed.indexOf('---', 3);
   if (endIndex === -1) {
     return {
-      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [] },
+      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [], references: [] },
       content: trimmed,
     };
   }
@@ -32,6 +33,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
     description: '',
     version: '0.0.0',
     tags: [],
+    references: [],
   };
 
   let currentKey = '';
@@ -41,9 +43,14 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
   for (const line of yamlBlock.split('\n')) {
     const trimmedLine = line.trim();
 
-    // Tag array items: "  - value"
-    if (trimmedLine.startsWith('- ') && currentKey === 'tags') {
-      metadata.tags.push(trimmedLine.slice(2).trim());
+    // Array items: "  - value"
+    if (trimmedLine.startsWith('- ') && (currentKey === 'tags' || currentKey === 'references')) {
+      const itemValue = trimmedLine.slice(2).trim();
+      if (currentKey === 'tags') {
+        metadata.tags.push(itemValue);
+      } else {
+        metadata.references?.push(itemValue);
+      }
       continue;
     }
 
@@ -72,9 +79,14 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
       isMultilineValue = true;
       multilineValue = '';
     } else if (value === '') {
-      // Could be start of array (tags:) — handled by "- " check above
+      // Could be start of array (tags:, references:) — handled by "- " check above
       continue;
     } else {
+      if (currentKey === 'references') {
+        const inlineReferences = parseInlineArray(value);
+        metadata.references = [...(metadata.references ?? []), ...inlineReferences];
+        continue;
+      }
       setMetadataField(metadata, currentKey, value);
     }
   }
@@ -85,6 +97,131 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
   }
 
   return { metadata, content };
+}
+
+function parseInlineArray(value: string): string[] {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return trimmed
+      .slice(1, -1)
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+
+  return [trimmed].filter(Boolean);
+}
+
+interface InlineReferenceExtraction {
+  cleanedContent: string;
+  references: string[];
+}
+
+function extractInlineReferences(content: string): InlineReferenceExtraction {
+  const references: string[] = [];
+  const cleanedLines: string[] = [];
+
+  for (const rawLine of content.split('\n')) {
+    const trimmedLine = rawLine.trim();
+    const directiveMatch = trimmedLine.match(/^@references?\s+(.+)$/i);
+
+    if (directiveMatch) {
+      references.push(
+        ...directiveMatch[1]
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean),
+      );
+      continue;
+    }
+
+    const inlineMatches = [...rawLine.matchAll(/@references?\(([^)]+)\)/gi)];
+    if (inlineMatches.length > 0) {
+      for (const match of inlineMatches) {
+        references.push(
+          ...match[1]
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean),
+        );
+      }
+
+      cleanedLines.push(rawLine.replace(/@references?\(([^)]+)\)/gi, '').trimEnd());
+      continue;
+    }
+
+    cleanedLines.push(rawLine);
+  }
+
+  return {
+    cleanedContent: cleanedLines.join('\n').trim(),
+    references,
+  };
+}
+
+function normalizeReferenceKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function resolveSkillContentWithReferences(
+  skill: AgentSkill,
+  skillsByName: Map<string, AgentSkill>,
+  agentsByName: Map<string, string>,
+  visitedSkills: Set<string> = new Set(),
+): string {
+  const skillKey = normalizeReferenceKey(skill.metadata.name);
+  if (visitedSkills.has(skillKey)) {
+    return extractInlineReferences(skill.content).cleanedContent;
+  }
+
+  const nextVisited = new Set(visitedSkills);
+  nextVisited.add(skillKey);
+
+  const { cleanedContent, references: inlineReferences } = extractInlineReferences(skill.content);
+  const declaredReferences = skill.metadata.references ?? [];
+  const allReferences = Array.from(new Set([...declaredReferences, ...inlineReferences]));
+
+  if (allReferences.length === 0) {
+    return cleanedContent;
+  }
+
+  const resolvedBlocks: string[] = [];
+
+  for (const reference of allReferences) {
+    const trimmedReference = reference.trim();
+    if (!trimmedReference) continue;
+
+    if (trimmedReference.toLowerCase().startsWith('agent:')) {
+      const agentName = trimmedReference.slice('agent:'.length).trim();
+      const agentInstructions = agentsByName.get(normalizeReferenceKey(agentName));
+      if (agentInstructions) {
+        resolvedBlocks.push(`#### Reference: agent:${agentName}\n${agentInstructions}`);
+      }
+      continue;
+    }
+
+    const skillName = trimmedReference.toLowerCase().startsWith('skill:')
+      ? trimmedReference.slice('skill:'.length).trim()
+      : trimmedReference;
+
+    const referencedSkill = skillsByName.get(normalizeReferenceKey(skillName));
+    if (referencedSkill && normalizeReferenceKey(referencedSkill.metadata.name) !== skillKey) {
+      const referencedContent = resolveSkillContentWithReferences(
+        referencedSkill,
+        skillsByName,
+        agentsByName,
+        nextVisited,
+      );
+
+      resolvedBlocks.push(`#### Reference: skill:${referencedSkill.metadata.name}\n${referencedContent}`);
+    }
+  }
+
+  if (resolvedBlocks.length === 0) {
+    return cleanedContent;
+  }
+
+  return `${cleanedContent}\n\n### @references\n${resolvedBlocks.join('\n\n')}`;
 }
 
 function setMetadataField(metadata: SkillMetadata, key: string, value: string): void {
@@ -179,9 +316,15 @@ export function buildSkillContext(activeNames?: string[]): string {
 
   if (skills.length === 0) return '';
 
+  const allSkills = getSkills();
+  const skillsByName = new Map(allSkills.map(skill => [normalizeReferenceKey(skill.metadata.name), skill]));
+  const agentsByName = new Map(
+    getAllAgents().map(agent => [normalizeReferenceKey(agent.metadata.name), agent.instructions]),
+  );
+
   const sections = skills.map(
     skill =>
-      `\n\n---\n## Agent Skill: ${skill.metadata.name}\n${skill.metadata.description}\n\n${skill.content}`
+      `\n\n---\n## Agent Skill: ${skill.metadata.name}\n${skill.metadata.description}\n\n${resolveSkillContentWithReferences(skill, skillsByName, agentsByName)}`
   );
 
   return `\n\n# Agent Skills\nThe following agent skills provide domain-specific knowledge. Use them to help the user with specialized tasks.${sections.join('')}`;
