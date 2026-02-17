@@ -10,7 +10,7 @@
   <Version>1.0.0.0</Version>
   <ProviderName>sbroenne</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Office Coding Agent" />
+  <DisplayName DefaultValue="Office Coding Agent (Staging)" />
   <Description DefaultValue="AI-powered Office coding assistant with host-routed tool execution" />
   <IconUrl DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-80.png" />
@@ -92,9 +92,9 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://sbroenne.github.io/office-coding-agent/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Office Coding Agent" />
-        <bt:String id="CommandsGroup.Label" DefaultValue="AI Assistant" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="AI Chat" />
+        <bt:String id="GetStarted.Title" DefaultValue="Office Coding Agent (Staging)" />
+        <bt:String id="CommandsGroup.Label" DefaultValue="AI Assistant STG" />
+        <bt:String id="TaskpaneButton.Label" DefaultValue="AI Chat STG" />
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="AI-powered Office coding assistant" />

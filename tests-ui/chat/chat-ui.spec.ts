@@ -35,4 +35,28 @@ test.describe('Chat UI (configured state)', () => {
     // No crash — page should still be functional
     await expect(page.getByText('AI Chat')).toBeVisible();
   });
+
+  test('agent manager dialog supports keyboard open/close', async ({ configuredTaskpane: page }) => {
+    await page.getByRole('button', { name: 'Select agent' }).click();
+
+    const manageAgents = page.getByRole('button', { name: 'Manage agents…' });
+    await manageAgents.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByRole('heading', { name: 'Manage Agents' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: 'Manage Agents' })).not.toBeVisible();
+  });
+
+  test('skill manager dialog supports keyboard open/close', async ({ configuredTaskpane: page }) => {
+    await page.getByRole('button', { name: 'Agent skills' }).click();
+
+    const manageSkills = page.getByRole('button', { name: 'Manage skills…' });
+    await manageSkills.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByRole('heading', { name: 'Manage Skills' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: 'Manage Skills' })).not.toBeVisible();
+  });
 });

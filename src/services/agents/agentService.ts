@@ -153,6 +153,19 @@ function setAgentArrayField(metadata: AgentMetadata, key: string, values: string
 
 /** All bundled agents, parsed at module load time. */
 const bundledAgents: AgentConfig[] = [parseAgentFrontmatter(excelAgentRaw)];
+let importedAgents: AgentConfig[] = [];
+
+export function getBundledAgents(): AgentConfig[] {
+  return bundledAgents;
+}
+
+export function getImportedAgents(): AgentConfig[] {
+  return importedAgents;
+}
+
+export function setImportedAgents(agents: AgentConfig[]): void {
+  importedAgents = agents;
+}
 
 function toAgentHost(host: OfficeHostApp): AgentHost | undefined {
   if (host === 'excel' || host === 'powerpoint') return host;
@@ -165,11 +178,13 @@ function toAgentHost(host: OfficeHostApp): AgentHost | undefined {
 export function getAgents(host: OfficeHostApp = 'excel'): AgentConfig[] {
   const targetHost = toAgentHost(host);
   if (!targetHost) return [];
-  return bundledAgents.filter(agent => agent.metadata.hosts.includes(targetHost));
+  return [...bundledAgents, ...importedAgents].filter(agent =>
+    agent.metadata.hosts.includes(targetHost)
+  );
 }
 
 export function getAllAgents(): AgentConfig[] {
-  return bundledAgents;
+  return [...bundledAgents, ...importedAgents];
 }
 
 /**

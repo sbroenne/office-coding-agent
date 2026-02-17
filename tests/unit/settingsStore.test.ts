@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { ModelInfo } from '@/types';
+import type { AgentConfig, AgentSkill } from '@/types';
 
 /** Reset store to defaults before each test */
 beforeEach(() => {
@@ -248,6 +249,42 @@ describe('settingsStore — skills', () => {
     useSettingsStore.getState().reset();
     expect(useSettingsStore.getState().activeSkillNames).toBeNull();
   });
+
+  it('importSkills stores imported skills', () => {
+    const skill: AgentSkill = {
+      metadata: {
+        name: 'Imported Skill',
+        description: 'Imported from zip.',
+        version: '1.0.0',
+        tags: [],
+      },
+      content: 'Skill body',
+    };
+
+    useSettingsStore.getState().importSkills([skill]);
+
+    expect(useSettingsStore.getState().importedSkills).toHaveLength(1);
+    expect(useSettingsStore.getState().importedSkills[0].metadata.name).toBe('Imported Skill');
+  });
+
+  it('removeImportedSkill removes imported skill and prunes active list', () => {
+    const skill: AgentSkill = {
+      metadata: {
+        name: 'Imported Skill',
+        description: 'Imported from zip.',
+        version: '1.0.0',
+        tags: [],
+      },
+      content: 'Skill body',
+    };
+
+    useSettingsStore.getState().importSkills([skill]);
+    useSettingsStore.getState().setActiveSkills(['Imported Skill']);
+    useSettingsStore.getState().removeImportedSkill('Imported Skill');
+
+    expect(useSettingsStore.getState().importedSkills).toEqual([]);
+    expect(useSettingsStore.getState().activeSkillNames).toEqual([]);
+  });
 });
 
 // ─── Agent management ───
@@ -276,6 +313,44 @@ describe('settingsStore — agents', () => {
   it('reset restores the default agent', () => {
     // Even if someone managed to set a different agent, reset brings back Excel
     useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
+  });
+
+  it('importAgents stores imported agents', () => {
+    const agent: AgentConfig = {
+      metadata: {
+        name: 'Imported Agent',
+        description: 'Imported from zip.',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
+      instructions: 'Do imported work.',
+    };
+
+    useSettingsStore.getState().importAgents([agent]);
+
+    expect(useSettingsStore.getState().importedAgents).toHaveLength(1);
+    expect(useSettingsStore.getState().importedAgents[0].metadata.name).toBe('Imported Agent');
+  });
+
+  it('removeImportedAgent resets active agent when removed agent was selected', () => {
+    const agent: AgentConfig = {
+      metadata: {
+        name: 'Imported Agent',
+        description: 'Imported from zip.',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
+      instructions: 'Do imported work.',
+    };
+
+    useSettingsStore.getState().importAgents([agent]);
+    useSettingsStore.getState().setActiveAgent('Imported Agent');
+    useSettingsStore.getState().removeImportedAgent('Imported Agent');
+
+    expect(useSettingsStore.getState().importedAgents).toEqual([]);
     expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
   });
 });

@@ -1,4 +1,8 @@
 /** Authentication method for an endpoint */
+import type { AgentConfig } from './agent';
+import type { AgentSkill } from './skill';
+
+/** Authentication method for an endpoint */
 export type AuthMethod = 'apiKey';
 
 /** Represents a configured Azure AI Foundry endpoint */
@@ -56,6 +60,10 @@ export interface UserSettings {
   activeSkillNames: string[] | null;
   /** ID of the currently selected agent (matches agent metadata name). */
   activeAgentId: string;
+  /** Imported skills loaded from local ZIP files. Bundled skills are managed separately and read-only. */
+  importedSkills: AgentSkill[];
+  /** Imported agents loaded from local ZIP files. Bundled agents are managed separately and read-only. */
+  importedAgents: AgentConfig[];
 }
 
 /** Default settings applied on first run */
@@ -67,4 +75,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   endpointModels: {},
   activeSkillNames: null,
   activeAgentId: 'Excel',
+  importedSkills: [],
+  importedAgents: [],
 };

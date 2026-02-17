@@ -176,15 +176,13 @@ describe('getAgentInstructions', () => {
   it('returns instructions for the Excel agent', () => {
     const instructions = getAgentInstructions('Excel');
     expect(instructions.length).toBeGreaterThan(0);
-    expect(instructions).toContain('Discover first');
+    expect(instructions).toContain('excel');
   });
 
-  it('includes execution rules adapted from MCP skill', () => {
+  it('includes concise core behavior guidance', () => {
     const instructions = getAgentInstructions('Excel');
-    expect(instructions).toContain('Never Ask Clarifying Questions');
-    expect(instructions).toContain('Always End With a Text Summary');
-    expect(instructions).toContain('Format Data Professionally');
-    expect(instructions).toContain('Tool Selection Quick Reference');
+    expect(instructions).toContain('Core Behavior');
+    expect(instructions).toContain('Provide a concise final summary');
   });
 
   it('returns empty string for unknown agent', () => {

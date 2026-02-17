@@ -20,6 +20,8 @@ An Office add-in research project that provides an AI-powered coding assistant u
 - **83 Excel tools** — the AI can read/write ranges, create charts, manage tables, format cells, add comments, create pivot tables, set data validation, and manipulate sheets
 - **Agent system** — split system prompt architecture + custom agents with host targeting (`hosts`, `defaultForHosts`)
 - **Skills system** — bundled skill files that inject additional context into the system prompt, toggleable via the SkillPicker
+- **Custom extension import** — import local ZIP files for custom agents and custom skills from Settings
+- **Extension management UX** — manage imported agents/skills in Settings, with bundled content shown as read-only
 - **Multi-model support** — add and validate deployed model names from your Azure AI Foundry endpoint (manual entry flow)
 - **Model management** — add, rename, and remove models per endpoint; switch models from the input toolbar
 - **Streaming responses** — real-time token streaming for fast, responsive interactions
@@ -101,27 +103,28 @@ On subsequent launches, the wizard is skipped — you go straight to the chat in
 
 ## Available Scripts
 
-| Script                  | Description                            |
-| ----------------------- | -------------------------------------- |
-| `npm run dev`           | Start webpack dev server (hot reload)  |
-| `npm run build`         | Production build to `dist/`            |
-| `npm run build:dev`     | Development build to `dist/`           |
-| `npm run start:desktop` | Build and sideload into Excel Desktop  |
-| `npm run stop`          | Stop debugging / unload the add-in     |
-| `npm run manifest:staging` | Generate staging manifest pointing to GitHub Pages |
-| `npm run sideload:share:setup` | Create local shared-folder catalog on Windows |
-| `npm run sideload:share:trust` | Register local share as trusted Office catalog |
-| `npm run sideload:share:publish` | Copy staging manifest into local shared folder |
-| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup |
-| `npm run lint`          | Run ESLint                             |
-| `npm run lint:fix`      | Auto-fix ESLint issues                 |
-| `npm run format`        | Format code with Prettier              |
-| `npm run typecheck`     | Type-check without emitting            |
-| `npm test`              | Run all Vitest tests                   |
-| `npm run test:watch`    | Run tests in watch mode                |
-| `npm run test:coverage` | Run tests with coverage                |
-| `npm run test:e2e`      | Run E2E tests in Excel Desktop (~187)  |
-| `npm run validate`      | Validate `manifest.xml`                |
+| Script                           | Description                                        |
+| -------------------------------- | -------------------------------------------------- |
+| `npm run dev`                    | Start webpack dev server (hot reload)              |
+| `npm run build`                  | Production build to `dist/`                        |
+| `npm run build:dev`              | Development build to `dist/`                       |
+| `npm run start:desktop`          | Build and sideload into Excel Desktop              |
+| `npm run stop`                   | Stop debugging / unload the add-in                 |
+| `npm run manifest:staging`       | Generate staging manifest pointing to GitHub Pages |
+| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files    |
+| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows      |
+| `npm run sideload:share:trust`   | Register local share as trusted Office catalog     |
+| `npm run sideload:share:publish` | Copy staging manifest into local shared folder     |
+| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup       |
+| `npm run lint`                   | Run ESLint                                         |
+| `npm run lint:fix`               | Auto-fix ESLint issues                             |
+| `npm run format`                 | Format code with Prettier                          |
+| `npm run typecheck`              | Type-check without emitting                        |
+| `npm test`                       | Run all Vitest tests                               |
+| `npm run test:watch`             | Run tests in watch mode                            |
+| `npm run test:coverage`          | Run tests with coverage                            |
+| `npm run test:e2e`               | Run E2E tests in Excel Desktop (~187)              |
+| `npm run validate`               | Validate `manifest.xml`                            |
 
 ## Testing
 
@@ -160,25 +163,25 @@ npm run validate
 
 Unit tests in `tests/unit/` (17 files) cover pure functions and store logic that have **no** `Excel.run()` dependency:
 
-| File                             | What it tests                                                                                 |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `agentService.test.ts`           | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions                          |
-| `aiClientFactory.test.ts`        | Provider creation, caching, invalidation, and clear-all behavior                               |
-| `buildSkillContext.test.ts`      | `buildSkillContext` and related skill functions with bundled `.md` files                      |
-| `chatErrorBoundary.test.tsx`     | Error boundary fallback rendering and recovery flow                                             |
-| `chatPanel.test.tsx`             | ChatPanel component logic (mocks assistant-ui components for jsdom)                           |
-| `humanizeToolName.test.ts`       | Tool-name formatting for user-facing progress labels                                            |
-| `id.test.ts`                     | `generateId` unique ID generation utility                                                     |
-| `manifest.test.ts`               | Manifest and runtime host assumptions used by tests                                             |
-| `messagesToCoreMessages.test.ts` | `messagesToCoreMessages` conversion from ChatMessage[] to core messages                       |
-| `modelDiscoveryHelpers.test.ts`  | `inferProvider`, `isEmbeddingOrUtilityModel`, `formatModelName` (table-driven with `it.each`) |
-| `normalizeEndpoint.test.ts`      | Endpoint URL normalization (trailing slashes, `/openai` suffixes, Foundry paths)              |
-| `officeStorage.test.ts`          | `officeStorage` localStorage fallback (OfficeRuntime undefined in jsdom)                      |
-| `officeStorageRuntime.test.ts`   | `officeStorage` behavior when OfficeRuntime is present and throws                               |
-| `parseFrontmatter.test.ts`       | YAML frontmatter parsing for skill files (delimiters, multiline scalars, tag arrays)          |
-| `settingsStore.test.ts`          | Zustand store: endpoint CRUD, model CRUD, cascade delete, auto-selection, URL dedup           |
-| `toolSchemas.test.ts`            | Zod `inputSchema` validation for all 83 tool definitions (valid accepts, invalid rejects)     |
-| `useToolInvocations-patch.test.tsx` | assistant-ui patch behavior for tool invocation argument streaming integrity                 |
+| File                                | What it tests                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `agentService.test.ts`              | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions                          |
+| `aiClientFactory.test.ts`           | Provider creation, caching, invalidation, and clear-all behavior                              |
+| `buildSkillContext.test.ts`         | `buildSkillContext` and related skill functions with bundled `.md` files                      |
+| `chatErrorBoundary.test.tsx`        | Error boundary fallback rendering and recovery flow                                           |
+| `chatPanel.test.tsx`                | ChatPanel component logic (mocks assistant-ui components for jsdom)                           |
+| `humanizeToolName.test.ts`          | Tool-name formatting for user-facing progress labels                                          |
+| `id.test.ts`                        | `generateId` unique ID generation utility                                                     |
+| `manifest.test.ts`                  | Manifest and runtime host assumptions used by tests                                           |
+| `messagesToCoreMessages.test.ts`    | `messagesToCoreMessages` conversion from ChatMessage[] to core messages                       |
+| `modelDiscoveryHelpers.test.ts`     | `inferProvider`, `isEmbeddingOrUtilityModel`, `formatModelName` (table-driven with `it.each`) |
+| `normalizeEndpoint.test.ts`         | Endpoint URL normalization (trailing slashes, `/openai` suffixes, Foundry paths)              |
+| `officeStorage.test.ts`             | `officeStorage` localStorage fallback (OfficeRuntime undefined in jsdom)                      |
+| `officeStorageRuntime.test.ts`      | `officeStorage` behavior when OfficeRuntime is present and throws                             |
+| `parseFrontmatter.test.ts`          | YAML frontmatter parsing for skill files (delimiters, multiline scalars, tag arrays)          |
+| `settingsStore.test.ts`             | Zustand store: endpoint CRUD, model CRUD, cascade delete, auto-selection, URL dedup           |
+| `toolSchemas.test.ts`               | Zod `inputSchema` validation for all 83 tool definitions (valid accepts, invalid rejects)     |
+| `useToolInvocations-patch.test.tsx` | assistant-ui patch behavior for tool invocation argument streaming integrity                  |
 
 **Key principle:** unit tests run against the **real** Zustand store with localStorage (jsdom). No mocking.
 
@@ -294,9 +297,83 @@ The AI agent uses a **split system prompt** architecture:
 
 `agentService` parses and filters agents by host. Agents are targeted via frontmatter `hosts` and can declare host defaults via `defaultForHosts`.
 
-### Skills
+### Skills and Agents
 
-Bundled skill files in `src/skills/` provide additional domain context injected into the system prompt. Skills can be toggled on/off via the SkillPicker (icon-only button with badge count in the header). Active skills are stored as `activeSkillNames` in the settings store (`null` = all ON).
+- Bundled skills/agents are a separate immutable category (read-only in UI).
+- Custom skills/agents are imported locally from ZIP files via picker management dialogs.
+- Imported items are persisted in settings storage and can be removed from the same management dialogs.
+
+#### Skills ZIP format (folder inference)
+
+Use a ZIP containing markdown files under `skills/`:
+
+```text
+my-skills.zip
+└── skills/
+    ├── security-review.md
+    └── finance-helper.md
+```
+
+Each skill markdown file must include frontmatter:
+
+```markdown
+---
+name: Security Review
+description: Threat-model and security-review guidance.
+version: 1.0.0
+tags:
+  - security
+  - review
+---
+
+Your skill instructions go here.
+```
+
+#### Agents ZIP format (folder inference)
+
+Use a ZIP containing markdown files under `agents/`:
+
+```text
+my-agents.zip
+└── agents/
+    ├── excel-data-analyst.md
+    └── powerpoint-storyteller.md
+```
+
+Each agent markdown file must include frontmatter with supported hosts:
+
+```markdown
+---
+name: Excel Data Analyst
+description: Focused Excel analysis assistant.
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+---
+
+Your agent instructions go here.
+```
+
+Notes:
+
+- Skills ZIP and Agents ZIP are imported separately.
+- If an imported item name collides with an existing one, the add-in keeps both and auto-suffixes the imported name.
+- Use `npm run extensions:samples` to generate starter ZIP files under `samples/extensions/`.
+
+#### Import and Management UX
+
+In picker management dialogs:
+
+- Open **Skill picker → Manage skills…** for skill import/removal
+- Open **Agent picker → Manage agents…** for agent import/removal
+- Import custom entries via **Import Skills ZIP** / **Import Agents ZIP**
+- Remove imported entries directly from Imported lists
+- View bundled entries separately in read-only sections
+
+In chat pickers:
+
+- Agent and skill lists are grouped by source (**Bundled** vs **Imported**)
+- Bundled category remains immutable; only imported entries are removable via Settings
 
 ### Key Hooks and Components
 

@@ -5,22 +5,33 @@
  * bundled `.md` skill files via the rawMarkdownPlugin in vitest.config.ts.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { AgentSkill } from '@/types/skill';
 import {
   buildSkillContext,
   getSkills,
   getSkill,
   parseFrontmatter,
+  setImportedSkills,
 } from '@/services/skills/skillService';
 
+beforeEach(() => {
+  setImportedSkills([]);
+});
+
+afterEach(() => {
+  setImportedSkills([]);
+});
+
 describe('buildSkillContext', () => {
-  it('returns empty string when no bundled skills exist', () => {
+  it('includes bundled skills when available', () => {
     const ctx = buildSkillContext();
-    expect(ctx).toBe('');
+    expect(ctx).toContain('# Agent Skills');
+    expect(ctx).toContain('Agent Skill: excel');
   });
 
-  it('returns empty string when activeNames provided but no skills are bundled', () => {
-    const ctx = buildSkillContext(['any-skill']);
+  it('returns empty string when activeNames do not match any skills', () => {
+    const ctx = buildSkillContext(['any-skill-that-does-not-exist']);
     expect(ctx).toBe('');
   });
 
@@ -39,12 +50,32 @@ describe('buildSkillContext', () => {
     const explicit = buildSkillContext(undefined);
     expect(explicit).toBe(all);
   });
+
+  it('resolves @references directives to internal skill and agent content', () => {
+    const importedSkill: AgentSkill = {
+      metadata: {
+        name: 'Ref Tester',
+        description: 'Skill that references internal context.',
+        version: '1.0.0',
+        tags: [],
+      },
+      content: `Intro for references\n@references skill:excel, agent:Excel\nEnd of skill`,
+    };
+
+    setImportedSkills([importedSkill]);
+
+    const context = buildSkillContext(['Ref Tester']);
+    expect(context).toContain('Reference: skill:excel');
+    expect(context).toContain('Reference: agent:Excel');
+    expect(context).toContain('You are an AI assistant running inside a Microsoft Excel add-in.');
+  });
 });
 
 describe('getSkills', () => {
-  it('returns empty list when no bundled skills are configured', () => {
+  it('returns bundled skills', () => {
     const skills = getSkills();
-    expect(skills).toEqual([]);
+    expect(skills.length).toBeGreaterThan(0);
+    expect(skills.some(skill => skill.metadata.name === 'excel')).toBe(true);
   });
 
   it('each skill has metadata with a name', () => {
@@ -65,8 +96,10 @@ describe('getSkill', () => {
     expect(getSkill('nonexistent-skill-xyz')).toBeUndefined();
   });
 
-  it('returns undefined when no skills are bundled', () => {
-    expect(getSkill('any-skill')).toBeUndefined();
+  it('returns bundled excel skill by name', () => {
+    const skill = getSkill('excel');
+    expect(skill).toBeDefined();
+    expect(skill?.metadata.name).toBe('excel');
   });
 });
 
@@ -106,5 +139,17 @@ tags:
 Content`;
     const { metadata } = parseFrontmatter(raw);
     expect(metadata.tags).toEqual(['azure', 'excel']);
+  });
+
+  it('parses references array', () => {
+    const raw = `---
+name: with-refs
+references:
+  - skill:excel
+  - agent:Excel
+---
+Content`;
+    const { metadata } = parseFrontmatter(raw);
+    expect(metadata.references).toEqual(['skill:excel', 'agent:Excel']);
   });
 });

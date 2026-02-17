@@ -39,11 +39,11 @@ describe('Integration: ChatHeader', () => {
     mockClearMessages.mockClear();
   });
 
-  it('renders title and toolbar buttons', () => {
+  it('renders title, skill picker, and toolbar buttons', () => {
     renderWithProviders(<StatefulChatHeader onClearMessages={mockClearMessages} />);
 
     expect(screen.getByText('AI Chat')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Agent skills')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Agent skills')).toBeInTheDocument();
     expect(screen.getByLabelText('New conversation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
   });
