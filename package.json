@@ -34,7 +34,8 @@
     "audit:tools:strict": "npx tsx scripts/check-tool-coverage.ts --strict",
     "runtime-logging-enable": "office-addin-dev-settings runtime-log --enable",
     "runtime-logging-disable": "office-addin-dev-settings runtime-log --disable",
-    "runtime-logging-show": "office-addin-dev-settings runtime-log"
+    "runtime-logging-show": "office-addin-dev-settings runtime-log",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@ai-sdk/azure": "^3.0.29",
@@ -89,6 +90,7 @@
     "office-addin-dev-certs": "^2.0.6",
     "office-addin-dev-settings": "^2.0.3",
     "office-addin-mock": "^3.0.6",
+    "patch-package": "^8.0.1",
     "postcss": "^8.5.6",
     "postcss-loader": "^8.2.1",
     "prettier": "^3.8.1",
