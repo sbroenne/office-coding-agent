@@ -101,6 +101,11 @@ module.exports = async (env, options) => {
       }),
       ...(isDev ? [] : [new MiniCssExtractPlugin({ filename: '[name].[contenthash].css' })]),
     ],
+    // Office task panes ship a single bundled entry loaded in WebView; webpack's generic web perf
+    // asset-size hints are noisy here and not actionable for our sideloaded add-in packaging model.
+    performance: {
+      hints: false,
+    },
     devtool: isDev ? 'source-map' : false,
   };
 };

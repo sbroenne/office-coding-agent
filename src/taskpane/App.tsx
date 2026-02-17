@@ -1,4 +1,11 @@
-import React, { useEffect, useState, useCallback, useSyncExternalStore, useMemo, useRef } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useSyncExternalStore,
+  useMemo,
+  useRef,
+} from 'react';
 import { Loader2 } from 'lucide-react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { useAISDKRuntime } from '@assistant-ui/react-ai-sdk';

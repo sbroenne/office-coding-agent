@@ -37,7 +37,7 @@ describe('SettingsDialog CRUD', () => {
       <SettingsDialog open={true} onOpenChange={onOpenChange} />
     );
 
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
 
     // Click Close
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -123,6 +123,23 @@ describe('SettingsDialog CRUD', () => {
     // Fill only display name — still disabled
     await userEvent.type(screen.getByPlaceholderText('My AI Foundry Resource'), 'Test');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('keeps Save disabled until API key is provided', async () => {
+    renderWithProviders(<SettingsDialog open={true} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Add Endpoint/ }));
+
+    await userEvent.type(screen.getByPlaceholderText('My AI Foundry Resource'), 'Test');
+    await userEvent.type(
+      screen.getByPlaceholderText('https://your-resource.openai.azure.com'),
+      'https://test.openai.azure.com'
+    );
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    await userEvent.type(screen.getByPlaceholderText('Enter API key'), 'test-key');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
   it('Cancel closes the form without saving', async () => {

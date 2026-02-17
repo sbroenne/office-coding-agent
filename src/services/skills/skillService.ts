@@ -111,37 +111,15 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
   }
 }
 
-/** All bundled skills, parsed at module load time. */
-interface WebpackSkillContext {
-  keys(): string[];
-  (request: string): string;
-}
-
-interface RequireWithWebpackContext extends NodeRequire {
-  context?: (path: string, deep?: boolean, filter?: RegExp) => WebpackSkillContext;
-}
-
 function loadBundledSkills(): AgentSkill[] {
-  const loaded: AgentSkill[] = [];
+  const bundledRawSkills = [excelSkillRaw];
 
-  const webpackRequire =
-    typeof require === 'function' ? (require as RequireWithWebpackContext) : undefined;
+  const loaded = bundledRawSkills.map(raw => {
+    const parsed = parseFrontmatter(raw);
+    return { metadata: parsed.metadata, content: parsed.content };
+  });
 
-  if (webpackRequire?.context) {
-    const context = webpackRequire.context('../../skills', true, /SKILL\.md$/);
-    for (const key of context.keys()) {
-      const raw = context(key);
-      const parsed = parseFrontmatter(raw);
-      loaded.push({ metadata: parsed.metadata, content: parsed.content });
-    }
-
-    return loaded.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
-  }
-
-  const parsedExcel = parseFrontmatter(excelSkillRaw);
-  loaded.push({ metadata: parsedExcel.metadata, content: parsedExcel.content });
-
-  return loaded;
+  return loaded.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
 }
 
 const bundledSkills: AgentSkill[] = loadBundledSkills();
