@@ -5,10 +5,7 @@
 import type { ToolConfig } from '../codegen';
 import { getSheet } from '../codegen';
 
-function getPivotField(
-  pt: Excel.PivotTable,
-  fieldName: string
-): Excel.PivotField {
+function getPivotField(pt: Excel.PivotTable, fieldName: string): Excel.PivotField {
   const hierarchy = pt.hierarchies.getItem(fieldName);
   return hierarchy.fields.getItem(fieldName);
 }
@@ -98,6 +95,30 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
   },
 
   {
+    name: 'refresh_all_pivot_tables',
+    description:
+      'Refresh all PivotTables. If sheetName is provided, refreshes PivotTables on that worksheet; otherwise refreshes all workbook PivotTables.',
+    params: {
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name to scope refresh to one sheet.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheetName = args.sheetName as string | undefined;
+      if (sheetName) {
+        const sheet = getSheet(context, sheetName);
+        sheet.pivotTables.refreshAll();
+      } else {
+        context.workbook.pivotTables.refreshAll();
+      }
+      await context.sync();
+      return { refreshed: true, sheetName: sheetName ?? null };
+    },
+  },
+
+  {
     name: 'get_pivot_table_source_info',
     description:
       'Get PivotTable source metadata, including source type and source address/connection string when available.',
@@ -118,6 +139,62 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
         pivotTableName,
         dataSourceType: sourceTypeResult.value,
         dataSourceString: sourceStringResult.value,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_hierarchy_counts',
+    description:
+      'Get counts of row, column, filter, and data hierarchies currently configured on a PivotTable.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+
+      const rowCount = pt.rowHierarchies.getCount();
+      const columnCount = pt.columnHierarchies.getCount();
+      const filterCount = pt.filterHierarchies.getCount();
+      const dataCount = pt.dataHierarchies.getCount();
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        rowHierarchyCount: rowCount.value,
+        columnHierarchyCount: columnCount.value,
+        filterHierarchyCount: filterCount.value,
+        dataHierarchyCount: dataCount.value,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_hierarchies',
+    description:
+      'List row, column, filter, and data hierarchies for a PivotTable including names and ids.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+
+      pt.rowHierarchies.load('items/name,id');
+      pt.columnHierarchies.load('items/name,id');
+      pt.filterHierarchies.load('items/name,id');
+      pt.dataHierarchies.load('items/name,id');
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        rowHierarchies: pt.rowHierarchies.items.map(h => ({ name: h.name, id: h.id })),
+        columnHierarchies: pt.columnHierarchies.items.map(h => ({ name: h.name, id: h.id })),
+        filterHierarchies: pt.filterHierarchies.items.map(h => ({ name: h.name, id: h.id })),
+        dataHierarchies: pt.dataHierarchies.items.map(h => ({ name: h.name, id: h.id })),
       };
     },
   },
@@ -428,6 +505,36 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
   },
 
   {
+    name: 'get_pivot_field_items',
+    description:
+      'List PivotItems for a PivotField, including item names, ids, and expand state.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+
+      field.items.load('items/name,id,isExpanded');
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        items: field.items.items.map(item => ({
+          name: item.name,
+          id: item.id,
+          isExpanded: item.isExpanded,
+        })),
+        count: field.items.items.length,
+      };
+    },
+  },
+
+  {
     name: 'clear_pivot_field_filters',
     description:
       'Clear filters on a PivotField. If filterType is omitted, clears all filters; otherwise clears only the specified filter type.',
@@ -688,6 +795,345 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
         fieldName: args.fieldName,
         showAllItems: field.showAllItems,
         updated: true,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_layout_ranges',
+    description:
+      'Get key PivotLayout range addresses (table, row labels, column labels, data body, and filter axis when available).',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const layout = pt.layout;
+
+      const tableRange = layout.getRange();
+      const rowLabelRange = layout.getRowLabelRange();
+      const columnLabelRange = layout.getColumnLabelRange();
+      const dataBodyRange = layout.getDataBodyRange();
+
+      tableRange.load('address');
+      rowLabelRange.load('address');
+      columnLabelRange.load('address');
+      dataBodyRange.load('address');
+      await context.sync();
+
+      let filterAxisAddress: string | null = null;
+      try {
+        const filterAxisRange = layout.getFilterAxisRange();
+        filterAxisRange.load('address');
+        await context.sync();
+        filterAxisAddress = filterAxisRange.address;
+      } catch {
+        filterAxisAddress = null;
+      }
+
+      return {
+        pivotTableName: args.pivotTableName,
+        tableRangeAddress: tableRange.address,
+        rowLabelRangeAddress: rowLabelRange.address,
+        columnLabelRangeAddress: columnLabelRange.address,
+        dataBodyRangeAddress: dataBodyRange.address,
+        filterAxisRangeAddress: filterAxisAddress,
+      };
+    },
+  },
+
+  {
+    name: 'set_pivot_layout_display_options',
+    description:
+      'Configure PivotLayout display and formatting behavior such as repeat labels, blank lines, auto-format, empty-cell text, and accessibility text.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      repeatAllItemLabels: {
+        type: 'boolean',
+        required: false,
+        description: 'Repeat item labels across all pivot fields',
+      },
+      displayBlankLineAfterEachItem: {
+        type: 'boolean',
+        required: false,
+        description: 'Display a blank line after each pivot item across fields',
+      },
+      autoFormat: {
+        type: 'boolean',
+        required: false,
+        description: 'Auto-apply formatting when refreshed or fields move',
+      },
+      preserveFormatting: {
+        type: 'boolean',
+        required: false,
+        description: 'Preserve formatting on refresh/recalculate',
+      },
+      fillEmptyCells: {
+        type: 'boolean',
+        required: false,
+        description: 'Fill empty pivot cells using emptyCellText',
+      },
+      emptyCellText: {
+        type: 'string',
+        required: false,
+        description: 'Text used when fillEmptyCells is enabled',
+      },
+      enableFieldList: {
+        type: 'boolean',
+        required: false,
+        description: 'Enable/disable field list in UI',
+      },
+      altTextTitle: {
+        type: 'string',
+        required: false,
+        description: 'Accessibility alt text title for the PivotTable',
+      },
+      altTextDescription: {
+        type: 'string',
+        required: false,
+        description: 'Accessibility alt text description for the PivotTable',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const layout = pt.layout;
+
+      if (args.repeatAllItemLabels !== undefined) {
+        layout.repeatAllItemLabels(args.repeatAllItemLabels as boolean);
+      }
+      if (args.displayBlankLineAfterEachItem !== undefined) {
+        layout.displayBlankLineAfterEachItem(args.displayBlankLineAfterEachItem as boolean);
+      }
+      if (args.autoFormat !== undefined) {
+        layout.autoFormat = args.autoFormat as boolean;
+      }
+      if (args.preserveFormatting !== undefined) {
+        layout.preserveFormatting = args.preserveFormatting as boolean;
+      }
+      if (args.fillEmptyCells !== undefined) {
+        layout.fillEmptyCells = args.fillEmptyCells as boolean;
+      }
+      if (args.emptyCellText !== undefined) {
+        layout.emptyCellText = args.emptyCellText as string;
+      }
+      if (args.enableFieldList !== undefined) {
+        layout.enableFieldList = args.enableFieldList as boolean;
+      }
+      if (args.altTextTitle !== undefined) {
+        layout.altTextTitle = args.altTextTitle as string;
+      }
+      if (args.altTextDescription !== undefined) {
+        layout.altTextDescription = args.altTextDescription as string;
+      }
+
+      layout.load([
+        'autoFormat',
+        'preserveFormatting',
+        'fillEmptyCells',
+        'emptyCellText',
+        'enableFieldList',
+        'altTextTitle',
+        'altTextDescription',
+      ]);
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        autoFormat: layout.autoFormat,
+        preserveFormatting: layout.preserveFormatting,
+        fillEmptyCells: layout.fillEmptyCells,
+        emptyCellText: layout.emptyCellText,
+        enableFieldList: layout.enableFieldList,
+        altTextTitle: layout.altTextTitle,
+        altTextDescription: layout.altTextDescription,
+        updated: true,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_data_hierarchy_for_cell',
+    description:
+      'Get the DataPivotHierarchy (measure) used to compute a specific cell in the PivotTable data body.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      cellAddress: {
+        type: 'string',
+        description: 'Single cell address inside the PivotTable data body (e.g., "B5")',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const layout = pt.layout;
+      const hierarchy = layout.getDataHierarchy(args.cellAddress as string);
+
+      hierarchy.load(['name', 'id']);
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        cellAddress: args.cellAddress,
+        dataHierarchyName: hierarchy.name,
+        dataHierarchyId: hierarchy.id,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_items_for_cell',
+    description:
+      'Get PivotItems from a specified axis that contribute to a PivotTable data-body cell value.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      axis: {
+        type: 'string',
+        description: 'Pivot axis to inspect for contributing items',
+        enum: ['Row', 'Column', 'Data', 'Filter'],
+      },
+      cellAddress: {
+        type: 'string',
+        description: 'Single cell address inside the PivotTable data body (e.g., "B5")',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const layout = pt.layout;
+      const axis = args.axis as 'Row' | 'Column' | 'Data' | 'Filter';
+      const items = layout.getPivotItems(axis, args.cellAddress as string);
+
+      items.load('items/name,id,isExpanded');
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        axis,
+        cellAddress: args.cellAddress,
+        items: items.items.map(item => ({
+          name: item.name,
+          id: item.id,
+          isExpanded: item.isExpanded,
+        })),
+        count: items.items.length,
+      };
+    },
+  },
+
+  {
+    name: 'set_pivot_layout_auto_sort_on_cell',
+    description:
+      'Apply PivotTable autosort using a specific pivot data-body cell as context (equivalent to UI autosort behavior).',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      cellAddress: {
+        type: 'string',
+        description: 'Single cell address inside the PivotTable data body used as autosort context',
+      },
+      sortBy: {
+        type: 'string',
+        description: 'Sort direction for autosort',
+        enum: ['Ascending', 'Descending'],
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const layout = pt.layout;
+
+      layout.setAutoSortOnCell(args.cellAddress as string, args.sortBy as Excel.SortBy);
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        cellAddress: args.cellAddress,
+        sortBy: args.sortBy,
+        sorted: true,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_table_count',
+    description:
+      'Get the PivotTable count for a worksheet or for the entire workbook when no sheet is provided.',
+    params: {
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name. If omitted, counts PivotTables in the workbook.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheetName = args.sheetName as string | undefined;
+      const count = sheetName
+        ? getSheet(context, sheetName).pivotTables.getCount()
+        : context.workbook.pivotTables.getCount();
+      await context.sync();
+
+      return { count: count.value, scope: sheetName ?? 'workbook' };
+    },
+  },
+
+  {
+    name: 'pivot_table_exists',
+    description:
+      'Check whether a PivotTable exists by name on a worksheet or across workbook PivotTables.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable to check' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheetName = args.sheetName as string | undefined;
+      const pivotTableName = args.pivotTableName as string;
+
+      const collection = sheetName
+        ? getSheet(context, sheetName).pivotTables
+        : context.workbook.pivotTables;
+      const pt = collection.getItemOrNullObject(pivotTableName);
+      pt.load('isNullObject,name,id');
+      await context.sync();
+
+      return {
+        pivotTableName,
+        exists: !pt.isNullObject,
+        sheetName: sheetName ?? null,
+        id: pt.isNullObject ? null : pt.id,
+        resolvedName: pt.isNullObject ? null : pt.name,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_table_location',
+    description:
+      'Get PivotTable worksheet name and layout range address for a named PivotTable on a worksheet.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheetName = args.sheetName as string | undefined;
+      const pivotTableName = args.pivotTableName as string;
+      const sheet = getSheet(context, sheetName);
+      const pt = sheet.pivotTables.getItem(pivotTableName);
+      const tableRange = pt.layout.getRange();
+
+      pt.worksheet.load('name');
+      tableRange.load('address');
+      await context.sync();
+
+      return {
+        pivotTableName,
+        worksheetName: pt.worksheet.name,
+        rangeAddress: tableRange.address,
       };
     },
   },
