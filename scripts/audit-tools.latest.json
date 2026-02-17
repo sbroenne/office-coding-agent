@@ -1,0 +1,3347 @@
+
+> office-coding-agent@0.1.0 audit:tools
+> npx tsx scripts/check-tool-coverage.ts --json
+
+{
+  "manifestToolCount": 112,
+  "excelTypeCount": 366,
+  "totalMembers": 2812,
+  "coveredMembers": 206,
+  "uncoveredMembers": 2606,
+  "coveragePercent": 7,
+  "goldenMapEntryCount": 170,
+  "generatedMapEntryCount": 19,
+  "mapEntryCount": 189,
+  "uncoveredByType": {
+    "AllowEditRange": [
+      "AllowEditRange.address",
+      "AllowEditRange.delete()",
+      "AllowEditRange.isPasswordProtected",
+      "AllowEditRange.pauseProtection()",
+      "AllowEditRange.setPassword()",
+      "AllowEditRange.title"
+    ],
+    "AllowEditRangeCollection": [
+      "AllowEditRangeCollection.add()",
+      "AllowEditRangeCollection.getCount()",
+      "AllowEditRangeCollection.getItem()",
+      "AllowEditRangeCollection.getItemAt()",
+      "AllowEditRangeCollection.getItemOrNullObject()",
+      "AllowEditRangeCollection.items",
+      "AllowEditRangeCollection.pauseProtection()"
+    ],
+    "AllowEditRangeOptions": [
+      "AllowEditRangeOptions.password"
+    ],
+    "Application": [
+      "Application.activeWindow",
+      "Application.calculationEngineVersion",
+      "Application.calculationMode",
+      "Application.calculationState",
+      "Application.checkSpelling()",
+      "Application.cultureInfo",
+      "Application.decimalSeparator",
+      "Application.enterEditingMode()",
+      "Application.iterativeCalculation",
+      "Application.suspendApiCalculationUntilNextSync()",
+      "Application.suspendScreenUpdatingUntilNextSync()",
+      "Application.thousandsSeparator",
+      "Application.union()",
+      "Application.useSystemSeparators",
+      "Application.windows"
+    ],
+    "ArrayCellValue": [
+      "ArrayCellValue.basicType",
+      "ArrayCellValue.basicValue",
+      "ArrayCellValue.elements",
+      "ArrayCellValue.referencedValues",
+      "ArrayCellValue.type"
+    ],
+    "AutoFilter": [
+      "AutoFilter.apply()",
+      "AutoFilter.clearColumnCriteria()",
+      "AutoFilter.clearCriteria()",
+      "AutoFilter.criteria",
+      "AutoFilter.enabled",
+      "AutoFilter.getRange()",
+      "AutoFilter.getRangeOrNullObject()",
+      "AutoFilter.isDataFiltered",
+      "AutoFilter.reapply()",
+      "AutoFilter.remove()"
+    ],
+    "BasicCardLayout": [
+      "BasicCardLayout.layout"
+    ],
+    "BasicCompactLayout": [
+      "BasicCompactLayout.icon"
+    ],
+    "BasicDataValidation": [
+      "BasicDataValidation.formula1",
+      "BasicDataValidation.formula2",
+      "BasicDataValidation.operator"
+    ],
+    "BasicViewLayouts": [
+      "BasicViewLayouts.card",
+      "BasicViewLayouts.compact"
+    ],
+    "Binding": [
+      "Binding.delete()",
+      "Binding.getRange()",
+      "Binding.getTable()",
+      "Binding.getText()",
+      "Binding.id",
+      "Binding.onDataChanged",
+      "Binding.onSelectionChanged",
+      "Binding.type"
+    ],
+    "BindingCollection": [
+      "BindingCollection.add()",
+      "BindingCollection.add()",
+      "BindingCollection.addFromNamedItem()",
+      "BindingCollection.addFromNamedItem()",
+      "BindingCollection.addFromSelection()",
+      "BindingCollection.addFromSelection()",
+      "BindingCollection.count",
+      "BindingCollection.getCount()",
+      "BindingCollection.getItem()",
+      "BindingCollection.getItemAt()",
+      "BindingCollection.getItemOrNullObject()",
+      "BindingCollection.items"
+    ],
+    "BindingDataChangedEventArgs": [
+      "BindingDataChangedEventArgs.binding"
+    ],
+    "BindingSelectionChangedEventArgs": [
+      "BindingSelectionChangedEventArgs.binding",
+      "BindingSelectionChangedEventArgs.columnCount",
+      "BindingSelectionChangedEventArgs.rowCount",
+      "BindingSelectionChangedEventArgs.startColumn",
+      "BindingSelectionChangedEventArgs.startRow"
+    ],
+    "BlockedErrorCellValue": [
+      "BlockedErrorCellValue.basicType",
+      "BlockedErrorCellValue.basicValue",
+      "BlockedErrorCellValue.errorSubType",
+      "BlockedErrorCellValue.errorType",
+      "BlockedErrorCellValue.type"
+    ],
+    "BooleanCellValue": [
+      "BooleanCellValue.basicType",
+      "BooleanCellValue.basicValue",
+      "BooleanCellValue.layouts",
+      "BooleanCellValue.properties",
+      "BooleanCellValue.provider",
+      "BooleanCellValue.referencedValues",
+      "BooleanCellValue.type"
+    ],
+    "BusyErrorCellValue": [
+      "BusyErrorCellValue.basicType",
+      "BusyErrorCellValue.basicValue",
+      "BusyErrorCellValue.errorSubType",
+      "BusyErrorCellValue.errorType",
+      "BusyErrorCellValue.type"
+    ],
+    "CalcErrorCellValue": [
+      "CalcErrorCellValue.basicType",
+      "CalcErrorCellValue.basicValue",
+      "CalcErrorCellValue.errorSubType",
+      "CalcErrorCellValue.errorType",
+      "CalcErrorCellValue.functionName",
+      "CalcErrorCellValue.type"
+    ],
+    "CardLayoutListSection": [
+      "CardLayoutListSection.layout"
+    ],
+    "CardLayoutPropertyReference": [
+      "CardLayoutPropertyReference.property"
+    ],
+    "CardLayoutSectionStandardProperties": [
+      "CardLayoutSectionStandardProperties.collapsed",
+      "CardLayoutSectionStandardProperties.collapsible",
+      "CardLayoutSectionStandardProperties.properties",
+      "CardLayoutSectionStandardProperties.title"
+    ],
+    "CardLayoutStandardProperties": [
+      "CardLayoutStandardProperties.mainImage",
+      "CardLayoutStandardProperties.sections",
+      "CardLayoutStandardProperties.subTitle",
+      "CardLayoutStandardProperties.title"
+    ],
+    "CardLayoutTableSection": [
+      "CardLayoutTableSection.layout"
+    ],
+    "CardLayoutTwoColumnSection": [
+      "CardLayoutTwoColumnSection.layout"
+    ],
+    "CellBorder": [
+      "CellBorder.color",
+      "CellBorder.style",
+      "CellBorder.tintAndShade",
+      "CellBorder.weight"
+    ],
+    "CellBorderCollection": [
+      "CellBorderCollection.bottom",
+      "CellBorderCollection.diagonalDown",
+      "CellBorderCollection.diagonalUp",
+      "CellBorderCollection.horizontal",
+      "CellBorderCollection.left",
+      "CellBorderCollection.right",
+      "CellBorderCollection.top",
+      "CellBorderCollection.vertical"
+    ],
+    "CellProperties": [
+      "CellProperties.address",
+      "CellProperties.addressLocal",
+      "CellProperties.hidden"
+    ],
+    "CellPropertiesFill": [
+      "CellPropertiesFill.color",
+      "CellPropertiesFill.pattern",
+      "CellPropertiesFill.patternColor",
+      "CellPropertiesFill.patternTintAndShade",
+      "CellPropertiesFill.tintAndShade"
+    ],
+    "CellPropertiesFont": [
+      "CellPropertiesFont.bold",
+      "CellPropertiesFont.color",
+      "CellPropertiesFont.italic",
+      "CellPropertiesFont.name",
+      "CellPropertiesFont.size",
+      "CellPropertiesFont.strikethrough",
+      "CellPropertiesFont.subscript",
+      "CellPropertiesFont.superscript",
+      "CellPropertiesFont.tintAndShade",
+      "CellPropertiesFont.underline"
+    ],
+    "CellPropertiesFormat": [
+      "CellPropertiesFormat.autoIndent",
+      "CellPropertiesFormat.borders",
+      "CellPropertiesFormat.fill",
+      "CellPropertiesFormat.font",
+      "CellPropertiesFormat.horizontalAlignment",
+      "CellPropertiesFormat.indentLevel",
+      "CellPropertiesFormat.protection",
+      "CellPropertiesFormat.readingOrder",
+      "CellPropertiesFormat.shrinkToFit",
+      "CellPropertiesFormat.textOrientation",
+      "CellPropertiesFormat.useStandardHeight",
+      "CellPropertiesFormat.useStandardWidth",
+      "CellPropertiesFormat.verticalAlignment",
+      "CellPropertiesFormat.wrapText"
+    ],
+    "CellPropertiesProtection": [
+      "CellPropertiesProtection.formulaHidden",
+      "CellPropertiesProtection.locked"
+    ],
+    "CellValueAttributionAttributes": [
+      "CellValueAttributionAttributes.licenseAddress",
+      "CellValueAttributionAttributes.licenseText",
+      "CellValueAttributionAttributes.sourceAddress",
+      "CellValueAttributionAttributes.sourceText"
+    ],
+    "CellValueConditionalFormat": [
+      "CellValueConditionalFormat.format",
+      "CellValueConditionalFormat.rule"
+    ],
+    "CellValueExtraProperties": [
+      "CellValueExtraProperties.writable",
+      "CellValueExtraProperties.writableNote"
+    ],
+    "CellValuePropertyMetadata": [
+      "CellValuePropertyMetadata.attribution",
+      "CellValuePropertyMetadata.excludeFrom",
+      "CellValuePropertyMetadata.sublabel"
+    ],
+    "CellValuePropertyMetadataExclusions": [
+      "CellValuePropertyMetadataExclusions.autoComplete",
+      "CellValuePropertyMetadataExclusions.calcCompare",
+      "CellValuePropertyMetadataExclusions.cardView",
+      "CellValuePropertyMetadataExclusions.dotNotation"
+    ],
+    "CellValueProviderAttributes": [
+      "CellValueProviderAttributes.description",
+      "CellValueProviderAttributes.logoSourceAddress",
+      "CellValueProviderAttributes.logoTargetAddress"
+    ],
+    "ChangedEventDetail": [
+      "ChangedEventDetail.valueAfter",
+      "ChangedEventDetail.valueAsJsonAfter",
+      "ChangedEventDetail.valueAsJsonBefore",
+      "ChangedEventDetail.valueBefore",
+      "ChangedEventDetail.valueTypeAfter",
+      "ChangedEventDetail.valueTypeBefore"
+    ],
+    "ChangeDirectionState": [
+      "ChangeDirectionState.deleteShiftDirection",
+      "ChangeDirectionState.insertShiftDirection"
+    ],
+    "Chart": [
+      "Chart.activate()",
+      "Chart.categoryLabelLevel",
+      "Chart.dataLabels",
+      "Chart.displayBlanksAs",
+      "Chart.format",
+      "Chart.getDataTable()",
+      "Chart.getDataTableOrNullObject()",
+      "Chart.getImage()",
+      "Chart.getImage()",
+      "Chart.id",
+      "Chart.onActivated",
+      "Chart.onDeactivated",
+      "Chart.pivotOptions",
+      "Chart.plotArea",
+      "Chart.plotBy",
+      "Chart.plotVisibleOnly",
+      "Chart.seriesNameLevel",
+      "Chart.showAllFieldButtons",
+      "Chart.showDataLabelsOverMaximum",
+      "Chart.style"
+    ],
+    "ChartActivatedEventArgs": [
+      "ChartActivatedEventArgs.chartId",
+      "ChartActivatedEventArgs.type",
+      "ChartActivatedEventArgs.worksheetId"
+    ],
+    "ChartAddedEventArgs": [
+      "ChartAddedEventArgs.chartId",
+      "ChartAddedEventArgs.source",
+      "ChartAddedEventArgs.type",
+      "ChartAddedEventArgs.worksheetId"
+    ],
+    "ChartAreaFormat": [
+      "ChartAreaFormat.border",
+      "ChartAreaFormat.colorScheme",
+      "ChartAreaFormat.fill",
+      "ChartAreaFormat.font",
+      "ChartAreaFormat.roundedCorners"
+    ],
+    "ChartAxes": [
+      "ChartAxes.categoryAxis",
+      "ChartAxes.seriesAxis",
+      "ChartAxes.valueAxis"
+    ],
+    "ChartAxis": [
+      "ChartAxis.alignment",
+      "ChartAxis.axisGroup",
+      "ChartAxis.baseTimeUnit",
+      "ChartAxis.categoryType",
+      "ChartAxis.customDisplayUnit",
+      "ChartAxis.displayUnit",
+      "ChartAxis.format",
+      "ChartAxis.height",
+      "ChartAxis.isBetweenCategories",
+      "ChartAxis.left",
+      "ChartAxis.linkNumberFormat",
+      "ChartAxis.logBase",
+      "ChartAxis.majorGridlines",
+      "ChartAxis.majorTickMark",
+      "ChartAxis.majorTimeUnitScale",
+      "ChartAxis.majorUnit",
+      "ChartAxis.maximum",
+      "ChartAxis.minimum",
+      "ChartAxis.minorGridlines",
+      "ChartAxis.minorTickMark",
+      "ChartAxis.minorTimeUnitScale",
+      "ChartAxis.minorUnit",
+      "ChartAxis.multiLevel",
+      "ChartAxis.numberFormat",
+      "ChartAxis.offset",
+      "ChartAxis.position",
+      "ChartAxis.positionAt",
+      "ChartAxis.reversePlotOrder",
+      "ChartAxis.scaleType",
+      "ChartAxis.setCategoryNames()",
+      "ChartAxis.setCustomDisplayUnit()",
+      "ChartAxis.setPositionAt()",
+      "ChartAxis.showDisplayUnitLabel",
+      "ChartAxis.textOrientation",
+      "ChartAxis.tickLabelPosition",
+      "ChartAxis.tickLabelSpacing",
+      "ChartAxis.tickMarkSpacing",
+      "ChartAxis.top",
+      "ChartAxis.type",
+      "ChartAxis.width"
+    ],
+    "ChartAxisFormat": [
+      "ChartAxisFormat.fill",
+      "ChartAxisFormat.font",
+      "ChartAxisFormat.line"
+    ],
+    "ChartAxisTitle": [
+      "ChartAxisTitle.format",
+      "ChartAxisTitle.setFormula()",
+      "ChartAxisTitle.textOrientation"
+    ],
+    "ChartAxisTitleFormat": [
+      "ChartAxisTitleFormat.border",
+      "ChartAxisTitleFormat.fill",
+      "ChartAxisTitleFormat.font"
+    ],
+    "ChartBinOptions": [
+      "ChartBinOptions.allowOverflow",
+      "ChartBinOptions.allowUnderflow",
+      "ChartBinOptions.count",
+      "ChartBinOptions.overflowValue",
+      "ChartBinOptions.type",
+      "ChartBinOptions.underflowValue",
+      "ChartBinOptions.width"
+    ],
+    "ChartBorder": [
+      "ChartBorder.clear()",
+      "ChartBorder.color",
+      "ChartBorder.lineStyle",
+      "ChartBorder.weight"
+    ],
+    "ChartBoxwhiskerOptions": [
+      "ChartBoxwhiskerOptions.quartileCalculation",
+      "ChartBoxwhiskerOptions.showInnerPoints",
+      "ChartBoxwhiskerOptions.showMeanLine",
+      "ChartBoxwhiskerOptions.showMeanMarker",
+      "ChartBoxwhiskerOptions.showOutlierPoints"
+    ],
+    "ChartCollection": [
+      "ChartCollection.count",
+      "ChartCollection.getCount()",
+      "ChartCollection.getItem()",
+      "ChartCollection.getItemAt()",
+      "ChartCollection.getItemOrNullObject()",
+      "ChartCollection.onActivated",
+      "ChartCollection.onAdded",
+      "ChartCollection.onDeactivated",
+      "ChartCollection.onDeleted"
+    ],
+    "ChartDataLabel": [
+      "ChartDataLabel.autoText",
+      "ChartDataLabel.format",
+      "ChartDataLabel.formula",
+      "ChartDataLabel.geometricShapeType",
+      "ChartDataLabel.getSubstring()",
+      "ChartDataLabel.getTailAnchor()",
+      "ChartDataLabel.height",
+      "ChartDataLabel.horizontalAlignment",
+      "ChartDataLabel.left",
+      "ChartDataLabel.linkNumberFormat",
+      "ChartDataLabel.numberFormat",
+      "ChartDataLabel.position",
+      "ChartDataLabel.separator",
+      "ChartDataLabel.setHeight()",
+      "ChartDataLabel.setWidth()",
+      "ChartDataLabel.showAsStickyCallout",
+      "ChartDataLabel.showBubbleSize",
+      "ChartDataLabel.showCategoryName",
+      "ChartDataLabel.showLegendKey",
+      "ChartDataLabel.showPercentage",
+      "ChartDataLabel.showSeriesName",
+      "ChartDataLabel.showValue",
+      "ChartDataLabel.text",
+      "ChartDataLabel.textOrientation",
+      "ChartDataLabel.top",
+      "ChartDataLabel.verticalAlignment",
+      "ChartDataLabel.width"
+    ],
+    "ChartDataLabelAnchor": [
+      "ChartDataLabelAnchor.left",
+      "ChartDataLabelAnchor.top"
+    ],
+    "ChartDataLabelFormat": [
+      "ChartDataLabelFormat.border",
+      "ChartDataLabelFormat.fill",
+      "ChartDataLabelFormat.font"
+    ],
+    "ChartDataLabels": [
+      "ChartDataLabels.autoText",
+      "ChartDataLabels.format",
+      "ChartDataLabels.geometricShapeType",
+      "ChartDataLabels.horizontalAlignment",
+      "ChartDataLabels.leaderLines",
+      "ChartDataLabels.linkNumberFormat",
+      "ChartDataLabels.numberFormat",
+      "ChartDataLabels.position",
+      "ChartDataLabels.separator",
+      "ChartDataLabels.showAsStickyCallout",
+      "ChartDataLabels.showBubbleSize",
+      "ChartDataLabels.showCategoryName",
+      "ChartDataLabels.showLeaderLines",
+      "ChartDataLabels.showLegendKey",
+      "ChartDataLabels.showPercentage",
+      "ChartDataLabels.showSeriesName",
+      "ChartDataLabels.showValue",
+      "ChartDataLabels.textOrientation",
+      "ChartDataLabels.verticalAlignment"
+    ],
+    "ChartDataTable": [
+      "ChartDataTable.format",
+      "ChartDataTable.showHorizontalBorder",
+      "ChartDataTable.showLegendKey",
+      "ChartDataTable.showOutlineBorder",
+      "ChartDataTable.showVerticalBorder",
+      "ChartDataTable.visible"
+    ],
+    "ChartDataTableFormat": [
+      "ChartDataTableFormat.border",
+      "ChartDataTableFormat.fill",
+      "ChartDataTableFormat.font"
+    ],
+    "ChartDeactivatedEventArgs": [
+      "ChartDeactivatedEventArgs.chartId",
+      "ChartDeactivatedEventArgs.type",
+      "ChartDeactivatedEventArgs.worksheetId"
+    ],
+    "ChartDeletedEventArgs": [
+      "ChartDeletedEventArgs.chartId",
+      "ChartDeletedEventArgs.source",
+      "ChartDeletedEventArgs.type",
+      "ChartDeletedEventArgs.worksheetId"
+    ],
+    "ChartErrorBars": [
+      "ChartErrorBars.endStyleCap",
+      "ChartErrorBars.format",
+      "ChartErrorBars.include",
+      "ChartErrorBars.type",
+      "ChartErrorBars.visible"
+    ],
+    "ChartErrorBarsFormat": [
+      "ChartErrorBarsFormat.line"
+    ],
+    "ChartFill": [
+      "ChartFill.clear()",
+      "ChartFill.getSolidColor()",
+      "ChartFill.setSolidColor()"
+    ],
+    "ChartFont": [
+      "ChartFont.bold",
+      "ChartFont.color",
+      "ChartFont.italic",
+      "ChartFont.name",
+      "ChartFont.size",
+      "ChartFont.underline"
+    ],
+    "ChartFormatString": [
+      "ChartFormatString.font"
+    ],
+    "ChartGridlines": [
+      "ChartGridlines.format",
+      "ChartGridlines.visible"
+    ],
+    "ChartGridlinesFormat": [
+      "ChartGridlinesFormat.line"
+    ],
+    "ChartLeaderLines": [
+      "ChartLeaderLines.format"
+    ],
+    "ChartLeaderLinesFormat": [
+      "ChartLeaderLinesFormat.line"
+    ],
+    "ChartLegend": [
+      "ChartLegend.format",
+      "ChartLegend.height",
+      "ChartLegend.left",
+      "ChartLegend.legendEntries",
+      "ChartLegend.overlay",
+      "ChartLegend.showShadow",
+      "ChartLegend.top",
+      "ChartLegend.width"
+    ],
+    "ChartLegendEntry": [
+      "ChartLegendEntry.height",
+      "ChartLegendEntry.index",
+      "ChartLegendEntry.left",
+      "ChartLegendEntry.top",
+      "ChartLegendEntry.visible",
+      "ChartLegendEntry.width"
+    ],
+    "ChartLegendEntryCollection": [
+      "ChartLegendEntryCollection.getCount()",
+      "ChartLegendEntryCollection.getItemAt()",
+      "ChartLegendEntryCollection.items"
+    ],
+    "ChartLegendFormat": [
+      "ChartLegendFormat.border",
+      "ChartLegendFormat.fill",
+      "ChartLegendFormat.font"
+    ],
+    "ChartLineFormat": [
+      "ChartLineFormat.clear()",
+      "ChartLineFormat.color",
+      "ChartLineFormat.lineStyle",
+      "ChartLineFormat.weight"
+    ],
+    "ChartMapOptions": [
+      "ChartMapOptions.labelStrategy",
+      "ChartMapOptions.level",
+      "ChartMapOptions.projectionType"
+    ],
+    "ChartPivotOptions": [
+      "ChartPivotOptions.showAxisFieldButtons",
+      "ChartPivotOptions.showLegendFieldButtons",
+      "ChartPivotOptions.showReportFilterFieldButtons",
+      "ChartPivotOptions.showValueFieldButtons"
+    ],
+    "ChartPlotArea": [
+      "ChartPlotArea.format",
+      "ChartPlotArea.height",
+      "ChartPlotArea.insideHeight",
+      "ChartPlotArea.insideLeft",
+      "ChartPlotArea.insideTop",
+      "ChartPlotArea.insideWidth",
+      "ChartPlotArea.left",
+      "ChartPlotArea.position",
+      "ChartPlotArea.top",
+      "ChartPlotArea.width"
+    ],
+    "ChartPlotAreaFormat": [
+      "ChartPlotAreaFormat.border",
+      "ChartPlotAreaFormat.fill"
+    ],
+    "ChartPoint": [
+      "ChartPoint.dataLabel",
+      "ChartPoint.format",
+      "ChartPoint.hasDataLabel",
+      "ChartPoint.markerBackgroundColor",
+      "ChartPoint.markerForegroundColor",
+      "ChartPoint.markerSize",
+      "ChartPoint.markerStyle",
+      "ChartPoint.value"
+    ],
+    "ChartPointFormat": [
+      "ChartPointFormat.border",
+      "ChartPointFormat.fill"
+    ],
+    "ChartPointsCollection": [
+      "ChartPointsCollection.count",
+      "ChartPointsCollection.getCount()",
+      "ChartPointsCollection.getItemAt()",
+      "ChartPointsCollection.items"
+    ],
+    "ChartSeries": [
+      "ChartSeries.axisGroup",
+      "ChartSeries.binOptions",
+      "ChartSeries.boxwhiskerOptions",
+      "ChartSeries.bubbleScale",
+      "ChartSeries.chartType",
+      "ChartSeries.dataLabels",
+      "ChartSeries.delete()",
+      "ChartSeries.doughnutHoleSize",
+      "ChartSeries.explosion",
+      "ChartSeries.firstSliceAngle",
+      "ChartSeries.format",
+      "ChartSeries.gapWidth",
+      "ChartSeries.getDimensionDataSourceString()",
+      "ChartSeries.getDimensionDataSourceString()",
+      "ChartSeries.getDimensionDataSourceType()",
+      "ChartSeries.getDimensionDataSourceType()",
+      "ChartSeries.getDimensionValues()",
+      "ChartSeries.getDimensionValues()",
+      "ChartSeries.gradientMaximumColor",
+      "ChartSeries.gradientMaximumType",
+      "ChartSeries.gradientMaximumValue",
+      "ChartSeries.gradientMidpointColor",
+      "ChartSeries.gradientMidpointType",
+      "ChartSeries.gradientMidpointValue",
+      "ChartSeries.gradientMinimumColor",
+      "ChartSeries.gradientMinimumType",
+      "ChartSeries.gradientMinimumValue",
+      "ChartSeries.gradientStyle",
+      "ChartSeries.hasDataLabels",
+      "ChartSeries.invertColor",
+      "ChartSeries.invertIfNegative",
+      "ChartSeries.mapOptions",
+      "ChartSeries.markerBackgroundColor",
+      "ChartSeries.markerForegroundColor",
+      "ChartSeries.markerSize",
+      "ChartSeries.markerStyle",
+      "ChartSeries.overlap",
+      "ChartSeries.parentLabelStrategy",
+      "ChartSeries.plotOrder",
+      "ChartSeries.points",
+      "ChartSeries.secondPlotSize",
+      "ChartSeries.setBubbleSizes()",
+      "ChartSeries.setValues()",
+      "ChartSeries.setXAxisValues()",
+      "ChartSeries.showConnectorLines",
+      "ChartSeries.showLeaderLines",
+      "ChartSeries.showShadow",
+      "ChartSeries.smooth",
+      "ChartSeries.splitType",
+      "ChartSeries.splitValue",
+      "ChartSeries.trendlines",
+      "ChartSeries.varyByCategories",
+      "ChartSeries.xErrorBars",
+      "ChartSeries.yErrorBars"
+    ],
+    "ChartSeriesCollection": [
+      "ChartSeriesCollection.add()",
+      "ChartSeriesCollection.count",
+      "ChartSeriesCollection.getCount()",
+      "ChartSeriesCollection.items"
+    ],
+    "ChartSeriesFormat": [
+      "ChartSeriesFormat.fill",
+      "ChartSeriesFormat.line"
+    ],
+    "ChartTitle": [
+      "ChartTitle.format",
+      "ChartTitle.getSubstring()",
+      "ChartTitle.height",
+      "ChartTitle.horizontalAlignment",
+      "ChartTitle.left",
+      "ChartTitle.overlay",
+      "ChartTitle.position",
+      "ChartTitle.setFormula()",
+      "ChartTitle.showShadow",
+      "ChartTitle.textOrientation",
+      "ChartTitle.top",
+      "ChartTitle.verticalAlignment",
+      "ChartTitle.visible",
+      "ChartTitle.width"
+    ],
+    "ChartTitleFormat": [
+      "ChartTitleFormat.border",
+      "ChartTitleFormat.fill",
+      "ChartTitleFormat.font"
+    ],
+    "ChartTrendline": [
+      "ChartTrendline.backwardPeriod",
+      "ChartTrendline.delete()",
+      "ChartTrendline.format",
+      "ChartTrendline.forwardPeriod",
+      "ChartTrendline.intercept",
+      "ChartTrendline.label",
+      "ChartTrendline.movingAveragePeriod",
+      "ChartTrendline.name",
+      "ChartTrendline.polynomialOrder",
+      "ChartTrendline.showEquation",
+      "ChartTrendline.showRSquared",
+      "ChartTrendline.type"
+    ],
+    "ChartTrendlineCollection": [
+      "ChartTrendlineCollection.add()",
+      "ChartTrendlineCollection.add()",
+      "ChartTrendlineCollection.getCount()",
+      "ChartTrendlineCollection.getItem()",
+      "ChartTrendlineCollection.items"
+    ],
+    "ChartTrendlineFormat": [
+      "ChartTrendlineFormat.line"
+    ],
+    "ChartTrendlineLabel": [
+      "ChartTrendlineLabel.autoText",
+      "ChartTrendlineLabel.format",
+      "ChartTrendlineLabel.formula",
+      "ChartTrendlineLabel.height",
+      "ChartTrendlineLabel.horizontalAlignment",
+      "ChartTrendlineLabel.left",
+      "ChartTrendlineLabel.linkNumberFormat",
+      "ChartTrendlineLabel.numberFormat",
+      "ChartTrendlineLabel.text",
+      "ChartTrendlineLabel.textOrientation",
+      "ChartTrendlineLabel.top",
+      "ChartTrendlineLabel.verticalAlignment",
+      "ChartTrendlineLabel.width"
+    ],
+    "ChartTrendlineLabelFormat": [
+      "ChartTrendlineLabelFormat.border",
+      "ChartTrendlineLabelFormat.fill",
+      "ChartTrendlineLabelFormat.font"
+    ],
+    "CheckboxCellControl": [
+      "CheckboxCellControl.type"
+    ],
+    "CheckSpellingOptions": [
+      "CheckSpellingOptions.customDictionary",
+      "CheckSpellingOptions.ignoreUppercase"
+    ],
+    "ColorScaleConditionalFormat": [
+      "ColorScaleConditionalFormat.criteria",
+      "ColorScaleConditionalFormat.threeColorScale"
+    ],
+    "ColumnProperties": [
+      "ColumnProperties.address",
+      "ColumnProperties.addressLocal",
+      "ColumnProperties.columnIndex"
+    ],
+    "Comment": [
+      "Comment.authorEmail",
+      "Comment.authorName",
+      "Comment.contentType",
+      "Comment.getLocation()",
+      "Comment.id",
+      "Comment.mentions",
+      "Comment.replies",
+      "Comment.resolved",
+      "Comment.richContent",
+      "Comment.updateMentions()"
+    ],
+    "CommentAddedEventArgs": [
+      "CommentAddedEventArgs.commentDetails",
+      "CommentAddedEventArgs.source",
+      "CommentAddedEventArgs.type",
+      "CommentAddedEventArgs.worksheetId"
+    ],
+    "CommentChangedEventArgs": [
+      "CommentChangedEventArgs.changeType",
+      "CommentChangedEventArgs.commentDetails",
+      "CommentChangedEventArgs.source",
+      "CommentChangedEventArgs.type",
+      "CommentChangedEventArgs.worksheetId"
+    ],
+    "CommentCollection": [
+      "CommentCollection.getCount()",
+      "CommentCollection.getItem()",
+      "CommentCollection.getItemAt()",
+      "CommentCollection.getItemByCell()",
+      "CommentCollection.getItemByReplyId()",
+      "CommentCollection.getItemOrNullObject()",
+      "CommentCollection.onAdded",
+      "CommentCollection.onChanged",
+      "CommentCollection.onDeleted"
+    ],
+    "CommentDeletedEventArgs": [
+      "CommentDeletedEventArgs.commentDetails",
+      "CommentDeletedEventArgs.source",
+      "CommentDeletedEventArgs.type",
+      "CommentDeletedEventArgs.worksheetId"
+    ],
+    "CommentDetail": [
+      "CommentDetail.commentId",
+      "CommentDetail.replyIds"
+    ],
+    "CommentMention": [
+      "CommentMention.email",
+      "CommentMention.id",
+      "CommentMention.name"
+    ],
+    "CommentReply": [
+      "CommentReply.authorEmail",
+      "CommentReply.authorName",
+      "CommentReply.content",
+      "CommentReply.contentType",
+      "CommentReply.creationDate",
+      "CommentReply.delete()",
+      "CommentReply.getLocation()",
+      "CommentReply.getParentComment()",
+      "CommentReply.id",
+      "CommentReply.mentions",
+      "CommentReply.resolved",
+      "CommentReply.richContent",
+      "CommentReply.updateMentions()"
+    ],
+    "CommentReplyCollection": [
+      "CommentReplyCollection.add()",
+      "CommentReplyCollection.add()",
+      "CommentReplyCollection.getCount()",
+      "CommentReplyCollection.getItem()",
+      "CommentReplyCollection.getItemAt()",
+      "CommentReplyCollection.getItemOrNullObject()",
+      "CommentReplyCollection.items"
+    ],
+    "CommentRichContent": [
+      "CommentRichContent.mentions",
+      "CommentRichContent.richContent"
+    ],
+    "ConditionalCellValueRule": [
+      "ConditionalCellValueRule.formula1",
+      "ConditionalCellValueRule.formula2",
+      "ConditionalCellValueRule.operator"
+    ],
+    "ConditionalColorScaleCriteria": [
+      "ConditionalColorScaleCriteria.maximum",
+      "ConditionalColorScaleCriteria.midpoint",
+      "ConditionalColorScaleCriteria.minimum"
+    ],
+    "ConditionalColorScaleCriterion": [
+      "ConditionalColorScaleCriterion.color",
+      "ConditionalColorScaleCriterion.formula",
+      "ConditionalColorScaleCriterion.type"
+    ],
+    "ConditionalDataBarNegativeFormat": [
+      "ConditionalDataBarNegativeFormat.borderColor",
+      "ConditionalDataBarNegativeFormat.fillColor",
+      "ConditionalDataBarNegativeFormat.matchPositiveBorderColor",
+      "ConditionalDataBarNegativeFormat.matchPositiveFillColor"
+    ],
+    "ConditionalDataBarPositiveFormat": [
+      "ConditionalDataBarPositiveFormat.borderColor",
+      "ConditionalDataBarPositiveFormat.fillColor",
+      "ConditionalDataBarPositiveFormat.gradientFill"
+    ],
+    "ConditionalDataBarRule": [
+      "ConditionalDataBarRule.formula",
+      "ConditionalDataBarRule.type"
+    ],
+    "ConditionalFormat": [
+      "ConditionalFormat.cellValue",
+      "ConditionalFormat.cellValueOrNullObject",
+      "ConditionalFormat.changeRuleToCellValue()",
+      "ConditionalFormat.changeRuleToColorScale()",
+      "ConditionalFormat.changeRuleToContainsText()",
+      "ConditionalFormat.changeRuleToCustom()",
+      "ConditionalFormat.changeRuleToDataBar()",
+      "ConditionalFormat.changeRuleToIconSet()",
+      "ConditionalFormat.changeRuleToPresetCriteria()",
+      "ConditionalFormat.changeRuleToTopBottom()",
+      "ConditionalFormat.colorScale",
+      "ConditionalFormat.colorScaleOrNullObject",
+      "ConditionalFormat.custom",
+      "ConditionalFormat.customOrNullObject",
+      "ConditionalFormat.dataBar",
+      "ConditionalFormat.dataBarOrNullObject",
+      "ConditionalFormat.delete()",
+      "ConditionalFormat.getRange()",
+      "ConditionalFormat.getRangeOrNullObject()",
+      "ConditionalFormat.getRanges()",
+      "ConditionalFormat.iconSet",
+      "ConditionalFormat.iconSetOrNullObject",
+      "ConditionalFormat.id",
+      "ConditionalFormat.preset",
+      "ConditionalFormat.presetOrNullObject",
+      "ConditionalFormat.priority",
+      "ConditionalFormat.setRanges()",
+      "ConditionalFormat.textComparison",
+      "ConditionalFormat.textComparisonOrNullObject",
+      "ConditionalFormat.topBottom",
+      "ConditionalFormat.topBottomOrNullObject",
+      "ConditionalFormat.type"
+    ],
+    "ConditionalFormatCollection": [
+      "ConditionalFormatCollection.getCount()",
+      "ConditionalFormatCollection.getItem()",
+      "ConditionalFormatCollection.getItemAt()",
+      "ConditionalFormatCollection.getItemOrNullObject()"
+    ],
+    "ConditionalFormatRule": [
+      "ConditionalFormatRule.formula",
+      "ConditionalFormatRule.formulaLocal",
+      "ConditionalFormatRule.formulaR1C1"
+    ],
+    "ConditionalIconCriterion": [
+      "ConditionalIconCriterion.customIcon",
+      "ConditionalIconCriterion.formula",
+      "ConditionalIconCriterion.operator",
+      "ConditionalIconCriterion.type"
+    ],
+    "ConditionalPresetCriteriaRule": [
+      "ConditionalPresetCriteriaRule.criterion"
+    ],
+    "ConditionalRangeBorder": [
+      "ConditionalRangeBorder.color",
+      "ConditionalRangeBorder.sideIndex",
+      "ConditionalRangeBorder.style"
+    ],
+    "ConditionalRangeBorderCollection": [
+      "ConditionalRangeBorderCollection.bottom",
+      "ConditionalRangeBorderCollection.count",
+      "ConditionalRangeBorderCollection.getItem()",
+      "ConditionalRangeBorderCollection.getItem()",
+      "ConditionalRangeBorderCollection.getItemAt()",
+      "ConditionalRangeBorderCollection.items",
+      "ConditionalRangeBorderCollection.left",
+      "ConditionalRangeBorderCollection.right",
+      "ConditionalRangeBorderCollection.top"
+    ],
+    "ConditionalRangeFill": [
+      "ConditionalRangeFill.clear()",
+      "ConditionalRangeFill.color"
+    ],
+    "ConditionalRangeFont": [
+      "ConditionalRangeFont.bold",
+      "ConditionalRangeFont.clear()",
+      "ConditionalRangeFont.color",
+      "ConditionalRangeFont.italic",
+      "ConditionalRangeFont.strikethrough",
+      "ConditionalRangeFont.underline"
+    ],
+    "ConditionalRangeFormat": [
+      "ConditionalRangeFormat.borders",
+      "ConditionalRangeFormat.clearFormat()",
+      "ConditionalRangeFormat.fill",
+      "ConditionalRangeFormat.font",
+      "ConditionalRangeFormat.numberFormat"
+    ],
+    "ConditionalTextComparisonRule": [
+      "ConditionalTextComparisonRule.operator",
+      "ConditionalTextComparisonRule.text"
+    ],
+    "ConditionalTopBottomRule": [
+      "ConditionalTopBottomRule.rank",
+      "ConditionalTopBottomRule.type"
+    ],
+    "ConnectErrorCellValue": [
+      "ConnectErrorCellValue.basicType",
+      "ConnectErrorCellValue.basicValue",
+      "ConnectErrorCellValue.errorSubType",
+      "ConnectErrorCellValue.errorType",
+      "ConnectErrorCellValue.type"
+    ],
+    "CultureInfo": [
+      "CultureInfo.datetimeFormat",
+      "CultureInfo.name",
+      "CultureInfo.numberFormat"
+    ],
+    "CustomConditionalFormat": [
+      "CustomConditionalFormat.format",
+      "CustomConditionalFormat.rule"
+    ],
+    "CustomDataValidation": [
+      "CustomDataValidation.formula"
+    ],
+    "CustomFunctionManager": [
+      "CustomFunctionManager.newObject()",
+      "CustomFunctionManager.setVisibility()"
+    ],
+    "CustomFunctionVisibilityOptions": [
+      "CustomFunctionVisibilityOptions.hide",
+      "CustomFunctionVisibilityOptions.show"
+    ],
+    "CustomProperty": [
+      "CustomProperty.delete()",
+      "CustomProperty.key",
+      "CustomProperty.type",
+      "CustomProperty.value"
+    ],
+    "CustomPropertyCollection": [
+      "CustomPropertyCollection.add()",
+      "CustomPropertyCollection.deleteAll()",
+      "CustomPropertyCollection.getCount()",
+      "CustomPropertyCollection.getItem()",
+      "CustomPropertyCollection.getItemOrNullObject()",
+      "CustomPropertyCollection.items"
+    ],
+    "CustomXmlPart": [
+      "CustomXmlPart.delete()",
+      "CustomXmlPart.getXml()",
+      "CustomXmlPart.id",
+      "CustomXmlPart.namespaceUri",
+      "CustomXmlPart.setXml()"
+    ],
+    "CustomXmlPartCollection": [
+      "CustomXmlPartCollection.add()",
+      "CustomXmlPartCollection.getByNamespace()",
+      "CustomXmlPartCollection.getCount()",
+      "CustomXmlPartCollection.getItem()",
+      "CustomXmlPartCollection.getItemOrNullObject()",
+      "CustomXmlPartCollection.items"
+    ],
+    "CustomXmlPartScopedCollection": [
+      "CustomXmlPartScopedCollection.getCount()",
+      "CustomXmlPartScopedCollection.getItem()",
+      "CustomXmlPartScopedCollection.getItemOrNullObject()",
+      "CustomXmlPartScopedCollection.getOnlyItem()",
+      "CustomXmlPartScopedCollection.getOnlyItemOrNullObject()",
+      "CustomXmlPartScopedCollection.items"
+    ],
+    "DataBarConditionalFormat": [
+      "DataBarConditionalFormat.axisColor",
+      "DataBarConditionalFormat.axisFormat",
+      "DataBarConditionalFormat.barDirection",
+      "DataBarConditionalFormat.lowerBoundRule",
+      "DataBarConditionalFormat.negativeFormat",
+      "DataBarConditionalFormat.positiveFormat",
+      "DataBarConditionalFormat.showDataBarOnly",
+      "DataBarConditionalFormat.upperBoundRule"
+    ],
+    "DataPivotHierarchy": [
+      "DataPivotHierarchy.field",
+      "DataPivotHierarchy.id",
+      "DataPivotHierarchy.name",
+      "DataPivotHierarchy.numberFormat",
+      "DataPivotHierarchy.position",
+      "DataPivotHierarchy.setToDefault()",
+      "DataPivotHierarchy.showAs",
+      "DataPivotHierarchy.summarizeBy"
+    ],
+    "DataPivotHierarchyCollection": [
+      "DataPivotHierarchyCollection.add()",
+      "DataPivotHierarchyCollection.getCount()",
+      "DataPivotHierarchyCollection.getItem()",
+      "DataPivotHierarchyCollection.getItemOrNullObject()",
+      "DataPivotHierarchyCollection.items",
+      "DataPivotHierarchyCollection.remove()"
+    ],
+    "DataValidation": [
+      "DataValidation.getInvalidCells()",
+      "DataValidation.getInvalidCellsOrNullObject()",
+      "DataValidation.ignoreBlanks",
+      "DataValidation.prompt",
+      "DataValidation.type",
+      "DataValidation.valid"
+    ],
+    "DataValidationErrorAlert": [
+      "DataValidationErrorAlert.message",
+      "DataValidationErrorAlert.showAlert",
+      "DataValidationErrorAlert.style",
+      "DataValidationErrorAlert.title"
+    ],
+    "DataValidationPrompt": [
+      "DataValidationPrompt.message",
+      "DataValidationPrompt.showPrompt",
+      "DataValidationPrompt.title"
+    ],
+    "DataValidationRule": [
+      "DataValidationRule.custom",
+      "DataValidationRule.date",
+      "DataValidationRule.decimal",
+      "DataValidationRule.list",
+      "DataValidationRule.textLength",
+      "DataValidationRule.time",
+      "DataValidationRule.wholeNumber"
+    ],
+    "DateTimeDataValidation": [
+      "DateTimeDataValidation.formula1",
+      "DateTimeDataValidation.formula2",
+      "DateTimeDataValidation.operator"
+    ],
+    "DatetimeFormatInfo": [
+      "DatetimeFormatInfo.dateSeparator",
+      "DatetimeFormatInfo.longDatePattern",
+      "DatetimeFormatInfo.longTimePattern",
+      "DatetimeFormatInfo.shortDatePattern",
+      "DatetimeFormatInfo.timeSeparator"
+    ],
+    "Div0ErrorCellValue": [
+      "Div0ErrorCellValue.basicType",
+      "Div0ErrorCellValue.basicValue",
+      "Div0ErrorCellValue.errorType",
+      "Div0ErrorCellValue.type"
+    ],
+    "DocumentProperties": [
+      "DocumentProperties.custom"
+    ],
+    "DoubleCellValue": [
+      "DoubleCellValue.basicType",
+      "DoubleCellValue.basicValue",
+      "DoubleCellValue.layouts",
+      "DoubleCellValue.numberFormat",
+      "DoubleCellValue.properties",
+      "DoubleCellValue.provider",
+      "DoubleCellValue.referencedValues",
+      "DoubleCellValue.type"
+    ],
+    "EmptyCellControl": [
+      "EmptyCellControl.type"
+    ],
+    "EmptyCellValue": [
+      "EmptyCellValue.basicType",
+      "EmptyCellValue.basicValue",
+      "EmptyCellValue.type"
+    ],
+    "EntityCardLayout": [
+      "EntityCardLayout.layout"
+    ],
+    "EntityCellValue": [
+      "EntityCellValue.basicType",
+      "EntityCellValue.basicValue",
+      "EntityCellValue.layouts",
+      "EntityCellValue.properties",
+      "EntityCellValue.provider",
+      "EntityCellValue.referencedValues",
+      "EntityCellValue.text",
+      "EntityCellValue.type"
+    ],
+    "EntityCompactLayout": [
+      "EntityCompactLayout.icon"
+    ],
+    "EntityPropertyExtraProperties": [
+      "EntityPropertyExtraProperties.propertyMetadata"
+    ],
+    "EntityViewLayouts": [
+      "EntityViewLayouts.card",
+      "EntityViewLayouts.compact"
+    ],
+    "ExternalErrorCellValue": [
+      "ExternalErrorCellValue.basicType",
+      "ExternalErrorCellValue.basicValue",
+      "ExternalErrorCellValue.errorSubType",
+      "ExternalErrorCellValue.errorType",
+      "ExternalErrorCellValue.type"
+    ],
+    "FieldErrorCellValue": [
+      "FieldErrorCellValue.basicType",
+      "FieldErrorCellValue.basicValue",
+      "FieldErrorCellValue.errorSubType",
+      "FieldErrorCellValue.errorType",
+      "FieldErrorCellValue.fieldName",
+      "FieldErrorCellValue.type"
+    ],
+    "Filter": [
+      "Filter.apply()",
+      "Filter.applyBottomItemsFilter()",
+      "Filter.applyBottomPercentFilter()",
+      "Filter.applyCellColorFilter()",
+      "Filter.applyCustomFilter()",
+      "Filter.applyCustomFilter()",
+      "Filter.applyDynamicFilter()",
+      "Filter.applyDynamicFilter()",
+      "Filter.applyFontColorFilter()",
+      "Filter.applyIconFilter()",
+      "Filter.applyTopItemsFilter()",
+      "Filter.applyTopPercentFilter()",
+      "Filter.applyValuesFilter()",
+      "Filter.clear()",
+      "Filter.criteria"
+    ],
+    "FilterCriteria": [
+      "FilterCriteria.color",
+      "FilterCriteria.criterion1",
+      "FilterCriteria.criterion2",
+      "FilterCriteria.dynamicCriteria",
+      "FilterCriteria.filterOn",
+      "FilterCriteria.icon",
+      "FilterCriteria.operator",
+      "FilterCriteria.subField",
+      "FilterCriteria.values"
+    ],
+    "FilterDatetime": [
+      "FilterDatetime.date",
+      "FilterDatetime.specificity"
+    ],
+    "FilterPivotHierarchy": [
+      "FilterPivotHierarchy.enableMultipleFilterItems",
+      "FilterPivotHierarchy.fields",
+      "FilterPivotHierarchy.id",
+      "FilterPivotHierarchy.name",
+      "FilterPivotHierarchy.position",
+      "FilterPivotHierarchy.setToDefault()"
+    ],
+    "FilterPivotHierarchyCollection": [
+      "FilterPivotHierarchyCollection.add()",
+      "FilterPivotHierarchyCollection.getCount()",
+      "FilterPivotHierarchyCollection.getItem()",
+      "FilterPivotHierarchyCollection.getItemOrNullObject()",
+      "FilterPivotHierarchyCollection.items",
+      "FilterPivotHierarchyCollection.remove()"
+    ],
+    "FiveArrowsGraySet": [
+      "FiveArrowsGraySet.grayDownArrow",
+      "FiveArrowsGraySet.grayDownInclineArrow",
+      "FiveArrowsGraySet.graySideArrow",
+      "FiveArrowsGraySet.grayUpArrow",
+      "FiveArrowsGraySet.grayUpInclineArrow"
+    ],
+    "FiveArrowsSet": [
+      "FiveArrowsSet.greenUpArrow",
+      "FiveArrowsSet.redDownArrow",
+      "FiveArrowsSet.yellowDownInclineArrow",
+      "FiveArrowsSet.yellowSideArrow",
+      "FiveArrowsSet.yellowUpInclineArrow"
+    ],
+    "FiveBoxesSet": [
+      "FiveBoxesSet.fourFilledBoxes",
+      "FiveBoxesSet.noFilledBoxes",
+      "FiveBoxesSet.oneFilledBox",
+      "FiveBoxesSet.threeFilledBoxes",
+      "FiveBoxesSet.twoFilledBoxes"
+    ],
+    "FiveQuartersSet": [
+      "FiveQuartersSet.blackCircle",
+      "FiveQuartersSet.circleWithOneWhiteQuarter",
+      "FiveQuartersSet.circleWithThreeWhiteQuarters",
+      "FiveQuartersSet.circleWithTwoWhiteQuarters",
+      "FiveQuartersSet.whiteCircleAllWhiteQuarters"
+    ],
+    "FiveRatingSet": [
+      "FiveRatingSet.fourBars",
+      "FiveRatingSet.noBars",
+      "FiveRatingSet.oneBar",
+      "FiveRatingSet.threeBars",
+      "FiveRatingSet.twoBars"
+    ],
+    "FormatProtection": [
+      "FormatProtection.formulaHidden",
+      "FormatProtection.locked"
+    ],
+    "FormattedNumberCellValue": [
+      "FormattedNumberCellValue.basicType",
+      "FormattedNumberCellValue.basicValue",
+      "FormattedNumberCellValue.numberFormat",
+      "FormattedNumberCellValue.type"
+    ],
+    "FormulaChangedEventDetail": [
+      "FormulaChangedEventDetail.cellAddress",
+      "FormulaChangedEventDetail.previousFormula"
+    ],
+    "FourArrowsGraySet": [
+      "FourArrowsGraySet.grayDownArrow",
+      "FourArrowsGraySet.grayDownInclineArrow",
+      "FourArrowsGraySet.grayUpArrow",
+      "FourArrowsGraySet.grayUpInclineArrow"
+    ],
+    "FourArrowsSet": [
+      "FourArrowsSet.greenUpArrow",
+      "FourArrowsSet.redDownArrow",
+      "FourArrowsSet.yellowDownInclineArrow",
+      "FourArrowsSet.yellowUpInclineArrow"
+    ],
+    "FourRatingSet": [
+      "FourRatingSet.fourBars",
+      "FourRatingSet.oneBar",
+      "FourRatingSet.threeBars",
+      "FourRatingSet.twoBars"
+    ],
+    "FourRedToBlackSet": [
+      "FourRedToBlackSet.blackCircle",
+      "FourRedToBlackSet.grayCircle",
+      "FourRedToBlackSet.pinkCircle",
+      "FourRedToBlackSet.redCircle"
+    ],
+    "FourTrafficLightsSet": [
+      "FourTrafficLightsSet.blackCircleWithBorder",
+      "FourTrafficLightsSet.greenCircle",
+      "FourTrafficLightsSet.redCircleWithBorder",
+      "FourTrafficLightsSet.yellowCircle"
+    ],
+    "FunctionResult": [
+      "FunctionResult.error",
+      "FunctionResult.value"
+    ],
+    "Functions": [
+      "Functions.abs()",
+      "Functions.accrInt()",
+      "Functions.accrIntM()",
+      "Functions.acos()",
+      "Functions.acosh()",
+      "Functions.acot()",
+      "Functions.acoth()",
+      "Functions.amorDegrc()",
+      "Functions.amorLinc()",
+      "Functions.and()",
+      "Functions.arabic()",
+      "Functions.areas()",
+      "Functions.asc()",
+      "Functions.asin()",
+      "Functions.asinh()",
+      "Functions.atan()",
+      "Functions.atan2()",
+      "Functions.atanh()",
+      "Functions.aveDev()",
+      "Functions.average()",
+      "Functions.averageA()",
+      "Functions.averageIf()",
+      "Functions.averageIfs()",
+      "Functions.bahtText()",
+      "Functions.base()",
+      "Functions.besselI()",
+      "Functions.besselJ()",
+      "Functions.besselK()",
+      "Functions.besselY()",
+      "Functions.beta_Dist()",
+      "Functions.beta_Inv()",
+      "Functions.bin2Dec()",
+      "Functions.bin2Hex()",
+      "Functions.bin2Oct()",
+      "Functions.binom_Dist_Range()",
+      "Functions.binom_Dist()",
+      "Functions.binom_Inv()",
+      "Functions.bitand()",
+      "Functions.bitlshift()",
+      "Functions.bitor()",
+      "Functions.bitrshift()",
+      "Functions.bitxor()",
+      "Functions.ceiling_Math()",
+      "Functions.ceiling_Precise()",
+      "Functions.char()",
+      "Functions.chiSq_Dist_RT()",
+      "Functions.chiSq_Dist()",
+      "Functions.chiSq_Inv_RT()",
+      "Functions.chiSq_Inv()",
+      "Functions.choose()",
+      "Functions.clean()",
+      "Functions.code()",
+      "Functions.columns()",
+      "Functions.combin()",
+      "Functions.combina()",
+      "Functions.complex()",
+      "Functions.concatenate()",
+      "Functions.confidence_Norm()",
+      "Functions.confidence_T()",
+      "Functions.convert()",
+      "Functions.cos()",
+      "Functions.cosh()",
+      "Functions.cot()",
+      "Functions.coth()",
+      "Functions.count()",
+      "Functions.countA()",
+      "Functions.countBlank()",
+      "Functions.countIf()",
+      "Functions.countIfs()",
+      "Functions.coupDayBs()",
+      "Functions.coupDays()",
+      "Functions.coupDaysNc()",
+      "Functions.coupNcd()",
+      "Functions.coupNum()",
+      "Functions.coupPcd()",
+      "Functions.csc()",
+      "Functions.csch()",
+      "Functions.cumIPmt()",
+      "Functions.cumPrinc()",
+      "Functions.date()",
+      "Functions.datevalue()",
+      "Functions.daverage()",
+      "Functions.day()",
+      "Functions.days()",
+      "Functions.days360()",
+      "Functions.db()",
+      "Functions.dbcs()",
+      "Functions.dcount()",
+      "Functions.dcountA()",
+      "Functions.ddb()",
+      "Functions.dec2Bin()",
+      "Functions.dec2Hex()",
+      "Functions.dec2Oct()",
+      "Functions.decimal()",
+      "Functions.degrees()",
+      "Functions.delta()",
+      "Functions.devSq()",
+      "Functions.dget()",
+      "Functions.disc()",
+      "Functions.dmax()",
+      "Functions.dmin()",
+      "Functions.dollar()",
+      "Functions.dollarDe()",
+      "Functions.dollarFr()",
+      "Functions.dproduct()",
+      "Functions.dstDev()",
+      "Functions.dstDevP()",
+      "Functions.dsum()",
+      "Functions.duration()",
+      "Functions.dvar()",
+      "Functions.dvarP()",
+      "Functions.ecma_Ceiling()",
+      "Functions.edate()",
+      "Functions.effect()",
+      "Functions.eoMonth()",
+      "Functions.erf_Precise()",
+      "Functions.erf()",
+      "Functions.erfC_Precise()",
+      "Functions.erfC()",
+      "Functions.error_Type()",
+      "Functions.even()",
+      "Functions.exact()",
+      "Functions.exp()",
+      "Functions.expon_Dist()",
+      "Functions.f_Dist_RT()",
+      "Functions.f_Dist()",
+      "Functions.f_Inv_RT()",
+      "Functions.f_Inv()",
+      "Functions.fact()",
+      "Functions.factDouble()",
+      "Functions.false()",
+      "Functions.find()",
+      "Functions.findB()",
+      "Functions.fisher()",
+      "Functions.fisherInv()",
+      "Functions.fixed()",
+      "Functions.floor_Math()",
+      "Functions.floor_Precise()",
+      "Functions.fv()",
+      "Functions.fvschedule()",
+      "Functions.gamma_Dist()",
+      "Functions.gamma_Inv()",
+      "Functions.gamma()",
+      "Functions.gammaLn_Precise()",
+      "Functions.gammaLn()",
+      "Functions.gauss()",
+      "Functions.gcd()",
+      "Functions.geoMean()",
+      "Functions.geStep()",
+      "Functions.harMean()",
+      "Functions.hex2Bin()",
+      "Functions.hex2Dec()",
+      "Functions.hex2Oct()",
+      "Functions.hlookup()",
+      "Functions.hour()",
+      "Functions.hyperlink()",
+      "Functions.hypGeom_Dist()",
+      "Functions.if()",
+      "Functions.imAbs()",
+      "Functions.imaginary()",
+      "Functions.imArgument()",
+      "Functions.imConjugate()",
+      "Functions.imCos()",
+      "Functions.imCosh()",
+      "Functions.imCot()",
+      "Functions.imCsc()",
+      "Functions.imCsch()",
+      "Functions.imDiv()",
+      "Functions.imExp()",
+      "Functions.imLn()",
+      "Functions.imLog10()",
+      "Functions.imLog2()",
+      "Functions.imPower()",
+      "Functions.imProduct()",
+      "Functions.imReal()",
+      "Functions.imSec()",
+      "Functions.imSech()",
+      "Functions.imSin()",
+      "Functions.imSinh()",
+      "Functions.imSqrt()",
+      "Functions.imSub()",
+      "Functions.imSum()",
+      "Functions.imTan()",
+      "Functions.int()",
+      "Functions.intRate()",
+      "Functions.ipmt()",
+      "Functions.irr()",
+      "Functions.isErr()",
+      "Functions.isError()",
+      "Functions.isEven()",
+      "Functions.isFormula()",
+      "Functions.isLogical()",
+      "Functions.isNA()",
+      "Functions.isNonText()",
+      "Functions.isNumber()",
+      "Functions.iso_Ceiling()",
+      "Functions.isOdd()",
+      "Functions.isoWeekNum()",
+      "Functions.ispmt()",
+      "Functions.isref()",
+      "Functions.isText()",
+      "Functions.kurt()",
+      "Functions.large()",
+      "Functions.lcm()",
+      "Functions.left()",
+      "Functions.leftb()",
+      "Functions.len()",
+      "Functions.lenb()",
+      "Functions.ln()",
+      "Functions.log()",
+      "Functions.log10()",
+      "Functions.logNorm_Dist()",
+      "Functions.logNorm_Inv()",
+      "Functions.lookup()",
+      "Functions.lower()",
+      "Functions.match()",
+      "Functions.max()",
+      "Functions.maxA()",
+      "Functions.mduration()",
+      "Functions.median()",
+      "Functions.mid()",
+      "Functions.midb()",
+      "Functions.min()",
+      "Functions.minA()",
+      "Functions.minute()",
+      "Functions.mirr()",
+      "Functions.mod()",
+      "Functions.month()",
+      "Functions.mround()",
+      "Functions.multiNomial()",
+      "Functions.n()",
+      "Functions.na()",
+      "Functions.negBinom_Dist()",
+      "Functions.networkDays_Intl()",
+      "Functions.networkDays()",
+      "Functions.nominal()",
+      "Functions.norm_Dist()",
+      "Functions.norm_Inv()",
+      "Functions.norm_S_Dist()",
+      "Functions.norm_S_Inv()",
+      "Functions.not()",
+      "Functions.now()",
+      "Functions.nper()",
+      "Functions.npv()",
+      "Functions.numberValue()",
+      "Functions.oct2Bin()",
+      "Functions.oct2Dec()",
+      "Functions.oct2Hex()",
+      "Functions.odd()",
+      "Functions.oddFPrice()",
+      "Functions.oddFYield()",
+      "Functions.oddLPrice()",
+      "Functions.oddLYield()",
+      "Functions.or()",
+      "Functions.pduration()",
+      "Functions.percentile_Exc()",
+      "Functions.percentile_Inc()",
+      "Functions.percentRank_Exc()",
+      "Functions.percentRank_Inc()",
+      "Functions.permut()",
+      "Functions.permutationa()",
+      "Functions.phi()",
+      "Functions.pi()",
+      "Functions.pmt()",
+      "Functions.poisson_Dist()",
+      "Functions.power()",
+      "Functions.ppmt()",
+      "Functions.price()",
+      "Functions.priceDisc()",
+      "Functions.priceMat()",
+      "Functions.product()",
+      "Functions.proper()",
+      "Functions.pv()",
+      "Functions.quartile_Exc()",
+      "Functions.quartile_Inc()",
+      "Functions.quotient()",
+      "Functions.radians()",
+      "Functions.rand()",
+      "Functions.randBetween()",
+      "Functions.rank_Avg()",
+      "Functions.rank_Eq()",
+      "Functions.rate()",
+      "Functions.received()",
+      "Functions.replace()",
+      "Functions.replaceB()",
+      "Functions.rept()",
+      "Functions.right()",
+      "Functions.rightb()",
+      "Functions.roman()",
+      "Functions.round()",
+      "Functions.roundDown()",
+      "Functions.roundUp()",
+      "Functions.rows()",
+      "Functions.rri()",
+      "Functions.sec()",
+      "Functions.sech()",
+      "Functions.second()",
+      "Functions.seriesSum()",
+      "Functions.sheet()",
+      "Functions.sheets()",
+      "Functions.sign()",
+      "Functions.sin()",
+      "Functions.sinh()",
+      "Functions.skew_p()",
+      "Functions.skew()",
+      "Functions.sln()",
+      "Functions.small()",
+      "Functions.sqrt()",
+      "Functions.sqrtPi()",
+      "Functions.standardize()",
+      "Functions.stDev_P()",
+      "Functions.stDev_S()",
+      "Functions.stDevA()",
+      "Functions.stDevPA()",
+      "Functions.substitute()",
+      "Functions.subtotal()",
+      "Functions.sum()",
+      "Functions.sumIf()",
+      "Functions.sumIfs()",
+      "Functions.sumSq()",
+      "Functions.syd()",
+      "Functions.t_Dist_2T()",
+      "Functions.t_Dist_RT()",
+      "Functions.t_Dist()",
+      "Functions.t_Inv_2T()",
+      "Functions.t_Inv()",
+      "Functions.t()",
+      "Functions.tan()",
+      "Functions.tanh()",
+      "Functions.tbillEq()",
+      "Functions.tbillPrice()",
+      "Functions.tbillYield()",
+      "Functions.text()",
+      "Functions.time()",
+      "Functions.timevalue()",
+      "Functions.today()",
+      "Functions.trim()",
+      "Functions.trimMean()",
+      "Functions.true()",
+      "Functions.trunc()",
+      "Functions.type()",
+      "Functions.unichar()",
+      "Functions.unicode()",
+      "Functions.upper()",
+      "Functions.usdollar()",
+      "Functions.value()",
+      "Functions.var_P()",
+      "Functions.var_S()",
+      "Functions.varA()",
+      "Functions.varPA()",
+      "Functions.vdb()",
+      "Functions.vlookup()",
+      "Functions.weekday()",
+      "Functions.weekNum()",
+      "Functions.weibull_Dist()",
+      "Functions.workDay_Intl()",
+      "Functions.workDay()",
+      "Functions.xirr()",
+      "Functions.xnpv()",
+      "Functions.xor()",
+      "Functions.year()",
+      "Functions.yearFrac()",
+      "Functions.yield()",
+      "Functions.yieldDisc()",
+      "Functions.yieldMat()",
+      "Functions.z_Test()"
+    ],
+    "GeometricShape": [
+      "GeometricShape.id",
+      "GeometricShape.shape"
+    ],
+    "GettingDataErrorCellValue": [
+      "GettingDataErrorCellValue.basicType",
+      "GettingDataErrorCellValue.basicValue",
+      "GettingDataErrorCellValue.errorType",
+      "GettingDataErrorCellValue.type"
+    ],
+    "GroupShapeCollection": [
+      "GroupShapeCollection.getCount()",
+      "GroupShapeCollection.getItem()",
+      "GroupShapeCollection.getItemAt()",
+      "GroupShapeCollection.getItemOrNullObject()",
+      "GroupShapeCollection.items"
+    ],
+    "HeaderFooter": [
+      "HeaderFooter.centerFooter",
+      "HeaderFooter.centerFooterPicture",
+      "HeaderFooter.centerHeader",
+      "HeaderFooter.centerHeaderPicture",
+      "HeaderFooter.leftFooter",
+      "HeaderFooter.leftFooterPicture",
+      "HeaderFooter.leftHeader",
+      "HeaderFooter.leftHeaderPicture",
+      "HeaderFooter.rightFooter",
+      "HeaderFooter.rightFooterPicture",
+      "HeaderFooter.rightHeader",
+      "HeaderFooter.rightHeaderPicture"
+    ],
+    "HeaderFooterGroup": [
+      "HeaderFooterGroup.defaultForAllPages",
+      "HeaderFooterGroup.evenPages",
+      "HeaderFooterGroup.firstPage",
+      "HeaderFooterGroup.oddPages",
+      "HeaderFooterGroup.state",
+      "HeaderFooterGroup.useSheetMargins",
+      "HeaderFooterGroup.useSheetScale"
+    ],
+    "HeaderFooterPicture": [
+      "HeaderFooterPicture.brightness",
+      "HeaderFooterPicture.colorType",
+      "HeaderFooterPicture.contrast",
+      "HeaderFooterPicture.cropBottom",
+      "HeaderFooterPicture.cropLeft",
+      "HeaderFooterPicture.cropRight",
+      "HeaderFooterPicture.cropTop",
+      "HeaderFooterPicture.filename",
+      "HeaderFooterPicture.height",
+      "HeaderFooterPicture.lockAspectRatio",
+      "HeaderFooterPicture.width"
+    ],
+    "Icon": [
+      "Icon.index"
+    ],
+    "IconCollections": [
+      "IconCollections.fiveArrows",
+      "IconCollections.fiveArrowsGray",
+      "IconCollections.fiveBoxes",
+      "IconCollections.fiveQuarters",
+      "IconCollections.fiveRating",
+      "IconCollections.fourArrows",
+      "IconCollections.fourArrowsGray",
+      "IconCollections.fourRating",
+      "IconCollections.fourRedToBlack",
+      "IconCollections.fourTrafficLights",
+      "IconCollections.threeArrows",
+      "IconCollections.threeArrowsGray",
+      "IconCollections.threeFlags",
+      "IconCollections.threeSigns",
+      "IconCollections.threeStars",
+      "IconCollections.threeSymbols",
+      "IconCollections.threeSymbols2",
+      "IconCollections.threeTrafficLights1",
+      "IconCollections.threeTrafficLights2",
+      "IconCollections.threeTriangles"
+    ],
+    "IconSetConditionalFormat": [
+      "IconSetConditionalFormat.criteria",
+      "IconSetConditionalFormat.reverseIconOrder",
+      "IconSetConditionalFormat.showIconOnly",
+      "IconSetConditionalFormat.style"
+    ],
+    "Image": [
+      "Image.brightness",
+      "Image.colorType",
+      "Image.contrast",
+      "Image.cropBottom",
+      "Image.cropLeft",
+      "Image.cropRight",
+      "Image.cropTop",
+      "Image.format",
+      "Image.id",
+      "Image.incrementBrightness()",
+      "Image.incrementContrast()",
+      "Image.shape"
+    ],
+    "InsertWorksheetOptions": [
+      "InsertWorksheetOptions.positionType",
+      "InsertWorksheetOptions.relativeTo",
+      "InsertWorksheetOptions.sheetNamesToInsert"
+    ],
+    "IterativeCalculation": [
+      "IterativeCalculation.enabled",
+      "IterativeCalculation.maxChange",
+      "IterativeCalculation.maxIteration"
+    ],
+    "JavaScriptCustomFunctionReferenceCellValue": [
+      "JavaScriptCustomFunctionReferenceCellValue.basicType",
+      "JavaScriptCustomFunctionReferenceCellValue.basicValue",
+      "JavaScriptCustomFunctionReferenceCellValue.functionType",
+      "JavaScriptCustomFunctionReferenceCellValue.id",
+      "JavaScriptCustomFunctionReferenceCellValue.namespace",
+      "JavaScriptCustomFunctionReferenceCellValue.type"
+    ],
+    "Line": [
+      "Line.beginArrowheadLength",
+      "Line.beginArrowheadStyle",
+      "Line.beginArrowheadWidth",
+      "Line.beginConnectedShape",
+      "Line.beginConnectedSite",
+      "Line.connectBeginShape()",
+      "Line.connectEndShape()",
+      "Line.connectorType",
+      "Line.disconnectBeginShape()",
+      "Line.disconnectEndShape()",
+      "Line.endArrowheadLength",
+      "Line.endArrowheadStyle",
+      "Line.endArrowheadWidth",
+      "Line.endConnectedShape",
+      "Line.endConnectedSite",
+      "Line.id",
+      "Line.isBeginConnected",
+      "Line.isEndConnected",
+      "Line.shape"
+    ],
+    "LinkedEntityCellValue": [
+      "LinkedEntityCellValue.basicType",
+      "LinkedEntityCellValue.basicValue",
+      "LinkedEntityCellValue.id",
+      "LinkedEntityCellValue.layouts",
+      "LinkedEntityCellValue.properties",
+      "LinkedEntityCellValue.provider",
+      "LinkedEntityCellValue.text",
+      "LinkedEntityCellValue.type"
+    ],
+    "LinkedEntityDataDomain": [
+      "LinkedEntityDataDomain.dataProvider",
+      "LinkedEntityDataDomain.delete()",
+      "LinkedEntityDataDomain.id",
+      "LinkedEntityDataDomain.lastRefreshed",
+      "LinkedEntityDataDomain.loadFunctionId",
+      "LinkedEntityDataDomain.name",
+      "LinkedEntityDataDomain.periodicRefreshInterval",
+      "LinkedEntityDataDomain.refresh()",
+      "LinkedEntityDataDomain.refreshMode",
+      "LinkedEntityDataDomain.serviceId",
+      "LinkedEntityDataDomain.supportedRefreshModes"
+    ],
+    "LinkedEntityDataDomainAddedEventArgs": [
+      "LinkedEntityDataDomainAddedEventArgs.id",
+      "LinkedEntityDataDomainAddedEventArgs.serviceId",
+      "LinkedEntityDataDomainAddedEventArgs.source",
+      "LinkedEntityDataDomainAddedEventArgs.type"
+    ],
+    "LinkedEntityDataDomainCollection": [
+      "LinkedEntityDataDomainCollection.add()",
+      "LinkedEntityDataDomainCollection.getCount()",
+      "LinkedEntityDataDomainCollection.getItem()",
+      "LinkedEntityDataDomainCollection.getItemAt()",
+      "LinkedEntityDataDomainCollection.getItemByName()",
+      "LinkedEntityDataDomainCollection.getItemByNameOrNullObject()",
+      "LinkedEntityDataDomainCollection.getItemOrNullObject()",
+      "LinkedEntityDataDomainCollection.items",
+      "LinkedEntityDataDomainCollection.onLinkedEntityDataDomainAdded",
+      "LinkedEntityDataDomainCollection.onRefreshCompleted",
+      "LinkedEntityDataDomainCollection.onRefreshModeChanged",
+      "LinkedEntityDataDomainCollection.refreshAll()"
+    ],
+    "LinkedEntityDataDomainCreateOptions": [
+      "LinkedEntityDataDomainCreateOptions.dataProvider",
+      "LinkedEntityDataDomainCreateOptions.id",
+      "LinkedEntityDataDomainCreateOptions.loadFunctionId",
+      "LinkedEntityDataDomainCreateOptions.name",
+      "LinkedEntityDataDomainCreateOptions.periodicRefreshInterval",
+      "LinkedEntityDataDomainCreateOptions.supportedRefreshModes"
+    ],
+    "LinkedEntityDataDomainRefreshCompletedEventArgs": [
+      "LinkedEntityDataDomainRefreshCompletedEventArgs.errors",
+      "LinkedEntityDataDomainRefreshCompletedEventArgs.id",
+      "LinkedEntityDataDomainRefreshCompletedEventArgs.refreshed",
+      "LinkedEntityDataDomainRefreshCompletedEventArgs.serviceId",
+      "LinkedEntityDataDomainRefreshCompletedEventArgs.source",
+      "LinkedEntityDataDomainRefreshCompletedEventArgs.type"
+    ],
+    "LinkedEntityDataDomainRefreshModeChangedEventArgs": [
+      "LinkedEntityDataDomainRefreshModeChangedEventArgs.id",
+      "LinkedEntityDataDomainRefreshModeChangedEventArgs.refreshMode",
+      "LinkedEntityDataDomainRefreshModeChangedEventArgs.serviceId",
+      "LinkedEntityDataDomainRefreshModeChangedEventArgs.source",
+      "LinkedEntityDataDomainRefreshModeChangedEventArgs.type"
+    ],
+    "LinkedEntityId": [
+      "LinkedEntityId.culture",
+      "LinkedEntityId.domainId",
+      "LinkedEntityId.entityId",
+      "LinkedEntityId.serviceId"
+    ],
+    "LinkedEntityIdCulture": [
+      "LinkedEntityIdCulture.culture",
+      "LinkedEntityIdCulture.entityId"
+    ],
+    "LinkedEntityLoadServiceRequest": [
+      "LinkedEntityLoadServiceRequest.domainId",
+      "LinkedEntityLoadServiceRequest.entities"
+    ],
+    "LinkedEntityLoadServiceResult": [
+      "LinkedEntityLoadServiceResult.entities"
+    ],
+    "LinkedWorkbook": [
+      "LinkedWorkbook.breakLinks()",
+      "LinkedWorkbook.id",
+      "LinkedWorkbook.refresh()"
+    ],
+    "LinkedWorkbookCollection": [
+      "LinkedWorkbookCollection.breakAllLinks()",
+      "LinkedWorkbookCollection.getItem()",
+      "LinkedWorkbookCollection.getItemOrNullObject()",
+      "LinkedWorkbookCollection.items",
+      "LinkedWorkbookCollection.refreshAll()",
+      "LinkedWorkbookCollection.workbookLinksRefreshMode"
+    ],
+    "ListDataValidation": [
+      "ListDataValidation.inCellDropDown",
+      "ListDataValidation.source"
+    ],
+    "MixedCellControl": [
+      "MixedCellControl.type"
+    ],
+    "NamedItem": [
+      "NamedItem.arrayValues",
+      "NamedItem.delete()",
+      "NamedItem.formula",
+      "NamedItem.getRange()",
+      "NamedItem.getRangeOrNullObject()",
+      "NamedItem.name",
+      "NamedItem.scope",
+      "NamedItem.type",
+      "NamedItem.value",
+      "NamedItem.valueAsJson",
+      "NamedItem.valueAsJsonLocal",
+      "NamedItem.visible",
+      "NamedItem.worksheet",
+      "NamedItem.worksheetOrNullObject"
+    ],
+    "NamedItemArrayValues": [
+      "NamedItemArrayValues.types",
+      "NamedItemArrayValues.values",
+      "NamedItemArrayValues.valuesAsJson",
+      "NamedItemArrayValues.valuesAsJsonLocal"
+    ],
+    "NamedItemCollection": [
+      "NamedItemCollection.getCount()",
+      "NamedItemCollection.getItem()",
+      "NamedItemCollection.getItemOrNullObject()"
+    ],
+    "NamedSheetView": [
+      "NamedSheetView.activate()",
+      "NamedSheetView.delete()",
+      "NamedSheetView.duplicate()",
+      "NamedSheetView.name"
+    ],
+    "NamedSheetViewCollection": [
+      "NamedSheetViewCollection.add()",
+      "NamedSheetViewCollection.enterTemporary()",
+      "NamedSheetViewCollection.exit()",
+      "NamedSheetViewCollection.getActive()",
+      "NamedSheetViewCollection.getCount()",
+      "NamedSheetViewCollection.getItem()",
+      "NamedSheetViewCollection.getItemAt()",
+      "NamedSheetViewCollection.items"
+    ],
+    "NameErrorCellValue": [
+      "NameErrorCellValue.basicType",
+      "NameErrorCellValue.basicValue",
+      "NameErrorCellValue.errorType",
+      "NameErrorCellValue.type"
+    ],
+    "NotAvailableErrorCellValue": [
+      "NotAvailableErrorCellValue.basicType",
+      "NotAvailableErrorCellValue.basicValue",
+      "NotAvailableErrorCellValue.errorType",
+      "NotAvailableErrorCellValue.type"
+    ],
+    "Note": [
+      "Note.authorName",
+      "Note.content",
+      "Note.delete()",
+      "Note.getLocation()",
+      "Note.height",
+      "Note.visible",
+      "Note.width"
+    ],
+    "NoteCollection": [
+      "NoteCollection.add()",
+      "NoteCollection.getCount()",
+      "NoteCollection.getItem()",
+      "NoteCollection.getItemAt()",
+      "NoteCollection.getItemOrNullObject()",
+      "NoteCollection.items"
+    ],
+    "NullErrorCellValue": [
+      "NullErrorCellValue.basicType",
+      "NullErrorCellValue.basicValue",
+      "NullErrorCellValue.errorType",
+      "NullErrorCellValue.type"
+    ],
+    "NumberFormatInfo": [
+      "NumberFormatInfo.numberDecimalSeparator",
+      "NumberFormatInfo.numberGroupSeparator"
+    ],
+    "NumErrorCellValue": [
+      "NumErrorCellValue.basicType",
+      "NumErrorCellValue.basicValue",
+      "NumErrorCellValue.errorSubType",
+      "NumErrorCellValue.errorType",
+      "NumErrorCellValue.functionName",
+      "NumErrorCellValue.type"
+    ],
+    "PageBreak": [
+      "PageBreak.columnIndex",
+      "PageBreak.delete()",
+      "PageBreak.getCellAfterBreak()",
+      "PageBreak.rowIndex"
+    ],
+    "PageBreakCollection": [
+      "PageBreakCollection.add()",
+      "PageBreakCollection.getCount()",
+      "PageBreakCollection.getItem()",
+      "PageBreakCollection.items",
+      "PageBreakCollection.removePageBreaks()"
+    ],
+    "PageLayout": [
+      "PageLayout.alignMarginsHeaderFooter",
+      "PageLayout.blackAndWhite",
+      "PageLayout.centerHorizontally",
+      "PageLayout.centerVertically",
+      "PageLayout.draftMode",
+      "PageLayout.firstPageNumber",
+      "PageLayout.footerMargin",
+      "PageLayout.getPrintArea()",
+      "PageLayout.getPrintAreaOrNullObject()",
+      "PageLayout.getPrintTitleColumns()",
+      "PageLayout.getPrintTitleColumnsOrNullObject()",
+      "PageLayout.getPrintTitleRows()",
+      "PageLayout.getPrintTitleRowsOrNullObject()",
+      "PageLayout.headerMargin",
+      "PageLayout.headersFooters",
+      "PageLayout.printComments",
+      "PageLayout.printErrors",
+      "PageLayout.printGridlines",
+      "PageLayout.printHeadings",
+      "PageLayout.printOrder",
+      "PageLayout.printQuality",
+      "PageLayout.setPrintArea()",
+      "PageLayout.setPrintMargins()",
+      "PageLayout.setPrintMargins()",
+      "PageLayout.setPrintTitleColumns()",
+      "PageLayout.setPrintTitleRows()",
+      "PageLayout.zoom"
+    ],
+    "PageLayoutMarginOptions": [
+      "PageLayoutMarginOptions.bottom",
+      "PageLayoutMarginOptions.footer",
+      "PageLayoutMarginOptions.header",
+      "PageLayoutMarginOptions.left",
+      "PageLayoutMarginOptions.right",
+      "PageLayoutMarginOptions.top"
+    ],
+    "PageLayoutZoomOptions": [
+      "PageLayoutZoomOptions.horizontalFitToPages",
+      "PageLayoutZoomOptions.scale",
+      "PageLayoutZoomOptions.verticalFitToPages"
+    ],
+    "Pane": [
+      "Pane.index"
+    ],
+    "PaneCollection": [
+      "PaneCollection.getCount()",
+      "PaneCollection.getItemAt()",
+      "PaneCollection.items"
+    ],
+    "PivotDateFilter": [
+      "PivotDateFilter.comparator",
+      "PivotDateFilter.condition",
+      "PivotDateFilter.exclusive",
+      "PivotDateFilter.lowerBound",
+      "PivotDateFilter.upperBound",
+      "PivotDateFilter.wholeDays"
+    ],
+    "PivotField": [
+      "PivotField.applyFilter()",
+      "PivotField.clearFilter()",
+      "PivotField.clearFilter()",
+      "PivotField.getFilters()",
+      "PivotField.id",
+      "PivotField.isFiltered()",
+      "PivotField.isFiltered()",
+      "PivotField.items",
+      "PivotField.name",
+      "PivotField.showAllItems",
+      "PivotField.sortByLabels()",
+      "PivotField.sortByValues()",
+      "PivotField.sortByValues()",
+      "PivotField.subtotals"
+    ],
+    "PivotFieldCollection": [
+      "PivotFieldCollection.getCount()",
+      "PivotFieldCollection.getItem()",
+      "PivotFieldCollection.getItemOrNullObject()",
+      "PivotFieldCollection.items"
+    ],
+    "PivotFilters": [
+      "PivotFilters.dateFilter",
+      "PivotFilters.labelFilter",
+      "PivotFilters.manualFilter",
+      "PivotFilters.valueFilter"
+    ],
+    "PivotHierarchy": [
+      "PivotHierarchy.fields",
+      "PivotHierarchy.id",
+      "PivotHierarchy.name"
+    ],
+    "PivotHierarchyCollection": [
+      "PivotHierarchyCollection.getCount()",
+      "PivotHierarchyCollection.getItem()",
+      "PivotHierarchyCollection.getItemOrNullObject()",
+      "PivotHierarchyCollection.items"
+    ],
+    "PivotItem": [
+      "PivotItem.id",
+      "PivotItem.isExpanded",
+      "PivotItem.name",
+      "PivotItem.visible"
+    ],
+    "PivotItemCollection": [
+      "PivotItemCollection.getCount()",
+      "PivotItemCollection.getItem()",
+      "PivotItemCollection.getItemOrNullObject()",
+      "PivotItemCollection.items"
+    ],
+    "PivotLabelFilter": [
+      "PivotLabelFilter.comparator",
+      "PivotLabelFilter.condition",
+      "PivotLabelFilter.exclusive",
+      "PivotLabelFilter.lowerBound",
+      "PivotLabelFilter.substring",
+      "PivotLabelFilter.upperBound"
+    ],
+    "PivotLayout": [
+      "PivotLayout.altTextDescription",
+      "PivotLayout.altTextTitle",
+      "PivotLayout.autoFormat",
+      "PivotLayout.displayBlankLineAfterEachItem()",
+      "PivotLayout.emptyCellText",
+      "PivotLayout.enableFieldList",
+      "PivotLayout.fillEmptyCells",
+      "PivotLayout.getColumnLabelRange()",
+      "PivotLayout.getDataBodyRange()",
+      "PivotLayout.getDataHierarchy()",
+      "PivotLayout.getFilterAxisRange()",
+      "PivotLayout.getPivotItems()",
+      "PivotLayout.getPivotItems()",
+      "PivotLayout.getRange()",
+      "PivotLayout.getRowLabelRange()",
+      "PivotLayout.layoutType",
+      "PivotLayout.preserveFormatting",
+      "PivotLayout.repeatAllItemLabels()",
+      "PivotLayout.setAutoSortOnCell()",
+      "PivotLayout.setAutoSortOnCell()",
+      "PivotLayout.showColumnGrandTotals",
+      "PivotLayout.showFieldHeaders",
+      "PivotLayout.showRowGrandTotals",
+      "PivotLayout.subtotalLocation"
+    ],
+    "PivotManualFilter": [
+      "PivotManualFilter.selectedItems"
+    ],
+    "PivotTable": [
+      "PivotTable.allowMultipleFiltersPerField",
+      "PivotTable.columnHierarchies",
+      "PivotTable.dataHierarchies",
+      "PivotTable.enableDataValueEditing",
+      "PivotTable.filterHierarchies",
+      "PivotTable.getDataSourceString()",
+      "PivotTable.getDataSourceType()",
+      "PivotTable.hierarchies",
+      "PivotTable.id",
+      "PivotTable.layout",
+      "PivotTable.refreshOnOpen",
+      "PivotTable.rowHierarchies",
+      "PivotTable.useCustomSortLists",
+      "PivotTable.worksheet"
+    ],
+    "PivotTableCollection": [
+      "PivotTableCollection.getCount()",
+      "PivotTableCollection.getItem()",
+      "PivotTableCollection.getItemOrNullObject()",
+      "PivotTableCollection.refreshAll()"
+    ],
+    "PivotTableScopedCollection": [
+      "PivotTableScopedCollection.getCount()",
+      "PivotTableScopedCollection.getFirst()",
+      "PivotTableScopedCollection.getFirstOrNullObject()",
+      "PivotTableScopedCollection.getItem()",
+      "PivotTableScopedCollection.getItemOrNullObject()",
+      "PivotTableScopedCollection.items"
+    ],
+    "PivotTableStyle": [
+      "PivotTableStyle.delete()",
+      "PivotTableStyle.duplicate()",
+      "PivotTableStyle.name",
+      "PivotTableStyle.readOnly"
+    ],
+    "PivotTableStyleCollection": [
+      "PivotTableStyleCollection.add()",
+      "PivotTableStyleCollection.getCount()",
+      "PivotTableStyleCollection.getDefault()",
+      "PivotTableStyleCollection.getItem()",
+      "PivotTableStyleCollection.getItemOrNullObject()",
+      "PivotTableStyleCollection.items",
+      "PivotTableStyleCollection.setDefault()"
+    ],
+    "PivotValueFilter": [
+      "PivotValueFilter.comparator",
+      "PivotValueFilter.condition",
+      "PivotValueFilter.exclusive",
+      "PivotValueFilter.lowerBound",
+      "PivotValueFilter.selectionType",
+      "PivotValueFilter.threshold",
+      "PivotValueFilter.upperBound",
+      "PivotValueFilter.value"
+    ],
+    "PlaceholderErrorCellValue": [
+      "PlaceholderErrorCellValue.basicType",
+      "PlaceholderErrorCellValue.basicValue",
+      "PlaceholderErrorCellValue.errorType",
+      "PlaceholderErrorCellValue.target",
+      "PlaceholderErrorCellValue.type"
+    ],
+    "PresetCriteriaConditionalFormat": [
+      "PresetCriteriaConditionalFormat.format",
+      "PresetCriteriaConditionalFormat.rule"
+    ],
+    "Range": [
+      "Range.addressLocal",
+      "Range.cellCount",
+      "Range.checkSpelling()",
+      "Range.clearOrResetContents()",
+      "Range.columnIndex",
+      "Range.conditionalFormats",
+      "Range.control",
+      "Range.convertDataTypeToText()",
+      "Range.convertToLinkedDataType()",
+      "Range.findOrNullObject()",
+      "Range.format",
+      "Range.formulasLocal",
+      "Range.formulasR1C1",
+      "Range.getAbsoluteResizedRange()",
+      "Range.getBoundingRect()",
+      "Range.getCell()",
+      "Range.getCellProperties()",
+      "Range.getColumn()",
+      "Range.getColumnProperties()",
+      "Range.getColumnsAfter()",
+      "Range.getColumnsBefore()",
+      "Range.getDependents()",
+      "Range.getDisplayedCellProperties()",
+      "Range.getEntireRow()",
+      "Range.getExtendedRange()",
+      "Range.getExtendedRange()",
+      "Range.getImage()",
+      "Range.getIntersection()",
+      "Range.getIntersectionOrNullObject()",
+      "Range.getLastCell()",
+      "Range.getLastColumn()",
+      "Range.getLastRow()",
+      "Range.getMergedAreasOrNullObject()",
+      "Range.getOffsetRange()",
+      "Range.getPivotTables()",
+      "Range.getPrecedents()",
+      "Range.getRangeEdge()",
+      "Range.getRangeEdge()",
+      "Range.getResizedRange()",
+      "Range.getRow()",
+      "Range.getRowProperties()",
+      "Range.getRowsAbove()",
+      "Range.getRowsBelow()",
+      "Range.getSpecialCellsOrNullObject()",
+      "Range.getSpecialCellsOrNullObject()",
+      "Range.getSpillingToRange()",
+      "Range.getSpillingToRangeOrNullObject()",
+      "Range.getSpillParent()",
+      "Range.getSpillParentOrNullObject()",
+      "Range.getSurroundingRegion()",
+      "Range.getUsedRangeOrNullObject()",
+      "Range.getVisibleView()",
+      "Range.hasSpill",
+      "Range.height",
+      "Range.hidden",
+      "Range.hideGroupDetails()",
+      "Range.hideGroupDetails()",
+      "Range.left",
+      "Range.linkedDataTypeState",
+      "Range.moveTo()",
+      "Range.numberFormatCategories",
+      "Range.numberFormatLocal",
+      "Range.rowIndex",
+      "Range.savedAsArray",
+      "Range.select()",
+      "Range.setCellProperties()",
+      "Range.setColumnProperties()",
+      "Range.setDirty()",
+      "Range.setRowProperties()",
+      "Range.showCard()",
+      "Range.showDependents()",
+      "Range.showGroupDetails()",
+      "Range.showGroupDetails()",
+      "Range.showPrecedents()",
+      "Range.text",
+      "Range.top",
+      "Range.valuesAsJson",
+      "Range.valuesAsJsonLocal",
+      "Range.valueTypes",
+      "Range.width",
+      "Range.worksheet"
+    ],
+    "RangeAreas": [
+      "RangeAreas.address",
+      "RangeAreas.addressLocal",
+      "RangeAreas.areaCount",
+      "RangeAreas.areas",
+      "RangeAreas.calculate()",
+      "RangeAreas.cellCount",
+      "RangeAreas.clear()",
+      "RangeAreas.clear()",
+      "RangeAreas.clearOrResetContents()",
+      "RangeAreas.conditionalFormats",
+      "RangeAreas.convertDataTypeToText()",
+      "RangeAreas.convertToLinkedDataType()",
+      "RangeAreas.copyFrom()",
+      "RangeAreas.copyFrom()",
+      "RangeAreas.dataValidation",
+      "RangeAreas.format",
+      "RangeAreas.getEntireColumn()",
+      "RangeAreas.getEntireRow()",
+      "RangeAreas.getIntersection()",
+      "RangeAreas.getIntersectionOrNullObject()",
+      "RangeAreas.getOffsetRangeAreas()",
+      "RangeAreas.getSpecialCells()",
+      "RangeAreas.getSpecialCells()",
+      "RangeAreas.getSpecialCellsOrNullObject()",
+      "RangeAreas.getSpecialCellsOrNullObject()",
+      "RangeAreas.getTables()",
+      "RangeAreas.getUsedRangeAreas()",
+      "RangeAreas.getUsedRangeAreasOrNullObject()",
+      "RangeAreas.isEntireColumn",
+      "RangeAreas.isEntireRow",
+      "RangeAreas.select()",
+      "RangeAreas.setDirty()",
+      "RangeAreas.style",
+      "RangeAreas.worksheet"
+    ],
+    "RangeAreasCollection": [
+      "RangeAreasCollection.getCount()",
+      "RangeAreasCollection.getItemAt()",
+      "RangeAreasCollection.items"
+    ],
+    "RangeBorder": [
+      "RangeBorder.color",
+      "RangeBorder.sideIndex",
+      "RangeBorder.style",
+      "RangeBorder.tintAndShade",
+      "RangeBorder.weight"
+    ],
+    "RangeBorderCollection": [
+      "RangeBorderCollection.count",
+      "RangeBorderCollection.getItem()",
+      "RangeBorderCollection.getItem()",
+      "RangeBorderCollection.getItemAt()",
+      "RangeBorderCollection.items",
+      "RangeBorderCollection.tintAndShade"
+    ],
+    "RangeCollection": [
+      "RangeCollection.getCount()",
+      "RangeCollection.getItemAt()",
+      "RangeCollection.items"
+    ],
+    "RangeFill": [
+      "RangeFill.clear()",
+      "RangeFill.color",
+      "RangeFill.pattern",
+      "RangeFill.patternColor",
+      "RangeFill.patternTintAndShade",
+      "RangeFill.tintAndShade"
+    ],
+    "RangeFont": [
+      "RangeFont.bold",
+      "RangeFont.color",
+      "RangeFont.italic",
+      "RangeFont.name",
+      "RangeFont.size",
+      "RangeFont.strikethrough",
+      "RangeFont.subscript",
+      "RangeFont.superscript",
+      "RangeFont.tintAndShade",
+      "RangeFont.underline"
+    ],
+    "RangeFormat": [
+      "RangeFormat.adjustIndent()",
+      "RangeFormat.autoIndent",
+      "RangeFormat.columnWidth",
+      "RangeFormat.indentLevel",
+      "RangeFormat.protection",
+      "RangeFormat.readingOrder",
+      "RangeFormat.rowHeight",
+      "RangeFormat.shrinkToFit",
+      "RangeFormat.textOrientation",
+      "RangeFormat.useStandardHeight",
+      "RangeFormat.useStandardWidth",
+      "RangeFormat.verticalAlignment"
+    ],
+    "RangeHyperlink": [
+      "RangeHyperlink.address",
+      "RangeHyperlink.documentReference",
+      "RangeHyperlink.screenTip",
+      "RangeHyperlink.textToDisplay"
+    ],
+    "RangeReference": [
+      "RangeReference.address"
+    ],
+    "RangeSort": [
+      "RangeSort.apply()",
+      "RangeSort.apply()"
+    ],
+    "RangeTextRun": [
+      "RangeTextRun.font",
+      "RangeTextRun.text"
+    ],
+    "RangeView": [
+      "RangeView.cellAddresses",
+      "RangeView.columnCount",
+      "RangeView.formulas",
+      "RangeView.formulasLocal",
+      "RangeView.formulasR1C1",
+      "RangeView.getRange()",
+      "RangeView.index",
+      "RangeView.numberFormat",
+      "RangeView.rowCount",
+      "RangeView.rows",
+      "RangeView.text",
+      "RangeView.values",
+      "RangeView.valuesAsJson",
+      "RangeView.valuesAsJsonLocal",
+      "RangeView.valueTypes"
+    ],
+    "RangeViewCollection": [
+      "RangeViewCollection.getCount()",
+      "RangeViewCollection.getItemAt()",
+      "RangeViewCollection.items"
+    ],
+    "ReferenceCellValue": [
+      "ReferenceCellValue.basicType",
+      "ReferenceCellValue.basicValue",
+      "ReferenceCellValue.reference",
+      "ReferenceCellValue.type"
+    ],
+    "RefErrorCellValue": [
+      "RefErrorCellValue.basicType",
+      "RefErrorCellValue.basicValue",
+      "RefErrorCellValue.errorSubType",
+      "RefErrorCellValue.errorType",
+      "RefErrorCellValue.type"
+    ],
+    "RemoveDuplicatesResult": [
+      "RemoveDuplicatesResult.removed",
+      "RemoveDuplicatesResult.uniqueRemaining"
+    ],
+    "ReplaceCriteria": [
+      "ReplaceCriteria.completeMatch",
+      "ReplaceCriteria.matchCase"
+    ],
+    "RequestContext": [
+      "RequestContext.application",
+      "RequestContext.runtime",
+      "RequestContext.workbook"
+    ],
+    "RootReferenceCellValue": [
+      "RootReferenceCellValue.basicType",
+      "RootReferenceCellValue.basicValue",
+      "RootReferenceCellValue.type"
+    ],
+    "RowColumnPivotHierarchy": [
+      "RowColumnPivotHierarchy.fields",
+      "RowColumnPivotHierarchy.id",
+      "RowColumnPivotHierarchy.name",
+      "RowColumnPivotHierarchy.position",
+      "RowColumnPivotHierarchy.setToDefault()"
+    ],
+    "RowColumnPivotHierarchyCollection": [
+      "RowColumnPivotHierarchyCollection.add()",
+      "RowColumnPivotHierarchyCollection.getCount()",
+      "RowColumnPivotHierarchyCollection.getItem()",
+      "RowColumnPivotHierarchyCollection.getItemOrNullObject()",
+      "RowColumnPivotHierarchyCollection.items",
+      "RowColumnPivotHierarchyCollection.remove()"
+    ],
+    "RowProperties": [
+      "RowProperties.address",
+      "RowProperties.addressLocal",
+      "RowProperties.rowIndex"
+    ],
+    "RunOptions": [
+      "RunOptions.delayForCellEdit",
+      "RunOptions.mergeUndoGroup"
+    ],
+    "Runtime": [
+      "Runtime.enableEvents"
+    ],
+    "SearchCriteria": [
+      "SearchCriteria.completeMatch",
+      "SearchCriteria.matchCase",
+      "SearchCriteria.searchDirection"
+    ],
+    "SelectionChangedEventArgs": [
+      "SelectionChangedEventArgs.workbook"
+    ],
+    "SettableCellProperties": [
+      "SettableCellProperties.format",
+      "SettableCellProperties.hyperlink",
+      "SettableCellProperties.style",
+      "SettableCellProperties.textRuns"
+    ],
+    "SettableColumnProperties": [
+      "SettableColumnProperties.columnHidden",
+      "SettableColumnProperties.format"
+    ],
+    "SettableRowProperties": [
+      "SettableRowProperties.format",
+      "SettableRowProperties.rowHidden"
+    ],
+    "Setting": [
+      "Setting.delete()",
+      "Setting.key",
+      "Setting.value"
+    ],
+    "SettingCollection": [
+      "SettingCollection.add()",
+      "SettingCollection.getCount()",
+      "SettingCollection.getItem()",
+      "SettingCollection.getItemOrNullObject()",
+      "SettingCollection.items",
+      "SettingCollection.onSettingsChanged"
+    ],
+    "SettingsChangedEventArgs": [
+      "SettingsChangedEventArgs.settings"
+    ],
+    "Shape": [
+      "Shape.altTextDescription",
+      "Shape.altTextTitle",
+      "Shape.connectionSiteCount",
+      "Shape.copyTo()",
+      "Shape.delete()",
+      "Shape.displayName",
+      "Shape.fill",
+      "Shape.geometricShape",
+      "Shape.geometricShapeType",
+      "Shape.getAsImage()",
+      "Shape.getAsImage()",
+      "Shape.group",
+      "Shape.height",
+      "Shape.id",
+      "Shape.image",
+      "Shape.incrementLeft()",
+      "Shape.incrementRotation()",
+      "Shape.incrementTop()",
+      "Shape.left",
+      "Shape.level",
+      "Shape.line",
+      "Shape.lineFormat",
+      "Shape.lockAspectRatio",
+      "Shape.name",
+      "Shape.onActivated",
+      "Shape.onDeactivated",
+      "Shape.parentGroup",
+      "Shape.placement",
+      "Shape.rotation",
+      "Shape.scaleHeight()",
+      "Shape.scaleHeight()",
+      "Shape.scaleWidth()",
+      "Shape.scaleWidth()",
+      "Shape.setZOrder()",
+      "Shape.setZOrder()",
+      "Shape.textFrame",
+      "Shape.top",
+      "Shape.type",
+      "Shape.visible",
+      "Shape.width",
+      "Shape.zOrderPosition"
+    ],
+    "ShapeActivatedEventArgs": [
+      "ShapeActivatedEventArgs.shapeId",
+      "ShapeActivatedEventArgs.type",
+      "ShapeActivatedEventArgs.worksheetId"
+    ],
+    "ShapeCollection": [
+      "ShapeCollection.addGeometricShape()",
+      "ShapeCollection.addGeometricShape()",
+      "ShapeCollection.addGroup()",
+      "ShapeCollection.addImage()",
+      "ShapeCollection.addLine()",
+      "ShapeCollection.addLine()",
+      "ShapeCollection.addTextBox()",
+      "ShapeCollection.getCount()",
+      "ShapeCollection.getItem()",
+      "ShapeCollection.getItemAt()",
+      "ShapeCollection.getItemOrNullObject()",
+      "ShapeCollection.items"
+    ],
+    "ShapeDeactivatedEventArgs": [
+      "ShapeDeactivatedEventArgs.shapeId",
+      "ShapeDeactivatedEventArgs.type",
+      "ShapeDeactivatedEventArgs.worksheetId"
+    ],
+    "ShapeFill": [
+      "ShapeFill.clear()",
+      "ShapeFill.foregroundColor",
+      "ShapeFill.setSolidColor()",
+      "ShapeFill.transparency",
+      "ShapeFill.type"
+    ],
+    "ShapeFont": [
+      "ShapeFont.bold",
+      "ShapeFont.color",
+      "ShapeFont.italic",
+      "ShapeFont.name",
+      "ShapeFont.size",
+      "ShapeFont.underline"
+    ],
+    "ShapeGroup": [
+      "ShapeGroup.id",
+      "ShapeGroup.shape",
+      "ShapeGroup.shapes",
+      "ShapeGroup.ungroup()"
+    ],
+    "ShapeLineFormat": [
+      "ShapeLineFormat.color",
+      "ShapeLineFormat.dashStyle",
+      "ShapeLineFormat.style",
+      "ShapeLineFormat.transparency",
+      "ShapeLineFormat.visible",
+      "ShapeLineFormat.weight"
+    ],
+    "ShowAsRule": [
+      "ShowAsRule.baseField",
+      "ShowAsRule.baseItem",
+      "ShowAsRule.calculation"
+    ],
+    "Slicer": [
+      "Slicer.caption",
+      "Slicer.clearFilters()",
+      "Slicer.delete()",
+      "Slicer.getSelectedItems()",
+      "Slicer.height",
+      "Slicer.id",
+      "Slicer.isFilterCleared",
+      "Slicer.left",
+      "Slicer.name",
+      "Slicer.selectItems()",
+      "Slicer.slicerItems",
+      "Slicer.sortBy",
+      "Slicer.style",
+      "Slicer.top",
+      "Slicer.width",
+      "Slicer.worksheet"
+    ],
+    "SlicerCollection": [
+      "SlicerCollection.add()",
+      "SlicerCollection.getCount()",
+      "SlicerCollection.getItem()",
+      "SlicerCollection.getItemAt()",
+      "SlicerCollection.getItemOrNullObject()",
+      "SlicerCollection.items"
+    ],
+    "SlicerItem": [
+      "SlicerItem.hasData",
+      "SlicerItem.isSelected",
+      "SlicerItem.key",
+      "SlicerItem.name"
+    ],
+    "SlicerItemCollection": [
+      "SlicerItemCollection.getCount()",
+      "SlicerItemCollection.getItem()",
+      "SlicerItemCollection.getItemAt()",
+      "SlicerItemCollection.getItemOrNullObject()",
+      "SlicerItemCollection.items"
+    ],
+    "SlicerStyle": [
+      "SlicerStyle.delete()",
+      "SlicerStyle.duplicate()",
+      "SlicerStyle.name",
+      "SlicerStyle.readOnly"
+    ],
+    "SlicerStyleCollection": [
+      "SlicerStyleCollection.add()",
+      "SlicerStyleCollection.getCount()",
+      "SlicerStyleCollection.getDefault()",
+      "SlicerStyleCollection.getItem()",
+      "SlicerStyleCollection.getItemOrNullObject()",
+      "SlicerStyleCollection.items",
+      "SlicerStyleCollection.setDefault()"
+    ],
+    "SortField": [
+      "SortField.ascending",
+      "SortField.color",
+      "SortField.dataOption",
+      "SortField.icon",
+      "SortField.key",
+      "SortField.sortOn",
+      "SortField.subField"
+    ],
+    "SpillErrorCellValue": [
+      "SpillErrorCellValue.basicType",
+      "SpillErrorCellValue.basicValue",
+      "SpillErrorCellValue.columnCount",
+      "SpillErrorCellValue.errorSubType",
+      "SpillErrorCellValue.errorType",
+      "SpillErrorCellValue.rowCount",
+      "SpillErrorCellValue.type"
+    ],
+    "StringCellValue": [
+      "StringCellValue.basicType",
+      "StringCellValue.basicValue",
+      "StringCellValue.layouts",
+      "StringCellValue.properties",
+      "StringCellValue.provider",
+      "StringCellValue.referencedValues",
+      "StringCellValue.type"
+    ],
+    "Style": [
+      "Style.autoIndent",
+      "Style.borders",
+      "Style.builtIn",
+      "Style.delete()",
+      "Style.fill",
+      "Style.font",
+      "Style.formulaHidden",
+      "Style.horizontalAlignment",
+      "Style.includeAlignment",
+      "Style.includeBorder",
+      "Style.includeFont",
+      "Style.includeNumber",
+      "Style.includePatterns",
+      "Style.includeProtection",
+      "Style.indentLevel",
+      "Style.locked",
+      "Style.name",
+      "Style.numberFormat",
+      "Style.numberFormatLocal",
+      "Style.readingOrder",
+      "Style.shrinkToFit",
+      "Style.textOrientation",
+      "Style.verticalAlignment",
+      "Style.wrapText"
+    ],
+    "StyleCollection": [
+      "StyleCollection.add()",
+      "StyleCollection.getCount()",
+      "StyleCollection.getItem()",
+      "StyleCollection.getItemAt()",
+      "StyleCollection.getItemOrNullObject()",
+      "StyleCollection.items"
+    ],
+    "Subtotals": [
+      "Subtotals.automatic",
+      "Subtotals.average",
+      "Subtotals.count",
+      "Subtotals.countNumbers",
+      "Subtotals.max",
+      "Subtotals.min",
+      "Subtotals.product",
+      "Subtotals.standardDeviation",
+      "Subtotals.standardDeviationP",
+      "Subtotals.sum",
+      "Subtotals.variance",
+      "Subtotals.varianceP"
+    ],
+    "Table": [
+      "Table.autoFilter",
+      "Table.getTotalRowRange()",
+      "Table.highlightFirstColumn",
+      "Table.highlightLastColumn",
+      "Table.legacyId",
+      "Table.onChanged",
+      "Table.onSelectionChanged",
+      "Table.showBandedColumns",
+      "Table.showBandedRows",
+      "Table.showFilterButton"
+    ],
+    "TableAddedEventArgs": [
+      "TableAddedEventArgs.source",
+      "TableAddedEventArgs.tableId",
+      "TableAddedEventArgs.type",
+      "TableAddedEventArgs.worksheetId"
+    ],
+    "TableChangedEventArgs": [
+      "TableChangedEventArgs.address",
+      "TableChangedEventArgs.changeType",
+      "TableChangedEventArgs.details",
+      "TableChangedEventArgs.getRange()",
+      "TableChangedEventArgs.getRangeOrNullObject()",
+      "TableChangedEventArgs.source",
+      "TableChangedEventArgs.tableId",
+      "TableChangedEventArgs.type",
+      "TableChangedEventArgs.worksheetId"
+    ],
+    "TableCollection": [
+      "TableCollection.count",
+      "TableCollection.getCount()",
+      "TableCollection.getItem()",
+      "TableCollection.getItemAt()",
+      "TableCollection.getItemOrNullObject()",
+      "TableCollection.onAdded",
+      "TableCollection.onChanged",
+      "TableCollection.onDeleted"
+    ],
+    "TableColumn": [
+      "TableColumn.getDataBodyRange()",
+      "TableColumn.getRange()",
+      "TableColumn.getTotalRowRange()",
+      "TableColumn.id",
+      "TableColumn.index",
+      "TableColumn.name",
+      "TableColumn.values",
+      "TableColumn.valuesAsJson",
+      "TableColumn.valuesAsJsonLocal"
+    ],
+    "TableColumnCollection": [
+      "TableColumnCollection.addAsJson()",
+      "TableColumnCollection.count",
+      "TableColumnCollection.getCount()",
+      "TableColumnCollection.getItemOrNullObject()",
+      "TableColumnCollection.items"
+    ],
+    "TableDeletedEventArgs": [
+      "TableDeletedEventArgs.source",
+      "TableDeletedEventArgs.tableId",
+      "TableDeletedEventArgs.tableName",
+      "TableDeletedEventArgs.type",
+      "TableDeletedEventArgs.worksheetId"
+    ],
+    "TableRow": [
+      "TableRow.getRange()",
+      "TableRow.index",
+      "TableRow.values",
+      "TableRow.valuesAsJson",
+      "TableRow.valuesAsJsonLocal"
+    ],
+    "TableRowCollection": [
+      "TableRowCollection.addAsJson()",
+      "TableRowCollection.count",
+      "TableRowCollection.deleteRows()",
+      "TableRowCollection.deleteRowsAt()",
+      "TableRowCollection.getCount()",
+      "TableRowCollection.getItemAt()",
+      "TableRowCollection.items"
+    ],
+    "TableScopedCollection": [
+      "TableScopedCollection.getCount()",
+      "TableScopedCollection.getFirst()",
+      "TableScopedCollection.getItem()",
+      "TableScopedCollection.getItemOrNullObject()",
+      "TableScopedCollection.items"
+    ],
+    "TableSelectionChangedEventArgs": [
+      "TableSelectionChangedEventArgs.address",
+      "TableSelectionChangedEventArgs.isInsideTable",
+      "TableSelectionChangedEventArgs.tableId",
+      "TableSelectionChangedEventArgs.type",
+      "TableSelectionChangedEventArgs.worksheetId"
+    ],
+    "TableSort": [
+      "TableSort.clear()",
+      "TableSort.fields",
+      "TableSort.matchCase",
+      "TableSort.method",
+      "TableSort.reapply()"
+    ],
+    "TableStyle": [
+      "TableStyle.delete()",
+      "TableStyle.duplicate()",
+      "TableStyle.name",
+      "TableStyle.readOnly"
+    ],
+    "TableStyleCollection": [
+      "TableStyleCollection.add()",
+      "TableStyleCollection.getCount()",
+      "TableStyleCollection.getDefault()",
+      "TableStyleCollection.getItem()",
+      "TableStyleCollection.getItemOrNullObject()",
+      "TableStyleCollection.items",
+      "TableStyleCollection.setDefault()"
+    ],
+    "TextConditionalFormat": [
+      "TextConditionalFormat.format",
+      "TextConditionalFormat.rule"
+    ],
+    "TextFrame": [
+      "TextFrame.autoSizeSetting",
+      "TextFrame.bottomMargin",
+      "TextFrame.deleteText()",
+      "TextFrame.hasText",
+      "TextFrame.horizontalAlignment",
+      "TextFrame.horizontalOverflow",
+      "TextFrame.leftMargin",
+      "TextFrame.orientation",
+      "TextFrame.readingOrder",
+      "TextFrame.rightMargin",
+      "TextFrame.textRange",
+      "TextFrame.topMargin",
+      "TextFrame.verticalAlignment",
+      "TextFrame.verticalOverflow"
+    ],
+    "TextRange": [
+      "TextRange.font",
+      "TextRange.getSubstring()",
+      "TextRange.text"
+    ],
+    "ThreeArrowsGraySet": [
+      "ThreeArrowsGraySet.grayDownArrow",
+      "ThreeArrowsGraySet.graySideArrow",
+      "ThreeArrowsGraySet.grayUpArrow"
+    ],
+    "ThreeArrowsSet": [
+      "ThreeArrowsSet.greenUpArrow",
+      "ThreeArrowsSet.redDownArrow",
+      "ThreeArrowsSet.yellowSideArrow"
+    ],
+    "ThreeFlagsSet": [
+      "ThreeFlagsSet.greenFlag",
+      "ThreeFlagsSet.redFlag",
+      "ThreeFlagsSet.yellowFlag"
+    ],
+    "ThreeSignsSet": [
+      "ThreeSignsSet.greenCircle",
+      "ThreeSignsSet.redDiamond",
+      "ThreeSignsSet.yellowTriangle"
+    ],
+    "ThreeStarsSet": [
+      "ThreeStarsSet.goldStar",
+      "ThreeStarsSet.halfGoldStar",
+      "ThreeStarsSet.silverStar"
+    ],
+    "ThreeSymbols2Set": [
+      "ThreeSymbols2Set.greenCheck",
+      "ThreeSymbols2Set.redCross",
+      "ThreeSymbols2Set.yellowExclamation"
+    ],
+    "ThreeSymbolsSet": [
+      "ThreeSymbolsSet.greenCheckSymbol",
+      "ThreeSymbolsSet.redCrossSymbol",
+      "ThreeSymbolsSet.yellowExclamationSymbol"
+    ],
+    "ThreeTrafficLights1Set": [
+      "ThreeTrafficLights1Set.greenCircle",
+      "ThreeTrafficLights1Set.redCircleWithBorder",
+      "ThreeTrafficLights1Set.yellowCircle"
+    ],
+    "ThreeTrafficLights2Set": [
+      "ThreeTrafficLights2Set.greenTrafficLight",
+      "ThreeTrafficLights2Set.redTrafficLight",
+      "ThreeTrafficLights2Set.yellowTrafficLight"
+    ],
+    "ThreeTrianglesSet": [
+      "ThreeTrianglesSet.greenUpTriangle",
+      "ThreeTrianglesSet.redDownTriangle",
+      "ThreeTrianglesSet.yellowDash"
+    ],
+    "TimelineStyle": [
+      "TimelineStyle.delete()",
+      "TimelineStyle.duplicate()",
+      "TimelineStyle.name",
+      "TimelineStyle.readOnly"
+    ],
+    "TimelineStyleCollection": [
+      "TimelineStyleCollection.add()",
+      "TimelineStyleCollection.getCount()",
+      "TimelineStyleCollection.getDefault()",
+      "TimelineStyleCollection.getItem()",
+      "TimelineStyleCollection.getItemOrNullObject()",
+      "TimelineStyleCollection.items",
+      "TimelineStyleCollection.setDefault()"
+    ],
+    "TopBottomConditionalFormat": [
+      "TopBottomConditionalFormat.format",
+      "TopBottomConditionalFormat.rule"
+    ],
+    "UnknownCellControl": [
+      "UnknownCellControl.type"
+    ],
+    "ValueErrorCellValue": [
+      "ValueErrorCellValue.basicType",
+      "ValueErrorCellValue.basicValue",
+      "ValueErrorCellValue.errorSubType",
+      "ValueErrorCellValue.errorType",
+      "ValueErrorCellValue.type"
+    ],
+    "ValueTypeNotAvailableCellValue": [
+      "ValueTypeNotAvailableCellValue.basicType",
+      "ValueTypeNotAvailableCellValue.basicValue",
+      "ValueTypeNotAvailableCellValue.type"
+    ],
+    "WebImageCellValue": [
+      "WebImageCellValue.address",
+      "WebImageCellValue.altText",
+      "WebImageCellValue.attribution",
+      "WebImageCellValue.basicType",
+      "WebImageCellValue.basicValue",
+      "WebImageCellValue.provider",
+      "WebImageCellValue.relatedImagesAddress",
+      "WebImageCellValue.type"
+    ],
+    "Window": [
+      "Window.activate()",
+      "Window.activateNext()",
+      "Window.activatePrevious()",
+      "Window.activeCell",
+      "Window.activePane",
+      "Window.activeWorksheet",
+      "Window.autoFilterDateGroupingEnabled",
+      "Window.close()",
+      "Window.enableResize",
+      "Window.freezePanes",
+      "Window.height",
+      "Window.index",
+      "Window.isVisible",
+      "Window.largeScroll()",
+      "Window.left",
+      "Window.name",
+      "Window.newWindow()",
+      "Window.panes",
+      "Window.pointsToScreenPixelsX()",
+      "Window.pointsToScreenPixelsY()",
+      "Window.scrollColumn",
+      "Window.scrollIntoView()",
+      "Window.scrollRow",
+      "Window.scrollWorkbookTabs()",
+      "Window.scrollWorkbookTabs()",
+      "Window.showFormulas",
+      "Window.showGridlines",
+      "Window.showHeadings",
+      "Window.showHorizontalScrollBar",
+      "Window.showOutline",
+      "Window.showRightToLeft",
+      "Window.showRuler",
+      "Window.showVerticalScrollBar",
+      "Window.showWhitespace",
+      "Window.showWorkbookTabs",
+      "Window.showZeros",
+      "Window.smallScroll()",
+      "Window.split",
+      "Window.splitColumn",
+      "Window.splitHorizontal",
+      "Window.splitRow",
+      "Window.splitVertical",
+      "Window.tabRatio",
+      "Window.top",
+      "Window.type",
+      "Window.usableHeight",
+      "Window.usableWidth",
+      "Window.view",
+      "Window.visibleRange",
+      "Window.width",
+      "Window.windowNumber",
+      "Window.windowState",
+      "Window.zoom"
+    ],
+    "WindowCollection": [
+      "WindowCollection.breakSideBySide()",
+      "WindowCollection.compareCurrentSideBySideWith()",
+      "WindowCollection.getCount()",
+      "WindowCollection.getItemAt()",
+      "WindowCollection.items",
+      "WindowCollection.resetPositionsSideBySide()"
+    ],
+    "Workbook": [
+      "Workbook.application",
+      "Workbook.autoSave",
+      "Workbook.bindings",
+      "Workbook.calculationEngineVersion",
+      "Workbook.close()",
+      "Workbook.close()",
+      "Workbook.customXmlParts",
+      "Workbook.focus()",
+      "Workbook.functions",
+      "Workbook.getActiveCell()",
+      "Workbook.getActiveChart()",
+      "Workbook.getActiveChartOrNullObject()",
+      "Workbook.getActiveShape()",
+      "Workbook.getActiveShapeOrNullObject()",
+      "Workbook.getActiveSlicer()",
+      "Workbook.getActiveSlicerOrNullObject()",
+      "Workbook.getIsActiveCollabSession()",
+      "Workbook.getLinkedEntityCellValue()",
+      "Workbook.getSelectedRanges()",
+      "Workbook.insertWorksheetsFromBase64()",
+      "Workbook.isDirty",
+      "Workbook.linkedEntityDataDomains",
+      "Workbook.linkedWorkbooks",
+      "Workbook.name",
+      "Workbook.notes",
+      "Workbook.onActivated",
+      "Workbook.onAutoSaveSettingChanged",
+      "Workbook.onSelectionChanged",
+      "Workbook.pivotTableStyles",
+      "Workbook.previouslySaved",
+      "Workbook.readOnly",
+      "Workbook.settings",
+      "Workbook.slicers",
+      "Workbook.slicerStyles",
+      "Workbook.styles",
+      "Workbook.tableStyles",
+      "Workbook.timelineStyles",
+      "Workbook.usePrecisionAsDisplayed"
+    ],
+    "WorkbookActivatedEventArgs": [
+      "WorkbookActivatedEventArgs.type"
+    ],
+    "WorkbookAutoSaveSettingChangedEventArgs": [
+      "WorkbookAutoSaveSettingChangedEventArgs.type"
+    ],
+    "WorkbookRangeAreas": [
+      "WorkbookRangeAreas.addresses",
+      "WorkbookRangeAreas.areas",
+      "WorkbookRangeAreas.getRangeAreasBySheet()",
+      "WorkbookRangeAreas.getRangeAreasOrNullObjectBySheet()",
+      "WorkbookRangeAreas.ranges"
+    ],
+    "Worksheet": [
+      "Worksheet.autoFilter",
+      "Worksheet.checkSpelling()",
+      "Worksheet.clearArrows()",
+      "Worksheet.customProperties",
+      "Worksheet.enableCalculation",
+      "Worksheet.evaluate()",
+      "Worksheet.findAll()",
+      "Worksheet.findAllOrNullObject()",
+      "Worksheet.getCell()",
+      "Worksheet.getNext()",
+      "Worksheet.getNextOrNullObject()",
+      "Worksheet.getPrevious()",
+      "Worksheet.getPreviousOrNullObject()",
+      "Worksheet.getRangeByIndexes()",
+      "Worksheet.getRanges()",
+      "Worksheet.horizontalPageBreaks",
+      "Worksheet.namedSheetViews",
+      "Worksheet.names",
+      "Worksheet.notes",
+      "Worksheet.onActivated",
+      "Worksheet.onCalculated",
+      "Worksheet.onChanged",
+      "Worksheet.onColumnSorted",
+      "Worksheet.onDeactivated",
+      "Worksheet.onFormatChanged",
+      "Worksheet.onFormulaChanged",
+      "Worksheet.onNameChanged",
+      "Worksheet.onProtectionChanged",
+      "Worksheet.onRowHiddenChanged",
+      "Worksheet.onRowSorted",
+      "Worksheet.onSelectionChanged",
+      "Worksheet.onSingleClicked",
+      "Worksheet.onVisibilityChanged",
+      "Worksheet.replaceAll()",
+      "Worksheet.shapes",
+      "Worksheet.showDataTypeIcons",
+      "Worksheet.showOutlineLevels()",
+      "Worksheet.slicers",
+      "Worksheet.standardHeight",
+      "Worksheet.standardWidth",
+      "Worksheet.tabId",
+      "Worksheet.verticalPageBreaks"
+    ],
+    "WorksheetActivatedEventArgs": [
+      "WorksheetActivatedEventArgs.type",
+      "WorksheetActivatedEventArgs.worksheetId"
+    ],
+    "WorksheetAddedEventArgs": [
+      "WorksheetAddedEventArgs.source",
+      "WorksheetAddedEventArgs.type",
+      "WorksheetAddedEventArgs.worksheetId"
+    ],
+    "WorksheetCalculatedEventArgs": [
+      "WorksheetCalculatedEventArgs.address",
+      "WorksheetCalculatedEventArgs.type",
+      "WorksheetCalculatedEventArgs.worksheetId"
+    ],
+    "WorksheetChangedEventArgs": [
+      "WorksheetChangedEventArgs.address",
+      "WorksheetChangedEventArgs.changeDirectionState",
+      "WorksheetChangedEventArgs.changeType",
+      "WorksheetChangedEventArgs.details",
+      "WorksheetChangedEventArgs.getRange()",
+      "WorksheetChangedEventArgs.getRangeOrNullObject()",
+      "WorksheetChangedEventArgs.source",
+      "WorksheetChangedEventArgs.triggerSource",
+      "WorksheetChangedEventArgs.type",
+      "WorksheetChangedEventArgs.worksheetId"
+    ],
+    "WorksheetCollection": [
+      "WorksheetCollection.getCount()",
+      "WorksheetCollection.getFirst()",
+      "WorksheetCollection.getItem()",
+      "WorksheetCollection.getItemOrNullObject()",
+      "WorksheetCollection.getLast()",
+      "WorksheetCollection.onActivated",
+      "WorksheetCollection.onAdded",
+      "WorksheetCollection.onCalculated",
+      "WorksheetCollection.onChanged",
+      "WorksheetCollection.onColumnSorted",
+      "WorksheetCollection.onDeactivated",
+      "WorksheetCollection.onDeleted",
+      "WorksheetCollection.onFormatChanged",
+      "WorksheetCollection.onFormulaChanged",
+      "WorksheetCollection.onMoved",
+      "WorksheetCollection.onNameChanged",
+      "WorksheetCollection.onProtectionChanged",
+      "WorksheetCollection.onRowHiddenChanged",
+      "WorksheetCollection.onRowSorted",
+      "WorksheetCollection.onSelectionChanged",
+      "WorksheetCollection.onSingleClicked",
+      "WorksheetCollection.onVisibilityChanged"
+    ],
+    "WorksheetColumnSortedEventArgs": [
+      "WorksheetColumnSortedEventArgs.address",
+      "WorksheetColumnSortedEventArgs.source",
+      "WorksheetColumnSortedEventArgs.type",
+      "WorksheetColumnSortedEventArgs.worksheetId"
+    ],
+    "WorksheetCustomProperty": [
+      "WorksheetCustomProperty.delete()",
+      "WorksheetCustomProperty.key",
+      "WorksheetCustomProperty.value"
+    ],
+    "WorksheetCustomPropertyCollection": [
+      "WorksheetCustomPropertyCollection.add()",
+      "WorksheetCustomPropertyCollection.getCount()",
+      "WorksheetCustomPropertyCollection.getItem()",
+      "WorksheetCustomPropertyCollection.getItemOrNullObject()",
+      "WorksheetCustomPropertyCollection.items"
+    ],
+    "WorksheetDeactivatedEventArgs": [
+      "WorksheetDeactivatedEventArgs.type",
+      "WorksheetDeactivatedEventArgs.worksheetId"
+    ],
+    "WorksheetDeletedEventArgs": [
+      "WorksheetDeletedEventArgs.source",
+      "WorksheetDeletedEventArgs.type",
+      "WorksheetDeletedEventArgs.worksheetId"
+    ],
+    "WorksheetFormatChangedEventArgs": [
+      "WorksheetFormatChangedEventArgs.address",
+      "WorksheetFormatChangedEventArgs.getRange()",
+      "WorksheetFormatChangedEventArgs.getRangeOrNullObject()",
+      "WorksheetFormatChangedEventArgs.source",
+      "WorksheetFormatChangedEventArgs.type",
+      "WorksheetFormatChangedEventArgs.worksheetId"
+    ],
+    "WorksheetFormulaChangedEventArgs": [
+      "WorksheetFormulaChangedEventArgs.formulaDetails",
+      "WorksheetFormulaChangedEventArgs.source",
+      "WorksheetFormulaChangedEventArgs.type",
+      "WorksheetFormulaChangedEventArgs.worksheetId"
+    ],
+    "WorksheetFreezePanes": [
+      "WorksheetFreezePanes.freezeColumns()",
+      "WorksheetFreezePanes.freezeRows()",
+      "WorksheetFreezePanes.getLocation()",
+      "WorksheetFreezePanes.getLocationOrNullObject()"
+    ],
+    "WorksheetMovedEventArgs": [
+      "WorksheetMovedEventArgs.positionAfter",
+      "WorksheetMovedEventArgs.positionBefore",
+      "WorksheetMovedEventArgs.source",
+      "WorksheetMovedEventArgs.type",
+      "WorksheetMovedEventArgs.worksheetId"
+    ],
+    "WorksheetNameChangedEventArgs": [
+      "WorksheetNameChangedEventArgs.nameAfter",
+      "WorksheetNameChangedEventArgs.nameBefore",
+      "WorksheetNameChangedEventArgs.source",
+      "WorksheetNameChangedEventArgs.type",
+      "WorksheetNameChangedEventArgs.worksheetId"
+    ],
+    "WorksheetProtection": [
+      "WorksheetProtection.allowEditRanges",
+      "WorksheetProtection.canPauseProtection",
+      "WorksheetProtection.checkPassword()",
+      "WorksheetProtection.isPasswordProtected",
+      "WorksheetProtection.isPaused",
+      "WorksheetProtection.options",
+      "WorksheetProtection.pauseProtection()",
+      "WorksheetProtection.protect()",
+      "WorksheetProtection.protected",
+      "WorksheetProtection.resumeProtection()",
+      "WorksheetProtection.savedOptions",
+      "WorksheetProtection.setPassword()",
+      "WorksheetProtection.unprotect()",
+      "WorksheetProtection.updateOptions()"
+    ],
+    "WorksheetProtectionChangedEventArgs": [
+      "WorksheetProtectionChangedEventArgs.allowEditRangesChanged",
+      "WorksheetProtectionChangedEventArgs.isProtected",
+      "WorksheetProtectionChangedEventArgs.protectionOptionsChanged",
+      "WorksheetProtectionChangedEventArgs.sheetPasswordChanged",
+      "WorksheetProtectionChangedEventArgs.source",
+      "WorksheetProtectionChangedEventArgs.type",
+      "WorksheetProtectionChangedEventArgs.worksheetId"
+    ],
+    "WorksheetProtectionOptions": [
+      "WorksheetProtectionOptions.allowAutoFilter",
+      "WorksheetProtectionOptions.allowDeleteColumns",
+      "WorksheetProtectionOptions.allowDeleteRows",
+      "WorksheetProtectionOptions.allowEditObjects",
+      "WorksheetProtectionOptions.allowEditScenarios",
+      "WorksheetProtectionOptions.allowFormatCells",
+      "WorksheetProtectionOptions.allowFormatColumns",
+      "WorksheetProtectionOptions.allowFormatRows",
+      "WorksheetProtectionOptions.allowInsertColumns",
+      "WorksheetProtectionOptions.allowInsertHyperlinks",
+      "WorksheetProtectionOptions.allowInsertRows",
+      "WorksheetProtectionOptions.allowPivotTables",
+      "WorksheetProtectionOptions.allowSort",
+      "WorksheetProtectionOptions.selectionMode"
+    ],
+    "WorksheetRowHiddenChangedEventArgs": [
+      "WorksheetRowHiddenChangedEventArgs.address",
+      "WorksheetRowHiddenChangedEventArgs.changeType",
+      "WorksheetRowHiddenChangedEventArgs.source",
+      "WorksheetRowHiddenChangedEventArgs.type",
+      "WorksheetRowHiddenChangedEventArgs.worksheetId"
+    ],
+    "WorksheetRowSortedEventArgs": [
+      "WorksheetRowSortedEventArgs.address",
+      "WorksheetRowSortedEventArgs.source",
+      "WorksheetRowSortedEventArgs.type",
+      "WorksheetRowSortedEventArgs.worksheetId"
+    ],
+    "WorksheetSearchCriteria": [
+      "WorksheetSearchCriteria.completeMatch",
+      "WorksheetSearchCriteria.matchCase"
+    ],
+    "WorksheetSelectionChangedEventArgs": [
+      "WorksheetSelectionChangedEventArgs.address",
+      "WorksheetSelectionChangedEventArgs.type",
+      "WorksheetSelectionChangedEventArgs.worksheetId"
+    ],
+    "WorksheetSingleClickedEventArgs": [
+      "WorksheetSingleClickedEventArgs.address",
+      "WorksheetSingleClickedEventArgs.offsetX",
+      "WorksheetSingleClickedEventArgs.offsetY",
+      "WorksheetSingleClickedEventArgs.type",
+      "WorksheetSingleClickedEventArgs.worksheetId"
+    ],
+    "WorksheetVisibilityChangedEventArgs": [
+      "WorksheetVisibilityChangedEventArgs.source",
+      "WorksheetVisibilityChangedEventArgs.type",
+      "WorksheetVisibilityChangedEventArgs.visibilityAfter",
+      "WorksheetVisibilityChangedEventArgs.visibilityBefore",
+      "WorksheetVisibilityChangedEventArgs.worksheetId"
+    ]
+  }
+}

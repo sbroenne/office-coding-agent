@@ -1,15 +1,23 @@
 /**
- * PivotTable tool configs — 6 tools for managing PivotTables.
+ * PivotTable tool configs — 7 tools for managing PivotTables.
  */
 
 import type { ToolConfig } from '../codegen';
 import { getSheet } from '../codegen';
 
+function getPivotField(
+  pt: Excel.PivotTable,
+  fieldName: string
+): Excel.PivotField {
+  const hierarchy = pt.hierarchies.getItem(fieldName);
+  return hierarchy.fields.getItem(fieldName);
+}
+
 export const pivotTableConfigs: readonly ToolConfig[] = [
   {
     name: 'list_pivot_tables',
     description:
-      "List all PivotTables on a worksheet. Returns each PivotTable's name, row hierarchies, and data hierarchies.",
+      "List all PivotTables on a worksheet. Returns each PivotTable's name plus row/column/filter/data hierarchy names.",
     params: {
       sheetName: {
         type: 'string',
@@ -27,6 +35,8 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
       for (const pt of pivotTables.items) {
         pt.load(['name', 'id']);
         pt.rowHierarchies.load('items/name');
+        pt.columnHierarchies.load('items/name');
+        pt.filterHierarchies.load('items/name');
         pt.dataHierarchies.load('items/name');
       }
       await context.sync();
@@ -35,6 +45,8 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
         name: pt.name,
         id: pt.id,
         rowHierarchies: pt.rowHierarchies.items.map(h => h.name),
+        columnHierarchies: pt.columnHierarchies.items.map(h => h.name),
+        filterHierarchies: pt.filterHierarchies.items.map(h => h.name),
         dataHierarchies: pt.dataHierarchies.items.map(h => h.name),
       }));
       return { pivotTables: result, count: result.length };
@@ -187,6 +199,289 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
 
       await context.sync();
       return { pivotTableName: args.pivotTableName, fieldName, fieldType, added: true };
+    },
+  },
+
+  {
+    name: 'set_pivot_layout',
+    description:
+      'Set PivotTable layout and display options such as layout type, subtotal placement, field headers, and grand totals.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable to configure' },
+      layoutType: {
+        type: 'string',
+        required: false,
+        description: 'Pivot layout type',
+        enum: ['Compact', 'Tabular', 'Outline'],
+      },
+      subtotalLocation: {
+        type: 'string',
+        required: false,
+        description: 'Subtotal location for row fields',
+        enum: ['AtTop', 'AtBottom', 'Off'],
+      },
+      showFieldHeaders: {
+        type: 'boolean',
+        required: false,
+        description: 'Show or hide pivot field headers',
+      },
+      showRowGrandTotals: {
+        type: 'boolean',
+        required: false,
+        description: 'Show or hide row grand totals',
+      },
+      showColumnGrandTotals: {
+        type: 'boolean',
+        required: false,
+        description: 'Show or hide column grand totals',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const layout = pt.layout;
+
+      if (args.layoutType !== undefined) {
+        layout.layoutType = args.layoutType as Excel.PivotLayoutType;
+      }
+      if (args.subtotalLocation !== undefined) {
+        layout.subtotalLocation = args.subtotalLocation as Excel.SubtotalLocationType;
+      }
+      if (args.showFieldHeaders !== undefined) {
+        layout.showFieldHeaders = args.showFieldHeaders as boolean;
+      }
+      if (args.showRowGrandTotals !== undefined) {
+        layout.showRowGrandTotals = args.showRowGrandTotals as boolean;
+      }
+      if (args.showColumnGrandTotals !== undefined) {
+        layout.showColumnGrandTotals = args.showColumnGrandTotals as boolean;
+      }
+
+      layout.load([
+        'layoutType',
+        'subtotalLocation',
+        'showFieldHeaders',
+        'showRowGrandTotals',
+        'showColumnGrandTotals',
+      ]);
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        layoutType: layout.layoutType,
+        subtotalLocation: layout.subtotalLocation,
+        showFieldHeaders: layout.showFieldHeaders,
+        showRowGrandTotals: layout.showRowGrandTotals,
+        showColumnGrandTotals: layout.showColumnGrandTotals,
+        updated: true,
+      };
+    },
+  },
+
+  {
+    name: 'get_pivot_field_filters',
+    description:
+      'Get active filter state for a PivotField, including whether any/date/label/manual/value filters are currently set.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+
+      const filtersResult = field.getFilters();
+      const hasAnyFilterResult = field.isFiltered();
+      await context.sync();
+
+      const filters = filtersResult.value;
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        hasAnyFilter: hasAnyFilterResult.value,
+        hasDateFilter: filters.dateFilter !== undefined,
+        hasLabelFilter: filters.labelFilter !== undefined,
+        hasManualFilter: filters.manualFilter !== undefined,
+        hasValueFilter: filters.valueFilter !== undefined,
+      };
+    },
+  },
+
+  {
+    name: 'clear_pivot_field_filters',
+    description:
+      'Clear filters on a PivotField. If filterType is omitted, clears all filters; otherwise clears only the specified filter type.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      filterType: {
+        type: 'string',
+        required: false,
+        description: 'Optional filter type to clear; omit to clear all filter types.',
+        enum: ['Value', 'Manual', 'Label', 'Date'],
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+
+      if (args.filterType === undefined) {
+        field.clearAllFilters();
+      } else {
+        field.clearFilter(args.filterType as Excel.PivotFilterType);
+      }
+
+      await context.sync();
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        filterType: (args.filterType as string | undefined) ?? null,
+        cleared: true,
+      };
+    },
+  },
+
+  {
+    name: 'apply_pivot_label_filter',
+    description:
+      'Apply a label filter to a PivotField. Provide condition and value1; optionally provide value2 for Between/NotBetween conditions.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      condition: {
+        type: 'string',
+        description: 'Label filter condition',
+        enum: [
+          'Equals',
+          'DoesNotEqual',
+          'BeginsWith',
+          'DoesNotBeginWith',
+          'EndsWith',
+          'DoesNotEndWith',
+          'Contains',
+          'DoesNotContain',
+          'GreaterThan',
+          'GreaterThanOrEqualTo',
+          'LessThan',
+          'LessThanOrEqualTo',
+          'Between',
+          'NotBetween',
+        ],
+      },
+      value1: { type: 'string', description: 'Primary comparator value' },
+      value2: {
+        type: 'string',
+        required: false,
+        description: 'Optional secondary comparator value for Between/NotBetween conditions',
+      },
+      substring: {
+        type: 'string',
+        required: false,
+        description: 'Optional substring for contains/begins/ends conditions',
+      },
+      exclusive: {
+        type: 'boolean',
+        required: false,
+        description: 'Optional flag for exclusive boundary behavior where supported',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+
+      const labelFilter: Excel.PivotLabelFilter = {
+        condition: args.condition as Excel.LabelFilterCondition,
+        comparator: (args.value1 as string) ?? '',
+      };
+
+      if (args.value2 !== undefined) {
+        labelFilter.lowerBound = args.value1 as string;
+        labelFilter.upperBound = args.value2 as string;
+      }
+      if (args.substring !== undefined) {
+        labelFilter.substring = args.substring as string;
+      }
+      if (args.exclusive !== undefined) {
+        labelFilter.exclusive = args.exclusive as boolean;
+      }
+
+      field.applyFilter({ labelFilter });
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        condition: args.condition,
+        value1: args.value1,
+        value2: (args.value2 as string | undefined) ?? null,
+        applied: true,
+      };
+    },
+  },
+
+  {
+    name: 'sort_pivot_field_labels',
+    description: 'Sort PivotField labels in ascending or descending order.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      sortBy: {
+        type: 'string',
+        description: 'Sort direction for labels',
+        enum: ['Ascending', 'Descending'],
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+
+      field.sortByLabels(args.sortBy as Excel.SortBy);
+      await context.sync();
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        sortBy: args.sortBy,
+        sorted: true,
+      };
+    },
+  },
+
+  {
+    name: 'set_pivot_field_show_all_items',
+    description: 'Set whether a PivotField shows all items, including those with no data.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      showAllItems: {
+        type: 'boolean',
+        description: 'Whether to show all items for the field',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+
+      field.showAllItems = args.showAllItems as boolean;
+      field.load('showAllItems');
+      await context.sync();
+
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        showAllItems: field.showAllItems,
+        updated: true,
+      };
     },
   },
 

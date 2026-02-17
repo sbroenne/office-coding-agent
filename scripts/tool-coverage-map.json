@@ -1,0 +1,26 @@
+{
+  "Chart.worksheet": ["list_charts"],
+  "Comment.creationDate": ["list_comments"],
+  "ConditionalFormat.stopIfTrue": ["list_conditional_formats"],
+  "DataValidation.errorAlert": ["get_data_validation"],
+  "NamedItem.comment": ["list_named_ranges"],
+  "NamedItemCollection.addFormulaLocal()": ["define_named_range"],
+  "NumberFormatInfo.currencySymbol": ["set_number_format"],
+  "PivotField.clearAllFilters()": ["remove_pivot_field"],
+  "PivotTable.name": ["list_pivot_tables"],
+  "Range.columnCount": ["get_used_range"],
+  "Range.formulaArray": [
+    "get_range_formulas",
+    "get_range_values",
+    "set_range_formulas",
+    "set_range_values"
+  ],
+  "Range.getEntireColumn()": ["insert_range"],
+  "Range.isEntireColumn": ["auto_fit_columns"],
+  "Range.isEntireRow": ["auto_fit_rows"],
+  "Range.style": ["set_cell_borders"],
+  "TableColumn.delete()": ["delete_table_column"],
+  "TableColumn.getHeaderRowRange()": ["get_table_data", "list_tables"],
+  "TableRow.delete()": ["clear_table_filters"],
+  "Workbook.chartDataPointTrack": ["get_workbook_info"]
+}

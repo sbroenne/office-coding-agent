@@ -344,4 +344,62 @@ export const sheetConfigs: readonly ToolConfig[] = [
       };
     },
   },
+
+  {
+    name: 'set_sheet_gridlines',
+    description: 'Show or hide worksheet gridlines for a specific sheet.',
+    params: {
+      name: { type: 'string', description: 'Name of the worksheet' },
+      showGridlines: { type: 'boolean', description: 'True to show gridlines, false to hide' },
+    },
+    execute: async (context, args) => {
+      const sheet = context.workbook.worksheets.getItem(args.name as string);
+      sheet.showGridlines = args.showGridlines as boolean;
+      sheet.load(['name', 'showGridlines']);
+      await context.sync();
+      return { name: sheet.name, showGridlines: sheet.showGridlines };
+    },
+  },
+
+  {
+    name: 'set_sheet_headings',
+    description: 'Show or hide row/column headings (A, B, C and 1, 2, 3) for a worksheet.',
+    params: {
+      name: { type: 'string', description: 'Name of the worksheet' },
+      showHeadings: {
+        type: 'boolean',
+        description: 'True to show row/column headings, false to hide',
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = context.workbook.worksheets.getItem(args.name as string);
+      sheet.showHeadings = args.showHeadings as boolean;
+      sheet.load(['name', 'showHeadings']);
+      await context.sync();
+      return { name: sheet.name, showHeadings: sheet.showHeadings };
+    },
+  },
+
+  {
+    name: 'recalculate_sheet',
+    description:
+      'Force recalculation of formulas on a specific worksheet. Defaults to full recalculation.',
+    params: {
+      name: { type: 'string', description: 'Name of the worksheet' },
+      recalcType: {
+        type: 'string',
+        required: false,
+        description: 'Recalculation type',
+        enum: ['Recalculate', 'Full'],
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = context.workbook.worksheets.getItem(args.name as string);
+      const recalcType = (args.recalcType as string) ?? 'Full';
+      const markAllDirty = recalcType === 'Full';
+      sheet.calculate(markAllDirty);
+      await context.sync();
+      return { name: args.name, recalculated: true, type: recalcType };
+    },
+  },
 ];

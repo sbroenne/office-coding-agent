@@ -10,7 +10,7 @@
   <Version>1.0.0.0</Version>
   <ProviderName>sbroenne</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Office Coding Agent (Staging)" />
+  <DisplayName DefaultValue="Office Coding Agent (STAGING)" />
   <Description DefaultValue="AI-powered Office coding assistant with host-routed tool execution" />
   <IconUrl DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://sbroenne.github.io/office-coding-agent/assets/icon-80.png" />
