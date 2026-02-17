@@ -139,9 +139,11 @@ const ALL_TOOL_NAMES = [
   'set_custom_validation',
   'get_data_validation',
   'clear_data_validation',
-  // pivot table (12)
+  // pivot table (16)
   'list_pivot_tables',
   'refresh_pivot_table',
+  'get_pivot_table_source_info',
+  'set_pivot_table_options',
   'delete_pivot_table',
   'create_pivot_table',
   'add_pivot_field',
@@ -150,6 +152,8 @@ const ALL_TOOL_NAMES = [
   'clear_pivot_field_filters',
   'apply_pivot_label_filter',
   'sort_pivot_field_labels',
+  'apply_pivot_manual_filter',
+  'sort_pivot_field_values',
   'set_pivot_field_show_all_items',
   'remove_pivot_field',
 ] as const;
@@ -724,6 +728,27 @@ describe('tool schemas — data validation tools (decomposed)', () => {
 });
 
 describe('tool schemas — pivot table tools', () => {
+  it('get_pivot_table_source_info requires pivotTableName', () => {
+    const schema = excelTools.get_pivot_table_source_info.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('set_pivot_table_options requires pivotTableName and accepts optional options', () => {
+    const schema = excelTools.set_pivot_table_options.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        allowMultipleFiltersPerField: true,
+        useCustomSortLists: false,
+        refreshOnOpen: true,
+        enableDataValueEditing: false,
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ allowMultipleFiltersPerField: true }).success).toBe(false);
+  });
+
   it('add_pivot_field requires pivotTableName + fieldName + fieldType', () => {
     const schema = excelTools.add_pivot_field.inputSchema;
     expect(
@@ -823,6 +848,39 @@ describe('tool schemas — pivot table tools', () => {
     expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
       false
     );
+  });
+
+  it('apply_pivot_manual_filter requires pivotTableName + fieldName + selectedItems', () => {
+    const schema = excelTools.apply_pivot_manual_filter.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        selectedItems: ['North', 'South'],
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      false
+    );
+  });
+
+  it('sort_pivot_field_values requires pivotTableName + fieldName + sortBy + valuesHierarchyName', () => {
+    const schema = excelTools.sort_pivot_field_values.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        sortBy: 'Descending',
+        valuesHierarchyName: 'Sales',
+      }).success
+    ).toBe(true);
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        sortBy: 'Descending',
+      }).success
+    ).toBe(false);
   });
 
   it('set_pivot_field_show_all_items requires pivotTableName + fieldName + showAllItems', () => {

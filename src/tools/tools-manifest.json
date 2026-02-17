@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-02-17T10:37:19.601Z",
+  "generatedAt": "2026-02-17T11:04:29.295Z",
   "tools": [
     {
       "name": "get_range_values",
@@ -2423,6 +2423,58 @@
       }
     },
     {
+      "name": "get_pivot_table_source_info",
+      "description": "Get PivotTable source metadata, including source type and source address/connection string when available.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_pivot_table_options",
+      "description": "Set PivotTable behavior options such as multiple filters per field, custom sort lists, refresh on open, and data value editing.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "allowMultipleFiltersPerField": {
+          "type": "boolean",
+          "required": false,
+          "description": "Allow multiple filters (for different filter types) on the same PivotField"
+        },
+        "useCustomSortLists": {
+          "type": "boolean",
+          "required": false,
+          "description": "Use workbook custom sort lists when sorting PivotFields"
+        },
+        "refreshOnOpen": {
+          "type": "boolean",
+          "required": false,
+          "description": "Refresh this PivotTable when the workbook opens"
+        },
+        "enableDataValueEditing": {
+          "type": "boolean",
+          "required": false,
+          "description": "Enable editing of data values directly in the PivotTable when supported"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
       "name": "delete_pivot_table",
       "description": "Delete a PivotTable from the worksheet.",
       "params": {
@@ -2699,6 +2751,72 @@
             "Ascending",
             "Descending"
           ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "apply_pivot_manual_filter",
+      "description": "Apply a manual item filter to a PivotField by explicitly selecting visible item names.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "selectedItems": {
+          "type": "string[]",
+          "required": true,
+          "description": "Pivot item names to keep visible for this field"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "sort_pivot_field_values",
+      "description": "Sort a PivotField by data values for a specified value hierarchy (measure). Optionally scope sort to a pivot item.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "sortBy": {
+          "type": "string",
+          "required": true,
+          "description": "Sort direction for value-based sort",
+          "enum": [
+            "Ascending",
+            "Descending"
+          ]
+        },
+        "valuesHierarchyName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the data hierarchy/measure to sort by"
+        },
+        "pivotItemScope": {
+          "type": "string",
+          "required": false,
+          "description": "Optional pivot item name to scope value sort"
         },
         "sheetName": {
           "type": "string",

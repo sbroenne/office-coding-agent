@@ -13,6 +13,33 @@ function getPivotField(
   return hierarchy.fields.getItem(fieldName);
 }
 
+async function resolveDataHierarchy(
+  context: Excel.RequestContext,
+  pt: Excel.PivotTable,
+  requestedName: string
+): Promise<Excel.DataPivotHierarchy> {
+  pt.dataHierarchies.load('items/name');
+  await context.sync();
+
+  const exact = pt.dataHierarchies.items.find(
+    item => item.name.toLowerCase() === requestedName.toLowerCase()
+  );
+  if (exact) return pt.dataHierarchies.getItem(exact.name);
+
+  const contains = pt.dataHierarchies.items.find(
+    item =>
+      item.name.toLowerCase().includes(requestedName.toLowerCase()) ||
+      requestedName.toLowerCase().includes(item.name.toLowerCase())
+  );
+  if (contains) return pt.dataHierarchies.getItem(contains.name);
+
+  if (pt.dataHierarchies.items.length > 0) {
+    return pt.dataHierarchies.getItem(pt.dataHierarchies.items[0].name);
+  }
+
+  return pt.dataHierarchies.getItem(requestedName);
+}
+
 export const pivotTableConfigs: readonly ToolConfig[] = [
   {
     name: 'list_pivot_tables',
@@ -67,6 +94,96 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
       pt.refresh();
       await context.sync();
       return { pivotTableName, refreshed: true };
+    },
+  },
+
+  {
+    name: 'get_pivot_table_source_info',
+    description:
+      'Get PivotTable source metadata, including source type and source address/connection string when available.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pivotTableName = args.pivotTableName as string;
+      const pt = sheet.pivotTables.getItem(pivotTableName);
+
+      const sourceTypeResult = pt.getDataSourceType();
+      const sourceStringResult = pt.getDataSourceString();
+      await context.sync();
+
+      return {
+        pivotTableName,
+        dataSourceType: sourceTypeResult.value,
+        dataSourceString: sourceStringResult.value,
+      };
+    },
+  },
+
+  {
+    name: 'set_pivot_table_options',
+    description:
+      'Set PivotTable behavior options such as multiple filters per field, custom sort lists, refresh on open, and data value editing.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      allowMultipleFiltersPerField: {
+        type: 'boolean',
+        required: false,
+        description: 'Allow multiple filters (for different filter types) on the same PivotField',
+      },
+      useCustomSortLists: {
+        type: 'boolean',
+        required: false,
+        description: 'Use workbook custom sort lists when sorting PivotFields',
+      },
+      refreshOnOpen: {
+        type: 'boolean',
+        required: false,
+        description: 'Refresh this PivotTable when the workbook opens',
+      },
+      enableDataValueEditing: {
+        type: 'boolean',
+        required: false,
+        description: 'Enable editing of data values directly in the PivotTable when supported',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pivotTableName = args.pivotTableName as string;
+      const pt = sheet.pivotTables.getItem(pivotTableName);
+
+      if (args.allowMultipleFiltersPerField !== undefined) {
+        pt.allowMultipleFiltersPerField = args.allowMultipleFiltersPerField as boolean;
+      }
+      if (args.useCustomSortLists !== undefined) {
+        pt.useCustomSortLists = args.useCustomSortLists as boolean;
+      }
+      if (args.refreshOnOpen !== undefined) {
+        pt.refreshOnOpen = args.refreshOnOpen as boolean;
+      }
+      if (args.enableDataValueEditing !== undefined) {
+        pt.enableDataValueEditing = args.enableDataValueEditing as boolean;
+      }
+
+      pt.load([
+        'allowMultipleFiltersPerField',
+        'useCustomSortLists',
+        'refreshOnOpen',
+        'enableDataValueEditing',
+      ]);
+      await context.sync();
+
+      return {
+        pivotTableName,
+        allowMultipleFiltersPerField: pt.allowMultipleFiltersPerField,
+        useCustomSortLists: pt.useCustomSortLists,
+        refreshOnOpen: pt.refreshOnOpen,
+        enableDataValueEditing: pt.enableDataValueEditing,
+        updated: true,
+      };
     },
   },
 
@@ -450,6 +567,96 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
         pivotTableName: args.pivotTableName,
         fieldName: args.fieldName,
         sortBy: args.sortBy,
+        sorted: true,
+      };
+    },
+  },
+
+  {
+    name: 'apply_pivot_manual_filter',
+    description:
+      'Apply a manual item filter to a PivotField by explicitly selecting visible item names.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      selectedItems: {
+        type: 'string[]',
+        description: 'Pivot item names to keep visible for this field',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+      const selectedItems = args.selectedItems as string[];
+
+      field.items.load('items/name');
+      await context.sync();
+
+      const selectedSet = new Set(selectedItems.map(v => v.toLowerCase()));
+      for (const item of field.items.items) {
+        item.visible = selectedSet.has(item.name.toLowerCase());
+      }
+      await context.sync();
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        selectedItems,
+        applied: true,
+      };
+    },
+  },
+
+  {
+    name: 'sort_pivot_field_values',
+    description:
+      'Sort a PivotField by data values for a specified value hierarchy (measure). Optionally scope sort to a pivot item.',
+    params: {
+      pivotTableName: { type: 'string', description: 'Name of the PivotTable' },
+      fieldName: { type: 'string', description: 'Name of the PivotField (source column name)' },
+      sortBy: {
+        type: 'string',
+        description: 'Sort direction for value-based sort',
+        enum: ['Ascending', 'Descending'],
+      },
+      valuesHierarchyName: {
+        type: 'string',
+        description: 'Name of the data hierarchy/measure to sort by',
+      },
+      pivotItemScope: {
+        type: 'string',
+        required: false,
+        description: 'Optional pivot item name to scope value sort',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const pt = sheet.pivotTables.getItem(args.pivotTableName as string);
+      const field = getPivotField(pt, args.fieldName as string);
+      const valuesHierarchy = await resolveDataHierarchy(
+        context,
+        pt,
+        args.valuesHierarchyName as string
+      );
+      const sortBy = args.sortBy as Excel.SortBy;
+      const pivotItemScopeName = args.pivotItemScope as string | undefined;
+
+      if (pivotItemScopeName) {
+        const scopeItem = field.items.getItem(pivotItemScopeName);
+        field.sortByValues(sortBy, valuesHierarchy, scopeItem);
+      } else {
+        field.sortByValues(sortBy, valuesHierarchy);
+      }
+
+      await context.sync();
+      return {
+        pivotTableName: args.pivotTableName,
+        fieldName: args.fieldName,
+        sortBy: args.sortBy,
+        valuesHierarchyName: args.valuesHierarchyName,
+        pivotItemScope: pivotItemScopeName ?? null,
         sorted: true,
       };
     },
