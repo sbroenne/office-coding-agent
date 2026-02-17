@@ -8,6 +8,7 @@ import { buildSkillContext } from '@/services/skills';
 import { resolveActiveAgent } from '@/services/agents';
 import { useSettingsStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
+import { normalizeChatErrorMessage } from '@/services/ai/chatErrorMessage';
 import type { OfficeHostApp } from '@/services/office/host';
 
 export type { UseChatHelpers };
@@ -46,6 +47,7 @@ export function useOfficeChat(
   return useChat({
     transport: transport ?? undefined,
     onError: error => {
+      error.message = normalizeChatErrorMessage(error.message);
       console.error('[useOfficeChat] Chat error:', error);
       console.error('[useOfficeChat] Error details:', {
         message: error.message,
