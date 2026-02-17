@@ -645,7 +645,7 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
 
       if (pivotItemScopeName) {
         const scopeItem = field.items.getItem(pivotItemScopeName);
-        field.sortByValues(sortBy, valuesHierarchy, scopeItem);
+        field.sortByValues(sortBy, valuesHierarchy, [scopeItem]);
       } else {
         field.sortByValues(sortBy, valuesHierarchy);
       }
