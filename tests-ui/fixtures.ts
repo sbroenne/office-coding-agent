@@ -32,6 +32,8 @@ function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
       },
       activeSkillNames: null,
       activeAgentId: 'Excel',
+      importedSkills: [],
+      importedAgents: [],
       ...overrides,
     },
     version: 0,

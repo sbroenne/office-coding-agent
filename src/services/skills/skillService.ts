@@ -1,4 +1,5 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
+import excelSkillRaw from '@/skills/excel/SKILL.md';
 
 /**
  * Parse YAML frontmatter from a skill markdown file.
@@ -110,20 +111,56 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
 }
 
 /** All bundled skills, parsed at module load time. */
-const bundledSkills: AgentSkill[] = [];
+function loadBundledSkills(): AgentSkill[] {
+  const loaded: AgentSkill[] = [];
+
+  const webpackRequire =
+    typeof require === 'function' ? (require as NodeRequire & { context?: Function }) : undefined;
+
+  if (webpackRequire?.context) {
+    const context = webpackRequire.context('../../skills', true, /SKILL\.md$/);
+    for (const key of context.keys() as string[]) {
+      const raw = context(key) as string;
+      const parsed = parseFrontmatter(raw);
+      loaded.push({ metadata: parsed.metadata, content: parsed.content });
+    }
+
+    return loaded.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
+  }
+
+  const parsedExcel = parseFrontmatter(excelSkillRaw);
+  loaded.push({ metadata: parsedExcel.metadata, content: parsedExcel.content });
+
+  return loaded;
+}
+
+const bundledSkills: AgentSkill[] = loadBundledSkills();
+let importedSkills: AgentSkill[] = [];
+
+export function getBundledSkills(): AgentSkill[] {
+  return bundledSkills;
+}
+
+export function getImportedSkills(): AgentSkill[] {
+  return importedSkills;
+}
+
+export function setImportedSkills(skills: AgentSkill[]): void {
+  importedSkills = skills;
+}
 
 /**
  * Get all loaded agent skills.
  */
 export function getSkills(): AgentSkill[] {
-  return bundledSkills;
+  return [...bundledSkills, ...importedSkills];
 }
 
 /**
  * Get a single skill by name.
  */
 export function getSkill(name: string): AgentSkill | undefined {
-  return bundledSkills.find(s => s.metadata.name === name);
+  return getSkills().find(s => s.metadata.name === name);
 }
 
 /**

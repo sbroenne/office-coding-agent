@@ -1,1 +1,9 @@
-export { getSkills, getSkill, buildSkillContext, parseFrontmatter } from './skillService';
+export {
+  getSkills,
+  getSkill,
+  getBundledSkills,
+  getImportedSkills,
+  setImportedSkills,
+  buildSkillContext,
+  parseFrontmatter,
+} from './skillService';

@@ -34,6 +34,8 @@ describe('Integration: AgentPicker', () => {
       const items = screen.getAllByText(agent.metadata.name);
       expect(items.length).toBeGreaterThanOrEqual(1);
     }
+
+    expect(screen.getByText('Manage agents…')).toBeInTheDocument();
   });
 
   it('shows agent description as secondary content', async () => {
@@ -44,6 +46,21 @@ describe('Integration: AgentPicker', () => {
     const agents = getAgents();
     const firstSentence = agents[0].metadata.description.split('.')[0];
     expect(screen.getByText(firstSentence)).toBeInTheDocument();
+  });
+
+  it('opens manager dialog from keyboard and closes with Escape', async () => {
+    renderWithProviders(<AgentPicker />);
+
+    await userEvent.click(screen.getByText('Excel'));
+
+    const manageButton = screen.getByRole('button', { name: /manage agents/i });
+    manageButton.focus();
+    await userEvent.keyboard('{Enter}');
+
+    expect(screen.getByRole('dialog', { name: 'Manage Agents' })).toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Manage Agents' })).not.toBeInTheDocument();
   });
 
   it('store reflects the default active agent', () => {

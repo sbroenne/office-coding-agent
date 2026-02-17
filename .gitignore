@@ -34,6 +34,7 @@ playwright-report/
 # Local skills (domain-specific, not published)
 src/skills/*/
 !src/skills/
+local/extensions/
 
 # OS generated files
 .DS_Store

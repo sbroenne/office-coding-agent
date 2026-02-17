@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -176,7 +177,11 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
         <Button variant="secondary" size="sm" onClick={onCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button size="sm" onClick={() => void handleSave()} disabled={(saveDisabled ?? false) || saving}>
+        <Button
+          size="sm"
+          onClick={() => void handleSave()}
+          disabled={(saveDisabled ?? false) || saving}
+        >
           {saving && <Loader2 className="size-4 animate-spin" />}
           {saving ? 'Saving…' : saveLabel}
         </Button>
@@ -323,6 +328,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <DialogContent className="max-w-[480px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
+          <DialogDescription>Configure model endpoints and runtime preferences.</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">

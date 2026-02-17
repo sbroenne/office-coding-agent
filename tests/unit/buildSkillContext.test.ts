@@ -14,13 +14,14 @@ import {
 } from '@/services/skills/skillService';
 
 describe('buildSkillContext', () => {
-  it('returns empty string when no bundled skills exist', () => {
+  it('includes bundled skills when available', () => {
     const ctx = buildSkillContext();
-    expect(ctx).toBe('');
+    expect(ctx).toContain('# Agent Skills');
+    expect(ctx).toContain('Agent Skill: excel');
   });
 
-  it('returns empty string when activeNames provided but no skills are bundled', () => {
-    const ctx = buildSkillContext(['any-skill']);
+  it('returns empty string when activeNames do not match any skills', () => {
+    const ctx = buildSkillContext(['any-skill-that-does-not-exist']);
     expect(ctx).toBe('');
   });
 
@@ -42,9 +43,10 @@ describe('buildSkillContext', () => {
 });
 
 describe('getSkills', () => {
-  it('returns empty list when no bundled skills are configured', () => {
+  it('returns bundled skills', () => {
     const skills = getSkills();
-    expect(skills).toEqual([]);
+    expect(skills.length).toBeGreaterThan(0);
+    expect(skills.some(skill => skill.metadata.name === 'excel')).toBe(true);
   });
 
   it('each skill has metadata with a name', () => {
@@ -65,8 +67,10 @@ describe('getSkill', () => {
     expect(getSkill('nonexistent-skill-xyz')).toBeUndefined();
   });
 
-  it('returns undefined when no skills are bundled', () => {
-    expect(getSkill('any-skill')).toBeUndefined();
+  it('returns bundled excel skill by name', () => {
+    const skill = getSkill('excel');
+    expect(skill).toBeDefined();
+    expect(skill?.metadata.name).toBe('excel');
   });
 });
 
