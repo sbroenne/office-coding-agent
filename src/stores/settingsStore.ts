@@ -356,6 +356,23 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'office-coding-agent-settings',
+      version: 1,
+      migrate: persistedState => {
+        const state = (persistedState ?? {}) as Partial<UserSettings>;
+        const persistedActiveSkillNames = state.activeSkillNames;
+
+        const normalizedActiveSkillNames = Array.isArray(persistedActiveSkillNames)
+          ? persistedActiveSkillNames.filter((name): name is string => typeof name === 'string')
+          : null;
+
+        return {
+          ...state,
+          activeSkillNames:
+            normalizedActiveSkillNames && normalizedActiveSkillNames.length > 0
+              ? normalizedActiveSkillNames
+              : null,
+        };
+      },
       storage: createJSONStorage(() => officeStorage),
       partialize: state => ({
         endpoints: state.endpoints,

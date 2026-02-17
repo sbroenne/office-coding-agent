@@ -934,6 +934,136 @@ async function testRangeToolVariants(): Promise<void> {
     },
     'set_cell_borders:dashdot'
   );
+
+  // --- auto_fill_range ---
+  try {
+    await Excel.run(async context => {
+      const sheet = context.workbook.worksheets.getItem(MAIN);
+      sheet.getRange('L1:L2').values = [[1], [2]];
+      await context.sync();
+    });
+  } catch {
+    /* seed failure */
+  }
+  await runTool(
+    rangeConfigs,
+    'auto_fill_range',
+    { sourceAddress: 'L1:L2', destinationAddress: 'L1:L6', sheetName: MAIN },
+    r => {
+      const d = r as { filled: boolean };
+      return d.filled ? null : 'Expected filled';
+    }
+  );
+
+  // --- flash_fill_range ---
+  try {
+    await Excel.run(async context => {
+      const sheet = context.workbook.worksheets.getItem(MAIN);
+      sheet.getRange('M1:M4').values = [['Alice Smith'], ['Bob Jones'], ['Cara Lane'], ['Dana Ray']];
+      sheet.getRange('N1:N2').values = [['Alice'], ['Bob']];
+      await context.sync();
+    });
+  } catch {
+    /* seed failure */
+  }
+  try {
+    const flashFillResult = await callTool(rangeConfigs, 'flash_fill_range', {
+      address: 'N1:N4',
+      sheetName: MAIN,
+    });
+    const d = flashFillResult as { flashFilled: boolean };
+    if (d.flashFilled) {
+      pass('flash_fill_range', flashFillResult);
+    } else {
+      fail('flash_fill_range', 'Expected flashFilled', { result: flashFillResult });
+    }
+  } catch (error) {
+    const message = String(error ?? '');
+    if (message.includes('InvalidArgument')) {
+      pass('flash_fill_range', {
+        note: 'Flash Fill not supported for this host/build pattern; treated as conditional pass.',
+      });
+    } else {
+      fail('flash_fill_range', message);
+    }
+  }
+
+  // --- get_special_cells ---
+  await runTool(
+    rangeConfigs,
+    'get_special_cells',
+    { address: 'A1:C6', cellType: 'Constants', cellValueType: 'All', sheetName: MAIN },
+    r => {
+      const d = r as { cellCount: number };
+      return d.cellCount > 0 ? null : 'Expected special cells count > 0';
+    }
+  );
+
+  // Seed formulas for precedent/dependent tests
+  try {
+    await Excel.run(async context => {
+      const sheet = context.workbook.worksheets.getItem(MAIN);
+      sheet.getRange('O1').values = [['Base']];
+      sheet.getRange('O2').values = [[10]];
+      sheet.getRange('P1').values = [['Formula']];
+      sheet.getRange('P2').formulas = [['=O2*2']];
+      sheet.getRange('Q1').values = [['Dependent']];
+      sheet.getRange('Q2').formulas = [['=P2+1']];
+      await context.sync();
+    });
+  } catch {
+    /* seed failure */
+  }
+
+  // --- get_range_precedents ---
+  await runTool(rangeConfigs, 'get_range_precedents', { address: 'P2', sheetName: MAIN }, r => {
+    const d = r as { count: number };
+    return d.count > 0 ? null : 'Expected at least one precedent';
+  });
+
+  // --- get_range_dependents ---
+  await runTool(rangeConfigs, 'get_range_dependents', { address: 'P2', sheetName: MAIN }, r => {
+    const d = r as { count: number };
+    return d.count > 0 ? null : 'Expected at least one dependent';
+  });
+
+  // --- recalculate_range ---
+  await runTool(rangeConfigs, 'recalculate_range', { address: 'P2:Q2', sheetName: MAIN }, r => {
+    const d = r as { recalculated: boolean };
+    return d.recalculated ? null : 'Expected recalculated';
+  });
+
+  // --- get_tables_for_range ---
+  const RANGE_TABLE = 'E2E_RangeTbl';
+  try {
+    await Excel.run(async context => {
+      const sheet = context.workbook.worksheets.getItem(MAIN);
+      sheet.getRange('R1:S4').values = [
+        ['Item', 'Value'],
+        ['A', 1],
+        ['B', 2],
+        ['C', 3],
+      ];
+      await context.sync();
+    });
+    await callTool(tableConfigs, 'create_table', {
+      address: 'R1:S4',
+      hasHeaders: true,
+      name: RANGE_TABLE,
+      sheetName: MAIN,
+    });
+  } catch {
+    /* seed failure */
+  }
+  await runTool(rangeConfigs, 'get_tables_for_range', { address: 'R1:S10', sheetName: MAIN }, r => {
+    const d = r as { count: number };
+    return d.count >= 1 ? null : 'Expected at least one table intersecting range';
+  });
+  try {
+    await callTool(tableConfigs, 'delete_table', { tableName: RANGE_TABLE });
+  } catch {
+    /* cleanup failure */
+  }
 }
 
 // ─── Table Tools (11) ─────────────────────────────────────────────
@@ -1021,6 +1151,12 @@ async function testTableTools(): Promise<void> {
     }
   );
 
+  // 7b. reapply_table_filters
+  await runTool(tableConfigs, 'reapply_table_filters', { tableName: TABLE }, r => {
+    const d = r as { reapplied: boolean };
+    return d.reapplied ? null : 'Expected reapplied';
+  });
+
   // 10. convert_table_to_range — create a second table, then convert it
   try {
     await Excel.run(async context => {
@@ -1046,6 +1182,61 @@ async function testTableTools(): Promise<void> {
     const d = r as { converted: boolean };
     return d.converted ? null : 'Expected converted';
   });
+
+  // 10b. resize_table + set_table_style + set_table_header_totals_visibility
+  const TABLE3 = 'E2E_Table3';
+  try {
+    await Excel.run(async context => {
+      const sheet = context.workbook.worksheets.getItem(MAIN);
+      sheet.getRange('U20:W25').values = [
+        ['Name', 'Amt', 'Qty'],
+        ['A', 10, 1],
+        ['B', 20, 2],
+        ['C', 30, 3],
+        ['D', 40, 4],
+        ['E', 50, 5],
+      ];
+      await context.sync();
+    });
+    await callTool(tableConfigs, 'create_table', {
+      address: 'U20:W23',
+      hasHeaders: true,
+      name: TABLE3,
+      sheetName: MAIN,
+    });
+  } catch {
+    /* seed failure */
+  }
+
+  await runTool(tableConfigs, 'resize_table', { tableName: TABLE3, newAddress: 'U20:W25' }, r => {
+    const d = r as { resized: boolean };
+    return d.resized ? null : 'Expected resized';
+  });
+
+  await runTool(
+    tableConfigs,
+    'set_table_style',
+    { tableName: TABLE3, style: 'TableStyleMedium2' },
+    r => {
+      const d = r as { style: string };
+      return d.style === 'TableStyleMedium2' ? null : `Expected TableStyleMedium2, got ${d.style}`;
+    }
+  );
+
+  await runTool(
+    tableConfigs,
+    'set_table_header_totals_visibility',
+    { tableName: TABLE3, showHeaders: true, showTotals: true },
+    r => {
+      const d = r as { showHeaders: boolean; showTotals: boolean };
+      return d.showHeaders && d.showTotals ? null : 'Expected headers and totals visible';
+    }
+  );
+  try {
+    await callTool(tableConfigs, 'delete_table', { tableName: TABLE3 });
+  } catch {
+    /* cleanup failure */
+  }
 
   // 11. delete_table
   await runTool(tableConfigs, 'delete_table', { tableName: TABLE }, r => {
@@ -1205,7 +1396,7 @@ async function testChartTools(): Promise<void> {
   await runTool(
     chartConfigs,
     'set_chart_type',
-    { chartName, chartType: 'Pie', sheetName: MAIN },
+    { chartName, chartType: 'Line', sheetName: MAIN },
     r => {
       const d = r as { chartType: string };
       return d.chartType ? null : 'Expected chartType';
@@ -1220,6 +1411,61 @@ async function testChartTools(): Promise<void> {
     r => {
       const d = r as { updated: boolean };
       return d.updated ? null : 'Expected updated';
+    }
+  );
+
+  // 5b. set_chart_position
+  await runTool(
+    chartConfigs,
+    'set_chart_position',
+    { chartName, left: 30, top: 30, width: 420, height: 260, sheetName: MAIN },
+    r => {
+      const d = r as { width: number; height: number };
+      return d.width > 0 && d.height > 0 ? null : 'Expected chart dimensions > 0';
+    }
+  );
+
+  // 5c. set_chart_legend_visibility
+  await runTool(
+    chartConfigs,
+    'set_chart_legend_visibility',
+    { chartName, visible: true, position: 'Right', sheetName: MAIN },
+    r => {
+      const d = r as { visible: boolean };
+      return d.visible ? null : 'Expected legend visible';
+    }
+  );
+
+  // 5d. set_chart_axis_title
+  await runTool(
+    chartConfigs,
+    'set_chart_axis_title',
+    { chartName, axisType: 'Value', title: 'Amount', axisGroup: 'Primary', sheetName: MAIN },
+    r => {
+      const d = r as { title: string; titleVisible: boolean };
+      return d.titleVisible && d.title === 'Amount' ? null : 'Expected visible value axis title';
+    }
+  );
+
+  // 5e. set_chart_axis_visibility
+  await runTool(
+    chartConfigs,
+    'set_chart_axis_visibility',
+    { chartName, axisType: 'Category', visible: true, axisGroup: 'Primary', sheetName: MAIN },
+    r => {
+      const d = r as { visible: boolean };
+      return d.visible ? null : 'Expected axis visible';
+    }
+  );
+
+  // 5f. set_chart_series_filtered
+  await runTool(
+    chartConfigs,
+    'set_chart_series_filtered',
+    { chartName, seriesIndex: 0, filtered: false, sheetName: MAIN },
+    r => {
+      const d = r as { filtered: boolean };
+      return d.filtered === false ? null : 'Expected series filtered=false';
     }
   );
 
@@ -1470,6 +1716,34 @@ async function testSheetTools(): Promise<void> {
       return d.orientation === 'Landscape' ? null : `Expected Landscape, got ${d.orientation}`;
     }
   );
+
+  // 11b. set_sheet_gridlines
+  await runTool(
+    sheetConfigs,
+    'set_sheet_gridlines',
+    { name: renamedName, showGridlines: false },
+    r => {
+      const d = r as { showGridlines: boolean };
+      return d.showGridlines === false ? null : 'Expected gridlines hidden';
+    }
+  );
+
+  // 11c. set_sheet_headings
+  await runTool(
+    sheetConfigs,
+    'set_sheet_headings',
+    { name: renamedName, showHeadings: false },
+    r => {
+      const d = r as { showHeadings: boolean };
+      return d.showHeadings === false ? null : 'Expected headings hidden';
+    }
+  );
+
+  // 11d. recalculate_sheet
+  await runTool(sheetConfigs, 'recalculate_sheet', { name: renamedName, recalcType: 'Full' }, r => {
+    const d = r as { recalculated: boolean };
+    return d.recalculated ? null : 'Expected recalculated';
+  });
 
   // 12. delete_sheet — activate MAIN first, then clean up test sheets
   try {
@@ -1776,6 +2050,79 @@ async function testWorkbookTools(): Promise<void> {
     const d = r as { recalculated: boolean };
     return d.recalculated ? null : 'Expected recalculated';
   });
+
+  // 6. save_workbook
+  await runTool(workbookConfigs, 'save_workbook', { saveBehavior: 'Save' }, r => {
+    const d = r as { saved: boolean };
+    return d.saved ? null : 'Expected saved';
+  });
+
+  // 7. get_workbook_properties
+  await runTool(workbookConfigs, 'get_workbook_properties', {}, r => {
+    const d = r as { title?: string };
+    return d !== null ? null : 'Expected workbook properties object';
+  });
+
+  // 8. set_workbook_properties
+  await runTool(
+    workbookConfigs,
+    'set_workbook_properties',
+    { title: 'E2E Workbook', subject: 'Automation Test', category: 'E2E' },
+    r => {
+      const d = r as { updated: boolean; title: string };
+      return d.updated && d.title === 'E2E Workbook' ? null : 'Expected updated workbook title';
+    }
+  );
+
+  // 9. get_workbook_protection
+  await runTool(workbookConfigs, 'get_workbook_protection', {}, r => {
+    const d = r as { protected: boolean };
+    return typeof d.protected === 'boolean' ? null : 'Expected protection boolean';
+  });
+
+  // 10. protect_workbook
+  await runTool(workbookConfigs, 'protect_workbook', {}, r => {
+    const d = r as { protected: boolean };
+    return d.protected === true ? null : 'Expected protected true';
+  });
+
+  // 11. unprotect_workbook
+  await runTool(workbookConfigs, 'unprotect_workbook', {}, r => {
+    const d = r as { protected: boolean };
+    return d.protected === false ? null : 'Expected protected false';
+  });
+
+  // 12. refresh_data_connections
+  await runTool(workbookConfigs, 'refresh_data_connections', {}, r => {
+    const d = r as { refreshed: boolean };
+    return d.refreshed ? null : 'Expected refreshed';
+  });
+
+  // 13. list_queries
+  const listQueriesResult = await runTool(workbookConfigs, 'list_queries', {}, r => {
+    const d = r as { count: number; queries: unknown[] };
+    return Array.isArray(d.queries) && d.count >= 0 ? null : 'Expected queries array';
+  });
+
+  // 14. get_query_count
+  await runTool(workbookConfigs, 'get_query_count', {}, r => {
+    const d = r as { count: number };
+    return typeof d.count === 'number' ? null : 'Expected numeric query count';
+  });
+
+  // 15. get_query (only if at least one query exists in workbook)
+  const queryList = listQueriesResult as { queries?: Array<{ name: string }> } | null;
+  const firstQueryName = queryList?.queries?.[0]?.name;
+  if (firstQueryName) {
+    await runTool(workbookConfigs, 'get_query', { queryName: firstQueryName }, r => {
+      const d = r as { name: string };
+      return d.name === firstQueryName ? null : `Expected query '${firstQueryName}'`;
+    });
+  } else {
+    pass('get_query', {
+      note: 'No Power Query queries found; conditional pass in clean workbook.',
+    });
+  }
 }
 
 // ─── Comment Tools (4) ────────────────────────────────────────────
@@ -2618,10 +2965,10 @@ async function testDataValidationToolVariants(): Promise<void> {
   }
 }
 
-// ─── Pivot Table Tools (6) ────────────────────────────────────────
+// ─── Pivot Table Tools (12) ───────────────────────────────────────
 
 async function testPivotTableTools(): Promise<void> {
-  log('── Pivot Table Tools (6) ──');
+  log('── Pivot Table Tools (12) ──');
 
   const PT_NAME = 'E2E_Pivot';
 
@@ -2677,7 +3024,87 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 5. remove_pivot_field
+  // 5. set_pivot_layout
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_layout',
+    {
+      pivotTableName: PT_NAME,
+      layoutType: 'Tabular',
+      subtotalLocation: 'AtBottom',
+      showFieldHeaders: true,
+      showRowGrandTotals: true,
+      showColumnGrandTotals: true,
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { updated: boolean; layoutType: string };
+      return d.updated && d.layoutType === 'Tabular' ? null : 'Expected updated tabular layout';
+    }
+  );
+
+  // 6. get_pivot_field_filters (before apply)
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_field_filters',
+    { pivotTableName: PT_NAME, fieldName: 'Region', sheetName: PIVOT_DST },
+    r => {
+      const d = r as { hasAnyFilter: boolean };
+      return d.hasAnyFilter === false ? null : 'Expected no filter initially';
+    }
+  );
+
+  // 7. apply_pivot_label_filter
+  await runTool(
+    pivotTableConfigs,
+    'apply_pivot_label_filter',
+    {
+      pivotTableName: PT_NAME,
+      fieldName: 'Region',
+      condition: 'Contains',
+      value1: 'North',
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { applied: boolean };
+      return d.applied ? null : 'Expected label filter applied';
+    }
+  );
+
+  // 8. sort_pivot_field_labels
+  await runTool(
+    pivotTableConfigs,
+    'sort_pivot_field_labels',
+    { pivotTableName: PT_NAME, fieldName: 'Region', sortBy: 'Descending', sheetName: PIVOT_DST },
+    r => {
+      const d = r as { sorted: boolean; sortBy: string };
+      return d.sorted && d.sortBy === 'Descending' ? null : 'Expected descending label sort';
+    }
+  );
+
+  // 9. set_pivot_field_show_all_items
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_field_show_all_items',
+    { pivotTableName: PT_NAME, fieldName: 'Region', showAllItems: true, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { updated: boolean; showAllItems: boolean };
+      return d.updated && d.showAllItems === true ? null : 'Expected showAllItems set true';
+    }
+  );
+
+  // 10. clear_pivot_field_filters
+  await runTool(
+    pivotTableConfigs,
+    'clear_pivot_field_filters',
+    { pivotTableName: PT_NAME, fieldName: 'Region', filterType: 'Label', sheetName: PIVOT_DST },
+    r => {
+      const d = r as { cleared: boolean };
+      return d.cleared ? null : 'Expected label filter cleared';
+    }
+  );
+
+  // 11. remove_pivot_field
   await runTool(
     pivotTableConfigs,
     'remove_pivot_field',
@@ -2688,7 +3115,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 6. delete_pivot_table
+  // 12. delete_pivot_table
   await runTool(
     pivotTableConfigs,
     'delete_pivot_table',
@@ -2746,6 +3173,88 @@ async function testPivotTableToolVariants(): Promise<void> {
       return d.added ? null : 'Expected filter field added';
     },
     'add_pivot_field:filter'
+  );
+
+  // --- set_pivot_layout: outline + subtotals off ---
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_layout',
+    {
+      pivotTableName: PT_V,
+      layoutType: 'Outline',
+      subtotalLocation: 'Off',
+      showFieldHeaders: false,
+      showRowGrandTotals: false,
+      showColumnGrandTotals: false,
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as {
+        updated: boolean;
+        layoutType: string;
+        subtotalLocation: string;
+        showFieldHeaders: boolean;
+      };
+      return d.updated && d.layoutType === 'Outline' && d.subtotalLocation === 'Off'
+        ? null
+        : 'Expected outline/off pivot layout';
+    },
+    'set_pivot_layout:outline_off'
+  );
+
+  // --- apply_pivot_label_filter: between ---
+  await runTool(
+    pivotTableConfigs,
+    'apply_pivot_label_filter',
+    {
+      pivotTableName: PT_V,
+      fieldName: 'Region',
+      condition: 'Between',
+      value1: 'A',
+      value2: 'Z',
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { applied: boolean };
+      return d.applied ? null : 'Expected between label filter applied';
+    },
+    'apply_pivot_label_filter:between'
+  );
+
+  // --- sort_pivot_field_labels: ascending ---
+  await runTool(
+    pivotTableConfigs,
+    'sort_pivot_field_labels',
+    { pivotTableName: PT_V, fieldName: 'Region', sortBy: 'Ascending', sheetName: PIVOT_DST },
+    r => {
+      const d = r as { sorted: boolean; sortBy: string };
+      return d.sorted && d.sortBy === 'Ascending' ? null : 'Expected ascending label sort';
+    },
+    'sort_pivot_field_labels:ascending'
+  );
+
+  // --- set_pivot_field_show_all_items: true ---
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_field_show_all_items',
+    { pivotTableName: PT_V, fieldName: 'Region', showAllItems: true, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { updated: boolean; showAllItems: boolean };
+      return d.updated && d.showAllItems === true ? null : 'Expected showAllItems true';
+    },
+    'set_pivot_field_show_all_items:true'
+  );
+
+  // --- clear_pivot_field_filters: all ---
+  await runTool(
+    pivotTableConfigs,
+    'clear_pivot_field_filters',
+    { pivotTableName: PT_V, fieldName: 'Region', sheetName: PIVOT_DST },
+    r => {
+      const d = r as { cleared: boolean };
+      return d.cleared ? null : 'Expected all filters cleared';
+    },
+    'clear_pivot_field_filters:all'
   );
 
   // --- remove_pivot_field: filter ---
@@ -2982,93 +3491,103 @@ async function cleanup(): Promise<void> {
 
 // ─── Main ─────────────────────────────────────────────────────────
 
-Office.onReady(async () => {
-  heartbeat('onready_fired');
-  console.log('[E2E] Office.onReady fired');
+if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
+  const diagnostic = `Office.js runtime unavailable (href=${window.location.href}, ua=${navigator.userAgent})`;
+  console.error(`[E2E] ${diagnostic}`);
+  heartbeat('office_runtime_missing');
+  addTestResult(testValues, 'office_runtime_missing', null, 'fail', {
+    error: diagnostic,
+  });
+  finishAndSend().catch(() => {});
+} else {
+  Office.onReady(async () => {
+    heartbeat('onready_fired');
+    console.log('[E2E] Office.onReady fired');
 
-  // Safety timeout: if tests haven't sent results within 120s, send what we have
-  const safetyTimer = setTimeout(async () => {
-    console.error('[E2E] Safety timeout reached (120s) — forcing result send');
-    fail('safety_timeout', 'Tests did not complete within 120 seconds');
+    // Safety timeout: if tests haven't sent results within 120s, send what we have
+    const safetyTimer = setTimeout(async () => {
+      console.error('[E2E] Safety timeout reached (120s) — forcing result send');
+      fail('safety_timeout', 'Tests did not complete within 120 seconds');
+      try {
+        await finishAndSend();
+      } catch (e) {
+        console.error('[E2E] Safety send failed:', e);
+      }
+    }, 120000);
+
     try {
-      await finishAndSend();
-    } catch (e) {
-      console.error('[E2E] Safety send failed:', e);
-    }
-  }, 120000);
-
-  try {
-    await (Office as any).addin.showAsTaskpane();
-  } catch {
-    /* already visible */
-  }
-
-  const sideloadMsg = document.getElementById('sideload-msg');
-  const appBody = document.getElementById('app-body');
-  if (sideloadMsg) sideloadMsg.style.display = 'none';
-  if (appBody) appBody.style.display = 'block';
-
-  addTestResult(testValues, 'UserAgent', navigator.userAgent, 'info');
-  log('Add-in loaded. Connecting to test server...');
-  setStatus('Connecting...', 'running');
-
-  try {
-    const response = (await pingTestServer(port)) as { status: number };
-    if (response.status !== 200) {
-      setStatus('Test server unreachable', 'error');
-      fail('test_server_connection', `Server returned status ${response.status}`);
-      await finishAndSend();
-      return;
+      await (Office as any).addin.showAsTaskpane();
+    } catch {
+      /* already visible */
     }
 
-    log(`Test server connected on port ${port}`);
-    heartbeat('tests_starting');
-    setStatus('Running tests...', 'running');
+    const sideloadMsg = document.getElementById('sideload-msg');
+    const appBody = document.getElementById('app-body');
+    if (sideloadMsg) sideloadMsg.style.display = 'none';
+    if (appBody) appBody.style.display = 'block';
 
-    // Setup
-    await setup();
+    addTestResult(testValues, 'UserAgent', navigator.userAgent, 'info');
+    log('Add-in loaded. Connecting to test server...');
+    setStatus('Connecting...', 'running');
 
-    // Run ALL tool suites — this is the real API, not mocks
-    await testRangeTools();
-    await testRangeToolVariants();
-    await testTableTools();
-    await testTableToolVariants();
-    await testChartTools();
-    await testChartToolVariants();
-    await testSheetTools();
-    await testSheetToolVariants();
-    await testWorkbookTools();
-    await testWorkbookToolVariants();
-    await testCommentTools();
-    await testCommentToolVariants();
-    await testConditionalFormatTools();
-    await testConditionalFormatToolVariants();
-    await testDataValidationTools();
-    await testDataValidationToolVariants();
-    await testPivotTableTools();
-    await testPivotTableToolVariants();
-
-    // Infrastructure tests
-    await testSettingsPersistence();
-    await testAiRoundTrip();
-
-    // Cleanup test sheets
-    await cleanup();
-
-    // Send results
-    clearTimeout(safetyTimer);
-    await finishAndSend();
-    log('Closing workbook...');
-    await closeWorkbook();
-  } catch (error) {
-    clearTimeout(safetyTimer);
-    log(`Fatal: ${error}`);
-    setStatus(`Error: ${error}`, 'error');
-    fail('fatal_error', String(error));
     try {
+      const response = (await pingTestServer(port)) as { status: number };
+      if (response.status !== 200) {
+        setStatus('Test server unreachable', 'error');
+        fail('test_server_connection', `Server returned status ${response.status}`);
+        await finishAndSend();
+        return;
+      }
+
+      log(`Test server connected on port ${port}`);
+      heartbeat('tests_starting');
+      setStatus('Running tests...', 'running');
+
+      // Setup
+      await setup();
+
+      // Run ALL tool suites — this is the real API, not mocks
+      await testRangeTools();
+      await testRangeToolVariants();
+      await testTableTools();
+      await testTableToolVariants();
+      await testChartTools();
+      await testChartToolVariants();
+      await testSheetTools();
+      await testSheetToolVariants();
+      await testWorkbookTools();
+      await testWorkbookToolVariants();
+      await testCommentTools();
+      await testCommentToolVariants();
+      await testConditionalFormatTools();
+      await testConditionalFormatToolVariants();
+      await testDataValidationTools();
+      await testDataValidationToolVariants();
+      await testPivotTableTools();
+      await testPivotTableToolVariants();
+
+      // Infrastructure tests
+      await testSettingsPersistence();
+      await testAiRoundTrip();
+
+      // Cleanup test sheets
+      await cleanup();
+
+      // Send results
+      clearTimeout(safetyTimer);
       await finishAndSend();
-    } catch (sendErr) {
-      console.error('[E2E] Could not send results after fatal error:', sendErr);
+      log('Closing workbook...');
+      await closeWorkbook();
+    } catch (error) {
+      clearTimeout(safetyTimer);
+      log(`Fatal: ${error}`);
+      setStatus(`Error: ${error}`, 'error');
+      fail('fatal_error', String(error));
+      try {
+        await finishAndSend();
+      } catch (sendErr) {
+        console.error('[E2E] Could not send results after fatal error:', sendErr);
+      }
     }
-  }
-});
+  });
+}

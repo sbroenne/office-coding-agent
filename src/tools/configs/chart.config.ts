@@ -197,4 +197,206 @@ export const chartConfigs: readonly ToolConfig[] = [
       return { chartName: args.chartName, dataRange: args.dataRange, updated: true };
     },
   },
+
+  {
+    name: 'set_chart_position',
+    description:
+      'Position and size a chart. Use startCell/endCell to anchor by range, or left/top/width/height for point-based positioning.',
+    params: {
+      chartName: { type: 'string', description: 'Name of the chart' },
+      startCell: {
+        type: 'string',
+        required: false,
+        description: 'Optional top-left anchor cell address',
+      },
+      endCell: {
+        type: 'string',
+        required: false,
+        description: 'Optional bottom-right anchor cell address',
+      },
+      left: { type: 'number', required: false, description: 'Left position in points' },
+      top: { type: 'number', required: false, description: 'Top position in points' },
+      width: { type: 'number', required: false, description: 'Width in points' },
+      height: { type: 'number', required: false, description: 'Height in points' },
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const chart = sheet.charts.getItem(args.chartName as string);
+
+      const startCell = args.startCell as string | undefined;
+      const endCell = args.endCell as string | undefined;
+      if (startCell) {
+        chart.setPosition(startCell, endCell);
+      }
+      if (args.left !== undefined) chart.left = args.left as number;
+      if (args.top !== undefined) chart.top = args.top as number;
+      if (args.width !== undefined) chart.width = args.width as number;
+      if (args.height !== undefined) chart.height = args.height as number;
+
+      chart.load(['name', 'left', 'top', 'width', 'height']);
+      await context.sync();
+      return {
+        chartName: chart.name,
+        left: chart.left,
+        top: chart.top,
+        width: chart.width,
+        height: chart.height,
+      };
+    },
+  },
+
+  {
+    name: 'set_chart_legend_visibility',
+    description: 'Show or hide the chart legend.',
+    params: {
+      chartName: { type: 'string', description: 'Name of the chart' },
+      visible: { type: 'boolean', description: 'Legend visibility' },
+      position: {
+        type: 'string',
+        required: false,
+        description: 'Optional legend position',
+        enum: ['Top', 'Bottom', 'Left', 'Right', 'Corner'],
+      },
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const chart = sheet.charts.getItem(args.chartName as string);
+      chart.legend.visible = args.visible as boolean;
+      if (args.position) {
+        chart.legend.position = args.position as Excel.ChartLegendPosition;
+      }
+      chart.legend.load(['visible', 'position']);
+      await context.sync();
+      return {
+        chartName: args.chartName,
+        visible: chart.legend.visible,
+        position: chart.legend.position,
+      };
+    },
+  },
+
+  {
+    name: 'set_chart_axis_title',
+    description: 'Set the axis title text for a chart axis and make the title visible.',
+    params: {
+      chartName: { type: 'string', description: 'Name of the chart' },
+      axisType: {
+        type: 'string',
+        description: 'Axis type to update',
+        enum: ['Category', 'Value', 'Series'],
+      },
+      title: { type: 'string', description: 'Axis title text' },
+      axisGroup: {
+        type: 'string',
+        required: false,
+        description: 'Optional axis group',
+        enum: ['Primary', 'Secondary'],
+      },
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const chart = sheet.charts.getItem(args.chartName as string);
+      const axis = chart.axes.getItem(
+        args.axisType as Excel.ChartAxisType,
+        args.axisGroup as Excel.ChartAxisGroup | undefined
+      );
+      axis.title.visible = true;
+      axis.title.text = args.title as string;
+      axis.title.load(['visible', 'text']);
+      await context.sync();
+      return {
+        chartName: args.chartName,
+        axisType: args.axisType,
+        axisGroup: args.axisGroup ?? 'Primary',
+        title: axis.title.text,
+        titleVisible: axis.title.visible,
+      };
+    },
+  },
+
+  {
+    name: 'set_chart_axis_visibility',
+    description: 'Show or hide a chart axis.',
+    params: {
+      chartName: { type: 'string', description: 'Name of the chart' },
+      axisType: {
+        type: 'string',
+        description: 'Axis type to update',
+        enum: ['Category', 'Value', 'Series'],
+      },
+      visible: { type: 'boolean', description: 'Axis visibility' },
+      axisGroup: {
+        type: 'string',
+        required: false,
+        description: 'Optional axis group',
+        enum: ['Primary', 'Secondary'],
+      },
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const chart = sheet.charts.getItem(args.chartName as string);
+      const axis = chart.axes.getItem(
+        args.axisType as Excel.ChartAxisType,
+        args.axisGroup as Excel.ChartAxisGroup | undefined
+      );
+      axis.visible = args.visible as boolean;
+      axis.load('visible');
+      await context.sync();
+      return {
+        chartName: args.chartName,
+        axisType: args.axisType,
+        axisGroup: args.axisGroup ?? 'Primary',
+        visible: axis.visible,
+      };
+    },
+  },
+
+  {
+    name: 'set_chart_series_filtered',
+    description: 'Set whether an individual chart series is filtered (hidden) by index.',
+    params: {
+      chartName: { type: 'string', description: 'Name of the chart' },
+      seriesIndex: { type: 'number', description: 'Zero-based series index' },
+      filtered: { type: 'boolean', description: 'True to hide series, false to show series' },
+      sheetName: {
+        type: 'string',
+        required: false,
+        description: 'Optional worksheet name.',
+      },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const chart = sheet.charts.getItem(args.chartName as string);
+      const series = chart.series.getItemAt(args.seriesIndex as number);
+      series.filtered = args.filtered as boolean;
+      series.load(['name', 'filtered']);
+      await context.sync();
+      return {
+        chartName: args.chartName,
+        seriesIndex: args.seriesIndex,
+        seriesName: series.name,
+        filtered: series.filtered,
+      };
+    },
+  },
 ];
