@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useSyncExternalStore, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useSyncExternalStore, useMemo, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { useAISDKRuntime } from '@assistant-ui/react-ai-sdk';
@@ -7,7 +7,7 @@ import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { SetupWizard } from '@/components/SetupWizard';
-import { useSettingsStore } from '@/stores';
+import { useChatStore, useSettingsStore } from '@/stores';
 import { getAzureProvider } from '@/services/ai/aiClientFactory';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { detectOfficeHost, type OfficeHostApp } from '@/services/office/host';
@@ -32,11 +32,33 @@ const ReadyAssistant: React.FC<ReadyAssistantProps> = ({
   onOpenSettings,
 }) => {
   const chat = useOfficeChat(provider, modelId, host);
+  const persistedMessages = useChatStore(s => s.messages);
+  const setPersistedMessages = useChatStore(s => s.setMessages);
+  const clearPersistedMessages = useChatStore(s => s.clearMessages);
+  const hydratedOnceRef = useRef(false);
+  const hasHydratedChat = useSyncExternalStore(useChatStore.persist.onFinishHydration, () =>
+    useChatStore.persist.hasHydrated()
+  );
   const runtime = useAISDKRuntime(chat);
+
+  useEffect(() => {
+    if (!hasHydratedChat || hydratedOnceRef.current) return;
+    hydratedOnceRef.current = true;
+    chat.setMessages((persistedMessages as typeof chat.messages) ?? []);
+  }, [chat, hasHydratedChat, persistedMessages]);
+
+  useEffect(() => {
+    if (!hasHydratedChat) return;
+    const currentSerialized = JSON.stringify(chat.messages ?? []);
+    const persistedSerialized = JSON.stringify(persistedMessages ?? []);
+    if (currentSerialized === persistedSerialized) return;
+    setPersistedMessages(chat.messages as unknown[]);
+  }, [chat.messages, hasHydratedChat, persistedMessages, setPersistedMessages]);
 
   const handleClearMessages = useCallback(() => {
     chat.setMessages([]);
-  }, [chat]);
+    clearPersistedMessages();
+  }, [chat, clearPersistedMessages]);
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
