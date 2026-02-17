@@ -19,7 +19,7 @@ An Office add-in research project that provides an AI-powered coding assistant u
 - **AI Chat Panel** — conversational assistant embedded in Excel's task pane
 - **83 Excel tools** — the AI can read/write ranges, create charts, manage tables, format cells, add comments, create pivot tables, set data validation, and manipulate sheets
 - **Agent system** — split system prompt architecture + custom agents with host targeting (`hosts`, `defaultForHosts`)
-- **Skills system** — bundled skill files that inject additional context into the system prompt, toggleable via the SkillPicker
+- **Skills system** — bundled skill files that inject additional context into the system prompt, toggleable via the SkillPicker (standard Agent Skills layout: one `SKILL.md` plus optional `references/` docs)
 - **Custom extension import** — import local ZIP files for custom agents and custom skills from Settings
 - **Extension management UX** — manage imported agents/skills in Settings, with bundled content shown as read-only
 - **Multi-model support** — add and validate deployed model names from your Azure AI Foundry endpoint (manual entry flow)
@@ -29,6 +29,13 @@ An Office add-in research project that provides an AI-powered coding assistant u
 - **API key authentication** — simple API key auth per endpoint, no Azure AD app registration required
 - **Multiple endpoints** — configure and switch between several Azure AI Foundry resources
 - **First-time setup wizard** — guided onboarding flow with auto-discovery and manual model entry
+
+## Agent Skills Format
+
+This project follows the standard Agent Skills model:
+
+- A skill is a folder containing `SKILL.md`.
+- Optional supporting docs live under `references/` inside that same skill.
 
 ## Prerequisites
 

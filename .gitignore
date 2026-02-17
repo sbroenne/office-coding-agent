@@ -31,9 +31,7 @@ coverage/
 test-results/
 playwright-report/
 
-# Local skills (domain-specific, not published)
-src/skills/*/
-!src/skills/
+# Local extensions (not published)
 local/extensions/
 
 # OS generated files

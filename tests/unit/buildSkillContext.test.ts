@@ -51,11 +51,11 @@ describe('buildSkillContext', () => {
     expect(explicit).toBe(all);
   });
 
-  it('resolves @references directives to internal skill and agent content', () => {
+  it('keeps @references directives as plain content without expansion', () => {
     const importedSkill: AgentSkill = {
       metadata: {
         name: 'Ref Tester',
-        description: 'Skill that references internal context.',
+        description: 'Skill with plain @references text.',
         version: '1.0.0',
         tags: [],
       },
@@ -65,9 +65,9 @@ describe('buildSkillContext', () => {
     setImportedSkills([importedSkill]);
 
     const context = buildSkillContext(['Ref Tester']);
-    expect(context).toContain('Reference: skill:excel');
-    expect(context).toContain('Reference: agent:Excel');
-    expect(context).toContain('You are an AI assistant running inside a Microsoft Excel add-in.');
+    expect(context).toContain('@references skill:excel, agent:Excel');
+    expect(context).not.toContain('Reference: skill:excel');
+    expect(context).not.toContain('Reference: agent:Excel');
   });
 });
 
@@ -141,7 +141,7 @@ Content`;
     expect(metadata.tags).toEqual(['azure', 'excel']);
   });
 
-  it('parses references array', () => {
+  it('ignores non-standard references field', () => {
     const raw = `---
 name: with-refs
 references:
@@ -150,6 +150,6 @@ references:
 ---
 Content`;
     const { metadata } = parseFrontmatter(raw);
-    expect(metadata.references).toEqual(['skill:excel', 'agent:Excel']);
+    expect(metadata).not.toHaveProperty('references');
   });
 });

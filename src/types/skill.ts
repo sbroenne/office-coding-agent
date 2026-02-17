@@ -4,7 +4,6 @@ export interface SkillMetadata {
   description: string;
   version: string;
   tags: string[];
-  references?: string[];
   license?: string;
   repository?: string;
   documentation?: string;
