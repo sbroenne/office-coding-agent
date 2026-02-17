@@ -9,9 +9,9 @@ interface ChatStoreState {
   reset: () => void;
 }
 
-const DEFAULT_CHAT_STATE = {
+const DEFAULT_CHAT_STATE: Pick<ChatStoreState, 'messages'> = {
   messages: [],
-} as const;
+};
 
 function toSerializableMessages(messages: unknown[]): unknown[] {
   try {
