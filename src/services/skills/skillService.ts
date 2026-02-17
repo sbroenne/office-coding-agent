@@ -112,16 +112,25 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
 }
 
 /** All bundled skills, parsed at module load time. */
+interface WebpackSkillContext {
+  keys(): string[];
+  (request: string): string;
+}
+
+interface RequireWithWebpackContext extends NodeRequire {
+  context?: (path: string, deep?: boolean, filter?: RegExp) => WebpackSkillContext;
+}
+
 function loadBundledSkills(): AgentSkill[] {
   const loaded: AgentSkill[] = [];
 
   const webpackRequire =
-    typeof require === 'function' ? (require as NodeRequire & { context?: Function }) : undefined;
+    typeof require === 'function' ? (require as RequireWithWebpackContext) : undefined;
 
   if (webpackRequire?.context) {
     const context = webpackRequire.context('../../skills', true, /SKILL\.md$/);
-    for (const key of context.keys() as string[]) {
-      const raw = context(key) as string;
+    for (const key of context.keys()) {
+      const raw = context(key);
       const parsed = parseFrontmatter(raw);
       loaded.push({ metadata: parsed.metadata, content: parsed.content });
     }

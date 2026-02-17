@@ -2965,10 +2965,10 @@ async function testDataValidationToolVariants(): Promise<void> {
   }
 }
 
-// ─── Pivot Table Tools (12) ───────────────────────────────────────
+// ─── Pivot Table Tools (16) ───────────────────────────────────────
 
 async function testPivotTableTools(): Promise<void> {
-  log('── Pivot Table Tools (12) ──');
+  log('── Pivot Table Tools (16) ──');
 
   const PT_NAME = 'E2E_Pivot';
 
@@ -3013,7 +3013,42 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 4. add_pivot_field
+  // 4. get_pivot_table_source_info
+  await runTool(
+    pivotTableConfigs,
+    'get_pivot_table_source_info',
+    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    r => {
+      const d = r as { dataSourceType: string; dataSourceString: string | null };
+      return d.dataSourceType ? null : 'Expected data source type';
+    }
+  );
+
+  // 5. set_pivot_table_options
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_table_options',
+    {
+      pivotTableName: PT_NAME,
+      allowMultipleFiltersPerField: true,
+      useCustomSortLists: true,
+      refreshOnOpen: false,
+      enableDataValueEditing: false,
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as {
+        updated: boolean;
+        allowMultipleFiltersPerField: boolean;
+        useCustomSortLists: boolean;
+      };
+      return d.updated && d.allowMultipleFiltersPerField && d.useCustomSortLists
+        ? null
+        : 'Expected pivot options updated';
+    }
+  );
+
+  // 6. add_pivot_field
   await runTool(
     pivotTableConfigs,
     'add_pivot_field',
@@ -3024,7 +3059,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 5. set_pivot_layout
+  // 7. set_pivot_layout
   await runTool(
     pivotTableConfigs,
     'set_pivot_layout',
@@ -3043,7 +3078,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 6. get_pivot_field_filters (before apply)
+  // 8. get_pivot_field_filters (before apply)
   await runTool(
     pivotTableConfigs,
     'get_pivot_field_filters',
@@ -3054,7 +3089,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 7. apply_pivot_label_filter
+  // 9. apply_pivot_label_filter
   await runTool(
     pivotTableConfigs,
     'apply_pivot_label_filter',
@@ -3071,7 +3106,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 8. sort_pivot_field_labels
+  // 10. sort_pivot_field_labels
   await runTool(
     pivotTableConfigs,
     'sort_pivot_field_labels',
@@ -3082,7 +3117,42 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 9. set_pivot_field_show_all_items
+  // 11. apply_pivot_manual_filter
+  await runTool(
+    pivotTableConfigs,
+    'apply_pivot_manual_filter',
+    {
+      pivotTableName: PT_NAME,
+      fieldName: 'Region',
+      selectedItems: ['North'],
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { applied: boolean; selectedItems: string[] };
+      return d.applied && d.selectedItems.length === 1 ? null : 'Expected manual filter applied';
+    }
+  );
+
+  // 12. sort_pivot_field_values
+  await runTool(
+    pivotTableConfigs,
+    'sort_pivot_field_values',
+    {
+      pivotTableName: PT_NAME,
+      fieldName: 'Region',
+      sortBy: 'Descending',
+      valuesHierarchyName: 'Sales',
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { sorted: boolean; sortBy: string; valuesHierarchyName: string };
+      return d.sorted && d.valuesHierarchyName === 'Sales' && d.sortBy === 'Descending'
+        ? null
+        : 'Expected value sort by Sales descending';
+    }
+  );
+
+  // 13. set_pivot_field_show_all_items
   await runTool(
     pivotTableConfigs,
     'set_pivot_field_show_all_items',
@@ -3093,7 +3163,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 10. clear_pivot_field_filters
+  // 14. clear_pivot_field_filters
   await runTool(
     pivotTableConfigs,
     'clear_pivot_field_filters',
@@ -3104,7 +3174,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 11. remove_pivot_field
+  // 15. remove_pivot_field
   await runTool(
     pivotTableConfigs,
     'remove_pivot_field',
@@ -3115,7 +3185,7 @@ async function testPivotTableTools(): Promise<void> {
     }
   );
 
-  // 12. delete_pivot_table
+  // 16. delete_pivot_table
   await runTool(
     pivotTableConfigs,
     'delete_pivot_table',
@@ -3158,6 +3228,31 @@ async function testPivotTableToolVariants(): Promise<void> {
     return;
   }
   await sleep(500);
+
+  // --- set_pivot_table_options: disable flags ---
+  await runTool(
+    pivotTableConfigs,
+    'set_pivot_table_options',
+    {
+      pivotTableName: PT_V,
+      allowMultipleFiltersPerField: false,
+      useCustomSortLists: false,
+      refreshOnOpen: false,
+      enableDataValueEditing: false,
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as {
+        updated: boolean;
+        allowMultipleFiltersPerField: boolean;
+        useCustomSortLists: boolean;
+      };
+      return d.updated && !d.allowMultipleFiltersPerField && !d.useCustomSortLists
+        ? null
+        : 'Expected pivot options disabled';
+    },
+    'set_pivot_table_options:disable_flags'
+  );
 
   // --- add_pivot_field: row ---
   // Region is already a row field, so let's skip that conflict.
@@ -3231,6 +3326,43 @@ async function testPivotTableToolVariants(): Promise<void> {
       return d.sorted && d.sortBy === 'Ascending' ? null : 'Expected ascending label sort';
     },
     'sort_pivot_field_labels:ascending'
+  );
+
+  // --- apply_pivot_manual_filter: multi ---
+  await runTool(
+    pivotTableConfigs,
+    'apply_pivot_manual_filter',
+    {
+      pivotTableName: PT_V,
+      fieldName: 'Region',
+      selectedItems: ['North', 'South'],
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { applied: boolean; selectedItems: string[] };
+      return d.applied && d.selectedItems.length === 2 ? null : 'Expected manual multi filter';
+    },
+    'apply_pivot_manual_filter:multi'
+  );
+
+  // --- sort_pivot_field_values: ascending ---
+  await runTool(
+    pivotTableConfigs,
+    'sort_pivot_field_values',
+    {
+      pivotTableName: PT_V,
+      fieldName: 'Region',
+      sortBy: 'Ascending',
+      valuesHierarchyName: 'Sales',
+      sheetName: PIVOT_DST,
+    },
+    r => {
+      const d = r as { sorted: boolean; sortBy: string; valuesHierarchyName: string };
+      return d.sorted && d.sortBy === 'Ascending' && d.valuesHierarchyName === 'Sales'
+        ? null
+        : 'Expected value sort ascending by Sales';
+    },
+    'sort_pivot_field_values:ascending'
   );
 
   // --- set_pivot_field_show_all_items: true ---
