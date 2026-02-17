@@ -272,4 +272,85 @@ export const tableConfigs: readonly ToolConfig[] = [
       return { tableName: args.tableName, rangeAddress: range.address, converted: true };
     },
   },
+
+  {
+    name: 'resize_table',
+    description:
+      'Resize a table to a new range address. The new range must overlap the existing table and keep a valid table shape.',
+    params: {
+      tableName: { type: 'string', description: 'Name of the table to resize' },
+      newAddress: {
+        type: 'string',
+        description: 'New table range address (e.g., "A1:F200")',
+      },
+    },
+    execute: async (context, args) => {
+      const table = context.workbook.tables.getItem(args.tableName as string);
+      table.resize(args.newAddress as string);
+      const range = table.getRange();
+      range.load('address');
+      await context.sync();
+      return { tableName: args.tableName, address: range.address, resized: true };
+    },
+  },
+
+  {
+    name: 'set_table_style',
+    description: 'Set or change a table style (e.g., "TableStyleMedium2").',
+    params: {
+      tableName: { type: 'string', description: 'Name of the table' },
+      style: { type: 'string', description: 'Table style name' },
+    },
+    execute: async (context, args) => {
+      const table = context.workbook.tables.getItem(args.tableName as string);
+      table.style = args.style as string;
+      table.load(['name', 'style']);
+      await context.sync();
+      return { tableName: table.name, style: table.style };
+    },
+  },
+
+  {
+    name: 'set_table_header_totals_visibility',
+    description: 'Show or hide table header row and totals row.',
+    params: {
+      tableName: { type: 'string', description: 'Name of the table' },
+      showHeaders: {
+        type: 'boolean',
+        required: false,
+        description: 'Set table header row visibility',
+      },
+      showTotals: {
+        type: 'boolean',
+        required: false,
+        description: 'Set table totals row visibility',
+      },
+    },
+    execute: async (context, args) => {
+      const table = context.workbook.tables.getItem(args.tableName as string);
+      if (args.showHeaders !== undefined) table.showHeaders = args.showHeaders as boolean;
+      if (args.showTotals !== undefined) table.showTotals = args.showTotals as boolean;
+      table.load(['name', 'showHeaders', 'showTotals']);
+      await context.sync();
+      return {
+        tableName: table.name,
+        showHeaders: table.showHeaders,
+        showTotals: table.showTotals,
+      };
+    },
+  },
+
+  {
+    name: 'reapply_table_filters',
+    description: 'Reapply existing filters on a table after data changes.',
+    params: {
+      tableName: { type: 'string', description: 'Name of the table' },
+    },
+    execute: async (context, args) => {
+      const table = context.workbook.tables.getItem(args.tableName as string);
+      table.reapplyFilters();
+      await context.sync();
+      return { tableName: args.tableName, reapplied: true };
+    },
+  },
 ];

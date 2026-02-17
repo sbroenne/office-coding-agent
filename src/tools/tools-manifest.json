@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-02-14T15:50:25.208Z",
+  "generatedAt": "2026-02-17T10:37:19.601Z",
   "tools": [
     {
       "name": "get_range_values",
@@ -249,6 +249,184 @@
           "type": "boolean",
           "required": false,
           "description": "First row is a header row. Default true."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "auto_fill_range",
+      "description": "Auto-fill a pattern from a source range into a destination range. Useful for extending formulas, dates, or sequences.",
+      "params": {
+        "sourceAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Source range containing the pattern (e.g., \"A1:A2\")"
+        },
+        "destinationAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Destination range to fill (e.g., \"A1:A20\")"
+        },
+        "autoFillType": {
+          "type": "string",
+          "required": false,
+          "description": "Auto-fill behavior. Default FillDefault.",
+          "enum": [
+            "FillDefault",
+            "FillCopy",
+            "FillSeries",
+            "FillFormats",
+            "FillValues",
+            "FillDays",
+            "FillWeekdays",
+            "FillMonths",
+            "FillYears",
+            "LinearTrend",
+            "GrowthTrend",
+            "FlashFill"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "flash_fill_range",
+      "description": "Apply Flash Fill to a range based on adjacent data patterns (Excel-detected extraction/transformation pattern).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address to flash-fill (e.g., \"B2:B100\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_special_cells",
+      "description": "Get a RangeAreas result containing only special cells in a range (e.g., blanks, formulas, constants, visible cells, conditional formats).",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address to inspect (e.g., \"A1:D200\")"
+        },
+        "cellType": {
+          "type": "string",
+          "required": true,
+          "description": "Special cell category to return",
+          "enum": [
+            "ConditionalFormats",
+            "DataValidations",
+            "Blanks",
+            "Constants",
+            "Formulas",
+            "SameConditionalFormat",
+            "SameDataValidation",
+            "Visible"
+          ]
+        },
+        "cellValueType": {
+          "type": "string",
+          "required": false,
+          "description": "Optional value filter for constants/formulas.",
+          "enum": [
+            "All",
+            "Errors",
+            "ErrorsLogical",
+            "ErrorsNumbers",
+            "ErrorsText",
+            "ErrorsLogicalNumber",
+            "ErrorsLogicalText",
+            "ErrorsNumberText",
+            "Logical",
+            "LogicalNumbers",
+            "LogicalText",
+            "LogicalNumbersText",
+            "Numbers",
+            "NumbersText",
+            "Text"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_range_precedents",
+      "description": "Get direct precedent cells (cells referenced by formulas) for a range as cross-sheet addresses.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range containing formulas to inspect (e.g., \"D2:D20\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_range_dependents",
+      "description": "Get direct dependent cells (formulas that reference this range) as cross-sheet addresses.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range whose dependents should be found (e.g., \"B2\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "recalculate_range",
+      "description": "Force recalculation for formulas in a specific range.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address to recalculate (e.g., \"A1:Z100\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_tables_for_range",
+      "description": "List tables that overlap (or are fully contained in) a given range.",
+      "params": {
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address to check for intersecting tables (e.g., \"A1:H500\")"
+        },
+        "fullyContained": {
+          "type": "boolean",
+          "required": false,
+          "description": "If true, only include tables fully contained in the range. Default false (any overlap)."
         },
         "sheetName": {
           "type": "string",
@@ -760,6 +938,70 @@
       }
     },
     {
+      "name": "resize_table",
+      "description": "Resize a table to a new range address. The new range must overlap the existing table and keep a valid table shape.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table to resize"
+        },
+        "newAddress": {
+          "type": "string",
+          "required": true,
+          "description": "New table range address (e.g., \"A1:F200\")"
+        }
+      }
+    },
+    {
+      "name": "set_table_style",
+      "description": "Set or change a table style (e.g., \"TableStyleMedium2\").",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table"
+        },
+        "style": {
+          "type": "string",
+          "required": true,
+          "description": "Table style name"
+        }
+      }
+    },
+    {
+      "name": "set_table_header_totals_visibility",
+      "description": "Show or hide table header row and totals row.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table"
+        },
+        "showHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "Set table header row visibility"
+        },
+        "showTotals": {
+          "type": "boolean",
+          "required": false,
+          "description": "Set table totals row visibility"
+        }
+      }
+    },
+    {
+      "name": "reapply_table_filters",
+      "description": "Reapply existing filters on a table after data changes.",
+      "params": {
+        "tableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the table"
+        }
+      }
+    },
+    {
       "name": "list_charts",
       "description": "List all charts on a worksheet. Returns each chart's name, type, and title. Uses the active sheet if no sheet is specified.",
       "params": {
@@ -891,6 +1133,191 @@
           "type": "string",
           "required": true,
           "description": "New data range address (e.g., \"B1:D20\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_position",
+      "description": "Position and size a chart. Use startCell/endCell to anchor by range, or left/top/width/height for point-based positioning.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "startCell": {
+          "type": "string",
+          "required": false,
+          "description": "Optional top-left anchor cell address"
+        },
+        "endCell": {
+          "type": "string",
+          "required": false,
+          "description": "Optional bottom-right anchor cell address"
+        },
+        "left": {
+          "type": "number",
+          "required": false,
+          "description": "Left position in points"
+        },
+        "top": {
+          "type": "number",
+          "required": false,
+          "description": "Top position in points"
+        },
+        "width": {
+          "type": "number",
+          "required": false,
+          "description": "Width in points"
+        },
+        "height": {
+          "type": "number",
+          "required": false,
+          "description": "Height in points"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_legend_visibility",
+      "description": "Show or hide the chart legend.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "visible": {
+          "type": "boolean",
+          "required": true,
+          "description": "Legend visibility"
+        },
+        "position": {
+          "type": "string",
+          "required": false,
+          "description": "Optional legend position",
+          "enum": [
+            "Top",
+            "Bottom",
+            "Left",
+            "Right",
+            "Corner"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_axis_title",
+      "description": "Set the axis title text for a chart axis and make the title visible.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "axisType": {
+          "type": "string",
+          "required": true,
+          "description": "Axis type to update",
+          "enum": [
+            "Category",
+            "Value",
+            "Series"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "Axis title text"
+        },
+        "axisGroup": {
+          "type": "string",
+          "required": false,
+          "description": "Optional axis group",
+          "enum": [
+            "Primary",
+            "Secondary"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_axis_visibility",
+      "description": "Show or hide a chart axis.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "axisType": {
+          "type": "string",
+          "required": true,
+          "description": "Axis type to update",
+          "enum": [
+            "Category",
+            "Value",
+            "Series"
+          ]
+        },
+        "visible": {
+          "type": "boolean",
+          "required": true,
+          "description": "Axis visibility"
+        },
+        "axisGroup": {
+          "type": "string",
+          "required": false,
+          "description": "Optional axis group",
+          "enum": [
+            "Primary",
+            "Secondary"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_chart_series_filtered",
+      "description": "Set whether an individual chart series is filtered (hidden) by index.",
+      "params": {
+        "chartName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the chart"
+        },
+        "seriesIndex": {
+          "type": "number",
+          "required": true,
+          "description": "Zero-based series index"
+        },
+        "filtered": {
+          "type": "boolean",
+          "required": true,
+          "description": "True to hide series, false to show series"
         },
         "sheetName": {
           "type": "string",
@@ -1118,6 +1545,58 @@
       }
     },
     {
+      "name": "set_sheet_gridlines",
+      "description": "Show or hide worksheet gridlines for a specific sheet.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet"
+        },
+        "showGridlines": {
+          "type": "boolean",
+          "required": true,
+          "description": "True to show gridlines, false to hide"
+        }
+      }
+    },
+    {
+      "name": "set_sheet_headings",
+      "description": "Show or hide row/column headings (A, B, C and 1, 2, 3) for a worksheet.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet"
+        },
+        "showHeadings": {
+          "type": "boolean",
+          "required": true,
+          "description": "True to show row/column headings, false to hide"
+        }
+      }
+    },
+    {
+      "name": "recalculate_sheet",
+      "description": "Force recalculation of formulas on a specific worksheet. Defaults to full recalculation.",
+      "params": {
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the worksheet"
+        },
+        "recalcType": {
+          "type": "string",
+          "required": false,
+          "description": "Recalculation type",
+          "enum": [
+            "Recalculate",
+            "Full"
+          ]
+        }
+      }
+    },
+    {
       "name": "get_workbook_info",
       "description": "Get a high-level overview of the entire workbook. Returns all sheet names, the active sheet, the used range dimensions of the active sheet, a list of all table names, and counts. This is the best starting point to understand what data exists before performing operations.",
       "params": {}
@@ -1172,6 +1651,130 @@
           ]
         }
       }
+    },
+    {
+      "name": "save_workbook",
+      "description": "Save the current workbook. Optionally prompt the user before saving.",
+      "params": {
+        "saveBehavior": {
+          "type": "string",
+          "required": false,
+          "description": "Save behavior",
+          "enum": [
+            "Save",
+            "Prompt"
+          ]
+        }
+      }
+    },
+    {
+      "name": "get_workbook_properties",
+      "description": "Get workbook document properties such as title, author, subject, and category.",
+      "params": {}
+    },
+    {
+      "name": "set_workbook_properties",
+      "description": "Set workbook document properties such as title, author, subject, category, and keywords.",
+      "params": {
+        "author": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook author"
+        },
+        "category": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook category"
+        },
+        "comments": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook comments metadata"
+        },
+        "company": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook company"
+        },
+        "keywords": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook keywords"
+        },
+        "manager": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook manager"
+        },
+        "revisionNumber": {
+          "type": "number",
+          "required": false,
+          "description": "Workbook revision number"
+        },
+        "subject": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook subject"
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook title"
+        }
+      }
+    },
+    {
+      "name": "get_workbook_protection",
+      "description": "Get current workbook protection state.",
+      "params": {}
+    },
+    {
+      "name": "protect_workbook",
+      "description": "Protect the workbook structure. Optionally provide a password.",
+      "params": {
+        "password": {
+          "type": "string",
+          "required": false,
+          "description": "Optional workbook protection password"
+        }
+      }
+    },
+    {
+      "name": "unprotect_workbook",
+      "description": "Remove workbook protection. Provide password if one was set.",
+      "params": {
+        "password": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook protection password if required"
+        }
+      }
+    },
+    {
+      "name": "refresh_data_connections",
+      "description": "Refresh all workbook data connections supported by the Excel data connection API.",
+      "params": {}
+    },
+    {
+      "name": "list_queries",
+      "description": "List all Power Query queries in the workbook. Returns query name, load target type, whether it loads to data model, last refresh time, rows loaded, and latest error status.",
+      "params": {}
+    },
+    {
+      "name": "get_query",
+      "description": "Get details for a single Power Query query by name. Returns load target type, data-model loading flag, last refresh time, rows loaded, and latest error status.",
+      "params": {
+        "queryName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the Power Query query to retrieve (case-insensitive)."
+        }
+      }
+    },
+    {
+      "name": "get_query_count",
+      "description": "Get the number of Power Query queries in the workbook.",
+      "params": {}
     },
     {
       "name": "add_comment",
@@ -1794,7 +2397,7 @@
     },
     {
       "name": "list_pivot_tables",
-      "description": "List all PivotTables on a worksheet. Returns each PivotTable's name, row hierarchies, and data hierarchies.",
+      "description": "List all PivotTables on a worksheet. Returns each PivotTable's name plus row/column/filter/data hierarchy names.",
       "params": {
         "sheetName": {
           "type": "string",
@@ -1900,6 +2503,228 @@
             "data",
             "filter"
           ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_pivot_layout",
+      "description": "Set PivotTable layout and display options such as layout type, subtotal placement, field headers, and grand totals.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable to configure"
+        },
+        "layoutType": {
+          "type": "string",
+          "required": false,
+          "description": "Pivot layout type",
+          "enum": [
+            "Compact",
+            "Tabular",
+            "Outline"
+          ]
+        },
+        "subtotalLocation": {
+          "type": "string",
+          "required": false,
+          "description": "Subtotal location for row fields",
+          "enum": [
+            "AtTop",
+            "AtBottom",
+            "Off"
+          ]
+        },
+        "showFieldHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show or hide pivot field headers"
+        },
+        "showRowGrandTotals": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show or hide row grand totals"
+        },
+        "showColumnGrandTotals": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show or hide column grand totals"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_field_filters",
+      "description": "Get active filter state for a PivotField, including whether any/date/label/manual/value filters are currently set.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "clear_pivot_field_filters",
+      "description": "Clear filters on a PivotField. If filterType is omitted, clears all filters; otherwise clears only the specified filter type.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "filterType": {
+          "type": "string",
+          "required": false,
+          "description": "Optional filter type to clear; omit to clear all filter types.",
+          "enum": [
+            "Value",
+            "Manual",
+            "Label",
+            "Date"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "apply_pivot_label_filter",
+      "description": "Apply a label filter to a PivotField. Provide condition and value1; optionally provide value2 for Between/NotBetween conditions.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "condition": {
+          "type": "string",
+          "required": true,
+          "description": "Label filter condition",
+          "enum": [
+            "Equals",
+            "DoesNotEqual",
+            "BeginsWith",
+            "DoesNotBeginWith",
+            "EndsWith",
+            "DoesNotEndWith",
+            "Contains",
+            "DoesNotContain",
+            "GreaterThan",
+            "GreaterThanOrEqualTo",
+            "LessThan",
+            "LessThanOrEqualTo",
+            "Between",
+            "NotBetween"
+          ]
+        },
+        "value1": {
+          "type": "string",
+          "required": true,
+          "description": "Primary comparator value"
+        },
+        "value2": {
+          "type": "string",
+          "required": false,
+          "description": "Optional secondary comparator value for Between/NotBetween conditions"
+        },
+        "substring": {
+          "type": "string",
+          "required": false,
+          "description": "Optional substring for contains/begins/ends conditions"
+        },
+        "exclusive": {
+          "type": "boolean",
+          "required": false,
+          "description": "Optional flag for exclusive boundary behavior where supported"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "sort_pivot_field_labels",
+      "description": "Sort PivotField labels in ascending or descending order.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "sortBy": {
+          "type": "string",
+          "required": true,
+          "description": "Sort direction for labels",
+          "enum": [
+            "Ascending",
+            "Descending"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_pivot_field_show_all_items",
+      "description": "Set whether a PivotField shows all items, including those with no data.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "showAllItems": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether to show all items for the field"
         },
         "sheetName": {
           "type": "string",

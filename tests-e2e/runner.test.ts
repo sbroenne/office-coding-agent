@@ -20,7 +20,6 @@
 import * as assert from 'assert';
 import { AppType, startDebugging, stopDebugging } from 'office-addin-debugging';
 import { toOfficeApp } from 'office-addin-manifest';
-import { pingTestServer } from 'office-addin-test-helpers';
 import { closeDesktopApplication } from './src/node-helpers';
 import * as path from 'path';
 import * as https from 'https';
@@ -34,6 +33,20 @@ const host = 'excel';
 const manifestPath = path.resolve(`${process.cwd()}/tests-e2e/test-manifest.xml`);
 const port = 4201;
 
+async function pingServer(serverPort: number): Promise<{ status: number }> {
+  return await new Promise((resolve, reject) => {
+    const request = https.get(
+      `https://localhost:${serverPort}/ping`,
+      { rejectUnauthorized: false },
+      response => {
+        resolve({ status: response.statusCode ?? 0 });
+      }
+    );
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 /**
  * Custom test server that reads POST body (not URL query params).
  */
@@ -42,8 +55,10 @@ class CustomTestServer {
   private server: https.Server | null = null;
   private resolveResults: ((results: TestResult[]) => void) | null = null;
   private resultsPromise: Promise<TestResult[]>;
+  private serverPort: number;
 
-  constructor(private serverPort: number) {
+  constructor(serverPort: number) {
+    this.serverPort = serverPort;
     this.resultsPromise = new Promise(resolve => {
       this.resolveResults = resolve;
     });
@@ -163,6 +178,13 @@ const rangeTools = [
   'set_cell_borders:thick',
   'set_cell_borders:dotted',
   'set_cell_borders:dashdot',
+  'auto_fill_range',
+  'flash_fill_range',
+  'get_special_cells',
+  'get_range_precedents',
+  'get_range_dependents',
+  'recalculate_range',
+  'get_tables_for_range',
 ];
 
 const tableTools = [
@@ -182,6 +204,10 @@ const tableTools = [
   'sort_table:descending',
   'add_table_column:auto_name',
   'list_tables:workbook_wide',
+  'resize_table',
+  'set_table_style',
+  'set_table_header_totals_visibility',
+  'reapply_table_filters',
 ];
 
 const chartTools = [
@@ -200,6 +226,11 @@ const chartTools = [
   'set_chart_type:scatter',
   'create_chart:column_stacked',
   'create_chart:line_markers',
+  'set_chart_position',
+  'set_chart_legend_visibility',
+  'set_chart_axis_title',
+  'set_chart_axis_visibility',
+  'set_chart_series_filtered',
 ];
 
 const sheetTools = [
@@ -226,6 +257,9 @@ const sheetTools = [
   'set_page_layout:letter',
   'set_page_layout:legal',
   'set_page_layout:tabloid',
+  'set_sheet_gridlines',
+  'set_sheet_headings',
+  'recalculate_sheet',
 ];
 
 const workbookTools = [
@@ -238,6 +272,16 @@ const workbookTools = [
   'define_named_range:no_comment',
   'recalculate:recalculate',
   'recalculate:default',
+  'save_workbook',
+  'get_workbook_properties',
+  'set_workbook_properties',
+  'get_workbook_protection',
+  'protect_workbook',
+  'unprotect_workbook',
+  'refresh_data_connections',
+  'list_queries',
+  'get_query',
+  'get_query_count',
 ];
 
 const commentTools = [
@@ -313,11 +357,22 @@ const pivotTableTools = [
   'list_pivot_tables',
   'refresh_pivot_table',
   'add_pivot_field',
+  'set_pivot_layout',
+  'get_pivot_field_filters',
+  'apply_pivot_label_filter',
+  'sort_pivot_field_labels',
+  'set_pivot_field_show_all_items',
+  'clear_pivot_field_filters',
   'remove_pivot_field',
   'delete_pivot_table',
   // Variants
   'create_pivot_table:multi_fields',
   'add_pivot_field:filter',
+  'set_pivot_layout:outline_off',
+  'apply_pivot_label_filter:between',
+  'sort_pivot_field_labels:ascending',
+  'set_pivot_field_show_all_items:true',
+  'clear_pivot_field_filters:all',
   'remove_pivot_field:filter',
   // Note: add_pivot_field:data and remove_pivot_field:data skipped (all fields assigned)
   'delete_pivot_table:variant',
@@ -359,7 +414,7 @@ describe('Excel AI E2E Tests', function () {
 
     // Start custom test server (reads POST body, no URL length limits)
     await testServer.start();
-    const serverResponse = await pingTestServer(port);
+    const serverResponse = await pingServer(port);
     assert.strictEqual(
       (serverResponse as { status: number }).status,
       200,
@@ -422,7 +477,7 @@ describe('Excel AI E2E Tests', function () {
 
   // ─── Tool Tests — one it() per tool ───────────────────────────
 
-  describe('Range Tools (52)', () => {
+  describe('Range Tools (59)', () => {
     for (const name of rangeTools) {
       it(name, () => {
         assertToolResult(name);
@@ -430,7 +485,7 @@ describe('Excel AI E2E Tests', function () {
     }
   });
 
-  describe('Table Tools (15)', () => {
+  describe('Table Tools (19)', () => {
     for (const name of tableTools) {
       it(name, () => {
         assertToolResult(name);
@@ -438,7 +493,7 @@ describe('Excel AI E2E Tests', function () {
     }
   });
 
-  describe('Chart Tools (14)', () => {
+  describe('Chart Tools (19)', () => {
     for (const name of chartTools) {
       it(name, () => {
         assertToolResult(name);
@@ -446,7 +501,7 @@ describe('Excel AI E2E Tests', function () {
     }
   });
 
-  describe('Sheet Tools (22)', () => {
+  describe('Sheet Tools (25)', () => {
     for (const name of sheetTools) {
       it(name, () => {
         assertToolResult(name);
@@ -454,7 +509,7 @@ describe('Excel AI E2E Tests', function () {
     }
   });
 
-  describe('Workbook Tools (8)', () => {
+  describe('Workbook Tools (18)', () => {
     for (const name of workbookTools) {
       it(name, () => {
         assertToolResult(name);
@@ -486,7 +541,7 @@ describe('Excel AI E2E Tests', function () {
     }
   });
 
-  describe('Pivot Table Tools (10)', () => {
+  describe('Pivot Table Tools (21)', () => {
     for (const name of pivotTableTools) {
       it(name, () => {
         assertToolResult(name);

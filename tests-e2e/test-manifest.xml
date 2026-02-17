@@ -5,9 +5,6 @@
   This manifest is used for automated E2E testing of Excel commands.
   It points to the test build served on localhost:3001.
   Uses a separate GUID so it can coexist with the dev add-in.
-
-  Structure matches manifests/manifest.prod.xml — just a different ID,
-  display name, port, and no custom functions.
 -->
 <OfficeApp
   xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
@@ -27,7 +24,7 @@
   <SupportUrl DefaultValue="https://github.com/sbroenne/office-coding-agent" />
 
   <AppDomains>
-    <AppDomain>https://localhost:3001/</AppDomain>
+    <AppDomain>https://localhost:3001</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -49,31 +46,35 @@
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Hosts>
       <Host xsi:type="Workbook">
-        <Runtimes>or>
+        <Runtimes>
           <Runtime resid="Taskpane.Url" lifetime="long" />
-        </Runtimes>Point xsi:type="PrimaryCommandSurface">
+        </Runtimes>
         <DesktopFormFactor>
-          <FunctionFile resid="Taskpane.Url" />id="E2ETestGroup">
-          <ExtensionPoint xsi:type="PrimaryCommandSurface">abel resid="CommandsGroup.Label" />
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
             <OfficeTab id="TabHome">
-              <Group id="E2ETestGroup">bt:Image size="16" resid="Icon.16x16" />
-                <Label resid="CommandsGroup.Label" />Image size="32" resid="Icon.32x32" />
+              <Group id="CommandsGroup">
+                <Label resid="CommandsGroup.Label" />
                 <Icon>
                   <bt:Image size="16" resid="Icon.16x16" />
-                  <bt:Image size="32" resid="Icon.32x32" />kpaneButton">
-                  <bt:Image size="80" resid="Icon.80x80" />sid="TaskpaneButton.Label" />
-                </Icon>ip>
-                <Control xsi:type="Button" id="E2ETaskpaneButton">resid="TaskpaneButton.Label" />
-                  <Label resid="TaskpaneButton.Label" />eButton.Tooltip" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Control xsi:type="Button" id="TaskpaneButton">
+                  <Label resid="TaskpaneButton.Label" />
                   <Supertip>
                     <Title resid="TaskpaneButton.Label" />
-                    <Description resid="TaskpaneButton.Tooltip" /> resid="Icon.16x16" />
-                  </Supertip>2x32" />
-                  <Icon>t:Image size="80" resid="Icon.80x80" />
+                    <Description resid="TaskpaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
                     <bt:Image size="16" resid="Icon.16x16" />
                     <bt:Image size="32" resid="Icon.32x32" />
                     <bt:Image size="80" resid="Icon.80x80" />
-                  </Icon>urceLocation resid="Taskpane.Url" />
+                  </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>E2ETestPane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Url" />
@@ -85,25 +86,27 @@
         </DesktopFormFactor>
       </Host>
     </Hosts>
-tps://localhost:3001/assets/icon-16.png"/>
-    <Resources>localhost:3001/assets/icon-32.png"/>
-      <bt:Images>alhost:3001/assets/icon-80.png"/>
+
+    <Resources>
+      <bt:Images>
         <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3001/assets/icon-16.png"/>
         <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3001/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3001/assets/icon-80.png"/>nctions.Script.Url" DefaultValue="https://localhost:3001/functions.js" />
-      </bt:Images>tions.Metadata.Url" DefaultValue="https://localhost:3001/functions.json" />
-      <bt:Urls>e.Url" DefaultValue="https://localhost:3001/test-taskpane.html" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3001/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812" />
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3001/test-taskpane.html" />
-      </bt:Urls>rtStrings>
-      <bt:ShortStrings>String id="Functions.Namespace" DefaultValue="E2ETEST" />
-        <bt:String id="GetStarted.Title" DefaultValue="Excel AI E2E Tests" />        <bt:String id="GetStarted.Title" DefaultValue="Excel AI E2E Tests" />
-        <bt:String id="CommandsGroup.Label" DefaultValue="E2E Tests" />ing id="CommandsGroup.Label" DefaultValue="E2E Tests" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Run E2E" />g id="TaskpaneButton.Label" DefaultValue="Run E2E" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Excel AI E2E Tests" />
+        <bt:String id="CommandsGroup.Label" DefaultValue="E2E Tests" />
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Run E2E" />
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="E2E test runner for Excel AI commands" />mmands" />
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Run E2E tests for Excel commands" /> id="TaskpaneButton.Tooltip" DefaultValue="Run E2E tests for Excel commands" />
-      </bt:LongStrings>Strings>
+        <bt:String id="GetStarted.Description" DefaultValue="E2E test runner for Excel AI commands" />
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Run E2E tests for Excel commands" />
+      </bt:LongStrings>
     </Resources>
+
   </VersionOverrides>
 </OfficeApp>

@@ -1,5 +1,5 @@
 /**
- * Range tool configs — 24 tools for reading, writing, formatting, and
+ * Range tool configs — 31 tools for reading, writing, formatting, and
  * manipulating cell ranges.
  *
  * Fixes applied (from tool audit):
@@ -369,6 +369,260 @@ export const rangeConfigs: readonly ToolConfig[] = [
       range.load('address');
       await context.sync();
       return { address: range.address, sortedByColumn: column, ascending };
+    },
+  },
+
+  {
+    name: 'auto_fill_range',
+    description:
+      'Auto-fill a pattern from a source range into a destination range. Useful for extending formulas, dates, or sequences.',
+    params: {
+      sourceAddress: {
+        type: 'string',
+        description: 'Source range containing the pattern (e.g., "A1:A2")',
+      },
+      destinationAddress: {
+        type: 'string',
+        description: 'Destination range to fill (e.g., "A1:A20")',
+      },
+      autoFillType: {
+        type: 'string',
+        required: false,
+        description: 'Auto-fill behavior. Default FillDefault.',
+        enum: [
+          'FillDefault',
+          'FillCopy',
+          'FillSeries',
+          'FillFormats',
+          'FillValues',
+          'FillDays',
+          'FillWeekdays',
+          'FillMonths',
+          'FillYears',
+          'LinearTrend',
+          'GrowthTrend',
+          'FlashFill',
+        ],
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const sourceRange = sheet.getRange(args.sourceAddress as string);
+      const destinationAddress = args.destinationAddress as string;
+      const autoFillType = ((args.autoFillType as string | undefined) ??
+        'FillDefault') as Excel.AutoFillType;
+
+      sourceRange.autoFill(destinationAddress, autoFillType);
+      const destinationRange = sheet.getRange(destinationAddress);
+      destinationRange.load('address');
+      await context.sync();
+
+      return {
+        sourceAddress: args.sourceAddress,
+        destinationAddress: destinationRange.address,
+        autoFillType,
+        filled: true,
+      };
+    },
+  },
+
+  {
+    name: 'flash_fill_range',
+    description:
+      'Apply Flash Fill to a range based on adjacent data patterns (Excel-detected extraction/transformation pattern).',
+    params: {
+      address: {
+        type: 'string',
+        description: 'Range address to flash-fill (e.g., "B2:B100")',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const range = sheet.getRange(args.address as string);
+      range.flashFill();
+      range.load('address');
+      await context.sync();
+      return { address: range.address, flashFilled: true };
+    },
+  },
+
+  {
+    name: 'get_special_cells',
+    description:
+      'Get a RangeAreas result containing only special cells in a range (e.g., blanks, formulas, constants, visible cells, conditional formats).',
+    params: {
+      address: {
+        type: 'string',
+        description: 'Range address to inspect (e.g., "A1:D200")',
+      },
+      cellType: {
+        type: 'string',
+        description: 'Special cell category to return',
+        enum: [
+          'ConditionalFormats',
+          'DataValidations',
+          'Blanks',
+          'Constants',
+          'Formulas',
+          'SameConditionalFormat',
+          'SameDataValidation',
+          'Visible',
+        ],
+      },
+      cellValueType: {
+        type: 'string',
+        required: false,
+        description: 'Optional value filter for constants/formulas.',
+        enum: [
+          'All',
+          'Errors',
+          'ErrorsLogical',
+          'ErrorsNumbers',
+          'ErrorsText',
+          'ErrorsLogicalNumber',
+          'ErrorsLogicalText',
+          'ErrorsNumberText',
+          'Logical',
+          'LogicalNumbers',
+          'LogicalText',
+          'LogicalNumbersText',
+          'Numbers',
+          'NumbersText',
+          'Text',
+        ],
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const range = sheet.getRange(args.address as string);
+      const cellType = args.cellType as Excel.SpecialCellType;
+      const cellValueType = args.cellValueType as Excel.SpecialCellValueType | undefined;
+      const special = range.getSpecialCells(cellType, cellValueType);
+      special.load(['address', 'cellCount', 'areaCount']);
+      await context.sync();
+      return {
+        sourceAddress: args.address,
+        specialAddress: special.address,
+        areaCount: special.areaCount,
+        cellCount: special.cellCount,
+        cellType,
+        cellValueType: cellValueType ?? null,
+      };
+    },
+  },
+
+  {
+    name: 'get_range_precedents',
+    description:
+      'Get direct precedent cells (cells referenced by formulas) for a range as cross-sheet addresses.',
+    params: {
+      address: {
+        type: 'string',
+        description: 'Range containing formulas to inspect (e.g., "D2:D20")',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const range = sheet.getRange(args.address as string);
+      const precedents = range.getDirectPrecedents();
+      precedents.load('addresses');
+      await context.sync();
+      return {
+        sourceAddress: args.address,
+        addresses: precedents.addresses,
+        count: precedents.addresses.length,
+      };
+    },
+  },
+
+  {
+    name: 'get_range_dependents',
+    description:
+      'Get direct dependent cells (formulas that reference this range) as cross-sheet addresses.',
+    params: {
+      address: {
+        type: 'string',
+        description: 'Range whose dependents should be found (e.g., "B2")',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const range = sheet.getRange(args.address as string);
+      const dependents = range.getDirectDependents();
+      dependents.load('addresses');
+      await context.sync();
+      return {
+        sourceAddress: args.address,
+        addresses: dependents.addresses,
+        count: dependents.addresses.length,
+      };
+    },
+  },
+
+  {
+    name: 'recalculate_range',
+    description: 'Force recalculation for formulas in a specific range.',
+    params: {
+      address: {
+        type: 'string',
+        description: 'Range address to recalculate (e.g., "A1:Z100")',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const range = sheet.getRange(args.address as string);
+      range.calculate();
+      await context.sync();
+      return { address: args.address, recalculated: true };
+    },
+  },
+
+  {
+    name: 'get_tables_for_range',
+    description: 'List tables that overlap (or are fully contained in) a given range.',
+    params: {
+      address: {
+        type: 'string',
+        description: 'Range address to check for intersecting tables (e.g., "A1:H500")',
+      },
+      fullyContained: {
+        type: 'boolean',
+        required: false,
+        description:
+          'If true, only include tables fully contained in the range. Default false (any overlap).',
+      },
+      sheetName: { type: 'string', required: false, description: 'Optional worksheet name.' },
+    },
+    execute: async (context, args) => {
+      const sheet = getSheet(context, args.sheetName as string | undefined);
+      const range = sheet.getRange(args.address as string);
+      const fullyContained = (args.fullyContained as boolean | undefined) ?? false;
+      const tables = range.getTables(fullyContained);
+      tables.load('items');
+      await context.sync();
+
+      for (const table of tables.items) {
+        table.load(['name', 'id']);
+      }
+      await context.sync();
+
+      const result = tables.items.map(table => ({
+        name: table.name,
+        id: table.id,
+      }));
+
+      return {
+        address: args.address,
+        fullyContained,
+        tables: result,
+        count: result.length,
+      };
     },
   },
 

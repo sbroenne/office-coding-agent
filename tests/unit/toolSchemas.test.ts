@@ -25,7 +25,7 @@ function asZod(schema: unknown): ZodLike {
 
 /** All expected tool names after decomposition */
 const ALL_TOOL_NAMES = [
-  // range (24)
+  // range (31)
   'get_range_values',
   'set_range_values',
   'get_used_range',
@@ -37,6 +37,13 @@ const ALL_TOOL_NAMES = [
   'set_range_formulas',
   'get_range_formulas',
   'sort_range',
+  'auto_fill_range',
+  'flash_fill_range',
+  'get_special_cells',
+  'get_range_precedents',
+  'get_range_dependents',
+  'recalculate_range',
+  'get_tables_for_range',
   'copy_range',
   'find_values',
   'insert_range',
@@ -50,7 +57,7 @@ const ALL_TOOL_NAMES = [
   'group_rows_columns',
   'ungroup_rows_columns',
   'set_cell_borders',
-  // table (11)
+  // table (15)
   'list_tables',
   'create_table',
   'add_table_rows',
@@ -62,14 +69,23 @@ const ALL_TOOL_NAMES = [
   'add_table_column',
   'delete_table_column',
   'convert_table_to_range',
-  // chart (6)
+  'resize_table',
+  'set_table_style',
+  'set_table_header_totals_visibility',
+  'reapply_table_filters',
+  // chart (11)
   'list_charts',
   'create_chart',
   'delete_chart',
   'set_chart_title',
   'set_chart_type',
   'set_chart_data_source',
-  // sheet (13)
+  'set_chart_position',
+  'set_chart_legend_visibility',
+  'set_chart_axis_title',
+  'set_chart_axis_visibility',
+  'set_chart_series_filtered',
+  // sheet (16)
   'list_sheets',
   'create_sheet',
   'rename_sheet',
@@ -82,12 +98,25 @@ const ALL_TOOL_NAMES = [
   'copy_sheet',
   'move_sheet',
   'set_page_layout',
-  // workbook (5)
+  'set_sheet_gridlines',
+  'set_sheet_headings',
+  'recalculate_sheet',
+  // workbook (15)
   'get_workbook_info',
   'get_selected_range',
   'define_named_range',
   'list_named_ranges',
   'recalculate_workbook',
+  'save_workbook',
+  'get_workbook_properties',
+  'set_workbook_properties',
+  'get_workbook_protection',
+  'protect_workbook',
+  'unprotect_workbook',
+  'refresh_data_connections',
+  'list_queries',
+  'get_query',
+  'get_query_count',
   // comment (4)
   'add_comment',
   'list_comments',
@@ -110,12 +139,18 @@ const ALL_TOOL_NAMES = [
   'set_custom_validation',
   'get_data_validation',
   'clear_data_validation',
-  // pivot table (6)
+  // pivot table (12)
   'list_pivot_tables',
   'refresh_pivot_table',
   'delete_pivot_table',
   'create_pivot_table',
   'add_pivot_field',
+  'set_pivot_layout',
+  'get_pivot_field_filters',
+  'clear_pivot_field_filters',
+  'apply_pivot_label_filter',
+  'sort_pivot_field_labels',
+  'set_pivot_field_show_all_items',
   'remove_pivot_field',
 ] as const;
 
@@ -261,6 +296,55 @@ describe('tool schemas — range tools', () => {
     ).toBe(true);
     expect(asZod(schema).safeParse({ address: 'A1:C10', borderStyle: 'Thin' }).success).toBe(false);
   });
+
+  it('auto_fill_range requires sourceAddress + destinationAddress', () => {
+    const schema = excelTools.auto_fill_range.inputSchema;
+    expect(
+      asZod(schema).safeParse({ sourceAddress: 'A1:A2', destinationAddress: 'A1:A20' }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ sourceAddress: 'A1:A2' }).success).toBe(false);
+  });
+
+  it('flash_fill_range requires address', () => {
+    const schema = excelTools.flash_fill_range.inputSchema;
+    expect(asZod(schema).safeParse({ address: 'B2:B20' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_special_cells requires address + cellType', () => {
+    const schema = excelTools.get_special_cells.inputSchema;
+    expect(
+      asZod(schema).safeParse({ address: 'A1:D100', cellType: 'Formulas', cellValueType: 'All' })
+        .success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ address: 'A1:D100' }).success).toBe(false);
+  });
+
+  it('get_range_precedents requires address', () => {
+    const schema = excelTools.get_range_precedents.inputSchema;
+    expect(asZod(schema).safeParse({ address: 'D2:D10' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_range_dependents requires address', () => {
+    const schema = excelTools.get_range_dependents.inputSchema;
+    expect(asZod(schema).safeParse({ address: 'B2' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('recalculate_range requires address', () => {
+    const schema = excelTools.recalculate_range.inputSchema;
+    expect(asZod(schema).safeParse({ address: 'A1:Z100' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_tables_for_range requires address', () => {
+    const schema = excelTools.get_tables_for_range.inputSchema;
+    expect(asZod(schema).safeParse({ address: 'A1:H500', fullyContained: true }).success).toBe(
+      true
+    );
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
 });
 
 describe('tool schemas — sheet tools', () => {
@@ -329,6 +413,25 @@ describe('tool schemas — sheet tools', () => {
     );
     expect(asZod(schema).safeParse({}).success).toBe(false);
   });
+
+  it('set_sheet_gridlines requires name + showGridlines', () => {
+    const schema = excelTools.set_sheet_gridlines.inputSchema;
+    expect(asZod(schema).safeParse({ name: 'Sheet1', showGridlines: true }).success).toBe(true);
+    expect(asZod(schema).safeParse({ name: 'Sheet1' }).success).toBe(false);
+  });
+
+  it('set_sheet_headings requires name + showHeadings', () => {
+    const schema = excelTools.set_sheet_headings.inputSchema;
+    expect(asZod(schema).safeParse({ name: 'Sheet1', showHeadings: false }).success).toBe(true);
+    expect(asZod(schema).safeParse({ name: 'Sheet1' }).success).toBe(false);
+  });
+
+  it('recalculate_sheet requires name, optional recalcType', () => {
+    const schema = excelTools.recalculate_sheet.inputSchema;
+    expect(asZod(schema).safeParse({ name: 'Sheet1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({ name: 'Sheet1', recalcType: 'Full' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
 });
 
 describe('tool schemas — table tools', () => {
@@ -347,6 +450,33 @@ describe('tool schemas — table tools', () => {
 
   it('convert_table_to_range requires tableName', () => {
     const schema = excelTools.convert_table_to_range.inputSchema;
+    expect(asZod(schema).safeParse({ tableName: 'T1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('resize_table requires tableName + newAddress', () => {
+    const schema = excelTools.resize_table.inputSchema;
+    expect(asZod(schema).safeParse({ tableName: 'T1', newAddress: 'A1:F100' }).success).toBe(true);
+    expect(asZod(schema).safeParse({ tableName: 'T1' }).success).toBe(false);
+  });
+
+  it('set_table_style requires tableName + style', () => {
+    const schema = excelTools.set_table_style.inputSchema;
+    expect(asZod(schema).safeParse({ tableName: 'T1', style: 'TableStyleMedium2' }).success).toBe(
+      true
+    );
+    expect(asZod(schema).safeParse({ tableName: 'T1' }).success).toBe(false);
+  });
+
+  it('set_table_header_totals_visibility requires tableName', () => {
+    const schema = excelTools.set_table_header_totals_visibility.inputSchema;
+    expect(asZod(schema).safeParse({ tableName: 'T1', showHeaders: true }).success).toBe(true);
+    expect(asZod(schema).safeParse({ tableName: 'T1', showTotals: false }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('reapply_table_filters requires tableName', () => {
+    const schema = excelTools.reapply_table_filters.inputSchema;
     expect(asZod(schema).safeParse({ tableName: 'T1' }).success).toBe(true);
     expect(asZod(schema).safeParse({}).success).toBe(false);
   });
@@ -399,6 +529,47 @@ describe('tool schemas — chart tools', () => {
       true
     );
     expect(asZod(schema).safeParse({ chartName: 'Chart1' }).success).toBe(false);
+  });
+
+  it('set_chart_position requires chartName', () => {
+    const schema = excelTools.set_chart_position.inputSchema;
+    expect(asZod(schema).safeParse({ chartName: 'Chart1', left: 20, top: 30 }).success).toBe(true);
+    expect(
+      asZod(schema).safeParse({ chartName: 'Chart1', startCell: 'A1', endCell: 'H20' }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('set_chart_legend_visibility requires chartName + visible', () => {
+    const schema = excelTools.set_chart_legend_visibility.inputSchema;
+    expect(asZod(schema).safeParse({ chartName: 'Chart1', visible: true }).success).toBe(true);
+    expect(asZod(schema).safeParse({ chartName: 'Chart1' }).success).toBe(false);
+  });
+
+  it('set_chart_axis_title requires chartName + axisType + title', () => {
+    const schema = excelTools.set_chart_axis_title.inputSchema;
+    expect(
+      asZod(schema).safeParse({ chartName: 'Chart1', axisType: 'Value', title: 'Sales' }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ chartName: 'Chart1', axisType: 'Value' }).success).toBe(false);
+  });
+
+  it('set_chart_axis_visibility requires chartName + axisType + visible', () => {
+    const schema = excelTools.set_chart_axis_visibility.inputSchema;
+    expect(
+      asZod(schema).safeParse({ chartName: 'Chart1', axisType: 'Category', visible: false }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ chartName: 'Chart1', axisType: 'Category' }).success).toBe(
+      false
+    );
+  });
+
+  it('set_chart_series_filtered requires chartName + seriesIndex + filtered', () => {
+    const schema = excelTools.set_chart_series_filtered.inputSchema;
+    expect(
+      asZod(schema).safeParse({ chartName: 'Chart1', seriesIndex: 0, filtered: true }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ chartName: 'Chart1', seriesIndex: 0 }).success).toBe(false);
   });
 });
 
@@ -578,6 +749,95 @@ describe('tool schemas — pivot table tools', () => {
     ).toBe(true);
     expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(false);
   });
+
+  it('set_pivot_layout requires pivotTableName and accepts optional layout/display flags', () => {
+    const schema = excelTools.set_pivot_layout.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        layoutType: 'Tabular',
+        subtotalLocation: 'AtBottom',
+        showFieldHeaders: true,
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_pivot_field_filters requires pivotTableName + fieldName', () => {
+    const schema = excelTools.get_pivot_field_filters.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      true
+    );
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(false);
+  });
+
+  it('clear_pivot_field_filters requires pivotTableName + fieldName and accepts optional filterType', () => {
+    const schema = excelTools.clear_pivot_field_filters.inputSchema;
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      true
+    );
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        filterType: 'Label',
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1' }).success).toBe(false);
+  });
+
+  it('apply_pivot_label_filter requires pivotTableName + fieldName + condition + value1', () => {
+    const schema = excelTools.apply_pivot_label_filter.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        condition: 'Contains',
+        value1: 'North',
+      }).success
+    ).toBe(true);
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        condition: 'Between',
+        value1: 'A',
+        value2: 'M',
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      false
+    );
+  });
+
+  it('sort_pivot_field_labels requires pivotTableName + fieldName + sortBy', () => {
+    const schema = excelTools.sort_pivot_field_labels.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        sortBy: 'Descending',
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      false
+    );
+  });
+
+  it('set_pivot_field_show_all_items requires pivotTableName + fieldName + showAllItems', () => {
+    const schema = excelTools.set_pivot_field_show_all_items.inputSchema;
+    expect(
+      asZod(schema).safeParse({
+        pivotTableName: 'PT1',
+        fieldName: 'Region',
+        showAllItems: false,
+      }).success
+    ).toBe(true);
+    expect(asZod(schema).safeParse({ pivotTableName: 'PT1', fieldName: 'Region' }).success).toBe(
+      false
+    );
+  });
 });
 
 describe('tool schemas — workbook tools', () => {
@@ -637,6 +897,59 @@ describe('tool schemas — workbook tools', () => {
     const schema = excelTools.define_named_range.inputSchema;
     expect(asZod(schema).safeParse({ name: 'Revenue', address: 'B2:B100' }).success).toBe(true);
     expect(asZod(schema).safeParse({ name: 'Revenue' }).success).toBe(false);
+  });
+
+  it('list_queries accepts empty object', () => {
+    const schema = excelTools.list_queries.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+  });
+
+  it('get_query requires queryName', () => {
+    const schema = excelTools.get_query.inputSchema;
+    expect(asZod(schema).safeParse({ queryName: 'SalesQuery' }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(false);
+  });
+
+  it('get_query_count accepts empty object', () => {
+    const schema = excelTools.get_query_count.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+  });
+
+  it('save_workbook accepts empty or optional saveBehavior', () => {
+    const schema = excelTools.save_workbook.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+    expect(asZod(schema).safeParse({ saveBehavior: 'Prompt' }).success).toBe(true);
+  });
+
+  it('get_workbook_properties accepts empty object', () => {
+    const schema = excelTools.get_workbook_properties.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+  });
+
+  it('set_workbook_properties accepts any supported property subset', () => {
+    const schema = excelTools.set_workbook_properties.inputSchema;
+    expect(asZod(schema).safeParse({ title: 'Quarterly Report' }).success).toBe(true);
+    expect(asZod(schema).safeParse({ author: 'Analyst', revisionNumber: 2 }).success).toBe(true);
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+  });
+
+  it('get_workbook_protection accepts empty object', () => {
+    const schema = excelTools.get_workbook_protection.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
+  });
+
+  it('protect_workbook and unprotect_workbook accept optional password', () => {
+    const protectSchema = excelTools.protect_workbook.inputSchema;
+    const unprotectSchema = excelTools.unprotect_workbook.inputSchema;
+    expect(asZod(protectSchema).safeParse({}).success).toBe(true);
+    expect(asZod(protectSchema).safeParse({ password: 'secret' }).success).toBe(true);
+    expect(asZod(unprotectSchema).safeParse({}).success).toBe(true);
+    expect(asZod(unprotectSchema).safeParse({ password: 'secret' }).success).toBe(true);
+  });
+
+  it('refresh_data_connections accepts empty object', () => {
+    const schema = excelTools.refresh_data_connections.inputSchema;
+    expect(asZod(schema).safeParse({}).success).toBe(true);
   });
 });
 
