@@ -6,7 +6,7 @@
   It points to the test build served on localhost:3001.
   Uses a separate GUID so it can coexist with the dev add-in.
 
-  Structure matches the production manifest.xml — just a different ID,
+  Structure matches manifests/manifest.prod.xml — just a different ID,
   display name, port, and no custom functions.
 -->
 <OfficeApp
