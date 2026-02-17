@@ -356,21 +356,28 @@ const pivotTableTools = [
   'create_pivot_table',
   'list_pivot_tables',
   'refresh_pivot_table',
+  'get_pivot_table_source_info',
+  'set_pivot_table_options',
   'add_pivot_field',
   'set_pivot_layout',
   'get_pivot_field_filters',
   'apply_pivot_label_filter',
   'sort_pivot_field_labels',
+  'apply_pivot_manual_filter',
+  'sort_pivot_field_values',
   'set_pivot_field_show_all_items',
   'clear_pivot_field_filters',
   'remove_pivot_field',
   'delete_pivot_table',
   // Variants
   'create_pivot_table:multi_fields',
+  'set_pivot_table_options:disable_flags',
   'add_pivot_field:filter',
   'set_pivot_layout:outline_off',
   'apply_pivot_label_filter:between',
   'sort_pivot_field_labels:ascending',
+  'apply_pivot_manual_filter:multi',
+  'sort_pivot_field_values:ascending',
   'set_pivot_field_show_all_items:true',
   'clear_pivot_field_filters:all',
   'remove_pivot_field:filter',
@@ -541,7 +548,7 @@ describe('Excel AI E2E Tests', function () {
     }
   });
 
-  describe('Pivot Table Tools (21)', () => {
+  describe('Pivot Table Tools (28)', () => {
     for (const name of pivotTableTools) {
       it(name, () => {
         assertToolResult(name);
