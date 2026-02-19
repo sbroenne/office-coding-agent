@@ -22,23 +22,9 @@ try {
 }
 
 /**
- * Acquire an Entra ID bearer token at build time when no API key is set.
- * The token is baked into the bundle so E2E tests (running in Excel's WebView,
- * where @azure/identity is unavailable) can authenticate with Azure AI.
+ * Acquire an Entra ID bearer token at build time (legacy - kept for compatibility).
  */
 async function acquireBearerToken() {
-  if (process.env.FOUNDRY_API_KEY || !process.env.FOUNDRY_ENDPOINT) return '';
-  try {
-    const { DefaultAzureCredential } = require('@azure/identity');
-    const credential = new DefaultAzureCredential();
-    const response = await credential.getToken('https://cognitiveservices.azure.com/.default');
-    if (response?.token) {
-      console.log('✓ Acquired Entra ID bearer token for E2E AI tests');
-      return response.token;
-    }
-  } catch (err) {
-    console.warn('⚠ Could not acquire Entra ID token:', err.message);
-  }
   return '';
 }
 
@@ -48,7 +34,6 @@ async function getHttpsOptions() {
 }
 
 module.exports = async (env, options) => {
-  const bearerToken = await acquireBearerToken();
   const config = {
     devtool: 'source-map',
     entry: {
@@ -126,10 +111,9 @@ module.exports = async (env, options) => {
         ],
       }),
       new webpack.DefinePlugin({
-        'process.env.FOUNDRY_ENDPOINT': JSON.stringify(process.env.FOUNDRY_ENDPOINT || ''),
-        'process.env.FOUNDRY_API_KEY': JSON.stringify(process.env.FOUNDRY_API_KEY || ''),
-        'process.env.FOUNDRY_MODEL': JSON.stringify(process.env.FOUNDRY_MODEL || 'gpt-5.2-chat'),
-        'process.env.FOUNDRY_BEARER_TOKEN': JSON.stringify(bearerToken),
+        'process.env.COPILOT_SERVER_URL': JSON.stringify(
+          process.env.COPILOT_SERVER_URL || 'wss://localhost:3000/api/copilot'
+        ),
       }),
     ],
     devServer: {

@@ -3639,110 +3639,117 @@ async function testSettingsPersistence(): Promise<void> {
   }
 }
 
-// ─── AI Round-Trip (Real LLM + Real Excel) ────────────────────────
+// ─── AI Round-Trip (Real LLM via GitHub Copilot + Real Excel) ────────────────
 
 async function testAiRoundTrip(): Promise<void> {
   log('── AI Round-Trip ──');
 
-  const endpoint = process.env.FOUNDRY_ENDPOINT || '';
-  const apiKey = process.env.FOUNDRY_API_KEY || '';
-  const bearerToken = process.env.FOUNDRY_BEARER_TOKEN || '';
-  const model = process.env.FOUNDRY_MODEL || 'gpt-5.2-chat';
+  const serverUrl = process.env.COPILOT_SERVER_URL || 'wss://localhost:3000/api/copilot';
+  const pingUrl = serverUrl.replace(/^wss?:\/\//, 'https://').replace('/api/copilot', '/ping');
 
-  if (!endpoint || (!apiKey && !bearerToken)) {
-    log('  ⏭ Skipping — no credentials');
-    addTestResult(testValues, 'ai_roundtrip_skipped', 'no credentials', 'skip');
+  // Check if Copilot proxy is reachable before attempting the test
+  try {
+    const resp = await fetch(pingUrl);
+    if (!resp.ok) throw new Error(`ping ${resp.status}`);
+  } catch {
+    log('  ⏭ Skipping — Copilot proxy not running (start `npm run server`)');
+    addTestResult(testValues, 'ai_roundtrip_skipped', 'server not running', 'skip');
     return;
   }
 
-  let createAzureFn: typeof import('@ai-sdk/azure').createAzure;
-  let normalizeEndpointFn: typeof import('@/services/ai/aiClientFactory').normalizeEndpoint;
-  let sendChatMessageFn: typeof import('@/services/ai/chatService').sendChatMessage;
+  let createWebSocketClientFn: typeof import('@/lib/websocket-client').createWebSocketClient;
+  let getToolsForHostFn: typeof import('@/tools').getToolsForHost;
 
   try {
-    const azureMod = await import('@ai-sdk/azure');
-    createAzureFn = azureMod.createAzure;
-    const clientFactoryMod = await import('@/services/ai/aiClientFactory');
-    normalizeEndpointFn = clientFactoryMod.normalizeEndpoint;
-    const chatServiceMod = await import('@/services/ai/chatService');
-    sendChatMessageFn = chatServiceMod.sendChatMessage;
+    const clientMod = await import('@/lib/websocket-client');
+    createWebSocketClientFn = clientMod.createWebSocketClient;
+    const toolsMod = await import('@/tools');
+    getToolsForHostFn = toolsMod.getToolsForHost;
   } catch (importErr) {
     fail('ai_roundtrip', `Import failed: ${importErr}`);
     return;
   }
 
-  const baseUrl = normalizeEndpointFn(endpoint);
-  const providerOptions: Parameters<typeof createAzureFn>[0] = {
-    baseURL: baseUrl + '/openai',
-    apiKey: apiKey || '',
-  };
-  if (!apiKey && bearerToken) {
-    providerOptions.headers = { Authorization: `Bearer ${bearerToken}` };
-  }
-  const provider = createAzureFn(providerOptions);
+  const tools = getToolsForHostFn('excel');
+  const client = await createWebSocketClientFn(serverUrl);
 
-  // LLM reads workbook data
   try {
-    const toolCallsSeen: string[] = [];
-    const response = await sendChatMessageFn(provider, {
-      modelId: model,
-      messages: [
-        {
-          role: 'user',
-          content: 'What data is in this spreadsheet? List the contents.',
-        },
-      ],
-      onToolCalls: calls => {
-        toolCallsSeen.push(...calls.map(c => c.functionName));
+    const session = await client.createSession({
+      systemMessage: {
+        mode: 'append',
+        content: 'You are testing an Excel add-in. Use the available tools when asked.',
       },
+      tools,
     });
 
-    const usedReadTool = toolCallsSeen.some(n =>
-      ['get_used_range', 'get_range_values', 'get_table_data', 'list_tables'].includes(n)
-    );
-    if (usedReadTool) pass('ai_roundtrip_read', { tools: toolCallsSeen });
-    else fail('ai_roundtrip_read', `No read tool called: ${toolCallsSeen.join(', ')}`);
+    // LLM reads workbook data
+    try {
+      const toolCallsSeen: string[] = [];
+      let fullText = '';
 
-    const mentionsData =
-      response.includes('Alice') || response.includes('Bob') || response.includes('Score');
-    if (mentionsData) pass('ai_roundtrip_response', { preview: response.substring(0, 200) });
-    else fail('ai_roundtrip_response', 'Response does not mention workbook data');
-  } catch (e) {
-    fail('ai_roundtrip_read', String(e));
-    fail('ai_roundtrip_response', String(e));
-  }
+      for await (const event of session.query({
+        prompt: 'What data is in this spreadsheet? List the contents.',
+      })) {
+        if (event.type === 'tool.execution_start') {
+          toolCallsSeen.push(event.data.toolName);
+        } else if (event.type === 'assistant.message_delta') {
+          fullText += event.data.deltaContent;
+        } else if (event.type === 'assistant.message') {
+          fullText += event.data.content;
+        } else if (event.type === 'session.idle') {
+          break;
+        }
+      }
 
-  // LLM writes data
-  try {
-    const toolCallsSeen: string[] = [];
-    await sendChatMessageFn(provider, {
-      modelId: model,
-      messages: [
-        {
-          role: 'user',
-          content: 'Write the text "PASSED" to cell Z1. Just do it.',
-        },
-      ],
-      onToolCalls: calls => toolCallsSeen.push(...calls.map(c => c.functionName)),
-    });
+      const usedReadTool = toolCallsSeen.some(n =>
+        ['get_used_range', 'get_range_values', 'get_table_data', 'list_tables'].includes(n)
+      );
+      if (usedReadTool) pass('ai_roundtrip_read', { tools: toolCallsSeen });
+      else fail('ai_roundtrip_read', `No read tool called: ${toolCallsSeen.join(', ')}`);
 
-    if (toolCallsSeen.includes('set_range_values'))
-      pass('ai_roundtrip_write', { tools: toolCallsSeen });
-    else fail('ai_roundtrip_write', `set_range_values not called: ${toolCallsSeen.join(', ')}`);
+      const mentionsData =
+        fullText.includes('Alice') || fullText.includes('Bob') || fullText.includes('Score');
+      if (mentionsData) pass('ai_roundtrip_response', { preview: fullText.substring(0, 200) });
+      else fail('ai_roundtrip_response', 'Response does not mention workbook data');
+    } catch (e) {
+      fail('ai_roundtrip_read', String(e));
+      fail('ai_roundtrip_response', String(e));
+    }
 
-    await sleep(500);
-    let cellValue: unknown = null;
-    await Excel.run(async context => {
-      const cell = context.workbook.worksheets.getItem(MAIN).getRange('Z1');
-      cell.load('values');
-      await context.sync();
-      cellValue = cell.values[0][0];
-    });
-    if (String(cellValue).toUpperCase() === 'PASSED') pass('ai_roundtrip_verify', { cellValue });
-    else fail('ai_roundtrip_verify', `Expected 'PASSED', got '${cellValue}'`);
-  } catch (e) {
-    fail('ai_roundtrip_write', String(e));
-    fail('ai_roundtrip_verify', String(e));
+    // LLM writes data
+    try {
+      const toolCallsSeen: string[] = [];
+
+      for await (const event of session.query({
+        prompt: 'Write the text "PASSED" to cell Z1. Just do it.',
+      })) {
+        if (event.type === 'tool.execution_start') {
+          toolCallsSeen.push(event.data.toolName);
+        } else if (event.type === 'session.idle') {
+          break;
+        }
+      }
+
+      if (toolCallsSeen.includes('set_range_values'))
+        pass('ai_roundtrip_write', { tools: toolCallsSeen });
+      else fail('ai_roundtrip_write', `set_range_values not called: ${toolCallsSeen.join(', ')}`);
+
+      await sleep(500);
+      let cellValue: unknown = null;
+      await Excel.run(async context => {
+        const cell = context.workbook.worksheets.getItem(MAIN).getRange('Z1');
+        cell.load('values');
+        await context.sync();
+        cellValue = cell.values[0][0];
+      });
+      if (String(cellValue).toUpperCase() === 'PASSED') pass('ai_roundtrip_verify', { cellValue });
+      else fail('ai_roundtrip_verify', `Expected 'PASSED', got '${cellValue}'`);
+    } catch (e) {
+      fail('ai_roundtrip_write', String(e));
+      fail('ai_roundtrip_verify', String(e));
+    }
+  } finally {
+    await client.stop();
   }
 }
 

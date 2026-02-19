@@ -3,37 +3,22 @@ import { test as base, type Page } from '@playwright/test';
 /**
  * Shared fixtures for UI tests.
  *
- * - `taskpane`: navigates to the task pane and waits for the app to render.
- * - `configuredTaskpane`: pre-seeds localStorage with a valid settings store
- *    so the app skips the SetupWizard and renders the chat UI immediately.
+ * - `taskpane`: navigates to the task pane (fresh state).
+ * - `configuredTaskpane`: pre-seeds localStorage with known settings for
+ *    deterministic UI state (active model, agent, skills).
  */
 
-/** Minimal settings blob that passes the `needsSetup` check in App.tsx */
+/** Minimal settings blob matching the current UserSettings shape. */
 function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
     state: {
-      endpoints: [
-        {
-          id: 'ep-test',
-          displayName: 'Test Endpoint',
-          resourceUrl: 'https://test.openai.azure.com',
-          authMethod: 'apiKey',
-          apiKey: 'test-key-for-ui-tests',
-        },
-      ],
-      activeEndpointId: 'ep-test',
-      activeModelId: 'gpt-4.1',
-      defaultModelId: 'gpt-4.1',
-      endpointModels: {
-        'ep-test': [
-          { id: 'gpt-4.1', name: 'gpt-4.1', ownedBy: 'azure', provider: 'OpenAI' },
-          { id: 'gpt-5.2-chat', name: 'gpt-5.2-chat', ownedBy: 'azure', provider: 'OpenAI' },
-        ],
-      },
+      activeModel: 'claude-sonnet-4.5',
       activeSkillNames: null,
       activeAgentId: 'Excel',
       importedSkills: [],
       importedAgents: [],
+      importedMcpServers: [],
+      activeMcpServerNames: null,
       ...overrides,
     },
     version: 0,
@@ -44,14 +29,14 @@ export const test = base.extend<{
   taskpane: Page;
   configuredTaskpane: Page;
 }>({
-  /** Navigate to the task pane (fresh state — will show SetupWizard) */
+  /** Navigate to the task pane (fresh/default state). */
   taskpane: async ({ page }, use) => {
     await page.goto('/taskpane.html');
     await page.waitForLoadState('domcontentloaded');
     await use(page);
   },
 
-  /** Navigate with pre-seeded settings (skips wizard → shows chat UI) */
+  /** Navigate with pre-seeded settings for deterministic UI state. */
   configuredTaskpane: async ({ page }, use) => {
     // Seed the Zustand persisted store BEFORE navigating
     await page.addInitScript((json: string) => {

@@ -19,8 +19,8 @@ test.describe('Chat UI (configured state)', () => {
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
-    // The model picker shows the active model name
-    await expect(page.getByText('gpt-4.1')).toBeVisible({ timeout: 5000 });
+    // The model picker shows the active model name (default: Claude Sonnet 4.5)
+    await expect(page.getByText('Claude Sonnet 4.5')).toBeVisible({ timeout: 5000 });
   });
 
   test('displays the agent picker', async ({ configuredTaskpane: page }) => {
