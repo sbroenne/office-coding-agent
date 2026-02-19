@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { ModelInfo } from '@/types';
-import type { AgentConfig, AgentSkill } from '@/types';
+import type { AgentConfig, AgentSkill, McpServerConfig } from '@/types';
 
 /** Reset store to defaults before each test */
 beforeEach(() => {
@@ -352,5 +352,64 @@ describe('settingsStore — agents', () => {
 
     expect(useSettingsStore.getState().importedAgents).toEqual([]);
     expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
+  });
+});
+
+// ─── MCP server management ───
+
+describe('settingsStore — MCP servers', () => {
+  const server1: McpServerConfig = { name: 'srv1', url: 'https://s1.com/mcp', transport: 'http' };
+  const server2: McpServerConfig = { name: 'srv2', url: 'https://s2.com/mcp', transport: 'sse' };
+
+  it('imports MCP servers', () => {
+    useSettingsStore.getState().importMcpServers([server1, server2]);
+    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(2);
+  });
+
+  it('renames duplicate server names on import', () => {
+    useSettingsStore.getState().importMcpServers([server1]);
+    useSettingsStore.getState().importMcpServers([server1]);
+    const names = useSettingsStore.getState().importedMcpServers.map(s => s.name);
+    expect(names[0]).toBe('srv1');
+    expect(names[1]).not.toBe('srv1');
+  });
+
+  it('removes a MCP server by name', () => {
+    useSettingsStore.getState().importMcpServers([server1, server2]);
+    useSettingsStore.getState().removeMcpServer('srv1');
+    expect(useSettingsStore.getState().importedMcpServers.map(s => s.name)).toEqual(['srv2']);
+  });
+
+  it('removes from activeMcpServerNames on server removal', () => {
+    useSettingsStore.getState().importMcpServers([server1, server2]);
+    // Force specific active set
+    useSettingsStore.setState({ activeMcpServerNames: ['srv1', 'srv2'] });
+    useSettingsStore.getState().removeMcpServer('srv1');
+    expect(useSettingsStore.getState().activeMcpServerNames).toEqual(['srv2']);
+  });
+
+  it('activeMcpServerNames is null (all on) by default', () => {
+    useSettingsStore.getState().importMcpServers([server1]);
+    expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
+  });
+
+  it('toggleMcpServer off materializes full list minus toggled server', () => {
+    useSettingsStore.getState().importMcpServers([server1, server2]);
+    useSettingsStore.getState().toggleMcpServer('srv1');
+    expect(useSettingsStore.getState().activeMcpServerNames).toEqual(['srv2']);
+  });
+
+  it('toggleMcpServer on adds server back to active list', () => {
+    useSettingsStore.getState().importMcpServers([server1, server2]);
+    useSettingsStore.setState({ activeMcpServerNames: ['srv2'] });
+    useSettingsStore.getState().toggleMcpServer('srv1');
+    expect(useSettingsStore.getState().activeMcpServerNames).toContain('srv1');
+  });
+
+  it('reset clears imported MCP servers', () => {
+    useSettingsStore.getState().importMcpServers([server1]);
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().importedMcpServers).toEqual([]);
+    expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
   });
 });

@@ -6,7 +6,7 @@ import { generateId } from '@/utils/id';
 import { invalidateClient } from '@/services/ai/aiClientFactory';
 import { getAllAgents, getBundledAgents, setImportedAgents } from '@/services/agents';
 import { getBundledSkills, getSkills, setImportedSkills } from '@/services/skills';
-import type { AgentConfig, AgentSkill } from '@/types';
+import type { AgentConfig, AgentSkill, McpServerConfig } from '@/types';
 import { officeStorage } from './officeStorage';
 
 function ensureUniqueImportedName(baseName: string, existingNames: Set<string>): string {
@@ -54,6 +54,11 @@ interface SettingsState extends UserSettings {
   // ─── Imported agent/skill management ───
   importAgents: (agents: AgentConfig[]) => void;
   removeImportedAgent: (agentName: string) => void;
+
+  // ─── MCP server management ───
+  importMcpServers: (servers: McpServerConfig[]) => void;
+  removeMcpServer: (serverName: string) => void;
+  toggleMcpServer: (serverName: string) => void;
 
   // ─── Getters ───
   getActiveEndpoint: () => FoundryEndpoint | undefined;
@@ -324,6 +329,43 @@ export const useSettingsStore = create<SettingsState>()(
         });
       },
 
+      // ─── MCP server management ───
+      importMcpServers: servers => {
+        set(state => {
+          const existingNames = new Set(state.importedMcpServers.map(s => s.name));
+          const nextImported = [...state.importedMcpServers];
+          for (const server of servers) {
+            const uniqueName = ensureUniqueImportedName(server.name, existingNames);
+            existingNames.add(uniqueName);
+            nextImported.push({ ...server, name: uniqueName });
+          }
+          return { importedMcpServers: nextImported };
+        });
+      },
+
+      removeMcpServer: serverName => {
+        set(state => {
+          const nextImported = state.importedMcpServers.filter(s => s.name !== serverName);
+          const nextActiveNames = state.activeMcpServerNames?.filter(n => n !== serverName) ?? null;
+          return { importedMcpServers: nextImported, activeMcpServerNames: nextActiveNames };
+        });
+      },
+
+      toggleMcpServer: serverName => {
+        set(state => {
+          const current = state.activeMcpServerNames;
+          if (current === null) {
+            // All were on — materialize the full list minus the toggled one
+            const allNames = state.importedMcpServers.map(s => s.name);
+            return { activeMcpServerNames: allNames.filter(n => n !== serverName) };
+          }
+          const next = current.includes(serverName)
+            ? current.filter(n => n !== serverName)
+            : [...current, serverName];
+          return { activeMcpServerNames: next };
+        });
+      },
+
       // ─── Getters ───
       getActiveEndpoint: () => {
         const state = get();
@@ -384,6 +426,8 @@ export const useSettingsStore = create<SettingsState>()(
         activeAgentId: state.activeAgentId,
         importedSkills: state.importedSkills,
         importedAgents: state.importedAgents,
+        importedMcpServers: state.importedMcpServers,
+        activeMcpServerNames: state.activeMcpServerNames,
       }),
       onRehydrateStorage: () => state => {
         setImportedSkills(state?.importedSkills ?? []);

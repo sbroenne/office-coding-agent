@@ -1,6 +1,7 @@
 /** Authentication method for an endpoint */
 import type { AgentConfig } from './agent';
 import type { AgentSkill } from './skill';
+import type { McpServerConfig } from './mcp';
 
 /** Authentication method for an endpoint */
 export type AuthMethod = 'apiKey';
@@ -64,6 +65,10 @@ export interface UserSettings {
   importedSkills: AgentSkill[];
   /** Imported agents loaded from local ZIP files. Bundled agents are managed separately and read-only. */
   importedAgents: AgentConfig[];
+  /** MCP servers imported from a mcp.json file. */
+  importedMcpServers: McpServerConfig[];
+  /** Names of currently active MCP servers. null = all servers enabled (default). */
+  activeMcpServerNames: string[] | null;
 }
 
 /** Default settings applied on first run */
@@ -77,4 +82,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   activeAgentId: 'Excel',
   importedSkills: [],
   importedAgents: [],
+  importedMcpServers: [],
+  activeMcpServerNames: null,
 };
