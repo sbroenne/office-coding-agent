@@ -772,11 +772,7 @@ class ExcelSimulator:
     # ─── Workbook Operations ─────────────────────────────────────────
 
     def get_workbook_info(self) -> ToolResult:
-        sheets_info = [{"name": s.name, "position": s.positio
-
-    def recalculate_workbook(self, recalc_type: str | None = None) -> ToolResult:
-        recalc = recalc_type or "Full"
-        return self._ok({"recalculated": True, "type": recalc})n}
+        sheets_info = [{"name": s.name, "position": s.position}
                        for s in sorted(self.sheets.values(), key=lambda s: s.position)]
         return self._ok({
             "activeSheet": self.active_sheet,
@@ -785,6 +781,10 @@ class ExcelSimulator:
             "chartCount": len(self.charts),
             "namedRangeCount": len(self.named_ranges),
         })
+
+    def recalculate_workbook(self, recalc_type: str | None = None) -> ToolResult:
+        recalc = recalc_type or "Full"
+        return self._ok({"recalculated": True, "type": recalc})
 
     def get_selected_range(self) -> ToolResult:
         return self._ok({"address": "A1", "values": [[""]], "sheetName": self.active_sheet})
@@ -889,7 +889,7 @@ class ExcelSimulator:
     def remove_pivot_field(
         self, pivot_table_name: str, field_name: str, field_type: str, sheet_name: str | None = None
     ) -> ToolResult:
-        return self._ok({"pivotTableName": pivot_table_name, "fieldName": field_name, "fieldType": field_type, "removed": True})turn self._ok({"pivotTableName": pivot_table_name, "refreshed": True})
+        return self._ok({"pivotTableName": pivot_table_name, "fieldName": field_name, "fieldType": field_type, "removed": True})
 
     def delete_pivot_table(self, pivot_table_name: str, sheet_name: str | None = None) -> ToolResult:
         return self._ok({"pivotTableName": pivot_table_name, "deleted": True})
