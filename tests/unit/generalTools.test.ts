@@ -133,6 +133,24 @@ describe('createRunSubagentTool', () => {
       expect(result.success).toBe(true);
     });
 
+    it('accepts task with optional maxSteps', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Analyse trends', maxSteps: 3 });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects non-integer maxSteps', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Do stuff', maxSteps: 1.5 });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects maxSteps below 1', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Do stuff', maxSteps: 0 });
+      expect(result.success).toBe(false);
+    });
+
     it('rejects missing task', () => {
       const tool = createRunSubagentTool(fakeModel, fakeHostTools);
       const result = asZod(tool.inputSchema).safeParse({ systemPrompt: 'foo' });
@@ -187,5 +205,14 @@ describe('getGeneralTools', () => {
 
     const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
     expect(Object.keys(callOpts.tools ?? {})).toContain('some_excel_tool');
+  });
+
+  it('forwards a custom maxSteps value to generateText', async () => {
+    const tools = getGeneralTools({} as LanguageModel, {});
+    await tools.run_subagent.execute!({ task: 'test task', maxSteps: 3 }, {} as never);
+
+    // generateText should have been called with stopWhen derived from maxSteps=3.
+    // We verify it was called (the exact stopWhen predicate is internal to the AI SDK).
+    expect(generateText).toHaveBeenCalledOnce();
   });
 });

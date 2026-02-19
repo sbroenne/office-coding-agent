@@ -34,6 +34,9 @@ export const webFetchTool = tool({
   },
 });
 
+/** Default maximum tool-call steps for run_subagent */
+const DEFAULT_SUBAGENT_MAX_STEPS = 5;
+
 /**
  * Create a `run_subagent` tool bound to a specific model and tool set.
  *
@@ -50,14 +53,22 @@ export function createRunSubagentTool(model: LanguageModel, hostTools: ToolSet) 
         .string()
         .optional()
         .describe("Optional system prompt to guide the subagent's behaviour"),
+      maxSteps: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe(
+          `Maximum number of tool-call steps the subagent may take. Defaults to ${String(DEFAULT_SUBAGENT_MAX_STEPS)}.`
+        ),
     }),
-    execute: async ({ task, systemPrompt }) => {
+    execute: async ({ task, systemPrompt, maxSteps = DEFAULT_SUBAGENT_MAX_STEPS }) => {
       const result = await generateText({
         model,
         ...(systemPrompt ? { system: systemPrompt } : {}),
         prompt: task,
         tools: hostTools,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(maxSteps),
       });
       return result.text;
     },
