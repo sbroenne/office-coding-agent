@@ -71,7 +71,8 @@ export class BrowserCopilotSession {
     try {
       while (!done || queue.length > 0) {
         if (queue.length > 0) {
-          yield queue.shift()!;
+          const item = queue.shift();
+          if (item !== undefined) yield item;
         } else {
           await new Promise<void>(r => {
             resolve = r;
@@ -140,8 +141,10 @@ export class WebSocketCopilotClient {
       this.wsSocket = new WebSocket(this.url);
 
       this.wsSocket.addEventListener('open', () => {
-        const reader = new WebSocketMessageReader(this.wsSocket!);
-        const writer = new WebSocketMessageWriter(this.wsSocket!);
+        const socket = this.wsSocket;
+        if (!socket) return;
+        const reader = new WebSocketMessageReader(socket);
+        const writer = new WebSocketMessageWriter(socket);
         this.connection = createMessageConnection(reader, writer);
         this.attachConnectionHandlers();
         this.connection.listen();

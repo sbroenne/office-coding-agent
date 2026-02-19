@@ -76,8 +76,10 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   const onNew = useCallback(async (message: AppendMessage) => {
     const userText = (message.content as readonly { type: string; text?: string }[])
-      .filter(c => c.type === 'text' && typeof c.text === 'string')
-      .map(c => c.text!)
+      .filter(
+        (c): c is { type: string; text: string } => c.type === 'text' && typeof c.text === 'string'
+      )
+      .map(c => c.text)
       .join('\n');
 
     if (!userText.trim() || !sessionRef.current) return;

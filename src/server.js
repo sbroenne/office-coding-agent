@@ -126,12 +126,15 @@ async function createServer() {
   setupCopilotProxy(httpsServer);
 
   httpsServer.listen(PORT, () => {
+    // eslint-disable-next-line no-console
     console.log(`\n  Copilot Office Add-in server running on https://localhost:${PORT}`);
+    // eslint-disable-next-line no-console
     console.log(`  API: https://localhost:${PORT}/api\n`);
   });
 }
 
 createServer().catch(err => {
+  // eslint-disable-next-line no-console
   console.error('Server startup error:', err);
   process.exit(1);
 });
