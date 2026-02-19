@@ -1,6 +1,6 @@
 # Office Coding Agent
 
-An Office add-in research project that provides an AI-powered coding assistant using Azure AI Foundry models. The runtime is host-routed (tools and prompts per application), with Excel as the first supported host. Built with React, assistant-ui, Radix UI, Tailwind CSS, and the [Vercel AI SDK](https://ai-sdk.dev/). It supports per host Agent Skills and custom agents.
+An Office add-in research project that provides an AI-powered coding assistant with support for multiple AI providers. The runtime is host-routed (tools and prompts per application), with Excel as the first supported host. Built with React, assistant-ui, Radix UI, Tailwind CSS, and the [Vercel AI SDK](https://ai-sdk.dev/). It supports per host Agent Skills and custom agents.
 
 > **Research Project Disclaimer**
 >
@@ -22,13 +22,13 @@ An Office add-in research project that provides an AI-powered coding assistant u
 - **Skills system** — bundled skill files that inject additional context into the system prompt, toggleable via the SkillPicker (standard Agent Skills layout: one `SKILL.md` plus optional `references/` docs)
 - **Custom extension import** — import local ZIP files for custom agents and custom skills from Settings
 - **Extension management UX** — manage imported agents/skills in Settings, with bundled content shown as read-only
-- **Multi-model support** — add and validate deployed model names from your Azure AI Foundry endpoint (manual entry flow)
+- **Multi-model support** — add and configure models per endpoint; Azure AI Foundry uses manual deployment name entry, while other providers offer pre-populated known model lists
 - **Model management** — add, rename, and remove models per endpoint; switch models from the input toolbar
 - **Streaming responses** — real-time token streaming for fast, responsive interactions
 - **Copilot-style UX** — cycling dot progress indicators, collapsible tool progress, choice cards, tool result summaries
-- **API key authentication** — simple API key auth per endpoint, no Azure AD app registration required
-- **Multiple endpoints** — configure and switch between several Azure AI Foundry resources
-- **First-time setup wizard** — guided onboarding flow with auto-discovery and manual model entry
+- **API key authentication** — simple API key auth per endpoint
+- **Multiple providers** — Azure AI Foundry, OpenAI, Anthropic, Mistral AI, DeepSeek, and xAI
+- **Multiple endpoints** — configure and switch between multiple provider endpoints
 
 ## Agent Skills Format
 
@@ -41,7 +41,13 @@ This project follows the standard Agent Skills model:
 
 - [Node.js](https://nodejs.org/) >= 20
 - Microsoft Excel (desktop or Microsoft 365 web)
-- An [Azure AI Foundry](https://ai.azure.com/) resource with at least one model deployed
+- An API key for at least one supported provider:
+  - [Azure AI Foundry](https://ai.azure.com/) resource with at least one model deployed
+  - [OpenAI](https://platform.openai.com/) API key
+  - [Anthropic](https://console.anthropic.com/) API key
+  - [Mistral AI](https://console.mistral.ai/) API key
+  - [DeepSeek](https://platform.deepseek.com/) API key
+  - [xAI](https://x.ai/) API key
 
 ## Getting Started
 
@@ -94,17 +100,31 @@ FOUNDRY_MODEL=gpt-5.2-chat
 
 When you launch the add-in for the first time, a setup wizard guides you through configuration:
 
-#### Step 1 — Connect Your Endpoint
+#### Step 1 — Choose Your AI Provider
 
-Enter your Azure AI Foundry resource URL (e.g., `https://my-resource.openai.azure.com`) and an optional display name. If the `AZURE_OPENAI_ENDPOINT` environment variable is set, this field is pre-populated.
+Select the provider you want to connect to:
 
-#### Step 2 — Authentication
+| Provider | Base URL |
+| -------- | -------- |
+| **Azure AI Foundry** | Custom resource URL (you enter it) |
+| **OpenAI** | `https://api.openai.com/v1` |
+| **Anthropic** | `https://api.anthropic.com` |
+| **Mistral AI** | `https://api.mistral.ai` |
+| **DeepSeek** | `https://api.deepseek.com` |
+| **xAI** | `https://api.x.ai` |
 
-Enter your API key from the Azure AI Foundry resource. If the `AZURE_OPENAI_API_KEY` environment variable is set, this field is pre-populated.
+#### Step 2 — Connect Your Endpoint (Azure only)
 
-#### Step 3 — Model Setup
+For Azure AI Foundry, enter your resource URL (e.g., `https://my-resource.openai.azure.com`). If the `AZURE_OPENAI_ENDPOINT` environment variable is set, this field is pre-populated. Other providers use a fixed URL.
 
-The wizard validates your endpoint connection, then you add model deployment names manually. The default model (`gpt-5.2-chat`) is auto-validated and pre-added when reachable.
+#### Step 3 — Authentication
+
+Enter your API key for the selected provider. If the `AZURE_OPENAI_API_KEY` environment variable is set (Azure), this field is pre-populated.
+
+#### Step 4 — Model Setup
+
+- **Azure AI Foundry**: Add model deployment names manually (e.g., `gpt-4.1`). The default model (`gpt-5.2-chat`) is auto-validated and pre-added when reachable.
+- **Other providers**: Well-known model IDs are pre-populated (e.g., `claude-opus-4-5` for Anthropic). You can deselect any or add custom model IDs.
 
 On subsequent launches, the wizard is skipped — you go straight to the chat interface. You can add, remove, or switch endpoints at any time from the Settings dialog (gear icon in the header). If all endpoints or models are removed, the wizard reappears automatically.
 

@@ -31,8 +31,7 @@ vi.mock('@/services/ai', () => ({
 }));
 
 vi.mock('@/services/ai/aiClientFactory', () => ({
-  getAIClient: vi.fn(),
-  getAzureProvider: vi.fn(() => ({})),
+  getProviderModel: vi.fn(() => ({})),
   invalidateClient: vi.fn(),
 }));
 
@@ -55,16 +54,19 @@ const { App } = await import('@/taskpane/App');
 
 // ─── Helpers ───
 
-/** Walk through the wizard: endpoint → auth → connect */
+/** Walk through the wizard: provider → endpoint → auth → connect */
 async function completeWizardSteps() {
-  // Step 1: Endpoint
+  // Step 1: Provider selection (Azure is pre-selected)
+  await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+  // Step 2: Endpoint URL
   await userEvent.type(
     screen.getByPlaceholderText('https://your-resource.openai.azure.com'),
     'https://my-resource.openai.azure.com'
   );
   await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
-  // Step 2: Auth
+  // Step 3: Auth
   await userEvent.type(screen.getByPlaceholderText('Enter your API key'), 'test-key-123');
   await userEvent.click(screen.getByRole('button', { name: 'Connect' }));
 }
@@ -95,7 +97,7 @@ describe('Wizard → Chat integration', () => {
 
     // Wait for wizard to appear
     await waitFor(() => {
-      expect(screen.getByText('Connect to Azure AI Foundry')).toBeInTheDocument();
+      expect(screen.getByText('Choose Your AI Provider')).toBeInTheDocument();
     });
 
     // Walk through wizard
@@ -142,14 +144,14 @@ describe('Wizard → Chat integration', () => {
 
     // Wait for wizard
     await waitFor(() => {
-      expect(screen.getByText('Connect to Azure AI Foundry')).toBeInTheDocument();
+      expect(screen.getByText('Choose Your AI Provider')).toBeInTheDocument();
     });
 
     await completeWizardSteps();
 
     // Manual step — default model should be pre-added
     await waitFor(() => {
-      expect(screen.getByText('Add Your Models')).toBeInTheDocument();
+      expect(screen.getByText('Select Models')).toBeInTheDocument();
     });
     expect(screen.getByText('gpt-5.2-chat')).toBeInTheDocument();
 
@@ -187,14 +189,14 @@ describe('Wizard → Chat integration', () => {
     renderWithProviders(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText('Connect to Azure AI Foundry')).toBeInTheDocument();
+      expect(screen.getByText('Choose Your AI Provider')).toBeInTheDocument();
     });
 
     await completeWizardSteps();
 
     // Manual step — no pre-added model (default failed)
     await waitFor(() => {
-      expect(screen.getByText('Add Your Models')).toBeInTheDocument();
+      expect(screen.getByText('Select Models')).toBeInTheDocument();
     });
 
     // Type and add a custom model

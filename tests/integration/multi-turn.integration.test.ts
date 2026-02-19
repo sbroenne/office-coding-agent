@@ -265,7 +265,7 @@ async function chat(
   const toolResults: { id: string; result: ToolCallResult }[] = [];
   let completedContent = '';
 
-  const finalContent = await sendChatMessage(provider, {
+  const finalContent = await sendChatMessage(provider.chat(TEST_CONFIG.model), {
     modelId: TEST_CONFIG.model,
     messages: [userMsg(prompt)],
     tools,
@@ -495,7 +495,7 @@ describe.skipIf(!!TEST_CONFIG.skipReason)(
       const { tools } = createSimulatedTools();
       const events: string[] = [];
 
-      await sendChatMessage(provider, {
+      await sendChatMessage(provider.chat(TEST_CONFIG.model), {
         modelId: TEST_CONFIG.model,
         messages: [userMsg('How many rows of data are in my spreadsheet?')],
         tools,
@@ -527,7 +527,7 @@ describe.skipIf(!!TEST_CONFIG.skipReason)(
       const onError = vi.fn();
 
       await expect(
-        sendChatMessage(provider, {
+        sendChatMessage(provider.chat('nonexistent-model-xyz'), {
           modelId: 'nonexistent-model-xyz',
           messages: [userMsg('hello')],
           tools,
