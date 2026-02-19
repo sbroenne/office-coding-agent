@@ -1,11 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
-import { config } from 'dotenv';
 import { readFileSync } from 'fs';
 import type { Plugin } from 'vite';
-
-// Load .env for integration test credentials (FOUNDRY_ENDPOINT, etc.)
-config();
 
 /**
  * Vite plugin that imports .md files as raw strings.
@@ -27,8 +23,9 @@ function rawMarkdownPlugin(): Plugin {
 /**
  * Vitest configuration for integration tests.
  *
- * These tests hit live Azure AI Foundry endpoints and require
- * FOUNDRY_ENDPOINT env var (set in .env). Auth is via API key or Entra ID.
+ * Copilot WebSocket tests require `npm run server` to be running on localhost:3000.
+ * They skip automatically when the server is unreachable.
+ * Other integration tests are pure component/store wiring with no network calls.
  */
 export default defineConfig({
   plugins: [rawMarkdownPlugin()],
@@ -38,8 +35,8 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'node',
-    include: ['tests/integration/**/*.test.ts'],
-    testTimeout: 60000, // 60s — API calls can be slow
+    environment: 'jsdom',
+    include: ['tests/integration/**/*.test.ts', 'tests/integration/**/*.test.tsx'],
+    testTimeout: 60000, // 60s — live Copilot calls can be slow
   },
 });
