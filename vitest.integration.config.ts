@@ -38,5 +38,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['tests/integration/**/*.test.ts', 'tests/integration/**/*.test.tsx'],
     testTimeout: 60000, // 60s — live Copilot calls can be slow
+    setupFiles: ['tests/setup.ts'],
+    globals: true,
   },
 });
