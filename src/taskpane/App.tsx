@@ -9,21 +9,20 @@ import React, {
 import { Loader2 } from 'lucide-react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { useAISDKRuntime } from '@assistant-ui/react-ai-sdk';
-import type { AzureOpenAIProvider } from '@ai-sdk/azure';
+import type { LanguageModel } from 'ai';
 import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { SetupWizard } from '@/components/SetupWizard';
 import { useChatStore, useSettingsStore } from '@/stores';
-import { getAzureProvider } from '@/services/ai/aiClientFactory';
+import { getProviderModel } from '@/services/ai/aiClientFactory';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { detectOfficeHost, type OfficeHostApp } from '@/services/office/host';
 
 type AppState = 'loading' | 'setup' | 'ready';
 
 interface ReadyAssistantProps {
-  provider: AzureOpenAIProvider;
-  modelId: string;
+  model: LanguageModel;
   host: OfficeHostApp;
   settingsOpen: boolean;
   onSettingsOpenChange: (open: boolean) => void;
@@ -31,14 +30,13 @@ interface ReadyAssistantProps {
 }
 
 const ReadyAssistant: React.FC<ReadyAssistantProps> = ({
-  provider,
-  modelId,
+  model,
   host,
   settingsOpen,
   onSettingsOpenChange,
   onOpenSettings,
 }) => {
-  const chat = useOfficeChat(provider, modelId, host);
+  const chat = useOfficeChat(model, host);
   const persistedMessages = useChatStore(s => s.messages);
   const setPersistedMessages = useChatStore(s => s.setMessages);
   const clearPersistedMessages = useChatStore(s => s.clearMessages);
@@ -119,12 +117,17 @@ export const App: React.FC = () => {
   const activeModels = activeEndpointId ? (endpointModels[activeEndpointId] ?? []) : [];
   const needsSetup = endpoints.length === 0 || activeModels.length === 0;
 
-  // Create the Azure provider from the active endpoint (memoised).
-  // Depends on endpoints array + activeEndpointId; getAzureProvider caches internally.
-  const provider = useMemo(() => {
+  // Create the language model from the active endpoint and model ID (memoised).
+  // Routes to Azure or Anthropic based on endpoint.providerType.
+  const model = useMemo(() => {
     const ep = endpoints.find(e => e.id === activeEndpointId);
-    return ep ? getAzureProvider(ep) : null;
-  }, [endpoints, activeEndpointId]);
+    if (!ep || !activeModelId) return null;
+    try {
+      return getProviderModel(ep, activeModelId);
+    } catch {
+      return null;
+    }
+  }, [endpoints, activeEndpointId, activeModelId]);
 
   const host = useMemo(() => detectOfficeHost(), []);
 
@@ -164,14 +167,13 @@ export const App: React.FC = () => {
     return <SetupWizard onComplete={handleSetupComplete} />;
   }
 
-  if (!provider || !activeModelId) {
+  if (!model || !activeModelId) {
     return <SetupWizard onComplete={handleSetupComplete} />;
   }
 
   return (
     <ReadyAssistant
-      provider={provider}
-      modelId={activeModelId}
+      model={model}
       host={host}
       settingsOpen={settingsOpen}
       onSettingsOpenChange={setSettingsOpen}

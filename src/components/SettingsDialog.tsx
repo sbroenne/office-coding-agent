@@ -28,8 +28,9 @@ import { Separator } from '@/components/ui/separator';
 import * as Popover from '@radix-ui/react-popover';
 import { useSettingsStore } from '@/stores';
 import { validateModelDeployment } from '@/services/ai';
+import { PROVIDER_ORDER, getProviderConfig } from '@/services/ai/providerConfig';
 import { ModelManager } from './ModelManager';
-import type { FoundryEndpoint } from '@/types';
+import type { FoundryEndpoint, ProviderType } from '@/types';
 
 /** Extract hostname from a resource URL for display */
 function extractHost(url: string): string {
@@ -44,6 +45,7 @@ interface EndpointFormData {
   displayName: string;
   resourceUrl: string;
   apiKey: string;
+  providerType: ProviderType;
 }
 
 // ─── Connection Form (shared for add / edit) ───
@@ -58,6 +60,8 @@ interface ConnectionFormProps {
   saveLabel?: string;
   placeholders?: boolean;
   testEndpoint?: FoundryEndpoint;
+  /** When true the provider selector is locked (editing an existing endpoint) */
+  lockProvider?: boolean;
 }
 
 const ConnectionForm: React.FC<ConnectionFormProps> = ({
@@ -70,20 +74,26 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
   saveLabel = 'Save',
   placeholders = false,
   testEndpoint,
+  lockProvider = false,
 }) => {
   const [showApiKey, setShowApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+
+  const cfg = getProviderConfig(formData.providerType);
+  const isAzure = formData.providerType === 'azure';
+
   const trimmedDisplayName = formData.displayName.trim();
-  const trimmedResourceUrl = formData.resourceUrl.trim();
+  const trimmedResourceUrl = isAzure ? formData.resourceUrl.trim() : (cfg.baseUrl ?? '');
   const trimmedApiKey = formData.apiKey.trim();
   const hasRequiredFields = Boolean(trimmedDisplayName && trimmedResourceUrl && trimmedApiKey);
 
   const handleSave = useCallback(async () => {
-    const url = trimmedResourceUrl.replace(/\/+$/, '');
+    const url = isAzure ? formData.resourceUrl.trim().replace(/\/+$/, '') : (cfg.baseUrl ?? '');
     const key = trimmedApiKey;
     if (!hasRequiredFields) {
-      setError('Display name, resource URL, and API key are required.');
+      setError('Display name and API key are required.');
       return;
     }
 
@@ -97,13 +107,16 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
         resourceUrl: url,
         authMethod: 'apiKey',
         apiKey: key,
+        providerType: formData.providerType,
       };
 
-      // Try to validate with an existing model on this endpoint, falling back to the default.
-      // This avoids failing validation when the default model isn't deployed.
+      // For non-Azure, validate with the first known model for the provider.
+      // For Azure, use an existing model or the default model ID.
       const state = useSettingsStore.getState();
       const existingModels = testEndpoint ? (state.endpointModels[testEndpoint.id] ?? []) : [];
-      const testModelId = existingModels[0]?.id ?? state.defaultModelId;
+      const knownModels = cfg.defaultModels;
+      const testModelId = existingModels[0]?.id ?? knownModels[0] ?? state.defaultModelId;
+
       const ok = await validateModelDeployment(epConfig, testModelId);
 
       if (ok) {
@@ -117,18 +130,76 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
       setSaving(false);
     }
   }, [
+    cfg,
     formData.displayName,
+    formData.providerType,
+    formData.resourceUrl,
     hasRequiredFields,
+    isAzure,
     onSave,
     testEndpoint,
     trimmedApiKey,
-    trimmedResourceUrl,
   ]);
 
   return (
     <div className="flex flex-col gap-3">
       <h3 className="text-sm font-semibold">{title}</h3>
       <p className="text-xs text-muted-foreground">All fields are required.</p>
+
+      {/* ── Provider selector ── */}
+      <div className="flex flex-col gap-1.5">
+        <Label>Provider</Label>
+        {lockProvider ? (
+          <div className="rounded-md bg-secondary px-3 py-1.5 text-sm">{cfg.label}</div>
+        ) : (
+          <Popover.Root open={providerMenuOpen} onOpenChange={setProviderMenuOpen}>
+            <Popover.Trigger asChild>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full justify-between"
+                type="button"
+              >
+                <span>{cfg.label}</span>
+                <ChevronDown className="size-3.5 opacity-50" />
+              </Button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                align="start"
+                sideOffset={4}
+                className="z-50 min-w-[200px] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+              >
+                {PROVIDER_ORDER.map(pt => {
+                  const pcfg = getProviderConfig(pt);
+                  return (
+                    <button
+                      key={pt}
+                      onClick={() => {
+                        const newUrl = pt === 'azure' ? '' : (pcfg.baseUrl ?? '');
+                        const newName = pt === 'azure' ? '' : pcfg.label;
+                        onChange({
+                          ...formData,
+                          providerType: pt,
+                          resourceUrl: newUrl,
+                          displayName: formData.displayName || newName,
+                        });
+                        setProviderMenuOpen(false);
+                        setError(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      {pt === formData.providerType && <Check className="size-3.5" />}
+                      {pt !== formData.providerType && <span className="w-3.5" />}
+                      {pcfg.label}
+                    </button>
+                  );
+                })}
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+        )}
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="conn-name">Display Name</Label>
@@ -139,30 +210,44 @@ const ConnectionForm: React.FC<ConnectionFormProps> = ({
             onChange({ ...formData, displayName: e.target.value });
             setError(null);
           }}
-          placeholder={placeholders ? 'My AI Foundry Resource' : undefined}
+          placeholder={placeholders ? (isAzure ? 'My AI Foundry Resource' : cfg.label) : undefined}
         />
         {!trimmedDisplayName && <p className="text-xs text-muted-foreground">Required</p>}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="conn-url">Resource URL</Label>
-        <Input
-          id="conn-url"
-          value={formData.resourceUrl}
-          onChange={e => {
-            onChange({ ...formData, resourceUrl: e.target.value });
-            setError(null);
-          }}
-          placeholder={placeholders ? 'https://your-resource.openai.azure.com' : undefined}
-        />
-        {!trimmedResourceUrl ? (
-          <p className="text-xs text-muted-foreground">Required</p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            e.g., https://my-resource.openai.azure.com
-          </p>
-        )}
-      </div>
+      {/* ── Resource URL — only for Azure ── */}
+      {isAzure && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="conn-url">Resource URL</Label>
+          <Input
+            id="conn-url"
+            value={formData.resourceUrl}
+            onChange={e => {
+              onChange({ ...formData, resourceUrl: e.target.value });
+              setError(null);
+            }}
+            placeholder={placeholders ? 'https://your-resource.openai.azure.com' : undefined}
+          />
+          {!formData.resourceUrl.trim() ? (
+            <p className="text-xs text-muted-foreground">Required</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              e.g., https://my-resource.openai.azure.com
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Fixed URL badge for non-Azure ── */}
+      {!isAzure && cfg.baseUrl && (
+        <div className="flex flex-col gap-1.5">
+          <Label>API Endpoint</Label>
+          <div className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5">
+            <Globe className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate text-sm text-muted-foreground">{cfg.baseUrl}</span>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="conn-key">API Key</Label>
@@ -245,6 +330,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     displayName: '',
     resourceUrl: '',
     apiKey: '',
+    providerType: 'azure',
   });
 
   // Delete confirmation
@@ -270,24 +356,30 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const handleStartAdd = useCallback(() => {
     setEditingNew(true);
     setEditingConnection(false);
-    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '', providerType: 'azure' });
   }, []);
 
   const handleSaveNew = useCallback(() => {
-    if (!formData.displayName || !formData.resourceUrl) return;
+    if (!formData.displayName) return;
+    const cfg = getProviderConfig(formData.providerType);
+    const url =
+      formData.providerType === 'azure'
+        ? formData.resourceUrl.replace(/\/+$/, '')
+        : (cfg.baseUrl ?? '');
     addEndpoint({
       displayName: formData.displayName,
-      resourceUrl: formData.resourceUrl.replace(/\/+$/, ''),
+      resourceUrl: url,
       authMethod: 'apiKey',
       apiKey: formData.apiKey,
+      providerType: formData.providerType,
     });
     setEditingNew(false);
-    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '', providerType: 'azure' });
   }, [formData, addEndpoint]);
 
   const handleCancelAdd = useCallback(() => {
     setEditingNew(false);
-    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '', providerType: 'azure' });
   }, []);
 
   const handleStartEditConnection = useCallback(() => {
@@ -298,23 +390,30 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       displayName: activeEndpoint.displayName,
       resourceUrl: activeEndpoint.resourceUrl,
       apiKey: activeEndpoint.apiKey ?? '',
+      providerType: activeEndpoint.providerType ?? 'azure',
     });
   }, [activeEndpoint]);
 
   const handleSaveConnection = useCallback(() => {
-    if (!activeEndpointId || !formData.displayName || !formData.resourceUrl) return;
+    if (!activeEndpointId || !formData.displayName) return;
+    const cfg = getProviderConfig(formData.providerType);
+    const url =
+      formData.providerType === 'azure'
+        ? formData.resourceUrl.replace(/\/+$/, '')
+        : (cfg.baseUrl ?? '');
     updateEndpoint(activeEndpointId, {
       displayName: formData.displayName,
-      resourceUrl: formData.resourceUrl.replace(/\/+$/, ''),
+      resourceUrl: url,
       apiKey: formData.apiKey,
+      providerType: formData.providerType,
     });
     setEditingConnection(false);
-    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '', providerType: 'azure' });
   }, [activeEndpointId, formData, updateEndpoint]);
 
   const handleCancelEditConnection = useCallback(() => {
     setEditingConnection(false);
-    setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+    setFormData({ displayName: '', resourceUrl: '', apiKey: '', providerType: 'azure' });
   }, []);
 
   const handleDeleteRequest = useCallback(() => {
@@ -325,7 +424,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     if (activeEndpointId) {
       removeEndpoint(activeEndpointId);
       setEditingConnection(false);
-      setFormData({ displayName: '', resourceUrl: '', apiKey: '' });
+      setFormData({ displayName: '', resourceUrl: '', apiKey: '', providerType: 'azure' });
     }
     setConfirmingDelete(false);
   }, [activeEndpointId, removeEndpoint]);
@@ -432,7 +531,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   onClick={handleStartEditConnection}
                   title="Click to edit connection"
                 >
-                  <span className="text-xs text-muted-foreground">Resource URL</span>
+                  <span className="text-xs text-muted-foreground">
+                    {getProviderConfig(activeEndpoint.providerType ?? 'azure').label}
+                  </span>
                   <div className="flex items-center gap-2">
                     <Globe className="size-4 shrink-0 text-muted-foreground" />
                     <span className="truncate text-sm" title={activeEndpoint.resourceUrl}>
@@ -452,8 +553,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   onChange={setFormData}
                   onSave={handleSaveConnection}
                   onCancel={handleCancelEditConnection}
-                  saveDisabled={!formData.displayName || !formData.resourceUrl}
+                  saveDisabled={!formData.displayName}
                   testEndpoint={activeEndpoint}
+                  lockProvider
                 />
 
                 {/* Delete option */}
@@ -503,7 +605,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                 onChange={setFormData}
                 onSave={handleSaveNew}
                 onCancel={handleCancelAdd}
-                saveDisabled={!formData.displayName || !formData.resourceUrl}
+                saveDisabled={!formData.displayName}
                 placeholders
               />
             )}

@@ -6,7 +6,10 @@ import type { McpServerConfig } from './mcp';
 /** Authentication method for an endpoint */
 export type AuthMethod = 'apiKey';
 
-/** Represents a configured Azure AI Foundry endpoint */
+/** Provider backend for an endpoint */
+export type ProviderType = 'azure' | 'anthropic' | 'openai' | 'mistral' | 'deepseek' | 'xai';
+
+/** Represents a configured AI provider endpoint */
 export interface FoundryEndpoint {
   /** Unique identifier */
   id: string;
@@ -18,6 +21,8 @@ export interface FoundryEndpoint {
   authMethod: AuthMethod;
   /** API key — required when authMethod is 'apiKey' */
   apiKey?: string;
+  /** Provider backend. Defaults to 'azure' when not set (backward-compatible). */
+  providerType?: ProviderType;
 }
 
 /** Information about a deployed model discovered from the endpoint */

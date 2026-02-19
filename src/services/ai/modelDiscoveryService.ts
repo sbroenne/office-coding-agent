@@ -1,4 +1,9 @@
 import { createAzure } from '@ai-sdk/azure';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createMistral } from '@ai-sdk/mistral';
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import { createXai } from '@ai-sdk/xai';
 import { generateText } from 'ai';
 import type { FoundryEndpoint, ModelInfo, ModelProvider } from '@/types';
 import { normalizeEndpoint } from './aiClientFactory';
@@ -45,11 +50,10 @@ export async function discoverModels(
 
 /**
  * Validate that a model deployment name actually works by making
- * a minimal chat completion call via the AzureOpenAI SDK.
+ * a minimal chat completion call via the AI SDK.
  *
- * Uses the SDK instead of raw `fetch` so it works in the Excel
- * WebView (which enforces CORS). Raw fetch would throw a CORS
- * error that was silently swallowed, making validation always fail.
+ * For Azure endpoints, uses the AzureOpenAI SDK.
+ * For Anthropic endpoints, uses the Anthropic SDK.
  *
  * Returns `true` if the model responds, `false` otherwise.
  */
@@ -57,19 +61,36 @@ export async function validateModelDeployment(
   endpoint: FoundryEndpoint,
   modelId: string
 ): Promise<boolean> {
-  const baseUrl = normalizeEndpoint(endpoint.resourceUrl);
-
   try {
-    const provider = createAzure({
-      baseURL: baseUrl + '/openai',
-      apiKey: endpoint.apiKey ?? '',
-    });
+    const type = endpoint.providerType ?? 'azure';
+    const apiKey = endpoint.apiKey ?? '';
 
-    await generateText({
-      model: provider.chat(modelId),
-      prompt: 'hi',
-      maxOutputTokens: 5,
-    });
+    let model;
+    switch (type) {
+      case 'anthropic':
+        model = createAnthropic({ apiKey })(modelId);
+        break;
+      case 'openai':
+        model = createOpenAI({ apiKey })(modelId);
+        break;
+      case 'mistral':
+        model = createMistral({ apiKey })(modelId);
+        break;
+      case 'deepseek':
+        model = createDeepSeek({ apiKey })(modelId);
+        break;
+      case 'xai':
+        model = createXai({ apiKey })(modelId);
+        break;
+      case 'azure':
+      default: {
+        const baseUrl = normalizeEndpoint(endpoint.resourceUrl);
+        model = createAzure({ baseURL: baseUrl + '/openai', apiKey }).chat(modelId);
+        break;
+      }
+    }
+
+    await generateText({ model, prompt: 'hi', maxOutputTokens: 5 });
     return true;
   } catch (err) {
     console.warn(`[validateModelDeployment] ${modelId} failed:`, err);

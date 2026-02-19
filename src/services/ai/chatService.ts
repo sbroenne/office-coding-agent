@@ -1,12 +1,12 @@
 import {
   streamText,
   stepCountIs,
+  type LanguageModel,
   type ModelMessage,
   type ToolCallPart,
   type ToolResultPart,
   type ToolSet,
 } from 'ai';
-import type { AzureOpenAIProvider } from '@ai-sdk/azure';
 import type { ChatMessage, ToolCall, ToolCallResult } from '@/types';
 
 import { getToolsForHost } from '@/tools';
@@ -47,11 +47,10 @@ export interface ChatRequestOptions {
  * Uses AI SDK's streamText with automatic multi-step tool execution.
  */
 export async function sendChatMessage(
-  provider: AzureOpenAIProvider,
+  model: LanguageModel,
   options: ChatRequestOptions
 ): Promise<string> {
-  const { modelId, messages, onContent, onToolCalls, onToolResult, onComplete, onError, signal } =
-    options;
+  const { messages, onContent, onToolCalls, onToolResult, onComplete, onError, signal } = options;
 
   try {
     const coreMessages = messagesToCoreMessages(messages);
@@ -59,7 +58,7 @@ export async function sendChatMessage(
     const host = options.host ?? detectOfficeHost();
 
     const result = streamText({
-      model: provider.chat(modelId),
+      model,
       system: buildSystemPrompt(host) + skillContext,
       messages: coreMessages,
       tools: options.tools ?? getToolsForHost(host),
