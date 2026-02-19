@@ -15,6 +15,8 @@ import { tool, type ToolSet, type ToolExecutionOptions } from 'ai';
 import { z } from 'zod';
 import type { OfficeHostApp } from '@/services/office/host';
 
+export { getGeneralTools, webFetchTool, createRunSubagentTool } from './general';
+
 export const MAX_TOOLS_PER_REQUEST = 128;
 
 /** All tool configs combined for manifest generation */
