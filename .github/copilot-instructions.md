@@ -7,8 +7,10 @@
 ## Key Technologies
 
 - **React 18** + **assistant-ui** + **Radix UI** + **Tailwind CSS v4** — task pane UI (Thread, ToolFallback, Popovers)
-- **Vercel AI SDK** — `ai` (ToolLoopAgent, DirectChatTransport), `@ai-sdk/react` (useChat), `@ai-sdk/azure`
-- **Zustand 5** — state management with persistence via `officeStorage` (OfficeRuntime.storage with localStorage fallback)
+- **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
+- **WebSocket + JSON-RPC** — browser-to-proxy transport (`src/lib/websocket-client.ts`, `src/lib/websocket-transport.ts`)
+- **Express + HTTPS** — local proxy server (`src/server.js`) that bridges WebSocket to the Copilot CLI
+- **Zustand 5** — state management with persistence via `officeStorage` (OfficeRuntime.storage)
 - **Webpack 5** — bundling (ts-loader, full type-checking during builds)
 - **TypeScript 5** — type safety
 - **Vitest** — unit + integration testing (jsdom env)
@@ -17,17 +19,19 @@
 
 ## Architecture
 
-The add-in runs a **fully client-side AI agent** — no backend API route. The `useOfficeChat` hook creates a `ToolLoopAgent` with `DirectChatTransport`, passing it to Vercel AI SDK's `useChat`.
+The add-in routes messages through a **local proxy server** — the browser cannot call the Copilot API directly.
 
 ```
-useOfficeChat + detectOfficeHost
-             ↓
-buildSystemPrompt(host) + getToolsForHost(host)
-             ↓
-ToolLoopAgent → DirectChatTransport → useChat
-             ↓
-Azure AI Foundry (streaming LLM)
+Browser task pane (React + assistant-ui)
+         ↓ WebSocket (wss://localhost:3000/api/copilot)
+Node.js proxy server  (src/server.js + src/copilotProxy.js)
+         ↓ stdio LSP
+@github/copilot CLI  (authenticates via GitHub account)
+         ↓ HTTPS
+GitHub Copilot API
 ```
+
+The `useOfficeChat` hook creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, and maps incoming `SessionEvent` objects to `ThreadMessage[]` for assistant-ui via `useExternalStoreRuntime`.
 
 ### Agent System
 
@@ -76,26 +80,20 @@ Bundled skill files in `src/skills/` provide additional context injected into th
 
 **Critical concept:** everything that calls real Office host runtime APIs belongs below the runtime boundary.
 
-Current state:
-
-- Excel commands call `Excel.run()` and require Excel E2E tests.
-- Host routing, prompt composition, agent parsing/filtering, and UI logic are testable in Vitest/Playwright.
-
 ```
 ┌──────────────────────────────────────────────────────┐
 │  Testable with Vitest/Playwright (no Excel host)     │
 │  ─────────────────────────────                       │
-│  • Pure functions (normalizeEndpoint,                │
-│    inferProvider, formatModelName,                    │
-│    isEmbeddingOrUtilityModel, parseFrontmatter,      │
-│    buildSkillContext, toolResultSummary, generateId)  │
+│  • Pure functions (parseFrontmatter,                 │
+│    buildSkillContext, toolResultSummary, generateId,  │
+│    humanizeToolName, zipImportService)               │
 │  • Host routing (detectOfficeHost,                   │
 │    getToolsForHost, buildSystemPrompt)               │
 │  • Agent targeting and default resolution            │
 │  • Zustand store logic (settingsStore)               │
-│  • Zod tool schemas (inputSchema validation)         │
+│  • JSON Schema tool configs (toCopilotTools)         │
 │  • React component wiring (integration)              │
-│  • AI client factory (with live API creds)           │
+│  • WebSocket client + session (mocked in unit tests) │
 │  • Agent/skill service parsing                       │
 ├──────────────────────────────────────────────────────┤
 │  Excel.run() boundary (current host implementation)  │
@@ -116,9 +114,7 @@ The task pane is split into three areas:
 
 - **ChatHeader** — "AI Chat" title + SkillPicker (icon-only with badge) + New Conversation button + Settings gear (SettingsDialog)
 - **ChatPanel** — message list (Thread), Copilot-style progress indicators, choice cards, error bar, Composer, and an **input toolbar** below the input box with AgentPicker + ModelPicker (GitHub Copilot-style)
-- **App** — owns settings dialog state, routes between SetupWizard and chat UI, detects system theme and Office host
-
-Settings dialog state is **lifted to App** so both ChatHeader (gear button) and ChatPanel (ModelPicker's "Configure models in Settings") can open it.
+- **App** — owns settings dialog state, detects system theme and Office host; no setup wizard (Copilot CLI handles auth)
 
 ## Testing Strategy
 
@@ -126,58 +122,63 @@ Settings dialog state is **lifted to App** so both ChatHeader (gear button) and 
 
 | Tier            | Runner     | Directory            | Count | What it tests                                               |
 | --------------- | ---------- | -------------------- | ----- | ----------------------------------------------------------- |
-| **Unit**        | Vitest     | `tests/unit/`        |       | Pure functions, store logic, Zod schemas, host routing      |
-| **Integration** | Vitest     | `tests/integration/` |       | Component wiring, live API round-trips, host-agent behavior |
-| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows (wizard/chat/settings)              |
-| **E2E**         | Mocha      | `tests-e2e/`         |       | Excel commands inside real Excel Desktop                    |
+| **Unit**        | Vitest     | `tests/unit/`        | 18    | Pure functions, store logic, JSON Schema tool configs       |
+| **Integration** | Vitest     | `tests/integration/` | 12    | Component wiring; live Copilot WebSocket (auto-skipped)     |
+| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                     |
+| **E2E**         | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                    |
 
 ### Unit Test Principles
 
-- **DO NOT mock Zustand stores** — test against the real store with localStorage (works in jsdom)
+- **DO NOT mock Zustand stores** — test against the real store (jsdom + OfficeRuntime mock from `tests/setup.ts`)
 - **DO NOT mock pure functions** — call them directly with test inputs
 - **Pure functions get unit tests, not integration tests** — they have no external dependencies
 - **Use table-driven tests** (`it.each`) for functions with many input→output mappings
 - **Reset store state** in `beforeEach` via `useSettingsStore.getState().reset()`
 
-### Current Unit Test Files (12)
+### Current Unit Test Files (18)
 
-| File                                        | What it covers                                                                 |
-| ------------------------------------------- | ------------------------------------------------------------------------------ |
-| `tests/unit/agentService.test.ts`           | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions           |
-| `tests/unit/buildSkillContext.test.ts`      | `buildSkillContext` and related skill functions with bundled `.md` files       |
-| `tests/unit/chatPanel.test.tsx`             | ChatPanel component logic (mocks assistant-ui components for jsdom)            |
-| `tests/unit/id.test.ts`                     | `generateId` unique ID generation utility                                      |
-| `tests/unit/messagesToCoreMessages.test.ts` | `messagesToCoreMessages` conversion from ChatMessage[] to core messages        |
-| `tests/unit/modelDiscoveryHelpers.test.ts`  | `inferProvider`, `isEmbeddingOrUtilityModel`, `formatModelName`                |
-| `tests/unit/normalizeEndpoint.test.ts`      | Endpoint URL normalization (trailing slashes, /openai suffixes, Foundry paths) |
-| `tests/unit/officeStorage.test.ts`          | `officeStorage` localStorage fallback (OfficeRuntime undefined in jsdom)       |
-| `tests/unit/parseFrontmatter.test.ts`       | YAML frontmatter parsing (skill files)                                         |
-| `tests/unit/settingsStore.test.ts`          | Endpoint CRUD, model CRUD, cascade delete, auto-selection, dedup               |
-| `tests/unit/toolResultSummary.test.ts`      | `toolResultSummary` — short human-readable summary from tool-result JSON       |
-| `tests/unit/toolSchemas.test.ts`            | Zod inputSchema validation for all Excel tool definitions                      |
+| File                                  | What it covers                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------- |
+| `agentService.test.ts`                | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions            |
+| `buildSkillContext.test.ts`           | `buildSkillContext` and related skill functions with bundled `.md` files        |
+| `chatErrorBoundary.test.tsx`          | Error boundary fallback rendering and recovery flow                             |
+| `chatPanel.test.tsx`                  | ChatPanel component logic (mocks assistant-ui components for jsdom)             |
+| `chatStore.test.ts`                   | Chat message store: append, clear, tool invocations                             |
+| `generalTools.test.ts`               | General-purpose tool definitions (web_fetch, etc.)                              |
+| `hostToolsLimit.test.ts`             | Host tool count limits per host                                                 |
+| `humanizeToolName.test.ts`           | Tool-name → human-readable progress label formatting                           |
+| `id.test.ts`                          | `generateId` unique ID generation utility                                       |
+| `manifest.test.ts`                    | Office manifest / runtime host assumptions                                      |
+| `mcpService.test.ts`                  | MCP server config parsing; HTTP/SSE transport filtering (no stdio)              |
+| `officeStorage.test.ts`               | `officeStorage` with `OfficeRuntime` mock (via tests/setup.ts)                  |
+| `parseFrontmatter.test.ts`            | YAML frontmatter parsing (skill files)                                          |
+| `settingsStore.test.ts`               | Zustand store: activeModel, agent/skill CRUD, reset                             |
+| `toolSchemas.test.ts`                 | JSON Schema validation for all tool definitions (toCopilotTools)                |
+| `useOfficeChat.test.tsx`              | useOfficeChat hook: mocked WebSocket session → ThreadMessage[] mapping          |
+| `useToolInvocations-patch.test.tsx`   | assistant-ui patch for tool invocation argument streaming integrity             |
+| `zipImportService.test.ts`            | ZIP import service for custom agents/skills                                     |
 
 ### Current Integration Test Files (12)
 
-| File                                                     | Category           | Requires API? |
-| -------------------------------------------------------- | ------------------ | ------------- |
-| `tests/integration/agent-picker.test.tsx`                | Component wiring   | No            |
-| `tests/integration/app-state.test.tsx`                   | Component wiring   | No            |
-| `tests/integration/chat-header-settings-flow.test.tsx`   | Component wiring   | No            |
-| `tests/integration/chat-panel.test.tsx`                  | Component wiring   | No            |
-| `tests/integration/chat-pipeline.integration.test.ts`    | Live API           | Yes           |
-| `tests/integration/foundry.integration.test.ts`          | Live API           | Yes           |
-| `tests/integration/llm-tool-calling.integration.test.ts` | LLM tool selection | Yes           |
-| `tests/integration/multi-turn.integration.test.ts`       | Live API           | Yes           |
-| `tests/integration/settings-dialog.test.tsx`             | Component wiring   | No            |
-| `tests/integration/skill-picker.test.tsx`                | Component wiring   | No            |
-| `tests/integration/stale-state.test.tsx`                 | Store hydration    | No            |
-| `tests/integration/wizard-to-chat.test.tsx`              | Component wiring   | No            |
+| File                                          | Category                   | Requires server? |
+| --------------------------------------------- | -------------------------- | ---------------- |
+| `agent-picker.test.tsx`                       | Component wiring           | No               |
+| `app-error-boundary.test.tsx`                 | Component wiring           | No               |
+| `app-state.test.tsx`                          | Component wiring           | No               |
+| `chat-header-settings-flow.test.tsx`          | Component wiring           | No               |
+| `chat-panel.test.tsx`                         | Component wiring           | No               |
+| `copilot-websocket.integration.test.ts`       | Live Copilot WebSocket E2E | Yes (auto-skip)  |
+| `mcp-manager-dialog.test.tsx`                 | Component wiring           | No               |
+| `model-manager.test.tsx`                      | Component wiring           | No               |
+| `model-picker-interactions.test.tsx`          | Component wiring           | No               |
+| `settings-dialog.test.tsx`                    | Component wiring           | No               |
+| `skill-picker.test.tsx`                       | Component wiring           | No               |
+| `stale-state.test.tsx`                        | Store hydration            | No               |
 
 ### Integration Test Categories
 
 - **Component wiring** — renders real components together (no child mocks)
-- **Live API** — hits a real Azure AI Foundry endpoint (requires `.env` credentials)
-- **LLM tool calling** — full ToolLoopAgent pipeline with live LLM
+- **Live Copilot WebSocket** — hits real GitHub Copilot API via proxy (requires `npm run server`; auto-skips when unavailable)
 
 ### When to Write What
 
@@ -198,69 +199,73 @@ Settings dialog state is **lifted to App** so both ChatHeader (gear button) and 
 ### State Management
 
 - Single Zustand store: `useSettingsStore` in `src/stores/settingsStore.ts`
-- Persisted via `officeStorage` adapter (auto-detects OfficeRuntime vs localStorage)
-- Chat state lives in `useChat` (ephemeral, not persisted)
-- `activeAgentId` and `activeSkillNames` (default: `null` = all ON) are persisted
-- Persist storage key is `office-coding-agent-settings` (clean break from old Excel key)
+- Persisted via `officeStorage` adapter (uses `OfficeRuntime.storage`; throws when unavailable — tests must mock it via `tests/setup.ts`)
+- Chat state is ephemeral (lives in `useOfficeChat` hook, not persisted)
+- `activeAgentId`, `activeSkillNames` (default: `null` = all ON), and `activeModel` are persisted
+- Persist storage key is `office-coding-agent-settings`
 
 ### Tool Definitions
 
 - Excel tools are defined across 9 config modules (range, table, chart, sheet, workbook, comment, conditionalFormat, dataValidation, pivotTable)
 - Each config module in `src/tools/configs/` defines tool schemas and handlers
-- Tool factory in `src/tools/codegen/factory.ts` generates tools from configs
-- Host routing is in `src/tools/index.ts` via `getToolsForHost(host)`
-- `src/tools/tools-manifest.json` — auto-generated manifest with all 83 tools
+- Tool factory in `src/tools/codegen/factory.ts` generates JSON Schema `Tool[]` for the Copilot SDK
+- Host routing is in `src/tools/index.ts` via `getToolsForHost(host)` → `Tool[]`
 
 ### UX Patterns
 
 - **Copilot-style progress indicators** — cycling dot animation + phase labels (auto-derived via `humanizeToolName()`)
-- **Choice cards** — `PromptStarterV2` renders `\`\`\`choices` blocks as clickable cards
+- **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners
 - **Input toolbar** — AgentPicker + ModelPicker below Composer (GitHub Copilot-style)
 
-### Error Handling (OfficeRuntime)
+### OfficeRuntime in Tests
 
-- **NEVER use `declare const OfficeRuntime`** — it satisfies TypeScript but throws `ReferenceError` at runtime in vitest
-- Use `typeof OfficeRuntime !== 'undefined'` guard instead (see `officeStorage.ts`)
+- `officeStorage.ts` throws if `OfficeRuntime.storage` is unavailable (no localStorage fallback)
+- Unit and integration tests rely on the `OfficeRuntime` mock in `tests/setup.ts`
+- **Both** `vitest.config.ts` and `vitest.integration.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`
 
 ## Build & Run
 
 ```bash
 npm install
-npm run dev            # Dev server with HMR
-npm run build:dev      # Development build
-npm run build          # Production build
-npm run start:desktop  # Sideload into Excel
-npm test               # All Vitest tests
-npm run test:ui        # Playwright UI tests
-npm run test:e2e       # E2E in Excel Desktop (~187 tests)
-npm run validate       # Typecheck + lint + test in one command
+npm run server            # Start Copilot proxy + webpack dev server (port 3000)
+npm run dev               # Webpack-dev-server only (UI, no Copilot proxy)
+npm run build:dev         # Development build
+npm run build             # Production build
+npm run start:desktop     # Sideload into Excel
+npm test                  # All Vitest unit tests (265)
+npm run test:integration  # Integration tests (47)
+npm run test:ui           # Playwright UI tests
+npm run test:e2e          # E2E in Excel Desktop (~187 tests)
+npm run validate          # Validate manifests/manifest.dev.xml
 ```
 
 ## Key Files
 
-- `src/taskpane/App.tsx` — root component, settings state, theme detection, routing, error boundary
-- `src/hooks/useOfficeChat.ts` — main hook wiring host-routed AI agent
+- `src/taskpane/App.tsx` — root component, settings dialog state, theme detection, Office host detection
+- `src/hooks/useOfficeChat.ts` — main hook: WebSocket session lifecycle → `useExternalStoreRuntime`
+- `src/lib/websocket-client.ts` — `WebSocketCopilotClient`, `BrowserCopilotSession`, `createWebSocketClient`
+- `src/lib/websocket-transport.ts` — JSON-RPC WebSocket transport (browser-compatible)
+- `src/server.js` — Express HTTPS server (port 3000): webpack-dev-middleware + Copilot WebSocket proxy
+- `src/copilotProxy.js` — spawns `@github/copilot` CLI and bridges its stdio to WebSocket
 - `src/components/ChatHeader.tsx` — header: title, SkillPicker, new convo, Settings
 - `src/components/ChatPanel.tsx` — messages, progress, input, AgentPicker, ModelPicker
-- `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI (keeps header functional on render errors)
+- `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI
 - `src/components/AgentPicker.tsx` — single-select agent dropdown (Radix Popover)
-- `src/components/ModelPicker.tsx` — model selection dropdown grouped by provider
+- `src/components/ModelPicker.tsx` — model selection dropdown (hardcoded `COPILOT_MODELS`)
 - `src/components/SkillPicker.tsx` — icon-only skill toggle with badge count
-- `src/components/SettingsDialog.tsx` — endpoint management dialog (controlled + uncontrolled)
-- `src/components/SetupWizard.tsx` — first-time onboarding wizard
-- `src/services/ai/aiClientFactory.ts` — creates Azure AI provider, normalizes endpoints
-- `src/services/ai/chatService.ts` — alternative chat pipeline using streamText (used by multi-turn integration tests)
-- `src/services/ai/modelDiscoveryService.ts` — discovers models, infers providers
+- `src/components/SettingsDialog.tsx` — settings/preferences dialog
 - `src/services/ai/BASE_PROMPT.md` — universal base system prompt
 - `src/services/ai/prompts/` — host-level app prompts (`EXCEL_APP_PROMPT.md`, `POWERPOINT_APP_PROMPT.md`)
 - `src/services/office/host.ts` — Office host detection (`excel`, `powerpoint`, `unknown`)
-- `src/services/agents/agentService.ts` — parses/filters host-targeted agent frontmatter and resolves host defaults
+- `src/services/agents/agentService.ts` — parses/filters host-targeted agent frontmatter
 - `src/agents/excel/AGENT.md` — default Excel agent definition (host-targeted frontmatter)
 - `src/services/skills/skillService.ts` — parses bundled skill files
-- `src/stores/settingsStore.ts` — Zustand store with all CRUD operations
-- `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter with localStorage fallback
-- `src/tools/` — 9 tool config modules + codegen factory (83 tools total)
+- `src/stores/settingsStore.ts` — Zustand store (activeModel, agent/skill CRUD, reset)
+- `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
+- `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
+- `src/types/settings.ts` — `CopilotModel`, `COPILOT_MODELS`, `UserSettings`
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
-- `vitest.config.ts` — test config (jsdom, `@/` alias, setup file)
-- `tests/setup.ts` — polyfills (ResizeObserver, IntersectionObserver, matchMedia)
+- `vitest.config.ts` — unit test config (jsdom, `@/` alias, setup file, globals)
+- `vitest.integration.config.ts` — integration test config (jsdom, setup file, globals, 60s timeout)
+- `tests/setup.ts` — `OfficeRuntime.storage` mock + polyfills (ResizeObserver, matchMedia, etc.)

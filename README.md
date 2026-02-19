@@ -217,28 +217,19 @@ This command:
 
 ## Chat Architecture
 
-The add-in runs a fully **client-side AI agent** — no backend API route is needed. The Vercel AI SDK's `ToolLoopAgent` and `DirectChatTransport` run in-process inside the Excel task pane:
+The add-in routes messages through a **local proxy server** — the browser task pane cannot call the GitHub Copilot API directly due to browser security restrictions.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  useOfficeChat(provider, modelId, host)                      │
-│                                                              │
-│  ┌─────────────────┐    ┌──────────────────────────────────┐ │
-│  │  ToolLoopAgent   │    │  DirectChatTransport             │ │
-│  │  - model         │───►│  - runs agent in-process         │ │
-│  │  - instructions  │    │  - no server / API route needed  │ │
-│  │  - tools(host)   │    └──────────────┬───────────────────┘ │
-│  │  - stopWhen(10)  │                   │                     │
-│  └─────────────────┘                   ▼                     │
-│                              useChat (transport)             │
-│                              ─────────────────               │
-│                              Returns UseChatHelpers          │
-│                              (messages, input, handleSubmit) │
-└──────────────────────────────────────────────────────────────┘
-         │                              │
-         ▼                              ▼
-  Azure AI Foundry              ChatPanel / ChatHeader
-  (streaming LLM)               (React UI via props)
+useOfficeChat(host)
+      ↓ createWebSocketClient(wss://localhost:3000/api/copilot)
+BrowserCopilotSession.query({ prompt, tools })
+      ↓ SessionEvent stream
+assistant.message_delta / tool.* / session.idle
+      ↓
+ThreadMessage[] → useExternalStoreRuntime
+      ↓ wss://localhost:3000/api/copilot
+src/server.js (Express HTTPS, port 3000)
+src/copilotProxy.js → @github/copilot CLI → GitHub Copilot API
 ```
 
 ### Agent System
@@ -332,12 +323,11 @@ In chat pickers:
 
 ### Key Hooks and Components
 
-- **`useOfficeChat`** — custom hook that creates the host-routed agent, transport, and returns `useChat` helpers
-- **`ToolLoopAgent`** — auto-executes Excel tool calls (up to 10 steps) via Zod-typed `execute` handlers
-- **`DirectChatTransport`** — routes `useChat` through the agent without an HTTP backend
-- **`useChat`** — Vercel AI SDK React hook that manages messages, streaming, and input state
+- **`useOfficeChat`** — creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, maps `SessionEvent` stream to `ThreadMessage[]` for `useExternalStoreRuntime`
+- **`BrowserCopilotSession.query()`** — async generator yielding `SessionEvent` objects (assistant.message_delta, tool.execution_start, session.idle, etc.)
+- **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host
 
-State is minimal: `useSettingsStore` (Zustand) persists endpoint/model/agent configuration; chat state lives entirely in `useChat`.
+State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill configuration; chat state is ephemeral.
 
 ## UI Layout
 
@@ -345,25 +335,26 @@ The task pane is organized into three areas:
 
 - **ChatHeader** — "AI Chat" title + SkillPicker (icon-only with badge) + New Conversation button + Settings gear
 - **ChatPanel** — CopilotChat messages, Copilot-style progress indicators (cycling dots + phase labels), choice cards, error bar, ChatInput, and an **input toolbar** below the text box with AgentPicker + ModelPicker (GitHub Copilot-style)
-- **App** — root component that owns settings dialog state, routes between SetupWizard and chat UI, detects system theme
+- **App** — root component that owns settings dialog state, detects system theme and Office host
 
 ## Authentication
 
-The API key is stored in the browser's `localStorage` as part of the endpoint configuration and sent directly as the `api-key` header to the Azure AI Foundry REST API. No Azure AD app registration is needed.
+Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copilot` package). Run `gh auth login` once and the CLI handles OAuth token management. No API keys or Azure AD configuration is needed.
 
 ## Tech Stack
 
 - **React 18** — UI framework
 - **assistant-ui + Radix UI + Tailwind CSS v4** — task pane UI components and styling
-- **Vercel AI SDK** — `ai` (ToolLoopAgent, DirectChatTransport) + `@ai-sdk/react` (useChat) + `@ai-sdk/azure` for streaming, multi-step tool calling, and client-side agent execution
-- **Zustand 5** — lightweight state management with `localStorage` persistence
+- **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
+- **WebSocket + JSON-RPC** (`vscode-jsonrpc`, `ws`) — browser-to-proxy transport
+- **Express + HTTPS** — local proxy server with webpack-dev-middleware
+- **Zustand 5** — lightweight state management with `OfficeRuntime.storage` persistence
 - **Webpack 5** — bundling with HMR
 - **TypeScript 5** — type safety
 - **Vitest** — unit, component, and integration testing
 - **Playwright** — browser UI testing for task pane flows
 - **Mocha** — E2E testing inside Excel Desktop (~187 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
-- **dotenv** — environment variable loading for integration tests
 - **ESLint + Prettier** — code quality
 
 ## Community & Security
