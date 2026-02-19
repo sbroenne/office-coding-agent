@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Live integration test: WebSocket → Copilot proxy → GitHub Copilot API
  *
@@ -10,11 +11,23 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import WS from 'ws';
 import type { SystemMessageConfig } from '@github/copilot-sdk';
 import { createWebSocketClient } from '@/lib/websocket-client';
 
-const SERVER_URL = 'ws://localhost:3000/api/copilot';
+const SERVER_URL = 'wss://localhost:3000/api/copilot';
 const TIMEOUT_MS = 30_000;
+
+// Node doesn't trust the office-addin-dev-certs CA by default.
+// Patch the global WebSocket to use `ws` with rejectUnauthorized: false
+// so we can connect to the local HTTPS dev server.
+global.WebSocket = class PatchedWebSocket extends WS {
+  constructor(url: string | URL, protocols?: string | string[]) {
+    super(url, typeof protocols === 'string' ? protocols : (protocols ?? []), {
+      rejectUnauthorized: false,
+    });
+  }
+} as unknown as typeof WebSocket;
 
 let serverAvailable = false;
 
@@ -82,6 +95,10 @@ describe('Copilot WebSocket integration', () => {
           events.push(event.type);
           if (event.type === 'assistant.message_delta') {
             fullText += event.data.deltaContent;
+          }
+          if (event.type === 'assistant.message') {
+            // Some models emit a complete message instead of streaming deltas
+            fullText += event.data.content;
           }
           if (event.type === 'session.idle') break;
         }
