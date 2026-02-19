@@ -90,9 +90,9 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     "set_chart_type": ("set_chart_type", {"chartName": "chart_name", "chartType": "chart_type"}),
     "set_chart_data_source": ("set_chart_data_source", {"chartName": "chart_name", "dataRange": "data_range"}),
     # Chart
-    "list_charts": ("list_charts", {"sheetName": "she
-    "recalculate_workbook": ("recalculate_workbook", {"recalcType": "recalc_type"}),et_name"}),
+    "list_charts": ("list_charts", {"sheetName": "sheet_name"}),
     "create_chart": ("create_chart", {"dataRange": "data_range", "chartType": "chart_type", "sheetName": "sheet_name"}),
+    "recalculate_workbook": ("recalculate_workbook", {"recalcType": "recalc_type"}),
     "delete_chart": ("delete_chart", {"chartName": "chart_name", "sheetName": "sheet_name"}),
     # Workbook
     "get_workbook_info": ("get_workbook_info", None),
@@ -125,9 +125,7 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     "list_pivot_tables": ("list_pivot_tables", {"sheetName": "sheet_name"}),
     "refresh_pivot_table": ("refresh_pivot_table", {"pivotTableName": "pivot_table_name", "sheetName": "sheet_name"}),
     "delete_pivot_table": ("delete_pivot_table", {"pivotTableName": "pivot_table_name", "sheetName": "sheet_name"}),
-    "cr
-    "add_pivot_field": ("add_pivot_field", {"pivotTableName": "pivot_table_name", "fieldName": "field_name", "fieldType": "field_type"}),
-    "remove_pivot_field": ("remove_pivot_field", {"pivotTableName": "pivot_table_name", "fieldName": "field_name", "fieldType": "field_type"}),eate_pivot_table": ("create_pivot_table", {
+    "create_pivot_table": ("create_pivot_table", {
         "sourceAddress": "source_address",
         "destinationAddress": "destination_address",
         "rowFields": "row_fields",
@@ -135,6 +133,8 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
         "sourceSheetName": "source_sheet_name",
         "destinationSheetName": "destination_sheet_name",
     }),
+    "add_pivot_field": ("add_pivot_field", {"pivotTableName": "pivot_table_name", "fieldName": "field_name", "fieldType": "field_type"}),
+    "remove_pivot_field": ("remove_pivot_field", {"pivotTableName": "pivot_table_name", "fieldName": "field_name", "fieldType": "field_type"}),
 }
 
 
@@ -287,7 +287,10 @@ def register_tools(manifest_path: Path) -> None:
                 annotations[pname] = ann
 
             annotations["return"] = str
-            handler.__signature__ = inspect.Signature(sig_params, return_annotation=str)
+            # Required params must come before optional ones in the signature
+            required_params = [p for p in sig_params if p.default is inspect.Parameter.empty]
+            optional_params = [p for p in sig_params if p.default is not inspect.Parameter.empty]
+            handler.__signature__ = inspect.Signature(required_params + optional_params, return_annotation=str)
             handler.__annotations__ = annotations
 
             return handler

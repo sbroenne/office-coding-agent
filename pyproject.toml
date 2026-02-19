@@ -1,0 +1,14 @@
+[project]
+name = "excel-ai-addin-aitests"
+version = "0.0.0"
+description = "AI agent integration tests for the Excel add-in"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest-aitest>=0.2.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-llm-assert>=0.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests-aitest"]
+asyncio_mode = "auto"
