@@ -23,7 +23,7 @@ import type { FC } from 'react';
 
 export const Thread: FC = () => {
   return (
-    <ThreadPrimitive.Root className="aui-root aui-thread-root flex h-full flex-col bg-background">
+    <ThreadPrimitive.Root className="aui-root aui-thread-root flex flex-1 flex-col bg-background">
       <ThreadPrimitive.Viewport
         turnAnchor="top"
         className="aui-thread-viewport relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto scroll-smooth px-3 pt-3"

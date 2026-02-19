@@ -31,12 +31,7 @@ vi.mock('@/components/ChatHeader', () => ({
     React.createElement(
       'div',
       { 'data-testid': 'chat-header' },
-      React.createElement(
-        'button',
-        { 'data-testid': 'clear-btn', onClick: onClearMessages },
-        'New conversation'
-      ),
-      React.createElement('span', null, 'AI Chat')
+      React.createElement('button', { 'data-testid': 'clear-btn', onClick: onClearMessages }, 'New conversation')
     ),
 }));
 
@@ -128,7 +123,6 @@ describe('App — error boundary integration', () => {
     await waitFor(() => {
       // Header should still be visible
       expect(screen.getByTestId('chat-header')).toBeInTheDocument();
-      expect(screen.getByText('AI Chat')).toBeInTheDocument();
       expect(screen.getByText('New conversation')).toBeInTheDocument();
 
       // Chat panel should NOT be visible
