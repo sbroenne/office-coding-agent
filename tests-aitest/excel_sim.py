@@ -215,24 +215,63 @@ class ExcelSimulator:
 
     # ─── Range Operations ────────────────────────────────────────────
 
-    def get_range_values(self, address: str, sheet_name: str | None = None) -> ToolResult:
+    def get_range_values(
+        self,
+        address: str,
+        sheet_name: str | None = None,
+        max_rows: int | None = None,
+        max_columns: int | None = None,
+        start_row: int | None = None,
+        start_column: int | None = None,
+    ) -> ToolResult:
         sheet_ref, start, end = _parse_range(address)
         sheet = self._resolve_sheet(sheet_ref or sheet_name)
         if isinstance(sheet, ToolResult):
             return sheet
 
-        start_col, start_row = _parse_cell(start)
-        end_col, end_row = _parse_cell(end)
+        start_col, rng_start_row = _parse_cell(start)
+        end_col, rng_end_row = _parse_cell(end)
+
+        total_rows = rng_end_row - rng_start_row + 1
+        total_cols = _col_to_index(end_col) - _col_to_index(start_col) + 1
+
+        # 1-based offsets into the range (default: 1)
+        row_offset = max(1, start_row or 1)
+        col_offset = max(1, start_column or 1)
+        actual_row_start = rng_start_row + row_offset - 1
+        actual_col_start = _col_to_index(start_col) + col_offset - 1
+        actual_row_end = rng_start_row + (row_offset - 1) + (max_rows or total_rows) - 1
+        actual_col_end = _col_to_index(start_col) + (col_offset - 1) + (max_columns or total_cols) - 1
+        actual_row_end = min(actual_row_end, rng_end_row)
+        actual_col_end = min(actual_col_end, _col_to_index(end_col))
 
         rows = []
-        for r in range(start_row, end_row + 1):
+        for r in range(actual_row_start, actual_row_end + 1):
             row = []
-            for c in range(_col_to_index(start_col), _col_to_index(end_col) + 1):
+            for c in range(actual_col_start, actual_col_end + 1):
                 cell_ref = f"{_index_to_col(c)}{r}"
                 row.append(sheet.cells.get(cell_ref, ""))
             rows.append(row)
 
-        return self._ok(rows)
+        result: dict[str, Any] = {
+            "address": f"{start}:{end}",
+            "rowCount": total_rows,
+            "columnCount": total_cols,
+            "values": rows,
+        }
+
+        is_paged = max_rows is not None or max_columns is not None or (start_row or 1) > 1 or (start_column or 1) > 1
+        if is_paged:
+            result["rowsReturned"] = len(rows)
+            result["columnsReturned"] = len(rows[0]) if rows else 0
+            if actual_row_end < rng_end_row:
+                result["moreRows"] = True
+                result["nextStartRow"] = actual_row_end - rng_start_row + 2
+            if actual_col_end < _col_to_index(end_col):
+                result["moreColumns"] = True
+                result["nextStartColumn"] = actual_col_end - _col_to_index(start_col) + 2
+
+        return self._ok(result)
 
     def set_range_values(self, address: str, values: list[list[Any]], sheet_name: str | None = None) -> ToolResult:
         sheet_ref, start, _end = _parse_range(address)
@@ -253,15 +292,26 @@ class ExcelSimulator:
         end_cell = f"{_index_to_col(base_col + num_cols - 1)}{start_row + num_rows - 1}"
         return self._ok({"address": f"{start}:{end_cell}", "rowsWritten": num_rows, "columnsWritten": num_cols})
 
-    def get_used_range(self, sheet_name: str | None = None, max_rows: int | None = None) -> ToolResult:
+    def get_used_range(
+        self,
+        sheet_name: str | None = None,
+        max_rows: int | None = None,
+        max_columns: int | None = None,
+        start_row: int | None = None,
+        start_column: int | None = None,
+    ) -> ToolResult:
         sheet = self._resolve_sheet(sheet_name)
         if isinstance(sheet, ToolResult):
             return sheet
 
+        include_values = max_rows is not None or start_row is not None or start_column is not None or max_columns is not None
+
         if not sheet.cells:
             result: dict[str, Any] = {"address": "A1", "rowCount": 1, "columnCount": 1}
-            if max_rows is not None:
+            if include_values:
                 result["values"] = [[""]]
+                result["rowsReturned"] = 1
+                result["columnsReturned"] = 1
             return self._ok(result)
 
         min_col = min_row = float("inf")
@@ -284,20 +334,34 @@ class ExcelSimulator:
             "columnCount": total_cols,
         }
 
-        # Only include values when maxRows is explicitly set
-        if max_rows is not None:
-            rows_to_read = min(max_rows, total_rows)
+        if include_values:
+            row_offset = max(1, start_row or 1)
+            col_offset = max(1, start_column or 1)
+            actual_row_start = int(min_row) + row_offset - 1
+            actual_col_start = int(min_col) + col_offset - 1
+            actual_row_end = actual_row_start + (max_rows or total_rows) - 1
+            actual_col_end = actual_col_start + (max_columns or total_cols) - 1
+            actual_row_end = min(actual_row_end, int(max_row))
+            actual_col_end = min(actual_col_end, int(max_col))
+
             rows = []
-            for r in range(int(min_row), int(min_row) + rows_to_read):
+            for r in range(actual_row_start, actual_row_end + 1):
                 row = []
-                for c in range(int(min_col), int(max_col) + 1):
+                for c in range(actual_col_start, actual_col_end + 1):
                     cell_ref = f"{_index_to_col(c)}{r}"
                     row.append(sheet.cells.get(cell_ref, ""))
                 rows.append(row)
+
             result["values"] = rows
-            if max_rows < total_rows:
-                result["truncated"] = True
-                result["rowsReturned"] = rows_to_read
+            result["rowsReturned"] = len(rows)
+            result["columnsReturned"] = len(rows[0]) if rows else 0
+
+            if actual_row_end < int(max_row):
+                result["moreRows"] = True
+                result["nextStartRow"] = actual_row_end - int(min_row) + 2
+            if actual_col_end < int(max_col):
+                result["moreColumns"] = True
+                result["nextStartColumn"] = actual_col_end - int(min_col) + 2
 
         return self._ok(result)
 

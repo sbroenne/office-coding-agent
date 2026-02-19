@@ -36,9 +36,9 @@ _sim = ExcelSimulator()
 # Most tools map 1:1. Decomposed tools merge back into generic methods.
 _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     # Range
-    "get_range_values": ("get_range_values", None),
+    "get_range_values": ("get_range_values", {"sheetName": "sheet_name", "maxRows": "max_rows", "maxColumns": "max_columns", "startRow": "start_row", "startColumn": "start_column"}),
     "set_range_values": ("set_range_values", None),
-    "get_used_range": ("get_used_range", {"maxRows": "max_rows"}),
+    "get_used_range": ("get_used_range", {"sheetName": "sheet_name", "maxRows": "max_rows", "maxColumns": "max_columns", "startRow": "start_row", "startColumn": "start_column"}),
     "clear_range": ("clear_range", None),
     "format_range": ("format_range", None),
     "set_number_format": ("set_number_format", {"formatCode": "format_code"}),

@@ -214,6 +214,16 @@ describe('tool schemas — range tools', () => {
     expect(result.success).toBe(false);
   });
 
+  it('get_range_values accepts paging params', () => {
+    const schema = excelTools.get_range_values.inputSchema;
+    expect(
+      asZod(schema).safeParse({ address: 'A1:Z100', maxRows: 20, startRow: 21 }).success
+    ).toBe(true);
+    expect(
+      asZod(schema).safeParse({ address: 'A1:Z100', maxColumns: 5, startColumn: 6 }).success
+    ).toBe(true);
+  });
+
   it('set_range_values accepts address + 2D array', () => {
     const schema = excelTools.set_range_values.inputSchema;
     const result = asZod(schema).safeParse({
@@ -236,6 +246,13 @@ describe('tool schemas — range tools', () => {
     const schema = excelTools.get_used_range.inputSchema;
     const result = asZod(schema).safeParse({});
     expect(result.success).toBe(true);
+  });
+
+  it('get_used_range accepts full paging params', () => {
+    const schema = excelTools.get_used_range.inputSchema;
+    expect(
+      asZod(schema).safeParse({ maxRows: 10, startRow: 11, maxColumns: 5, startColumn: 6 }).success
+    ).toBe(true);
   });
 
   it('clear_range requires address', () => {
