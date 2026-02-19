@@ -93,12 +93,12 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Office Coding Agent (Staging)" />
-        <bt:String id="CommandsGroup.Label" DefaultValue="AI Assistant STG" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="AI Chat STG" />
+        <bt:String id="CommandsGroup.Label" DefaultValue="Coding Agent STG" />
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Coding Agent STG" />
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="AI-powered Office coding assistant" />
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the AI assistant chat panel" />
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Coding Agent" />
       </bt:LongStrings>
     </Resources>
 

@@ -22,6 +22,7 @@ export function useOfficeChat(
   tools?: ToolSet
 ) {
   const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
+  const importedSkills = useSettingsStore(s => s.importedSkills);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
@@ -47,7 +48,7 @@ export function useOfficeChat(
       stopWhen: stepCountIs(10),
       maxRetries: 4,
     });
-  }, [provider, modelId, host, tools, activeSkillNames, activeAgentId, mcpTools]);
+  }, [provider, modelId, host, tools, activeSkillNames, importedSkills, activeAgentId, mcpTools]);
 
   const transport = useMemo(() => {
     if (!agent) return null;

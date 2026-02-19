@@ -1,7 +1,7 @@
 /**
  * Integration test: ChatHeader — SkillPicker, New Conversation, SettingsDialog.
  *
- * ChatHeader now contains: "AI Chat" title, SkillPicker, New Conversation
+ * ChatHeader contains: SkillPicker, New Conversation
  * button, and SettingsDialog. The ModelPicker and AgentPicker have moved
  * to ChatPanel's input toolbar.
  */
@@ -42,7 +42,6 @@ describe('Integration: ChatHeader', () => {
   it('renders title, skill picker, and toolbar buttons', () => {
     renderWithProviders(<StatefulChatHeader onClearMessages={mockClearMessages} />);
 
-    expect(screen.getByText('AI Chat')).toBeInTheDocument();
     expect(screen.getByLabelText('Agent skills')).toBeInTheDocument();
     expect(screen.getByLabelText('New conversation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();

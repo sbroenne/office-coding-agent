@@ -20,7 +20,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   return (
     <div className="flex items-center justify-between border-b border-border bg-background px-3 py-1.5">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="font-semibold text-sm whitespace-nowrap text-foreground">AI Chat</span>
         <SkillPicker />
       </div>
 
