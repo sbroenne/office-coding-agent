@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
 import { useChat, type UseChatHelpers } from '@ai-sdk/react';
-import { ToolLoopAgent, DirectChatTransport, stepCountIs, type ToolSet } from 'ai';
-import type { AzureOpenAIProvider } from '@ai-sdk/azure';
+import {
+  ToolLoopAgent,
+  DirectChatTransport,
+  stepCountIs,
+  type ToolSet,
+  type LanguageModel,
+} from 'ai';
 
 import { getToolsForHost } from '@/tools';
 import { buildSkillContext } from '@/services/skills';
@@ -15,12 +20,7 @@ import type { OfficeHostApp } from '@/services/office/host';
 
 export type { UseChatHelpers };
 
-export function useOfficeChat(
-  provider: AzureOpenAIProvider | null,
-  modelId: string | null,
-  host: OfficeHostApp,
-  tools?: ToolSet
-) {
+export function useOfficeChat(model: LanguageModel | null, host: OfficeHostApp, tools?: ToolSet) {
   const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
   const importedSkills = useSettingsStore(s => s.importedSkills);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
@@ -34,7 +34,7 @@ export function useOfficeChat(
   const mcpTools = useMcpTools(activeMcpServers);
 
   const agent = useMemo(() => {
-    if (!provider || !modelId) return null;
+    if (!model) return null;
 
     const resolvedAgent = resolveActiveAgent(activeAgentId, host);
     const agentInstructions = resolvedAgent?.instructions ?? '';
@@ -42,13 +42,13 @@ export function useOfficeChat(
     const instructions = `${buildSystemPrompt(host)}\n\n${agentInstructions}${skillContext}`;
 
     return new ToolLoopAgent({
-      model: provider.chat(modelId),
+      model,
       instructions,
       tools: { ...(tools ?? getToolsForHost(host)), ...mcpTools },
       stopWhen: stepCountIs(10),
       maxRetries: 4,
     });
-  }, [provider, modelId, host, tools, activeSkillNames, importedSkills, activeAgentId, mcpTools]);
+  }, [model, host, tools, activeSkillNames, importedSkills, activeAgentId, mcpTools]);
 
   const transport = useMemo(() => {
     if (!agent) return null;

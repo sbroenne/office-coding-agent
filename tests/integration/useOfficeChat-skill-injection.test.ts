@@ -14,7 +14,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AzureOpenAIProvider } from '@ai-sdk/azure';
+import type { LanguageModel } from 'ai';
 import type { AgentSkill } from '@/types';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -50,7 +50,7 @@ vi.mock('@/hooks/useMcpTools', () => ({
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────────
 
-const fakeProvider = { chat: vi.fn(() => ({})) } as unknown as AzureOpenAIProvider;
+const fakeModel = {} as unknown as LanguageModel;
 
 const importedSkill: AgentSkill = {
   metadata: {
@@ -73,14 +73,14 @@ describe('useOfficeChat — imported skill injection', () => {
   });
 
   it('does not include imported skill content before the skill is imported', () => {
-    renderHook(() => useOfficeChat(fakeProvider, 'gpt-4', 'excel'));
+    renderHook(() => useOfficeChat(fakeModel, 'excel'));
 
     expect(constructedInstructions.at(-1)).not.toContain('My Custom Skill');
     expect(constructedInstructions.at(-1)).not.toContain('Custom skill content injected here.');
   });
 
   it('rebuilds agent instructions when a new skill is imported (null activeSkillNames = all ON)', () => {
-    const { rerender } = renderHook(() => useOfficeChat(fakeProvider, 'gpt-4', 'excel'));
+    const { rerender } = renderHook(() => useOfficeChat(fakeModel, 'excel'));
 
     // Confirm activeSkillNames is null (all ON) — importing should be immediately active
     expect(useSettingsStore.getState().activeSkillNames).toBeNull();
@@ -102,7 +102,7 @@ describe('useOfficeChat — imported skill injection', () => {
   });
 
   it('removing the skill causes agent to rebuild without its content', () => {
-    const { rerender } = renderHook(() => useOfficeChat(fakeProvider, 'gpt-4', 'excel'));
+    const { rerender } = renderHook(() => useOfficeChat(fakeModel, 'excel'));
 
     act(() => {
       useSettingsStore.getState().importSkills([importedSkill]);

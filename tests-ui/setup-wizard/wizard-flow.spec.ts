@@ -1,12 +1,22 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Setup Wizard', () => {
-  test('shows the endpoint step on first launch', async ({ taskpane }) => {
+  test('shows the provider selection step on first launch', async ({ taskpane }) => {
+    await expect(taskpane.getByText('Choose Your AI Provider')).toBeVisible();
+    await expect(taskpane.getByText('Azure AI Foundry')).toBeVisible();
+  });
+
+  test('Next from provider selection goes to endpoint step (Azure)', async ({ taskpane }) => {
+    // Azure is pre-selected
+    await taskpane.getByRole('button', { name: 'Next' }).click();
+
     await expect(taskpane.getByText('Connect to Azure AI Foundry')).toBeVisible();
     await expect(taskpane.getByLabel('Resource URL')).toBeVisible();
   });
 
   test('Next button enables when URL is entered', async ({ taskpane }) => {
+    await taskpane.getByRole('button', { name: 'Next' }).click(); // skip provider step
+
     // Clear any build-time default, then type a URL
     await taskpane.getByLabel('Resource URL').clear();
     await expect(taskpane.getByRole('button', { name: 'Next' })).toBeDisabled();
@@ -16,6 +26,8 @@ test.describe('Setup Wizard', () => {
   });
 
   test('advances to the auth step', async ({ taskpane }) => {
+    await taskpane.getByRole('button', { name: 'Next' }).click(); // skip provider step
+
     await taskpane.getByLabel('Resource URL').fill('https://my-resource.openai.azure.com');
     await taskpane.getByRole('button', { name: 'Next' }).click();
 
@@ -25,6 +37,8 @@ test.describe('Setup Wizard', () => {
   });
 
   test('Connect button enables when API key is entered', async ({ taskpane }) => {
+    await taskpane.getByRole('button', { name: 'Next' }).click(); // skip provider step
+
     await taskpane.getByLabel('Resource URL').fill('https://my-resource.openai.azure.com');
     await taskpane.getByRole('button', { name: 'Next' }).click();
 
@@ -33,6 +47,8 @@ test.describe('Setup Wizard', () => {
   });
 
   test('can toggle API key visibility', async ({ taskpane }) => {
+    await taskpane.getByRole('button', { name: 'Next' }).click(); // skip provider step
+
     await taskpane.getByLabel('Resource URL').fill('https://my-resource.openai.azure.com');
     await taskpane.getByRole('button', { name: 'Next' }).click();
 
@@ -46,7 +62,9 @@ test.describe('Setup Wizard', () => {
     await expect(apiKeyInput).toHaveAttribute('type', 'password');
   });
 
-  test('Back button returns to endpoint step', async ({ taskpane }) => {
+  test('Back button returns to endpoint step from auth', async ({ taskpane }) => {
+    await taskpane.getByRole('button', { name: 'Next' }).click(); // skip provider step
+
     await taskpane.getByLabel('Resource URL').fill('https://my-resource.openai.azure.com');
     await taskpane.getByRole('button', { name: 'Next' }).click();
     await expect(taskpane.getByText('Authentication')).toBeVisible();
@@ -60,6 +78,8 @@ test.describe('Setup Wizard', () => {
   });
 
   test('shows connecting state after clicking Connect', async ({ taskpane }) => {
+    await taskpane.getByRole('button', { name: 'Next' }).click(); // skip provider step
+
     await taskpane.getByLabel('Resource URL').fill('https://my-resource.openai.azure.com');
     await taskpane.getByRole('button', { name: 'Next' }).click();
 
@@ -70,8 +90,18 @@ test.describe('Setup Wizard', () => {
     // directly to the next wizard step.
     const transitionState = taskpane
       .getByText('Connecting...')
-      .or(taskpane.getByText('Add Your Models'))
+      .or(taskpane.getByText('Select Models'))
       .or(taskpane.getByText("You're all set!"));
     await expect(transitionState).toBeVisible();
+  });
+
+  test('Anthropic provider goes directly to auth step (no URL entry)', async ({ taskpane }) => {
+    // Select Anthropic
+    await taskpane.getByText('Anthropic').click();
+    await taskpane.getByRole('button', { name: 'Next' }).click();
+
+    // Should jump straight to Authentication (no endpoint URL step for Anthropic)
+    await expect(taskpane.getByText('Authentication')).toBeVisible();
+    await expect(taskpane.getByText('api.anthropic.com')).toBeVisible();
   });
 });

@@ -1,5 +1,6 @@
 export type {
   AuthMethod,
+  ProviderType,
   FoundryEndpoint,
   ModelInfo,
   ModelProvider,

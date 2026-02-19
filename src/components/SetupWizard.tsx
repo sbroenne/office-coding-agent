@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSettingsStore } from '@/stores';
 import { discoverModels, validateModelDeployment, invalidateClient } from '@/services/ai';
+import { PROVIDER_ORDER, getProviderConfig } from '@/services/ai/providerConfig';
 import type { DiscoveryResult } from '@/services/ai';
-import type { ModelInfo } from '@/types';
+import type { ModelInfo, ModelProvider, ProviderType } from '@/types';
 
-type Step = 'endpoint' | 'auth' | 'connecting' | 'models' | 'done';
+type Step = 'provider' | 'endpoint' | 'auth' | 'connecting' | 'models' | 'done';
 
 /** Environment defaults injected at build time via DefinePlugin */
 const ENV_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT ?? '';
@@ -18,11 +19,31 @@ interface Props {
   onComplete: () => void;
 }
 
+/** Map a ProviderType to the ModelProvider label used for UI grouping */
+function toModelProvider(pt: ProviderType): ModelProvider {
+  switch (pt) {
+    case 'anthropic':
+      return 'Anthropic';
+    case 'openai':
+      return 'OpenAI';
+    case 'mistral':
+      return 'Mistral';
+    case 'deepseek':
+      return 'DeepSeek';
+    case 'xai':
+      return 'xAI';
+    case 'azure':
+    default:
+      return 'Other';
+  }
+}
+
 export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
   const { addEndpoint, setModelsForEndpoint, setActiveEndpoint, defaultModelId } =
     useSettingsStore();
 
-  const [step, setStep] = useState<Step>('endpoint');
+  const [step, setStep] = useState<Step>('provider');
+  const [providerType, setProviderType] = useState<ProviderType>('azure');
   const [resourceUrl, setResourceUrl] = useState(ENV_ENDPOINT);
   const [displayName, setDisplayName] = useState('');
   const [apiKey, setApiKey] = useState(ENV_API_KEY);
@@ -34,11 +55,25 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
   const [discoveredModels, setDiscoveredModels] = useState<ModelInfo[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  // Manual model entry state (for AI Services endpoints without deployments API)
+  // Manual / pre-populated model state
   const [manualModelName, setManualModelName] = useState('');
   const [manualModels, setManualModels] = useState<ModelInfo[]>([]);
   const [validatingModel, setValidatingModel] = useState(false);
   const [modelValidationError, setModelValidationError] = useState<string | null>(null);
+
+  const config = getProviderConfig(providerType);
+
+  // ─── Provider → next step ───
+  const handleProviderNext = useCallback(() => {
+    if (providerType === 'azure') {
+      setStep('endpoint');
+    } else {
+      const cfg = getProviderConfig(providerType);
+      setResourceUrl(cfg.baseUrl ?? '');
+      setDisplayName(cfg.label);
+      setStep('auth');
+    }
+  }, [providerType]);
 
   const handleEndpointNext = useCallback(() => {
     if (!resourceUrl.trim()) return;
@@ -68,14 +103,36 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
       setConnecting(true);
       setConnectionError(null);
       try {
+        const cfg = getProviderConfig(providerType);
+        const url =
+          providerType === 'azure' ? resourceUrl.trim().replace(/\/+$/, '') : (cfg.baseUrl ?? '');
+
         const endpointConfig = {
           id: '__setup_validation__',
-          displayName: displayName.trim() || 'My Endpoint',
-          resourceUrl: resourceUrl.trim().replace(/\/+$/, ''),
+          displayName: displayName.trim() || cfg.label,
+          resourceUrl: url,
           authMethod: 'apiKey' as const,
           apiKey: apiKey.trim(),
+          providerType,
         };
 
+        if (providerType !== 'azure') {
+          // Non-Azure: skip discovery — use the provider's known default models
+          if (cancelled) return;
+          invalidateClient('__setup_validation__');
+          const prePopulated: ModelInfo[] = cfg.defaultModels.map(id => ({
+            id,
+            name: id,
+            ownedBy: 'system',
+            provider: toModelProvider(providerType),
+          }));
+          setManualModels(prePopulated);
+          setManualModelName('');
+          setStep('models');
+          return;
+        }
+
+        // Azure: run auto-discovery / manual fallback
         const discovery: DiscoveryResult = await discoverModels(endpointConfig, true);
         const { models, method } = discovery;
         if (cancelled) return;
@@ -115,6 +172,7 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
           resourceUrl: endpointConfig.resourceUrl,
           authMethod: 'apiKey',
           apiKey: apiKey.trim(),
+          providerType,
         });
         setModelsForEndpoint(endpointId, models);
         setActiveEndpoint(endpointId);
@@ -142,13 +200,55 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
     displayName,
     resourceUrl,
     apiKey,
+    providerType,
     addEndpoint,
     setModelsForEndpoint,
     setActiveEndpoint,
     defaultModelId,
   ]);
 
-  // ─── Step: Endpoint URL ───
+  // ─── Step: Provider selection ───
+  if (step === 'provider') {
+    return (
+      <div className="flex h-screen flex-col overflow-hidden bg-background px-4 py-3 text-foreground">
+        <div className="mb-4 mt-1 shrink-0">
+          <h2 className="text-sm font-semibold">Choose Your AI Provider</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Select the provider you want to connect to.
+          </p>
+        </div>
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+          {PROVIDER_ORDER.map(pt => {
+            const cfg = getProviderConfig(pt);
+            const isSelected = providerType === pt;
+            return (
+              <button
+                key={pt}
+                onClick={() => setProviderType(pt)}
+                className={`flex flex-col gap-0.5 rounded-md border px-3 py-2.5 text-left transition-colors ${
+                  isSelected
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border bg-card hover:bg-accent'
+                }`}
+              >
+                <span className="text-sm font-medium">{cfg.label}</span>
+                {cfg.baseUrl ? (
+                  <span className="text-xs text-muted-foreground">{cfg.baseUrl}</span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Custom resource URL</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex shrink-0 justify-end gap-2 py-3">
+          <Button onClick={handleProviderNext}>Next</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Step: Endpoint URL (Azure only) ───
   if (step === 'endpoint') {
     return (
       <div className="flex h-screen flex-col overflow-hidden bg-background px-4 py-3 text-foreground">
@@ -173,6 +273,9 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
           </div>
         </div>
         <div className="flex shrink-0 justify-end gap-2 py-3">
+          <Button variant="secondary" onClick={() => setStep('provider')}>
+            Back
+          </Button>
           <Button onClick={handleEndpointNext} disabled={!resourceUrl.trim()}>
             Next
           </Button>
@@ -187,9 +290,7 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
       <div className="flex h-screen flex-col overflow-hidden bg-background px-4 py-3 text-foreground">
         <div className="mb-4 mt-1 shrink-0">
           <h2 className="text-sm font-semibold">Authentication</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Enter your API key from Azure AI Foundry.
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">Enter your {config.label} API key.</p>
         </div>
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
           {error && (
@@ -220,7 +321,10 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
           </div>
         </div>
         <div className="flex shrink-0 justify-end gap-2 py-3">
-          <Button variant="secondary" onClick={() => setStep('endpoint')}>
+          <Button
+            variant="secondary"
+            onClick={() => setStep(providerType === 'azure' ? 'endpoint' : 'provider')}
+          >
             Back
           </Button>
           <Button onClick={handleFinish} disabled={!apiKey.trim()}>
@@ -273,29 +377,40 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
   const handleAddManualModel = async () => {
     const name = manualModelName.trim();
     if (!name) return;
-    setValidatingModel(true);
-    setModelValidationError(null);
-
-    const endpointConfig = {
-      id: '__setup_validation__',
-      displayName: displayName.trim() || 'My Endpoint',
-      resourceUrl: resourceUrl.trim().replace(/\/+$/, ''),
-      authMethod: 'apiKey' as const,
-      apiKey: apiKey.trim(),
-    };
-
-    const ok = await validateModelDeployment(endpointConfig, name);
-    setValidatingModel(false);
-
-    if (!ok) {
-      setModelValidationError(
-        `Model "${name}" could not be reached. Verify the deployment name and try again.`
-      );
+    if (manualModels.some(m => m.id === name)) {
+      setManualModelName('');
       return;
     }
-    if (manualModels.some(m => m.id === name)) return;
 
-    setManualModels(prev => [...prev, { id: name, name, ownedBy: 'user', provider: 'Other' }]);
+    if (providerType === 'azure') {
+      // Azure: validate the deployment name with the real API
+      setValidatingModel(true);
+      setModelValidationError(null);
+
+      const endpointConfig = {
+        id: '__setup_validation__',
+        displayName: displayName.trim() || 'My Endpoint',
+        resourceUrl: resourceUrl.trim().replace(/\/+$/, ''),
+        authMethod: 'apiKey' as const,
+        apiKey: apiKey.trim(),
+        providerType,
+      };
+
+      const ok = await validateModelDeployment(endpointConfig, name);
+      setValidatingModel(false);
+
+      if (!ok) {
+        setModelValidationError(
+          `Model "${name}" could not be reached. Verify the deployment name and try again.`
+        );
+        return;
+      }
+    }
+
+    setManualModels(prev => [
+      ...prev,
+      { id: name, name, ownedBy: 'user', provider: toModelProvider(providerType) },
+    ]);
     setManualModelName('');
     setModelValidationError(null);
   };
@@ -303,41 +418,51 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
   const handleModelsFinish = () => {
     if (manualModels.length === 0) return;
     setDiscoveredModels(manualModels);
+    const cfg = getProviderConfig(providerType);
+    const url =
+      providerType === 'azure' ? resourceUrl.trim().replace(/\/+$/, '') : (cfg.baseUrl ?? '');
     const endpointId = addEndpoint({
-      displayName: displayName.trim() || 'My Endpoint',
-      resourceUrl: resourceUrl.trim().replace(/\/+$/, ''),
+      displayName: displayName.trim() || cfg.label,
+      resourceUrl: url,
       authMethod: 'apiKey',
       apiKey: apiKey.trim(),
+      providerType,
     });
     setModelsForEndpoint(endpointId, manualModels);
     setActiveEndpoint(endpointId);
     setStep('done');
   };
 
-  // ─── Step: Manual model entry (AI Services fallback) ───
+  // ─── Step: Model selection / manual entry ───
   if (step === 'models') {
+    const isAzure = providerType === 'azure';
     return (
       <div className="flex h-screen flex-col overflow-hidden bg-background px-4 py-3 text-foreground">
         <div className="mb-4 mt-1 shrink-0">
-          <h2 className="text-sm font-semibold">Add Your Models</h2>
+          <h2 className="text-sm font-semibold">Select Models</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Auto-discovery is not available for this endpoint type. Enter your model deployment
-            names below.
+            {isAzure
+              ? 'Enter your model deployment names below.'
+              : 'Choose the models you want to use. You can also add a custom model ID.'}
           </p>
         </div>
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto">
-          <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-            <Info className="mt-0.5 size-4 shrink-0" />
-            <div>
-              <span className="font-medium">Tip: </span>
-              Enter the exact deployment name from Azure AI Foundry (e.g., gpt-4.1, gpt-5.2-chat).
-              Each model will be validated before being added.
+          {isAzure && (
+            <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+              <Info className="mt-0.5 size-4 shrink-0" />
+              <div>
+                <span className="font-medium">Tip: </span>
+                Enter the exact deployment name from Azure AI Foundry (e.g., gpt-4.1, gpt-5.2-chat).
+                Each model will be validated before being added.
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex items-end gap-2">
             <div className="flex flex-1 flex-col gap-1.5">
-              <Label htmlFor="manual-model">Model deployment name</Label>
+              <Label htmlFor="manual-model">
+                {isAzure ? 'Model deployment name' : 'Custom model ID (optional)'}
+              </Label>
               <Input
                 id="manual-model"
                 value={manualModelName}
@@ -345,7 +470,7 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
                   setManualModelName(e.target.value);
                   setModelValidationError(null);
                 }}
-                placeholder="e.g., gpt-4.1"
+                placeholder={isAzure ? 'e.g., gpt-4.1' : 'e.g., gpt-4o-2024-11-20'}
                 onKeyDown={e => {
                   if (e.key === 'Enter') void handleAddManualModel();
                 }}
@@ -373,7 +498,9 @@ export const SetupWizard: React.FC<Props> = ({ onComplete }) => {
 
           {manualModels.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <p className="text-xs text-muted-foreground">Added models:</p>
+              <p className="text-xs text-muted-foreground">
+                {isAzure ? 'Added models:' : 'Selected models:'}
+              </p>
               {manualModels.map(m => (
                 <div
                   key={m.id}

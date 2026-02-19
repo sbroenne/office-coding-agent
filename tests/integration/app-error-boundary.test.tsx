@@ -61,7 +61,7 @@ vi.mock('@assistant-ui/react-ai-sdk', () => ({
 }));
 
 vi.mock('@/services/ai/aiClientFactory', () => ({
-  getAzureProvider: vi.fn(() => ({})),
+  getProviderModel: vi.fn(() => ({})),
 }));
 
 vi.mock('@/hooks/useOfficeChat', () => ({
