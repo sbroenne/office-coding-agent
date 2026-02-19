@@ -33,6 +33,7 @@ playwright-report/
 
 # Local extensions (not published)
 local/extensions/
+local/*.json
 
 # OS generated files
 .DS_Store
