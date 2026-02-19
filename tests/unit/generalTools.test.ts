@@ -24,6 +24,14 @@ function asZod(schema: unknown): ZodLike {
   return schema as ZodLike;
 }
 
+/** Retrieve a tool's execute function, throwing if it's absent. */
+function getExecute(t: unknown) {
+  const tool = t as { execute?: ((input: Record<string, unknown>, opts: never) => Promise<unknown>) | undefined };
+  const { execute } = tool;
+  if (!execute) throw new Error('Tool has no execute function');
+  return execute;
+}
+
 // ─── web_fetch ────────────────────────────────────────────────────────────────
 
 describe('webFetchTool', () => {
@@ -68,7 +76,7 @@ describe('webFetchTool', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      const result = await webFetchTool.execute!({ url: 'https://example.com' }, {} as never);
+      const result = await getExecute(webFetchTool)({ url: 'https://example.com' }, {} as never);
       expect(result).toBe('Hello, world!');
       expect(mockFetch).toHaveBeenCalledWith('https://example.com');
 
@@ -83,7 +91,7 @@ describe('webFetchTool', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      const result = (await webFetchTool.execute!(
+      const result = (await getExecute(webFetchTool)(
         { url: 'https://example.com', maxLength: 100 },
         {} as never
       )) as string;
@@ -103,7 +111,7 @@ describe('webFetchTool', () => {
       vi.stubGlobal('fetch', mockFetch);
 
       await expect(
-        webFetchTool.execute!({ url: 'https://example.com/missing' }, {} as never)
+        getExecute(webFetchTool)({ url: 'https://example.com/missing' }, {} as never)
       ).rejects.toThrow('HTTP 404: Not Found');
 
       vi.unstubAllGlobals();
@@ -184,7 +192,7 @@ describe('getGeneralTools', () => {
 
   it('does not include run_subagent inside the subagent tools (no recursion)', async () => {
     const tools = getGeneralTools({} as LanguageModel, {});
-    await tools.run_subagent.execute!({ task: 'test task' }, {} as never);
+    await getExecute(tools.run_subagent)({ task: 'test task' }, {} as never);
 
     const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
     expect(Object.keys(callOpts.tools ?? {})).not.toContain('run_subagent');
@@ -192,7 +200,7 @@ describe('getGeneralTools', () => {
 
   it('provides web_fetch to the subagent', async () => {
     const tools = getGeneralTools({} as LanguageModel, {});
-    await tools.run_subagent.execute!({ task: 'test task' }, {} as never);
+    await getExecute(tools.run_subagent)({ task: 'test task' }, {} as never);
 
     const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
     expect(Object.keys(callOpts.tools ?? {})).toContain('web_fetch');
@@ -201,7 +209,7 @@ describe('getGeneralTools', () => {
   it('passes host tools through to the subagent', async () => {
     const hostTools = { some_excel_tool: webFetchTool } as ToolSet;
     const tools = getGeneralTools({} as LanguageModel, hostTools);
-    await tools.run_subagent.execute!({ task: 'test task' }, {} as never);
+    await getExecute(tools.run_subagent)({ task: 'test task' }, {} as never);
 
     const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
     expect(Object.keys(callOpts.tools ?? {})).toContain('some_excel_tool');
@@ -209,7 +217,7 @@ describe('getGeneralTools', () => {
 
   it('forwards a custom maxSteps value to generateText', async () => {
     const tools = getGeneralTools({} as LanguageModel, {});
-    await tools.run_subagent.execute!({ task: 'test task', maxSteps: 3 }, {} as never);
+    await getExecute(tools.run_subagent)({ task: 'test task', maxSteps: 3 }, {} as never);
 
     // generateText should have been called with stopWhen derived from maxSteps=3.
     // We verify it was called (the exact stopWhen predicate is internal to the AI SDK).
