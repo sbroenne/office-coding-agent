@@ -2,106 +2,40 @@
  * Zustand storage adapter backed by OfficeRuntime.storage.
  *
  * OfficeRuntime.storage is a persistent, async key-value store provided by
- * Office.js for add-ins using the SharedRuntime. Unlike localStorage (which
- * the WebView may clear), this storage persists reliably across sessions and
- * is NOT tied to a specific workbook — settings survive when the user opens
- * a different file.
+ * Office.js for add-ins using the SharedRuntime. Unlike localStorage, it
+ * persists reliably across Excel sessions and is not tied to a specific
+ * workbook — settings survive when the user opens a different file.
  *
- * In tests or environments where OfficeRuntime isn't available, we fall back
- * to localStorage so the store still works outside Excel.
+ * This add-in requires SharedRuntime (manifest declares it), so
+ * OfficeRuntime.storage is always available in production. Tests supply a
+ * lightweight in-memory mock via tests/setup.ts.
  *
  * @see https://learn.microsoft.com/javascript/api/office-runtime/officeruntime.storage
  */
 import type { StateStorage } from 'zustand/middleware';
 
-/**
- * Type for the OfficeRuntime global injected by Office.js shared runtime.
- */
 interface OfficeRuntimeStorage {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
   removeItem(key: string): Promise<void>;
 }
 
-/**
- * Safely access the OfficeRuntime.storage API.
- *
- * Uses `typeof` to avoid ReferenceError when the global doesn't exist
- * (e.g. in tests, dev server without sideload, or non-Excel environments).
- */
-function getOfficeStorage(): OfficeRuntimeStorage | undefined {
-  // typeof is safe for undeclared variables — unlike a bare reference,
-  // it won't throw ReferenceError when OfficeRuntime doesn't exist.
-
-  if (typeof OfficeRuntime !== 'undefined' && OfficeRuntime?.storage) {
-    return OfficeRuntime.storage as OfficeRuntimeStorage;
+function getStorage(): OfficeRuntimeStorage {
+  if (typeof OfficeRuntime === 'undefined' || !OfficeRuntime?.storage) {
+    throw new Error(
+      '[officeStorage] OfficeRuntime.storage is not available. ' +
+        'This add-in requires SharedRuntime — ensure the manifest declares it ' +
+        'and the add-in is running inside the Office host.'
+    );
   }
-  return undefined;
+  return OfficeRuntime.storage as OfficeRuntimeStorage;
 }
 
-/** Log which storage backend is actually used on first access */
-let _logged = false;
-function logBackend(storage: OfficeRuntimeStorage | undefined) {
-  if (_logged) return;
-  _logged = true;
-  const backend = storage ? 'OfficeRuntime.storage' : 'localStorage (fallback)';
-  console.log(`[officeStorage] Using ${backend}`);
-}
-
-/**
- * Zustand-compatible StateStorage implementation backed by OfficeRuntime.storage,
- * with a graceful fallback to localStorage when running outside the Office runtime
- * (tests, standalone dev server, etc.).
- */
 export const officeStorage: StateStorage = {
-  getItem: async (name: string): Promise<string | null> => {
-    const storage = getOfficeStorage();
-    logBackend(storage);
-    if (storage) {
-      try {
-        const value = await storage.getItem(name);
-        // treat both null and undefined as "key not found"
-        if (value != null) {
-          return value;
-        }
-        // OfficeRuntime.storage has no value for this key.
-        // Check localStorage as a last resort — handles the case where a
-        // previous setItem() failed and wrote to localStorage instead, so
-        // we don't silently lose data the next time we read.
-        return localStorage.getItem(name);
-      } catch (err) {
-        console.warn('[officeStorage] getItem failed, falling back to localStorage:', err);
-      }
-    }
-    // Fallback
-    return localStorage.getItem(name);
-  },
-
-  setItem: async (name: string, value: string): Promise<void> => {
-    const storage = getOfficeStorage();
-    if (storage) {
-      try {
-        await storage.setItem(name, value);
-        return;
-      } catch (err) {
-        console.warn('[officeStorage] setItem failed, falling back to localStorage:', err);
-      }
-    }
-    // Fallback
-    localStorage.setItem(name, value);
-  },
-
-  removeItem: async (name: string): Promise<void> => {
-    const storage = getOfficeStorage();
-    if (storage) {
-      try {
-        await storage.removeItem(name);
-        return;
-      } catch (err) {
-        console.warn('[officeStorage] removeItem failed, falling back to localStorage:', err);
-      }
-    }
-    // Fallback
-    localStorage.removeItem(name);
-  },
+  getItem: async (name: string) =>
+    getStorage()
+      .getItem(name)
+      .then(v => v ?? null),
+  setItem: async (name: string, value: string) => getStorage().setItem(name, value),
+  removeItem: async (name: string) => getStorage().removeItem(name),
 };

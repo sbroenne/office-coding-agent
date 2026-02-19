@@ -1,8 +1,35 @@
 import '@testing-library/jest-dom/vitest';
 import { config } from 'dotenv';
+import { beforeEach } from 'vitest';
 
 // Load .env for integration test credentials (FOUNDRY_ENDPOINT, FOUNDRY_API_KEY, etc.)
 config();
+
+// ─── OfficeRuntime.storage mock ───────────────────────────────────────────────
+// officeStorage.ts exclusively uses OfficeRuntime.storage (no localStorage
+// fallback). Provide a lightweight in-memory implementation for all tests.
+const _mockOfficeStore: Record<string, string> = {};
+
+(globalThis as Record<string, unknown>).OfficeRuntime = {
+  storage: {
+    getItem: (key: string) => Promise.resolve(_mockOfficeStore[key] ?? null),
+    setItem: (key: string, value: string) => {
+      _mockOfficeStore[key] = value;
+      return Promise.resolve();
+    },
+    removeItem: (key: string) => {
+      delete _mockOfficeStore[key];
+      return Promise.resolve();
+    },
+  },
+};
+
+// Clear the mock store before each test to prevent cross-test contamination.
+beforeEach(() => {
+  Object.keys(_mockOfficeStore).forEach(key => {
+    delete _mockOfficeStore[key];
+  });
+});
 
 // ─── Polyfills for jsdom ───
 // Fluent UI MessageBar uses ResizeObserver which jsdom lacks
