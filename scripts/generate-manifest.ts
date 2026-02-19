@@ -11,7 +11,6 @@ import { fileURLToPath } from 'node:url';
 import { generateManifest } from '../src/tools/codegen/manifest';
 import {
   rangeConfigs,
-  rangeFormatConfigs,
   tableConfigs,
   chartConfigs,
   sheetConfigs,
@@ -26,7 +25,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const manifest = generateManifest(
   rangeConfigs,
-  rangeFormatConfigs,
   tableConfigs,
   chartConfigs,
   sheetConfigs,
