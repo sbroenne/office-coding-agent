@@ -1,84 +1,88 @@
 /**
- * Tool factory — generates Vercel AI SDK tools from declarative ToolConfig.
+ * Tool factory — generates Copilot SDK tools from declarative ToolConfig.
  *
- * Each config entry produces a `tool()` with:
- *   - A Zod inputSchema built from the `params` definition
- *   - An execute fn that wraps config.execute() inside excelRun()
+ * Each config entry produces a Tool with:
+ *   - A JSON Schema parameters object built from the `params` definition
+ *   - A handler that wraps config.execute() inside excelRun()
  */
 
-import { tool, type Tool } from 'ai';
-import { z, type ZodTypeAny } from 'zod';
+import type { Tool, ToolInvocation, ToolResultObject } from '@github/copilot-sdk';
 import type { ToolConfig, ParamType } from './types';
 import { excelRun, getSheet } from '@/services/excel/helpers';
 
 // Re-export getSheet so configs can use it without extra imports
 export { getSheet };
 
-/** Map ParamType → Zod schema */
-function zodForType(type: ParamType): ZodTypeAny {
+type JSONSchemaProperty = Record<string, unknown>;
+
+/** Map ParamType → JSON Schema property object */
+function jsonSchemaForType(type: ParamType, enumValues?: readonly string[]): JSONSchemaProperty {
   switch (type) {
     case 'string':
-      return z.string();
+      return enumValues ? { type: 'string', enum: enumValues } : { type: 'string' };
     case 'number':
-      return z.number();
+      return { type: 'number' };
     case 'boolean':
-      return z.boolean();
+      return { type: 'boolean' };
     case 'string[]':
-      return z.array(z.string());
+      return { type: 'array', items: { type: 'string' } };
     case 'any[][]':
-      return z.array(z.array(z.any()));
+      return { type: 'array', items: { type: 'array' } };
     case 'string[][]':
-      return z.array(z.array(z.string()));
+      return { type: 'array', items: { type: 'array', items: { type: 'string' } } };
   }
 }
 
-/** Build a Zod object schema from a ParamDef record */
-function buildZodSchema(params: ToolConfig['params']): ZodTypeAny {
-  const shape: Record<string, ZodTypeAny> = {};
+/** Build a JSON Schema object from a ParamDef record */
+function buildJsonSchema(params: ToolConfig['params']): Record<string, unknown> {
+  const properties: Record<string, JSONSchemaProperty> = {};
+  const required: string[] = [];
 
   for (const [key, def] of Object.entries(params)) {
-    let schema = zodForType(def.type);
+    properties[key] = {
+      ...jsonSchemaForType(def.type, def.enum),
+      description: def.description,
+    };
 
-    // Apply enum constraint for strings
-    if (def.enum && def.type === 'string') {
-      schema = z.enum(def.enum as [string, ...string[]]);
+    if (def.required !== false && def.default === undefined) {
+      required.push(key);
     }
-
-    // Add description
-    schema = schema.describe(def.description);
-
-    // Make optional if not required
-    if (def.required === false) {
-      schema = schema.optional();
-    }
-
-    shape[key] = schema;
   }
 
-  return z.object(shape);
+  return {
+    type: 'object',
+    properties,
+    ...(required.length > 0 ? { required } : {}),
+  };
 }
 
 /**
- * Create Vercel AI SDK tools from an array of ToolConfig.
- * Returns a Record<toolName, Tool> ready to spread into excelTools.
+ * Create Copilot SDK tools from an array of ToolConfig.
+ * Returns Tool[] ready for use in SessionConfig.tools.
  */
-export function createTools(configs: readonly ToolConfig[]): Record<string, Tool> {
-  const tools: Record<string, Tool> = {};
-
-  for (const config of configs) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment -- dynamic schema can't satisfy tool()'s generic inference
-    const schema = buildZodSchema(config.params) as any;
-    tools[config.name] = tool({
-      description: config.description,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- schema is dynamically built
-      inputSchema: schema,
-      execute: async (args: Record<string, unknown>) => {
-        return excelRun(async context => {
-          return config.execute(context, args);
-        });
-      },
-    });
-  }
-
-  return tools;
+export function createTools(configs: readonly ToolConfig[]): Tool[] {
+  return configs.map(config => ({
+    name: config.name,
+    description: config.description,
+    parameters: buildJsonSchema(config.params),
+    handler: async (_args: unknown, invocation: ToolInvocation): Promise<ToolResultObject> => {
+      const args = invocation.arguments as Record<string, unknown>;
+      try {
+        const result = await excelRun(context => config.execute(context, args));
+        return {
+          textResultForLlm: typeof result === 'string' ? result : JSON.stringify(result),
+          resultType: 'success',
+          toolTelemetry: {},
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          textResultForLlm: message,
+          resultType: 'failure',
+          error: message,
+          toolTelemetry: {},
+        };
+      }
+    },
+  }));
 }

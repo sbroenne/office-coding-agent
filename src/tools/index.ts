@@ -12,10 +12,10 @@ import {
   pivotTableConfigs,
 } from './configs';
 import type { ToolConfig } from './codegen/types';
-import type { ToolSet } from 'ai';
+import type { Tool } from '@github/copilot-sdk';
 import type { OfficeHostApp } from '@/services/office/host';
 
-export { getGeneralTools, webFetchTool, createRunSubagentTool } from './general';
+export { webFetchTool } from './general';
 
 export const MAX_TOOLS_PER_REQUEST = 128;
 
@@ -33,27 +33,18 @@ export const allConfigs: readonly (readonly ToolConfig[])[] = [
   pivotTableConfigs,
 ];
 
-/** All Excel tools combined into a single record for AI SDK */
-export const excelTools: ToolSet = allConfigs.reduce<ToolSet>((acc, configs) => {
-  const generatedTools = createTools(configs);
-  return { ...acc, ...generatedTools };
-}, {});
+/** All Excel tools combined into a single array for Copilot SDK */
+export const excelTools: Tool[] = allConfigs.flatMap(configs => createTools(configs));
 
-export const powerPointTools: ToolSet = {};
+export const powerPointTools: Tool[] = [];
 
-function clampToolSet(toolSet: ToolSet, maxTools = MAX_TOOLS_PER_REQUEST): ToolSet {
-  const entries = Object.entries(toolSet);
-  if (entries.length <= maxTools) return toolSet;
-  return Object.fromEntries(entries.slice(0, maxTools)) as ToolSet;
-}
-
-export function getToolsForHost(host: OfficeHostApp): ToolSet {
+export function getToolsForHost(host: OfficeHostApp): Tool[] {
   switch (host) {
     case 'excel':
-      return clampToolSet(excelTools);
+      return excelTools.slice(0, MAX_TOOLS_PER_REQUEST);
     case 'powerpoint':
-      return clampToolSet(powerPointTools);
+      return powerPointTools.slice(0, MAX_TOOLS_PER_REQUEST);
     default:
-      return {};
+      return [];
   }
 }

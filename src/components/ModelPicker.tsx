@@ -1,54 +1,26 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Check, ChevronDown, Settings } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
-import type { ModelInfo, ModelProvider } from '@/types';
+import { COPILOT_MODELS } from '@/types';
+import type { CopilotModel } from '@/types';
 
-/** Provider display order */
-const PROVIDER_ORDER: ModelProvider[] = [
-  'Anthropic',
-  'OpenAI',
-  'DeepSeek',
-  'Meta',
-  'Mistral',
-  'xAI',
-  'Microsoft',
-  'Other',
-];
+const PROVIDER_ORDER: CopilotModel['provider'][] = ['Anthropic', 'OpenAI', 'Google', 'Other'];
 
-interface ModelPickerProps {
-  onOpenSettings?: () => void;
-}
-
-export const ModelPicker: React.FC<ModelPickerProps> = ({ onOpenSettings }) => {
+export const ModelPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const { activeModel, setActiveModel } = useSettingsStore();
 
-  const {
-    activeModelId,
-    setActiveModel,
-    getActiveEndpoint,
-    getActiveModel,
-    getModelsForActiveEndpoint,
-  } = useSettingsStore();
+  const currentModel = COPILOT_MODELS.find(m => m.id === activeModel);
+  const displayLabel = currentModel?.name ?? 'Select model';
 
-  const activeEndpoint = getActiveEndpoint();
-  const activeModel = getActiveModel();
-  const models = getModelsForActiveEndpoint();
-
-  const groupedModels = groupByProvider(models);
-  const displayLabel = activeModel?.name ?? 'Select model';
-
-  if (!activeEndpoint) {
-    return (
-      <button
-        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground opacity-50 cursor-not-allowed"
-        disabled
-      >
-        No endpoint configured
-      </button>
-    );
-  }
+  const groupedModels = COPILOT_MODELS.reduce((groups, model) => {
+    const group = groups.get(model.provider) ?? [];
+    group.push(model);
+    groups.set(model.provider, group);
+    return groups;
+  }, new Map<CopilotModel['provider'], CopilotModel[]>());
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -69,19 +41,6 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onOpenSettings }) => {
           sideOffset={4}
           align="start"
         >
-          {models.length === 0 && (
-            <button
-              onClick={() => {
-                onOpenSettings?.();
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent"
-            >
-              <Settings className="size-3.5" />
-              Configure models in Settings
-            </button>
-          )}
-
           {PROVIDER_ORDER.filter(p => groupedModels.get(p)?.length).map((provider, idx, arr) => {
             const providerModels = groupedModels.get(provider) ?? [];
             return (
@@ -90,7 +49,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onOpenSettings }) => {
                   {provider}
                 </div>
                 {providerModels.map(model => {
-                  const isActive = model.id === activeModelId;
+                  const isActive = model.id === activeModel;
                   return (
                     <button
                       key={model.id}
@@ -119,16 +78,3 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ onOpenSettings }) => {
     </Popover.Root>
   );
 };
-
-function groupByProvider(models: ModelInfo[]): Map<ModelProvider, ModelInfo[]> {
-  const groups = new Map<ModelProvider, ModelInfo[]>();
-
-  for (const model of models) {
-    const provider = model.provider;
-    const group = groups.get(provider) ?? [];
-    group.push(model);
-    groups.set(provider, group);
-  }
-
-  return groups;
-}
