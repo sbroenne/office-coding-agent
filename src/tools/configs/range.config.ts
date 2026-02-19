@@ -15,7 +15,7 @@ export const rangeConfigs: readonly ToolConfig[] = [
   {
     name: 'get_range_values',
     description:
-      'Read cell values from a specified range. Returns a 2D array of the displayed values (not formulas). Use get_range_formulas instead if you need to inspect formulas.',
+      'Read cell values from a specified range. Returns a 2D array of the displayed values (not formulas). Use get_range_formulas instead if you need to inspect formulas. Use maxRows/maxColumns to limit the response size on large ranges, and startRow/startColumn to page through data.',
     params: {
       address: {
         type: 'string',
@@ -26,18 +26,75 @@ export const rangeConfigs: readonly ToolConfig[] = [
         required: false,
         description: 'Optional worksheet name. Uses active sheet if omitted.',
       },
+      maxRows: {
+        type: 'number',
+        required: false,
+        description:
+          'Maximum number of rows to return. Omit to return all rows. Use with startRow to page through large ranges.',
+      },
+      maxColumns: {
+        type: 'number',
+        required: false,
+        description:
+          'Maximum number of columns to return. Omit to return all columns. Use with startColumn to page through wide ranges.',
+      },
+      startRow: {
+        type: 'number',
+        required: false,
+        description:
+          '1-based row offset within the range to start reading from. Defaults to 1 (first row). Use with maxRows to read subsequent pages.',
+      },
+      startColumn: {
+        type: 'number',
+        required: false,
+        description:
+          '1-based column offset within the range to start reading from. Defaults to 1 (first column). Use with maxColumns to read subsequent pages.',
+      },
     },
     execute: async (context, args) => {
       const sheet = getSheet(context, args.sheetName as string | undefined);
       const range = sheet.getRange(args.address as string);
       range.load(['values', 'address', 'rowCount', 'columnCount']);
       await context.sync();
-      return {
+
+      const startRow = Math.max(1, (args.startRow as number | undefined) ?? 1);
+      const startCol = Math.max(1, (args.startColumn as number | undefined) ?? 1);
+      const maxRows = args.maxRows as number | undefined;
+      const maxCols = args.maxColumns as number | undefined;
+
+      const rowStart = startRow - 1; // convert to 0-based
+      const colStart = startCol - 1;
+      const rowEnd =
+        maxRows != null ? Math.min(rowStart + maxRows, range.rowCount) : range.rowCount;
+      const colEnd =
+        maxCols != null ? Math.min(colStart + maxCols, range.columnCount) : range.columnCount;
+
+      const slicedValues = range.values
+        .slice(rowStart, rowEnd)
+        .map((row: unknown[]) => row.slice(colStart, colEnd));
+
+      const result: Record<string, unknown> = {
         address: range.address,
         rowCount: range.rowCount,
         columnCount: range.columnCount,
-        values: range.values,
+        values: slicedValues,
       };
+
+      const isPaged = maxRows != null || maxCols != null || startRow > 1 || startCol > 1;
+      if (isPaged) {
+        result.rowsReturned = slicedValues.length;
+        result.columnsReturned = slicedValues[0]?.length ?? 0;
+        if (rowEnd < range.rowCount) {
+          result.moreRows = true;
+          result.nextStartRow = rowEnd + 1;
+        }
+        if (colEnd < range.columnCount) {
+          result.moreColumns = true;
+          result.nextStartColumn = colEnd + 1;
+        }
+      }
+
+      return result;
     },
   },
 
@@ -68,7 +125,7 @@ export const rangeConfigs: readonly ToolConfig[] = [
   {
     name: 'get_used_range',
     description:
-      'Get the bounding rectangle of all non-empty cells on a worksheet. By default returns only the address and dimensions (rowCount, columnCount) — no cell values. Set maxRows to include values for the first N rows (e.g., maxRows=5 to preview headers and a few data rows). Use get_range_values to read a specific sub-range when you already know the address.',
+      'Get the bounding rectangle of all non-empty cells on a worksheet. By default returns only the address and dimensions (rowCount, columnCount) — no cell values. Set maxRows to include values for the first N rows (e.g., maxRows=5 to preview headers and a few data rows). Use startRow/startColumn/maxColumns to page through large sheets in 2D. Use get_range_values to read a specific sub-range when you already know the address.',
     params: {
       sheetName: {
         type: 'string',
@@ -81,13 +138,34 @@ export const rangeConfigs: readonly ToolConfig[] = [
         description:
           'How many rows of cell values to include in the response. Omit to get dimensions only (no values). Set to a small number like 5 to preview headers + a few data rows, saving tokens on large sheets.',
       },
+      maxColumns: {
+        type: 'number',
+        required: false,
+        description:
+          'Maximum number of columns to return per row. Omit to return all columns. Use with startColumn to page through wide sheets.',
+      },
+      startRow: {
+        type: 'number',
+        required: false,
+        description:
+          '1-based row offset to start reading from. Defaults to 1. Use with maxRows to read subsequent row pages.',
+      },
+      startColumn: {
+        type: 'number',
+        required: false,
+        description:
+          '1-based column offset to start reading from. Defaults to 1. Use with maxColumns to read subsequent column pages.',
+      },
     },
     execute: async (context, args) => {
       const sheet = getSheet(context, args.sheetName as string | undefined);
       const usedRange = sheet.getUsedRange();
 
       const maxRows = args.maxRows as number | undefined;
-      const includeValues = maxRows != null;
+      const maxCols = args.maxColumns as number | undefined;
+      const startRow = Math.max(1, (args.startRow as number | undefined) ?? 1);
+      const startCol = Math.max(1, (args.startColumn as number | undefined) ?? 1);
+      const includeValues = maxRows != null || startRow > 1 || startCol > 1 || maxCols != null;
 
       if (includeValues) {
         usedRange.load(['address', 'rowCount', 'columnCount', 'values']);
@@ -103,11 +181,28 @@ export const rangeConfigs: readonly ToolConfig[] = [
       };
 
       if (includeValues) {
-        result.values =
-          maxRows < usedRange.rowCount ? usedRange.values.slice(0, maxRows) : usedRange.values;
-        if (maxRows < usedRange.rowCount) {
-          result.truncated = true;
-          result.rowsReturned = maxRows;
+        const rowStart = startRow - 1; // convert to 0-based
+        const colStart = startCol - 1;
+        const rowEnd =
+          maxRows != null ? Math.min(rowStart + maxRows, usedRange.rowCount) : usedRange.rowCount;
+        const colEnd =
+          maxCols != null
+            ? Math.min(colStart + maxCols, usedRange.columnCount)
+            : usedRange.columnCount;
+
+        result.values = usedRange.values
+          .slice(rowStart, rowEnd)
+          .map((row: unknown[]) => row.slice(colStart, colEnd));
+        result.rowsReturned = (result.values as unknown[][]).length;
+        result.columnsReturned = (result.values as unknown[][])[0]?.length ?? 0;
+
+        if (rowEnd < usedRange.rowCount) {
+          result.moreRows = true;
+          result.nextStartRow = rowEnd + 1;
+        }
+        if (colEnd < usedRange.columnCount) {
+          result.moreColumns = true;
+          result.nextStartColumn = colEnd + 1;
         }
       }
 

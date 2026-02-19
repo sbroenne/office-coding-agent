@@ -1,10 +1,10 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-02-17T11:04:29.295Z",
+  "generatedAt": "2026-02-19T16:58:18.861Z",
   "tools": [
     {
       "name": "get_range_values",
-      "description": "Read cell values from a specified range. Returns a 2D array of the displayed values (not formulas). Use get_range_formulas instead if you need to inspect formulas.",
+      "description": "Read cell values from a specified range. Returns a 2D array of the displayed values (not formulas). Use get_range_formulas instead if you need to inspect formulas. Use maxRows/maxColumns to limit the response size on large ranges, and startRow/startColumn to page through data.",
       "params": {
         "address": {
           "type": "string",
@@ -15,6 +15,26 @@
           "type": "string",
           "required": false,
           "description": "Optional worksheet name. Uses active sheet if omitted."
+        },
+        "maxRows": {
+          "type": "number",
+          "required": false,
+          "description": "Maximum number of rows to return. Omit to return all rows. Use with startRow to page through large ranges."
+        },
+        "maxColumns": {
+          "type": "number",
+          "required": false,
+          "description": "Maximum number of columns to return. Omit to return all columns. Use with startColumn to page through wide ranges."
+        },
+        "startRow": {
+          "type": "number",
+          "required": false,
+          "description": "1-based row offset within the range to start reading from. Defaults to 1 (first row). Use with maxRows to read subsequent pages."
+        },
+        "startColumn": {
+          "type": "number",
+          "required": false,
+          "description": "1-based column offset within the range to start reading from. Defaults to 1 (first column). Use with maxColumns to read subsequent pages."
         }
       }
     },
@@ -41,7 +61,7 @@
     },
     {
       "name": "get_used_range",
-      "description": "Get the bounding rectangle of all non-empty cells on a worksheet. By default returns only the address and dimensions (rowCount, columnCount) — no cell values. Set maxRows to include values for the first N rows (e.g., maxRows=5 to preview headers and a few data rows). Use get_range_values to read a specific sub-range when you already know the address.",
+      "description": "Get the bounding rectangle of all non-empty cells on a worksheet. By default returns only the address and dimensions (rowCount, columnCount) — no cell values. Set maxRows to include values for the first N rows (e.g., maxRows=5 to preview headers and a few data rows). Use startRow/startColumn/maxColumns to page through large sheets in 2D. Use get_range_values to read a specific sub-range when you already know the address.",
       "params": {
         "sheetName": {
           "type": "string",
@@ -52,6 +72,21 @@
           "type": "number",
           "required": false,
           "description": "How many rows of cell values to include in the response. Omit to get dimensions only (no values). Set to a small number like 5 to preview headers + a few data rows, saving tokens on large sheets."
+        },
+        "maxColumns": {
+          "type": "number",
+          "required": false,
+          "description": "Maximum number of columns to return per row. Omit to return all columns. Use with startColumn to page through wide sheets."
+        },
+        "startRow": {
+          "type": "number",
+          "required": false,
+          "description": "1-based row offset to start reading from. Defaults to 1. Use with maxRows to read subsequent row pages."
+        },
+        "startColumn": {
+          "type": "number",
+          "required": false,
+          "description": "1-based column offset to start reading from. Defaults to 1. Use with maxColumns to read subsequent column pages."
         }
       }
     },
@@ -2423,8 +2458,51 @@
       }
     },
     {
+      "name": "refresh_all_pivot_tables",
+      "description": "Refresh all PivotTables. If sheetName is provided, refreshes PivotTables on that worksheet; otherwise refreshes all workbook PivotTables.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name to scope refresh to one sheet."
+        }
+      }
+    },
+    {
       "name": "get_pivot_table_source_info",
       "description": "Get PivotTable source metadata, including source type and source address/connection string when available.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_hierarchy_counts",
+      "description": "Get counts of row, column, filter, and data hierarchies currently configured on a PivotTable.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_hierarchies",
+      "description": "List row, column, filter, and data hierarchies for a PivotTable including names and ids.",
       "params": {
         "pivotTableName": {
           "type": "string",
@@ -2617,6 +2695,27 @@
     {
       "name": "get_pivot_field_filters",
       "description": "Get active filter state for a PivotField, including whether any/date/label/manual/value filters are currently set.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "fieldName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotField (source column name)"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_field_items",
+      "description": "List PivotItems for a PivotField, including item names, ids, and expand state.",
       "params": {
         "pivotTableName": {
           "type": "string",
@@ -2843,6 +2942,209 @@
           "type": "boolean",
           "required": true,
           "description": "Whether to show all items for the field"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_layout_ranges",
+      "description": "Get key PivotLayout range addresses (table, row labels, column labels, data body, and filter axis when available).",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_pivot_layout_display_options",
+      "description": "Configure PivotLayout display and formatting behavior such as repeat labels, blank lines, auto-format, empty-cell text, and accessibility text.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "repeatAllItemLabels": {
+          "type": "boolean",
+          "required": false,
+          "description": "Repeat item labels across all pivot fields"
+        },
+        "displayBlankLineAfterEachItem": {
+          "type": "boolean",
+          "required": false,
+          "description": "Display a blank line after each pivot item across fields"
+        },
+        "autoFormat": {
+          "type": "boolean",
+          "required": false,
+          "description": "Auto-apply formatting when refreshed or fields move"
+        },
+        "preserveFormatting": {
+          "type": "boolean",
+          "required": false,
+          "description": "Preserve formatting on refresh/recalculate"
+        },
+        "fillEmptyCells": {
+          "type": "boolean",
+          "required": false,
+          "description": "Fill empty pivot cells using emptyCellText"
+        },
+        "emptyCellText": {
+          "type": "string",
+          "required": false,
+          "description": "Text used when fillEmptyCells is enabled"
+        },
+        "enableFieldList": {
+          "type": "boolean",
+          "required": false,
+          "description": "Enable/disable field list in UI"
+        },
+        "altTextTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Accessibility alt text title for the PivotTable"
+        },
+        "altTextDescription": {
+          "type": "string",
+          "required": false,
+          "description": "Accessibility alt text description for the PivotTable"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_data_hierarchy_for_cell",
+      "description": "Get the DataPivotHierarchy (measure) used to compute a specific cell in the PivotTable data body.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "cellAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Single cell address inside the PivotTable data body (e.g., \"B5\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_items_for_cell",
+      "description": "Get PivotItems from a specified axis that contribute to a PivotTable data-body cell value.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "axis": {
+          "type": "string",
+          "required": true,
+          "description": "Pivot axis to inspect for contributing items",
+          "enum": [
+            "Row",
+            "Column",
+            "Data",
+            "Filter"
+          ]
+        },
+        "cellAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Single cell address inside the PivotTable data body (e.g., \"B5\")"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "set_pivot_layout_auto_sort_on_cell",
+      "description": "Apply PivotTable autosort using a specific pivot data-body cell as context (equivalent to UI autosort behavior).",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
+        },
+        "cellAddress": {
+          "type": "string",
+          "required": true,
+          "description": "Single cell address inside the PivotTable data body used as autosort context"
+        },
+        "sortBy": {
+          "type": "string",
+          "required": true,
+          "description": "Sort direction for autosort",
+          "enum": [
+            "Ascending",
+            "Descending"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_table_count",
+      "description": "Get the PivotTable count for a worksheet or for the entire workbook when no sheet is provided.",
+      "params": {
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name. If omitted, counts PivotTables in the workbook."
+        }
+      }
+    },
+    {
+      "name": "pivot_table_exists",
+      "description": "Check whether a PivotTable exists by name on a worksheet or across workbook PivotTables.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable to check"
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "get_pivot_table_location",
+      "description": "Get PivotTable worksheet name and layout range address for a named PivotTable on a worksheet.",
+      "params": {
+        "pivotTableName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the PivotTable"
         },
         "sheetName": {
           "type": "string",
