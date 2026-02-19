@@ -17,3 +17,4 @@ export type {
 } from './excel';
 export type { AgentSkill, SkillMetadata } from './skill';
 export type { AgentConfig, AgentMetadata } from './agent';
+export type { McpServerConfig, McpTransportType } from './mcp';
