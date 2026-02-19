@@ -8,7 +8,7 @@ import {
   type LanguageModel,
 } from 'ai';
 
-import { getToolsForHost } from '@/tools';
+import { getToolsForHost, getGeneralTools } from '@/tools';
 import { buildSkillContext } from '@/services/skills';
 import { resolveActiveMcpServers } from '@/services/mcp';
 import { resolveActiveAgent } from '@/services/agents';
@@ -41,10 +41,11 @@ export function useOfficeChat(model: LanguageModel | null, host: OfficeHostApp, 
     const skillContext = buildSkillContext(activeSkillNames ?? undefined);
     const instructions = `${buildSystemPrompt(host)}\n\n${agentInstructions}${skillContext}`;
 
+    const hostTools = tools ?? getToolsForHost(host);
     return new ToolLoopAgent({
       model,
       instructions,
-      tools: { ...(tools ?? getToolsForHost(host)), ...mcpTools },
+      tools: { ...hostTools, ...getGeneralTools(model, hostTools), ...mcpTools },
       stopWhen: stepCountIs(10),
       maxRetries: 4,
     });

@@ -11,9 +11,17 @@ import {
   pivotTableConfigs,
 } from './configs';
 import type { ToolConfig } from './codegen/types';
-import { tool, type ToolSet, type ToolExecutionOptions } from 'ai';
+import {
+  tool,
+  type ToolSet,
+  type ToolExecutionOptions,
+  type Tool,
+  type ToolExecuteFunction,
+} from 'ai';
 import { z } from 'zod';
 import type { OfficeHostApp } from '@/services/office/host';
+
+export { getGeneralTools, webFetchTool, createRunSubagentTool } from './general';
 
 export const MAX_TOOLS_PER_REQUEST = 128;
 
@@ -80,12 +88,18 @@ const CONSOLIDATED_RANGE_ADVANCED_TOOL_NAMES = [
   'set_cell_borders',
 ] as const;
 
-function getRequiredTool(name: string) {
+/** A tool that is guaranteed to have an execute function. */
+type ExecutableTool = Tool & { execute: ToolExecuteFunction<Record<string, unknown>, unknown> };
+
+function getRequiredTool(name: string): ExecutableTool {
   const toolDef = excelTools[name];
   if (!toolDef) {
     throw new Error(`Missing required consolidated source tool: ${name}`);
   }
-  return toolDef;
+  if (!toolDef.execute) {
+    throw new Error(`Tool ${name} has no execute function`);
+  }
+  return toolDef as ExecutableTool;
 }
 
 function buildConsolidatedExcelTools(): ToolSet {
@@ -159,7 +173,7 @@ function buildConsolidatedExcelTools(): ToolSet {
     }),
     execute: (args, options: ToolExecutionOptions) => {
       if (args.action === 'list') {
-        return listComments.execute!({ sheetName: args.sheetName }, options) as Promise<unknown>;
+        return listComments.execute({ sheetName: args.sheetName }, options) as Promise<unknown>;
       }
 
       if (!args.cellAddress) {
@@ -168,7 +182,7 @@ function buildConsolidatedExcelTools(): ToolSet {
 
       if (args.action === 'add') {
         if (!args.text) throw new Error('text is required for add comment action.');
-        return addComment.execute!(
+        return addComment.execute(
           {
             cellAddress: args.cellAddress,
             text: args.text,
@@ -180,7 +194,7 @@ function buildConsolidatedExcelTools(): ToolSet {
 
       if (args.action === 'edit') {
         if (!args.newText) throw new Error('newText is required for edit comment action.');
-        return editComment.execute!(
+        return editComment.execute(
           {
             cellAddress: args.cellAddress,
             newText: args.newText,
@@ -190,7 +204,7 @@ function buildConsolidatedExcelTools(): ToolSet {
         ) as Promise<unknown>;
       }
 
-      return deleteComment.execute!(
+      return deleteComment.execute(
         {
           cellAddress: args.cellAddress,
           sheetName: args.sheetName,
@@ -211,14 +225,14 @@ function buildConsolidatedExcelTools(): ToolSet {
     }),
     execute: (args, options: ToolExecutionOptions) => {
       if (args.action === 'get') {
-        return getWorkbookProtection.execute!({}, options) as Promise<unknown>;
+        return getWorkbookProtection.execute({}, options) as Promise<unknown>;
       }
 
       if (args.action === 'protect') {
-        return protectWorkbook.execute!({ password: args.password }, options) as Promise<unknown>;
+        return protectWorkbook.execute({ password: args.password }, options) as Promise<unknown>;
       }
 
-      return unprotectWorkbook.execute!({ password: args.password }, options) as Promise<unknown>;
+      return unprotectWorkbook.execute({ password: args.password }, options) as Promise<unknown>;
     },
   });
 
@@ -230,18 +244,18 @@ function buildConsolidatedExcelTools(): ToolSet {
     }),
     execute: (args, options: ToolExecutionOptions) => {
       if (args.action === 'list') {
-        return listQueries.execute!({}, options) as Promise<unknown>;
+        return listQueries.execute({}, options) as Promise<unknown>;
       }
 
       if (args.action === 'count') {
-        return getQueryCount.execute!({}, options) as Promise<unknown>;
+        return getQueryCount.execute({}, options) as Promise<unknown>;
       }
 
       if (!args.queryName) {
         throw new Error('queryName is required for get action.');
       }
 
-      return getQuery.execute!({ queryName: args.queryName }, options) as Promise<unknown>;
+      return getQuery.execute({ queryName: args.queryName }, options) as Promise<unknown>;
     },
   });
 
@@ -256,14 +270,14 @@ function buildConsolidatedExcelTools(): ToolSet {
     }),
     execute: (args, options: ToolExecutionOptions) => {
       if (args.action === 'list') {
-        return listNamedRanges.execute!({}, options) as Promise<unknown>;
+        return listNamedRanges.execute({}, options) as Promise<unknown>;
       }
 
       if (!args.name || !args.address) {
         throw new Error('name and address are required for define action.');
       }
 
-      return defineNamedRange.execute!(
+      return defineNamedRange.execute(
         {
           name: args.name,
           address: args.address,
@@ -296,24 +310,24 @@ function buildConsolidatedExcelTools(): ToolSet {
     }),
     execute: (args, options: ToolExecutionOptions) => {
       if (args.action === 'recalculate') {
-        return recalculateWorkbook.execute!(
+        return recalculateWorkbook.execute(
           { recalcType: args.recalcType },
           options
         ) as Promise<unknown>;
       }
 
       if (args.action === 'save') {
-        return saveWorkbook.execute!(
+        return saveWorkbook.execute(
           { saveBehavior: args.saveBehavior },
           options
         ) as Promise<unknown>;
       }
 
       if (args.action === 'get-properties') {
-        return getWorkbookProperties.execute!({}, options) as Promise<unknown>;
+        return getWorkbookProperties.execute({}, options) as Promise<unknown>;
       }
 
-      return setWorkbookProperties.execute!(
+      return setWorkbookProperties.execute(
         {
           author: args.author,
           category: args.category,
@@ -356,7 +370,7 @@ function buildConsolidatedExcelTools(): ToolSet {
     execute: (args, options: ToolExecutionOptions) => {
       switch (args.action) {
         case 'add-column':
-          return addTableColumn.execute!(
+          return addTableColumn.execute(
             {
               tableName: args.tableName,
               columnName: args.columnName,
@@ -366,29 +380,29 @@ function buildConsolidatedExcelTools(): ToolSet {
           ) as Promise<unknown>;
         case 'delete-column':
           if (!args.columnName) throw new Error('columnName is required for delete-column action.');
-          return deleteTableColumn.execute!(
+          return deleteTableColumn.execute(
             { tableName: args.tableName, columnName: args.columnName },
             options
           ) as Promise<unknown>;
         case 'convert-to-range':
-          return convertTableToRange.execute!(
+          return convertTableToRange.execute(
             { tableName: args.tableName },
             options
           ) as Promise<unknown>;
         case 'resize':
           if (!args.newAddress) throw new Error('newAddress is required for resize action.');
-          return resizeTable.execute!(
+          return resizeTable.execute(
             { tableName: args.tableName, newAddress: args.newAddress },
             options
           ) as Promise<unknown>;
         case 'set-style':
           if (!args.style) throw new Error('style is required for set-style action.');
-          return setTableStyle.execute!(
+          return setTableStyle.execute(
             { tableName: args.tableName, style: args.style },
             options
           ) as Promise<unknown>;
         case 'set-header-totals-visibility':
-          return setTableHeaderTotalsVisibility.execute!(
+          return setTableHeaderTotalsVisibility.execute(
             {
               tableName: args.tableName,
               showHeaders: args.showHeaders,
@@ -397,7 +411,7 @@ function buildConsolidatedExcelTools(): ToolSet {
             options
           ) as Promise<unknown>;
         default:
-          return reapplyTableFilters.execute!(
+          return reapplyTableFilters.execute(
             { tableName: args.tableName },
             options
           ) as Promise<unknown>;
@@ -445,7 +459,7 @@ function buildConsolidatedExcelTools(): ToolSet {
               'sourceAddress and destinationAddress are required for auto-fill action.'
             );
           }
-          return autoFillRange.execute!(
+          return autoFillRange.execute(
             {
               sourceAddress: args.sourceAddress,
               destinationAddress: args.destinationAddress,
@@ -456,7 +470,7 @@ function buildConsolidatedExcelTools(): ToolSet {
           ) as Promise<unknown>;
         case 'flash-fill':
           if (!args.address) throw new Error('address is required for flash-fill action.');
-          return flashFillRange.execute!(
+          return flashFillRange.execute(
             { address: args.address, sheetName: args.sheetName },
             options
           ) as Promise<unknown>;
@@ -464,7 +478,7 @@ function buildConsolidatedExcelTools(): ToolSet {
           if (!args.address || !args.cellType) {
             throw new Error('address and cellType are required for get-special-cells action.');
           }
-          return getSpecialCells.execute!(
+          return getSpecialCells.execute(
             {
               address: args.address,
               cellType: args.cellType,
@@ -475,25 +489,25 @@ function buildConsolidatedExcelTools(): ToolSet {
           ) as Promise<unknown>;
         case 'get-precedents':
           if (!args.address) throw new Error('address is required for get-precedents action.');
-          return getRangePrecedents.execute!(
+          return getRangePrecedents.execute(
             { address: args.address, sheetName: args.sheetName },
             options
           ) as Promise<unknown>;
         case 'get-dependents':
           if (!args.address) throw new Error('address is required for get-dependents action.');
-          return getRangeDependents.execute!(
+          return getRangeDependents.execute(
             { address: args.address, sheetName: args.sheetName },
             options
           ) as Promise<unknown>;
         case 'recalculate':
           if (!args.address) throw new Error('address is required for recalculate action.');
-          return recalculateRange.execute!(
+          return recalculateRange.execute(
             { address: args.address, sheetName: args.sheetName },
             options
           ) as Promise<unknown>;
         case 'get-tables':
           if (!args.address) throw new Error('address is required for get-tables action.');
-          return getTablesForRange.execute!(
+          return getTablesForRange.execute(
             { address: args.address, sheetName: args.sheetName },
             options
           ) as Promise<unknown>;
@@ -501,7 +515,7 @@ function buildConsolidatedExcelTools(): ToolSet {
           if (!args.address || !args.target || args.visible === undefined) {
             throw new Error('address, target, and visible are required for visibility action.');
           }
-          return toggleRowColumnVisibility.execute!(
+          return toggleRowColumnVisibility.execute(
             {
               address: args.address,
               target: args.target,
@@ -514,7 +528,7 @@ function buildConsolidatedExcelTools(): ToolSet {
           if (!args.address || !args.groupBy) {
             throw new Error('address and groupBy are required for group action.');
           }
-          return groupRowsColumns.execute!(
+          return groupRowsColumns.execute(
             {
               address: args.address,
               groupBy: args.groupBy,
@@ -526,7 +540,7 @@ function buildConsolidatedExcelTools(): ToolSet {
           if (!args.address || !args.groupBy) {
             throw new Error('address and groupBy are required for ungroup action.');
           }
-          return ungroupRowsColumns.execute!(
+          return ungroupRowsColumns.execute(
             {
               address: args.address,
               groupBy: args.groupBy,
@@ -538,7 +552,7 @@ function buildConsolidatedExcelTools(): ToolSet {
           if (!args.address || !args.borderStyle) {
             throw new Error('address and borderStyle are required for set-borders action.');
           }
-          return setCellBorders.execute!(
+          return setCellBorders.execute(
             {
               address: args.address,
               borderStyle: args.borderStyle,
