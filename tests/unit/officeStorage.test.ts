@@ -1,13 +1,68 @@
 /**
  * Unit tests for officeStorage.
  *
- * In jsdom (Vitest), OfficeRuntime is undefined, so all operations
- * fall back to localStorage. These tests verify the fallback path
- * works correctly — the OfficeRuntime path is tested in E2E.
+ * Two suites:
+ *  1. OfficeRuntime.storage — localStorage recovery — tests the scenario where
+ *     a previous setItem() failed and wrote to localStorage instead. On the next
+ *     getItem() call, OfficeRuntime.storage has nothing for the key; we must also
+ *     check localStorage so the data isn't silently lost.
+ *     (Happy path + error fallbacks are in officeStorageRuntime.test.ts)
+ *  2. localStorage fallback — OfficeRuntime is undefined (jsdom default), so all
+ *     operations fall back to localStorage.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { officeStorage } from '@/stores/officeStorage';
+
+// ─── 1. OfficeRuntime path — localStorage recovery scenario ──────────────────
+
+describe('officeStorage (OfficeRuntime.storage — localStorage recovery)', () => {
+  const mockStorage = {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockStorage.getItem.mockReset();
+    mockStorage.setItem.mockReset();
+    mockStorage.removeItem.mockReset();
+    (globalThis as Record<string, unknown>).OfficeRuntime = { storage: mockStorage };
+  });
+
+  afterEach(() => {
+    delete (globalThis as Record<string, unknown>).OfficeRuntime;
+  });
+
+  it('getItem checks localStorage when OfficeRuntime.storage returns null (recovery from failed setItem)', async () => {
+    // Simulate: a previous setItem() failed and fell back to localStorage.
+    // OfficeRuntime.storage has nothing for this key.
+    mockStorage.getItem.mockResolvedValue(null);
+    localStorage.setItem('settings', '{"state":{"endpoints":[]},"version":1}');
+
+    const result = await officeStorage.getItem('settings');
+
+    expect(result).toBe('{"state":{"endpoints":[]},"version":1}');
+  });
+
+  it('getItem checks localStorage when OfficeRuntime.storage returns undefined (recovery)', async () => {
+    mockStorage.getItem.mockResolvedValue(undefined);
+    localStorage.setItem('settings', '{"state":{"endpoints":[]},"version":1}');
+
+    const result = await officeStorage.getItem('settings');
+
+    expect(result).toBe('{"state":{"endpoints":[]},"version":1}');
+  });
+
+  it('getItem returns null when both OfficeRuntime and localStorage have no value', async () => {
+    mockStorage.getItem.mockResolvedValue(null);
+
+    expect(await officeStorage.getItem('nonexistent')).toBeNull();
+  });
+});
+
+// ─── 2. localStorage fallback (OfficeRuntime undefined) ──────────────────────
 
 describe('officeStorage (localStorage fallback)', () => {
   beforeEach(() => {

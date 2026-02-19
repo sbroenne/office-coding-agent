@@ -60,7 +60,15 @@ export const officeStorage: StateStorage = {
     if (storage) {
       try {
         const value = await storage.getItem(name);
-        return value ?? null;
+        // treat both null and undefined as "key not found"
+        if (value != null) {
+          return value;
+        }
+        // OfficeRuntime.storage has no value for this key.
+        // Check localStorage as a last resort — handles the case where a
+        // previous setItem() failed and wrote to localStorage instead, so
+        // we don't silently lose data the next time we read.
+        return localStorage.getItem(name);
       } catch (err) {
         console.warn('[officeStorage] getItem failed, falling back to localStorage:', err);
       }
