@@ -25,6 +25,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "playwright test",
@@ -35,7 +36,8 @@
     "runtime-logging-enable": "office-addin-dev-settings runtime-log --enable",
     "runtime-logging-disable": "office-addin-dev-settings runtime-log --disable",
     "runtime-logging-show": "office-addin-dev-settings runtime-log",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "prepare": "husky"
   },
   "dependencies": {
     "@ai-sdk/azure": "^3.0.29",
@@ -83,7 +85,9 @@
     "globals": "^17.3.0",
     "html-loader": "^5.1.0",
     "html-webpack-plugin": "^5.6.6",
+    "husky": "^9.1.7",
     "jsdom": "^28.1.0",
+    "lint-staged": "^16.2.7",
     "mini-css-extract-plugin": "^2.10.0",
     "mocha": "^11.7.5",
     "office-addin-debugging": "^6.0.6",
@@ -112,5 +116,9 @@
   "overrides": {
     "tmp": "0.2.4",
     "@noble/hashes": "2.0.1"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "src/**/*.css": ["prettier --write"]
   }
 }
