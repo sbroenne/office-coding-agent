@@ -1,19 +1,24 @@
 import { test, expect } from '../fixtures';
 
-test.describe('Settings Dialog', () => {
-  async function openSettings(page: import('@playwright/test').Page) {
-    const header = page.locator('div.flex.items-center.justify-between');
-    await header.locator('button').last().click();
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 3000 });
-  }
-
-  test('opens and shows the configured endpoint', async ({ configuredTaskpane: page }) => {
-    await openSettings(page);
-    await expect(page.getByRole('heading', { name: 'Test Endpoint' })).toBeVisible();
+test.describe('Model Picker', () => {
+  test('shows the active model name', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByText('Claude Sonnet 4.5')).toBeVisible({ timeout: 5000 });
   });
 
-  test('shows endpoint URL in the dialog', async ({ configuredTaskpane: page }) => {
-    await openSettings(page);
-    await expect(page.getByText('test.openai.azure.com')).toBeVisible();
+  test('opens the model list on click', async ({ configuredTaskpane: page }) => {
+    // Click the model picker button (contains the model name text)
+    await page.getByText('Claude Sonnet 4.5').click();
+
+    // Dropdown should show model groups
+    await expect(page.getByText('Anthropic')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('OpenAI')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('can select a different model', async ({ configuredTaskpane: page }) => {
+    await page.getByText('Claude Sonnet 4.5').click();
+    await page.getByText('GPT-4.1').click();
+
+    // Picker now shows the newly selected model
+    await expect(page.getByText('GPT-4.1')).toBeVisible({ timeout: 3000 });
   });
 });

@@ -1,12 +1,5 @@
-export type {
-  AuthMethod,
-  ProviderType,
-  FoundryEndpoint,
-  ModelInfo,
-  ModelProvider,
-  UserSettings,
-} from './settings';
-export { DEFAULT_SETTINGS } from './settings';
+export type { CopilotModel, UserSettings } from './settings';
+export { COPILOT_MODELS, DEFAULT_SETTINGS } from './settings';
 export type { ChatMessage, Suggestion, ToolCall } from './chat';
 export type {
   RangeData,
