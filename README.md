@@ -92,10 +92,10 @@ The project has four layers of tests:
 
 | Layer           | Tool       | Count    | What it covers                                                          |
 | --------------- | ---------- | -------- | ----------------------------------------------------------------------- |
-| **Unit**        | Vitest     | ~12 files | Pure functions, Zustand store, JSON Schema tool configs, host/agent parsing |
-| **Integration** | Vitest     | ~10 files | Component wiring (no live API needed)                                   |
-| **UI**          | Playwright | ~14 tests | Browser taskpane flows                                                  |
-| **E2E**         | Mocha      | ~187     | Excel commands inside real Excel Desktop                                |
+| **Unit**        | Vitest     | 18 files (265 tests) | Pure functions, Zustand store, JSON Schema tool configs, host/agent parsing |
+| **Integration** | Vitest     | 12 files             | Component wiring (no live API needed)                                   |
+| **UI**          | Playwright | ~14 tests            | Browser taskpane flows                                                  |
+| **E2E**         | Mocha      | 234 tests            | Excel commands inside real Excel Desktop (4 require live Copilot)       |
 
 ### Running Tests
 

@@ -72,7 +72,7 @@ The single most important architectural concept for testing this project is the 
 - **Reset store state** in `beforeEach` via `useSettingsStore.getState().reset()`.
 - **Use table-driven tests** (`it.each`) for functions with many input→output mappings.
 
-### Tier 1b: Integration Tests (`tests/integration/`) — 12 files
+### Tier 1b: Integration Tests (`tests/integration/`) — 12 files (47 tests)
 
 **Runner:** Vitest with jsdom  
 **Real components wired together; live Copilot WebSocket test auto-skips without a server.**
@@ -98,7 +98,7 @@ The single most important architectural concept for testing this project is the 
 - The live Copilot WebSocket test (`copilot-websocket.integration.test.ts`) auto-skips when `npm run server` is not running.
 - Both `vitest.config.ts` and `vitest.integration.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`.
 
-### Tier 2: E2E Tests (`tests-e2e/`) — ~187 tests
+### Tier 2: E2E Tests (`tests-e2e/`) — 234 tests
 
 **Runner:** Mocha inside Excel Desktop  
 **Real Excel.run(), real Office.js APIs.**
@@ -153,7 +153,7 @@ npm run test:integration
 # Watch mode
 npm run test:watch
 
-# E2E (requires Excel Desktop, ~187 tests)
+# E2E (requires Excel Desktop, 234 tests; 4 require live Copilot server)
 npm run test:e2e
 
 # Validate manifest
