@@ -1,4 +1,5 @@
 export { rangeConfigs } from './range.config';
+export { rangeFormatConfigs } from './rangeFormat.config';
 export { tableConfigs } from './table.config';
 export { chartConfigs } from './chart.config';
 export { sheetConfigs } from './sheet.config';

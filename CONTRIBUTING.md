@@ -5,8 +5,11 @@ Thanks for your interest in contributing to Office Coding Agent.
 ## Development Setup
 
 - Install dependencies: `npm install`
-- Start dev server: `npm run dev`
+- Start the Copilot proxy server: `npm run server` (requires GitHub Copilot subscription)
+- Or start the webpack-only dev server (UI only): `npm run dev`
 - Sideload in Excel Desktop: `npm run start:desktop`
+
+> **Note:** For full AI functionality you need an active GitHub Copilot subscription and must authenticate with `gh auth login` (or equivalent). For UI-only work (`npm run dev`) no subscription is required.
 
 ## Before Submitting a PR
 
@@ -27,6 +30,7 @@ If your change touches Excel host runtime behavior (`Excel.run` paths), also run
 - Follow existing architecture: single UI, host-routed runtime behavior.
 - Add or update tests for any behavior change.
 - Avoid introducing unrelated refactors in feature/fix PRs.
+- No live API credentials are needed for unit or integration tests — they run in jsdom without a Copilot connection.
 
 ## Pull Request Checklist
 
