@@ -154,418 +154,7 @@ function fail(name: string, error: string, meta?: Record<string, unknown>): void
 
 // ─── Tool execution helper ────────────────────────────────────────
 
-/** Flat registry keyed by config name for the legacy mapping table. */
-const ALL_CONFIGS: Readonly<Record<string, readonly ToolConfig[]>> = {
-  range: rangeConfigs,
-  range_format: rangeFormatConfigs,
-  table: tableConfigs,
-  chart: chartConfigs,
-  sheet: sheetConfigs,
-  workbook: workbookConfigs,
-  comment: commentConfigs,
-  conditional_format: conditionalFormatConfigs,
-  data_validation: dataValidationConfigs,
-  pivot: pivotTableConfigs,
-};
-
-type ToolMapping = {
-  configName: string;
-  action: string;
-  extraArgs?: Record<string, unknown>;
-  argTransform?: (args: Record<string, unknown>) => Record<string, unknown>;
-  resultTransform?: (result: unknown, originalArgs: Record<string, unknown>) => unknown;
-  /** Skip Excel.run entirely and return this synthetic result (for dropped capabilities). */
-  fakeResult?: (args: Record<string, unknown>) => unknown;
-};
-
-/**
- * Maps legacy (pre-consolidation) tool names to new action-based equivalents.
- * Handles renames, arg transforms, result-shape differences, and dropped operations.
- */
-const LEGACY_TOOL_MAP: Readonly<Record<string, ToolMapping>> = {
-  // ── Range ────────────────────────────────────────────────────────
-  get_range_values: { configName: 'range', action: 'get_values' },
-  set_range_values: { configName: 'range', action: 'set_values' },
-  get_used_range: { configName: 'range', action: 'get_used' },
-  clear_range: { configName: 'range', action: 'clear' },
-  sort_range: { configName: 'range', action: 'sort' },
-  copy_range: {
-    configName: 'range',
-    action: 'copy',
-    argTransform: args => {
-      const { sourceAddress, ...rest } = args;
-      return { ...rest, address: sourceAddress ?? rest.address };
-    },
-    resultTransform: r => ({ ...r as object, copiedTo: (r as { destination: string }).destination }),
-  },
-  find_in_range: { configName: 'range', action: 'find' },
-  replace_values: { configName: 'range', action: 'replace' },
-  fill_range: { configName: 'range', action: 'fill' },
-  flash_fill_range: { configName: 'range', action: 'flash_fill' },
-  get_special_cells: { configName: 'range', action: 'get_special_cells' },
-  get_precedents: { configName: 'range', action: 'get_precedents' },
-  get_dependents: { configName: 'range', action: 'get_dependents' },
-  get_range_tables: { configName: 'range', action: 'get_tables' },
-  remove_duplicates: { configName: 'range', action: 'remove_duplicates' },
-  merge_range: { configName: 'range', action: 'merge' },
-  unmerge_range: { configName: 'range', action: 'unmerge' },
-  group_range: { configName: 'range', action: 'group' },
-  ungroup_range: { configName: 'range', action: 'ungroup' },
-  insert_cells: { configName: 'range', action: 'insert' },
-  delete_cells: { configName: 'range', action: 'delete' },
-  recalculate_range: { configName: 'range', action: 'recalculate' },
-  set_range_formulas: { configName: 'range', action: 'set_formulas' },
-  // Alternate old names used in tests
-  find_values: { configName: 'range', action: 'find' },
-  insert_range: { configName: 'range', action: 'insert' },
-  delete_range: { configName: 'range', action: 'delete' },
-  merge_cells: { configName: 'range', action: 'merge' },
-  unmerge_cells: { configName: 'range', action: 'unmerge' },
-  group_rows_columns: { configName: 'range', action: 'group' },
-  ungroup_rows_columns: { configName: 'range', action: 'ungroup' },
-  auto_fill_range: { configName: 'range', action: 'fill' },
-  get_range_precedents: { configName: 'range', action: 'get_precedents' },
-  get_range_dependents: { configName: 'range', action: 'get_dependents' },
-  get_tables_for_range: { configName: 'range', action: 'get_tables' },
-  get_range_formulas: { configName: 'range', action: 'get_formulas' },
-  // ── Range Format ─────────────────────────────────────────────────
-  format_range: { configName: 'range_format', action: 'format' },
-  set_number_format: { configName: 'range_format', action: 'set_number_format' },
-  auto_fit_columns: { configName: 'range_format', action: 'auto_fit', extraArgs: { fitTarget: 'columns' } },
-  auto_fit_rows: { configName: 'range_format', action: 'auto_fit', extraArgs: { fitTarget: 'rows' } },
-  set_cell_borders: { configName: 'range_format', action: 'set_borders' },
-  set_hyperlink: { configName: 'range_format', action: 'set_hyperlink' },
-  toggle_row_column_visibility: { configName: 'range_format', action: 'toggle_visibility' },
-  // ── Table ────────────────────────────────────────────────────────
-  list_tables: { configName: 'table', action: 'list' },
-  create_table: { configName: 'table', action: 'create' },
-  delete_table: { configName: 'table', action: 'delete' },
-  get_table_data: { configName: 'table', action: 'get_data' },
-  add_table_rows: { configName: 'table', action: 'add_rows' },
-  sort_table: { configName: 'table', action: 'sort' },
-  filter_table: {
-    configName: 'table',
-    action: 'filter',
-    argTransform: args => {
-      const { values, ...rest } = args;
-      return { ...rest, filterValues: values ?? rest.filterValues };
-    },
-  },
-  clear_table_filters: { configName: 'table', action: 'clear_filters' },
-  reapply_table_filters: { configName: 'table', action: 'reapply_filters' },
-  add_table_column: { configName: 'table', action: 'add_column' },
-  delete_table_column: { configName: 'table', action: 'delete_column' },
-  convert_table_to_range: { configName: 'table', action: 'convert_to_range' },
-  resize_table: {
-    configName: 'table',
-    action: 'resize',
-    argTransform: args => {
-      const { newAddress, ...rest } = args;
-      return { ...rest, address: newAddress ?? rest.address };
-    },
-  },
-  configure_table: { configName: 'table', action: 'configure' },
-  set_table_style: { configName: 'table', action: 'configure' },
-  set_table_header_totals_visibility: { configName: 'table', action: 'configure' },
-  // ── Chart ────────────────────────────────────────────────────────
-  list_charts: { configName: 'chart', action: 'list' },
-  create_chart: { configName: 'chart', action: 'create' },
-  delete_chart: {
-    configName: 'chart',
-    action: 'delete',
-    resultTransform: r => {
-      const d = r as { chartName: string; deleted: boolean };
-      return { ...d, deleted: d.chartName }; // legacy test checks d.deleted === chartName
-    },
-  },
-  set_chart_title: {
-    configName: 'chart',
-    action: 'configure',
-    resultTransform: (r, orig) => ({ ...r as object, title: orig.title }),
-  },
-  set_chart_type: { configName: 'chart', action: 'configure' },
-  set_chart_position: { configName: 'chart', action: 'configure' },
-  set_chart_data_labels: { configName: 'chart', action: 'configure' },
-  set_chart_data_source: {
-    configName: 'chart',
-    action: 'configure',
-    resultTransform: () => ({ updated: true }),
-  },
-  set_chart_legend_visibility: {
-    configName: 'chart',
-    action: 'configure',
-    argTransform: args => {
-      const { visible, position, ...rest } = args;
-      return {
-        ...rest,
-        ...(visible !== undefined ? { legendVisible: visible } : {}),
-        ...(position !== undefined ? { legendPosition: position } : {}),
-      };
-    },
-    resultTransform: (r, orig) => ({ ...r as object, visible: (orig.visible as boolean | undefined) ?? true }),
-  },
-  // Axis/series ops dropped in consolidation — synthetic pass results
-  set_chart_axis_title: {
-    configName: 'chart', action: 'configure',
-    fakeResult: args => ({ chartName: args.chartName, title: args.title, titleVisible: true }),
-  },
-  set_chart_axis_visibility: {
-    configName: 'chart', action: 'configure',
-    fakeResult: args => ({ chartName: args.chartName, visible: args.visible ?? true }),
-  },
-  set_chart_series_filtered: {
-    configName: 'chart', action: 'configure',
-    fakeResult: args => ({ chartName: args.chartName, seriesIndex: args.seriesIndex, filtered: args.filtered ?? false }),
-  },
-  // ── Sheet ────────────────────────────────────────────────────────
-  list_sheets: { configName: 'sheet', action: 'list' },
-  create_sheet: { configName: 'sheet', action: 'create' },
-  delete_sheet: { configName: 'sheet', action: 'delete' },
-  rename_sheet: { configName: 'sheet', action: 'rename' },
-  copy_sheet: { configName: 'sheet', action: 'copy' },
-  move_sheet: { configName: 'sheet', action: 'move' },
-  activate_sheet: { configName: 'sheet', action: 'activate' },
-  protect_sheet: { configName: 'sheet', action: 'protect' },
-  unprotect_sheet: { configName: 'sheet', action: 'unprotect' },
-  freeze_panes: { configName: 'sheet', action: 'freeze' },
-  set_sheet_visibility: { configName: 'sheet', action: 'set_visibility' },
-  set_sheet_gridlines: { configName: 'sheet', action: 'set_gridlines' },
-  set_sheet_headings: { configName: 'sheet', action: 'set_headings' },
-  set_page_layout: { configName: 'sheet', action: 'set_page_layout' },
-  recalculate_sheet: { configName: 'sheet', action: 'recalculate' },
-  // ── Workbook ─────────────────────────────────────────────────────
-  get_workbook_info: { configName: 'workbook', action: 'get_info' },
-  get_selected_range: { configName: 'workbook', action: 'get_selected_range' },
-  get_workbook_properties: { configName: 'workbook', action: 'get_properties' },
-  set_workbook_properties: {
-    configName: 'workbook',
-    action: 'set_properties',
-    resultTransform: (r, orig) => ({ ...r as object, title: orig.title }),
-  },
-  protect_workbook: { configName: 'workbook', action: 'protect' },
-  unprotect_workbook: { configName: 'workbook', action: 'unprotect' },
-  save_workbook: { configName: 'workbook', action: 'save' },
-  recalculate_workbook: { configName: 'workbook', action: 'recalculate' },
-  refresh_data_connections: { configName: 'workbook', action: 'refresh_connections' },
-  define_named_range: { configName: 'workbook', action: 'define_named_range' },
-  list_named_ranges: { configName: 'workbook', action: 'list_named_ranges' },
-  list_queries: { configName: 'workbook', action: 'list_queries' },
-  get_query: { configName: 'workbook', action: 'get_query' },
-  get_workbook_protection: {
-    configName: 'workbook', action: 'get_info',
-    fakeResult: () => ({ protected: false }),
-  },
-  get_query_count: {
-    configName: 'workbook',
-    action: 'list_queries',
-    resultTransform: r => ({ count: (r as { count: number }).count }),
-  },
-  // ── Comment ──────────────────────────────────────────────────────
-  list_comments: { configName: 'comment', action: 'list' },
-  add_comment: { configName: 'comment', action: 'add' },
-  edit_comment: {
-    configName: 'comment',
-    action: 'edit',
-    argTransform: args => {
-      const { newText, ...rest } = args;
-      return { ...rest, text: newText ?? rest.text };
-    },
-  },
-  delete_comment: { configName: 'comment', action: 'delete' },
-  // ── Conditional Format ───────────────────────────────────────────
-  add_color_scale: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'colorScale' },
-    argTransform: args => ({ ...args, minColor: (args.minColor as string) ?? '#FF0000', maxColor: (args.maxColor as string) ?? '#00FF00' }),
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  add_data_bar: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'dataBar' },
-    argTransform: args => { const { barColor, ...rest } = args; return { ...rest, fillColor: barColor ?? rest.fillColor }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  add_cell_value_format: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'cellValue' },
-    argTransform: args => { const { fillColor, ...rest } = args; return { ...rest, backgroundColor: fillColor ?? rest.backgroundColor }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  add_top_bottom_format: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'topBottom' },
-    argTransform: args => {
-      const { rank, topOrBottom, fillColor, ...rest } = args;
-      return {
-        ...rest,
-        topBottomRank: (rank ?? rest.topBottomRank ?? 10) as number,
-        topBottomType: (topOrBottom ?? rest.topBottomType ?? 'TopItems') as string,
-        backgroundColor: fillColor ?? rest.backgroundColor,
-      };
-    },
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  add_text_contains_format: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'containsText' },
-    argTransform: args => { const { text, fillColor, ...rest } = args; return { ...rest, containsText: text ?? rest.containsText, backgroundColor: fillColor ?? rest.backgroundColor }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  add_contains_text_format: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'containsText' },
-    argTransform: args => { const { text, fillColor, ...rest } = args; return { ...rest, containsText: text ?? rest.containsText, backgroundColor: fillColor ?? rest.backgroundColor }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  add_custom_format: {
-    configName: 'conditional_format', action: 'add', extraArgs: { type: 'custom' },
-    argTransform: args => { const { formula, fillColor, ...rest } = args; return { ...rest, formula1: formula ?? rest.formula1, backgroundColor: fillColor ?? rest.backgroundColor }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
-  },
-  list_conditional_formats: { configName: 'conditional_format', action: 'list' },
-  clear_conditional_formats: { configName: 'conditional_format', action: 'clear' },
-  // ── Data Validation ──────────────────────────────────────────────
-  get_data_validation: { configName: 'data_validation', action: 'get' },
-  set_list_validation: {
-    configName: 'data_validation',
-    action: 'set',
-    argTransform: args => {
-      const { source, inCellDropDown: _drop, ...rest } = args;
-      return { ...rest, type: 'list', listValues: typeof source === 'string' ? source.split(',') : (source as string[]) };
-    },
-    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
-  },
-  set_number_validation: {
-    configName: 'data_validation',
-    action: 'set',
-    argTransform: args => { const { numberType, ...rest } = args; return { ...rest, type: numberType === 'decimal' ? 'decimal' : 'number' }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
-  },
-  set_date_validation: {
-    configName: 'data_validation', action: 'set', extraArgs: { type: 'date' },
-    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
-  },
-  set_text_length_validation: {
-    configName: 'data_validation', action: 'set', extraArgs: { type: 'textLength' },
-    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
-  },
-  set_custom_validation: {
-    configName: 'data_validation',
-    action: 'set',
-    argTransform: args => { const { formula, ...rest } = args; return { ...rest, type: 'custom', customFormula: formula }; },
-    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
-  },
-  clear_data_validation: { configName: 'data_validation', action: 'clear' },
-  // ── Pivot Table ──────────────────────────────────────────────────
-  list_pivot_tables: { configName: 'pivot', action: 'list' },
-  create_pivot_table: { configName: 'pivot', action: 'create' },
-  delete_pivot_table: { configName: 'pivot', action: 'delete' },
-  get_pivot_table_info: { configName: 'pivot', action: 'get_info' },
-  refresh_pivot_table: { configName: 'pivot', action: 'refresh' },
-  configure_pivot_table: { configName: 'pivot', action: 'configure' },
-  add_pivot_field: { configName: 'pivot', action: 'add_field' },
-  remove_pivot_field: { configName: 'pivot', action: 'remove_field' },
-  apply_pivot_label_filter: {
-    configName: 'pivot',
-    action: 'filter',
-    argTransform: args => {
-      const { condition, value1, value2, ...rest } = args;
-      return { ...rest, filterType: 'label', labelCondition: condition, labelValue1: value1, ...(value2 !== undefined ? { labelValue2: value2 } : {}) };
-    },
-  },
-  apply_pivot_manual_filter: { configName: 'pivot', action: 'filter', extraArgs: { filterType: 'manual' } },
-  clear_pivot_field_filters: { configName: 'pivot', action: 'filter', extraArgs: { filterType: 'clear' } },
-  sort_pivot_field_labels: { configName: 'pivot', action: 'sort', extraArgs: { sortMode: 'labels' } },
-  sort_pivot_field_values: {
-    configName: 'pivot', action: 'sort', extraArgs: { sortMode: 'values' },
-    resultTransform: (r, orig) => ({ ...r as object, valuesHierarchyName: orig.valuesHierarchyName }),
-  },
-  set_pivot_layout: { configName: 'pivot', action: 'configure' },
-  set_pivot_table_options: { configName: 'pivot', action: 'configure' },
-  // Pivot aggregate-style ops — compute from existing actions
-  get_pivot_table_count: { configName: 'pivot', action: 'list', resultTransform: r => r },
-  pivot_table_exists: {
-    configName: 'pivot',
-    action: 'list',
-    resultTransform: (r, orig) => {
-      const d = r as { pivotTables: Array<{ name: string }> };
-      return { exists: d.pivotTables.some(pt => pt.name === (orig.pivotTableName as string)), count: d.pivotTables.length };
-    },
-  },
-  get_pivot_table_source_info: { configName: 'pivot', action: 'get_info', resultTransform: r => r },
-  get_pivot_hierarchy_counts: {
-    configName: 'pivot',
-    action: 'get_info',
-    resultTransform: r => {
-      const d = r as { rowHierarchyCount: number; dataHierarchyCount: number; columnHierarchyCount: number; filterHierarchyCount: number };
-      return { ...d, rowCount: d.rowHierarchyCount, dataCount: d.dataHierarchyCount, columnCount: d.columnHierarchyCount, filterCount: d.filterHierarchyCount };
-    },
-  },
-  get_pivot_hierarchies: { configName: 'pivot', action: 'get_info', resultTransform: r => r },
-  // Pivot ops dropped in consolidation — synthetic pass results
-  get_pivot_table_location: {
-    configName: 'pivot', action: 'get_info',
-    fakeResult: args => ({ pivotTableName: args.pivotTableName, rangeAddress: 'E1:F10', worksheetName: args.sheetName ?? '' }),
-  },
-  refresh_all_pivot_tables: {
-    configName: 'pivot', action: 'refresh',
-    fakeResult: () => ({ refreshed: true, refreshedCount: 1 }),
-  },
-  get_pivot_field_filters: {
-    configName: 'pivot', action: 'get_info',
-    fakeResult: () => ({ hasAnyFilter: false, filters: [] }),
-  },
-  set_pivot_field_show_all_items: {
-    configName: 'pivot', action: 'configure',
-    fakeResult: args => ({ updated: true, showAllItems: args.showAllItems }),
-  },
-  get_pivot_layout_ranges: {
-    configName: 'pivot', action: 'get_info',
-    fakeResult: args => ({ pivotTableName: args.pivotTableName, tableRangeAddress: 'E1:F10', dataBodyRangeAddress: 'F2:F9' }),
-  },
-  set_pivot_layout_display_options: {
-    configName: 'pivot', action: 'configure',
-    fakeResult: args => ({ ...args, updated: true, autoFormat: args.autoFormat ?? false, fillEmptyCells: args.fillEmptyCells ?? false }),
-  },
-  get_pivot_data_hierarchy_for_cell: {
-    configName: 'pivot', action: 'get_info',
-    fakeResult: () => ({ dataHierarchyName: 'Sum of Sales' }),
-  },
-  get_pivot_items_for_cell: {
-    configName: 'pivot', action: 'get_info',
-    fakeResult: () => ({ count: 0, items: [] }),
-  },
-  set_pivot_layout_auto_sort_on_cell: {
-    configName: 'pivot', action: 'configure',
-    fakeResult: args => ({ sorted: true, sortBy: args.sortBy }),
-  },
-  get_pivot_field_items: {
-    configName: 'pivot', action: 'get_info',
-    fakeResult: () => ({ count: 0, items: [] }),
-  },
-};
-
-/**
- * Call a tool's execute() inside a real Excel.run(). Returns its result.
- * Throws on error — callers catch and report.
- */
-async function callTool(
-  configs: readonly ToolConfig[],
-  name: string,
-  args: Record<string, unknown> = {}
-): Promise<unknown> {
-  // Resolve via legacy mapping table first
-  const mapping = LEGACY_TOOL_MAP[name];
-  if (mapping) {
-    if (mapping.fakeResult) return mapping.fakeResult(args);
-    // Build args: inject action + extraArgs, then run argTransform
-    const baseArgs: Record<string, unknown> = { action: mapping.action, ...args, ...(mapping.extraArgs ?? {}) };
-    const resolvedArgs = mapping.argTransform ? mapping.argTransform(baseArgs) : baseArgs;
-    if (!resolvedArgs.action) resolvedArgs.action = mapping.action;
-    const targetConfigs = ALL_CONFIGS[mapping.configName]!;
-    const config = targetConfigs.find(c => c.name === mapping.configName)!;
-    let result: unknown;
-    await Excel.run(async context => {
-      result = await config.execute(context, resolvedArgs);
-    });
-    return mapping.resultTransform ? mapping.resultTransform(result, args) : result;
-  }
-
-  // Fallback: look up directly by name in the provided configs array
+async function callTool(configs: readonly ToolConfig[], name: string, args: Record<string, unknown> = {}): Promise<unknown> {
   const config = configs.find(c => c.name === name);
   if (!config) throw new Error(`Tool config not found: ${name}`);
   let result: unknown;
@@ -694,7 +283,7 @@ async function testRangeTools(): Promise<void> {
   log('── Range Tools (24) ──');
 
   // 1. get_range_values
-  await runTool(rangeConfigs, 'get_range_values', { address: 'A1:C6', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'get_values', address: 'A1:C6', sheetName: MAIN }, r => {
     const d = r as { rowCount: number; values: unknown[][] };
     if (d.rowCount !== 6) return `Expected 6 rows, got ${d.rowCount}`;
     if (d.values[0][0] !== 'Name') return `Expected header 'Name', got ${d.values[0][0]}`;
@@ -704,8 +293,8 @@ async function testRangeTools(): Promise<void> {
   // 2. set_range_values
   await runTool(
     rangeConfigs,
-    'set_range_values',
-    { address: 'E1:E2', values: [['Test'], ['Data']], sheetName: MAIN },
+    'range',
+    { action: 'set_values', address: 'E1:E2', values: [['Test'], ['Data']], sheetName: MAIN },
     r => {
       const d = r as { rowsWritten: number };
       if (d.rowsWritten !== 2) return `Expected 2 rows written, got ${d.rowsWritten}`;
@@ -714,7 +303,7 @@ async function testRangeTools(): Promise<void> {
   );
 
   // 3. get_used_range (dimensions only)
-  await runTool(rangeConfigs, 'get_used_range', { sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'get_used', sheetName: MAIN }, r => {
     const d = r as { rowCount: number; columnCount: number };
     if (d.rowCount < 6) return `Expected ≥6 rows, got ${d.rowCount}`;
     return null;
@@ -723,8 +312,8 @@ async function testRangeTools(): Promise<void> {
   // 4. get_used_range with maxRows (values path)
   await runTool(
     rangeConfigs,
-    'get_used_range',
-    { sheetName: MAIN, maxRows: 2 },
+    'range',
+    { action: 'get_used', sheetName: MAIN, maxRows: 2 },
     r => {
       const d = r as { values: unknown[][] };
       if (!d.values) return 'Expected values with maxRows';
@@ -735,16 +324,16 @@ async function testRangeTools(): Promise<void> {
   );
 
   // 5. clear_range
-  await runTool(rangeConfigs, 'clear_range', { address: 'E1:E2', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'clear', address: 'E1:E2', sheetName: MAIN }, r => {
     const d = r as { cleared: boolean };
     return d.cleared ? null : 'Expected cleared === true';
   });
 
   // 6. format_range
   await runTool(
-    rangeConfigs,
-    'format_range',
-    {
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'format',
       address: 'A1:C1',
       bold: true,
       italic: false,
@@ -763,9 +352,9 @@ async function testRangeTools(): Promise<void> {
 
   // 7. set_number_format
   await runTool(
-    rangeConfigs,
-    'set_number_format',
-    { address: 'B2:B6', format: '#,##0', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_number_format', address: 'B2:B6', format: '#,##0', sheetName: MAIN },
     r => {
       const d = r as { format: string };
       return d.format === '#,##0' ? null : `Expected format '#,##0', got '${d.format}'`;
@@ -773,13 +362,13 @@ async function testRangeTools(): Promise<void> {
   );
 
   // 8. auto_fit_columns
-  await runTool(rangeConfigs, 'auto_fit_columns', { address: 'A1:C6', sheetName: MAIN }, r => {
+  await runTool(rangeFormatConfigs, 'range_format', { action: 'auto_fit', fitTarget: 'columns', address: 'A1:C6', sheetName: MAIN }, r => {
     const d = r as { autoFitted: boolean };
     return d.autoFitted ? null : 'Expected autoFitted';
   });
 
   // 9. auto_fit_rows
-  await runTool(rangeConfigs, 'auto_fit_rows', { address: 'A1:C6', sheetName: MAIN }, r => {
+  await runTool(rangeFormatConfigs, 'range_format', { action: 'auto_fit', fitTarget: 'rows', address: 'A1:C6', sheetName: MAIN }, r => {
     const d = r as { autoFitted: boolean };
     return d.autoFitted ? null : 'Expected autoFitted';
   });
@@ -787,8 +376,8 @@ async function testRangeTools(): Promise<void> {
   // 10. set_range_formulas
   await runTool(
     rangeConfigs,
-    'set_range_formulas',
-    { address: 'D2', formulas: [['=B2+10']], sheetName: MAIN },
+    'range',
+    { action: 'set_formulas', address: 'D2', formulas: [['=B2+10']], sheetName: MAIN },
     r => {
       const d = r as { rowsWritten: number };
       return d.rowsWritten === 1 ? null : `Expected 1 row written, got ${d.rowsWritten}`;
@@ -796,7 +385,7 @@ async function testRangeTools(): Promise<void> {
   );
 
   // 11. get_range_formulas
-  await runTool(rangeConfigs, 'get_range_formulas', { address: 'D2', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'get_formulas', address: 'D2', sheetName: MAIN }, r => {
     const d = r as { formulas: string[][] };
     const f = d.formulas?.[0]?.[0] ?? '';
     return f.includes('=') ? null : `Expected a formula, got '${f}'`;
@@ -805,8 +394,8 @@ async function testRangeTools(): Promise<void> {
   // 12. sort_range
   await runTool(
     rangeConfigs,
-    'sort_range',
-    { address: 'A1:C6', column: 1, ascending: true, hasHeaders: true, sheetName: MAIN },
+    'range',
+    { action: 'sort', address: 'A1:C6', column: 1, ascending: true, hasHeaders: true, sheetName: MAIN },
     r => {
       const d = r as { ascending: boolean };
       return d.ascending === true ? null : 'Expected ascending sort';
@@ -816,9 +405,10 @@ async function testRangeTools(): Promise<void> {
   // 13. copy_range
   await runTool(
     rangeConfigs,
-    'copy_range',
+    'range',
     {
-      sourceAddress: 'A1:C1',
+      action: 'copy',
+      address: 'A1:C1',
       destinationAddress: 'A10',
       sourceSheet: MAIN,
       destinationSheet: MAIN,
@@ -830,7 +420,7 @@ async function testRangeTools(): Promise<void> {
   );
 
   // 14. find_values
-  await runTool(rangeConfigs, 'find_values', { searchText: 'Alice', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'find', searchText: 'Alice', sheetName: MAIN }, r => {
     const d = r as { found: boolean };
     return d.found ? null : 'Expected to find "Alice"';
   });
@@ -838,8 +428,8 @@ async function testRangeTools(): Promise<void> {
   // 15. insert_range
   await runTool(
     rangeConfigs,
-    'insert_range',
-    { address: 'F10:F12', shift: 'down', sheetName: MAIN },
+    'range',
+    { action: 'insert', address: 'F10:F12', shift: 'down', sheetName: MAIN },
     r => {
       const d = r as { inserted: boolean };
       return d.inserted ? null : 'Expected inserted === true';
@@ -849,8 +439,8 @@ async function testRangeTools(): Promise<void> {
   // 16. delete_range
   await runTool(
     rangeConfigs,
-    'delete_range',
-    { address: 'F10:F12', shift: 'up', sheetName: MAIN },
+    'range',
+    { action: 'delete', address: 'F10:F12', shift: 'up', sheetName: MAIN },
     r => {
       const d = r as { deleted: boolean };
       return d.deleted ? null : 'Expected deleted === true';
@@ -858,13 +448,13 @@ async function testRangeTools(): Promise<void> {
   );
 
   // 17. merge_cells
-  await runTool(rangeConfigs, 'merge_cells', { address: 'F1:G1', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'merge', address: 'F1:G1', sheetName: MAIN }, r => {
     const d = r as { merged: boolean };
     return d.merged ? null : 'Expected merged === true';
   });
 
   // 18. unmerge_cells
-  await runTool(rangeConfigs, 'unmerge_cells', { address: 'F1:G1', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'unmerge', address: 'F1:G1', sheetName: MAIN }, r => {
     const d = r as { unmerged: boolean };
     return d.unmerged ? null : 'Expected unmerged === true';
   });
@@ -872,8 +462,8 @@ async function testRangeTools(): Promise<void> {
   // 19. replace_values
   await runTool(
     rangeConfigs,
-    'replace_values',
-    { find: 'Old', replace: 'New', address: 'H1:H4', sheetName: MAIN },
+    'range',
+    { action: 'replace', find: 'Old', replace: 'New', address: 'H1:H4', sheetName: MAIN },
     r => {
       const d = r as { replacements: number };
       return d.replacements >= 1 ? null : `Expected ≥1 replacement, got ${d.replacements}`;
@@ -883,8 +473,8 @@ async function testRangeTools(): Promise<void> {
   // 20. remove_duplicates
   await runTool(
     rangeConfigs,
-    'remove_duplicates',
-    { address: 'I1:I6', columns: ['0'], sheetName: MAIN },
+    'range',
+    { action: 'remove_duplicates', address: 'I1:I6', columns: ['0'], sheetName: MAIN },
     r => {
       const d = r as { rowsRemoved: number; rowsRemaining: number };
       return d.rowsRemoved >= 1 ? null : `Expected ≥1 row removed, got ${d.rowsRemoved}`;
@@ -893,9 +483,9 @@ async function testRangeTools(): Promise<void> {
 
   // 21. set_hyperlink
   await runTool(
-    rangeConfigs,
-    'set_hyperlink',
-    {
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_hyperlink',
       address: 'J1',
       url: 'https://example.com',
       textToDisplay: 'Example',
@@ -919,7 +509,7 @@ async function testRangeTools(): Promise<void> {
   );
   // Unhide cleanup
   try {
-    await callTool(rangeConfigs, 'toggle_row_column_visibility', {
+    await callTool(rangeFormatConfigs, 'range_format', { action: 'toggle_visibility',
       address: 'K:K',
       hidden: false,
       target: 'columns',
@@ -930,22 +520,22 @@ async function testRangeTools(): Promise<void> {
   }
 
   // 23. group_rows_columns
-  await runTool(rangeConfigs, 'group_rows_columns', { address: '8:10', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'group', address: '8:10', sheetName: MAIN }, r => {
     const d = r as { grouped: boolean };
     return d.grouped ? null : 'Expected grouped';
   });
 
   // 24. ungroup_rows_columns
-  await runTool(rangeConfigs, 'ungroup_rows_columns', { address: '8:10', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'ungroup', address: '8:10', sheetName: MAIN }, r => {
     const d = r as { ungrouped: boolean };
     return d.ungrouped ? null : 'Expected ungrouped';
   });
 
   // 25. set_cell_borders
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    {
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders',
       address: 'A1:C6',
       borderStyle: 'Thin',
       side: 'EdgeBottom',
@@ -966,9 +556,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- format_range: underline ---
   await runTool(
-    rangeConfigs,
-    'format_range',
-    { address: 'A2', underline: true, sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'format', address: 'A2', underline: true, sheetName: MAIN },
     r => {
       const d = r as { formatted: boolean };
       return d.formatted ? null : 'Expected formatted';
@@ -978,9 +568,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- format_range: horizontalAlignment Left ---
   await runTool(
-    rangeConfigs,
-    'format_range',
-    { address: 'A3', horizontalAlignment: 'Left', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'format', address: 'A3', horizontalAlignment: 'Left', sheetName: MAIN },
     r => {
       const d = r as { formatted: boolean };
       return d.formatted ? null : 'Expected formatted';
@@ -990,9 +580,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- format_range: horizontalAlignment Right ---
   await runTool(
-    rangeConfigs,
-    'format_range',
-    { address: 'A4', horizontalAlignment: 'Right', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'format', address: 'A4', horizontalAlignment: 'Right', sheetName: MAIN },
     r => {
       const d = r as { formatted: boolean };
       return d.formatted ? null : 'Expected formatted';
@@ -1003,8 +593,8 @@ async function testRangeToolVariants(): Promise<void> {
   // --- sort_range: ascending false ---
   await runTool(
     rangeConfigs,
-    'sort_range',
-    { address: 'A1:C6', column: 1, ascending: false, hasHeaders: true, sheetName: MAIN },
+    'range',
+    { action: 'sort', address: 'A1:C6', column: 1, ascending: false, hasHeaders: true, sheetName: MAIN },
     r => {
       const d = r as { ascending: boolean };
       return d.ascending === false ? null : 'Expected descending sort';
@@ -1025,8 +615,8 @@ async function testRangeToolVariants(): Promise<void> {
   }
   await runTool(
     rangeConfigs,
-    'sort_range',
-    { address: 'R1:R4', column: 0, ascending: true, hasHeaders: false, sheetName: MAIN },
+    'range',
+    { action: 'sort', address: 'R1:R4', column: 0, ascending: true, hasHeaders: false, sheetName: MAIN },
     r => {
       const d = r as { ascending: boolean };
       return d.ascending === true ? null : 'Expected ascending sort';
@@ -1075,8 +665,8 @@ async function testRangeToolVariants(): Promise<void> {
   // --- insert_range: shift right ---
   await runTool(
     rangeConfigs,
-    'insert_range',
-    { address: 'S1:S2', shift: 'right', sheetName: MAIN },
+    'range',
+    { action: 'insert', address: 'S1:S2', shift: 'right', sheetName: MAIN },
     r => {
       const d = r as { inserted: boolean };
       return d.inserted ? null : 'Expected inserted';
@@ -1087,8 +677,8 @@ async function testRangeToolVariants(): Promise<void> {
   // --- delete_range: shift left ---
   await runTool(
     rangeConfigs,
-    'delete_range',
-    { address: 'S1:S2', shift: 'left', sheetName: MAIN },
+    'range',
+    { action: 'delete', address: 'S1:S2', shift: 'left', sheetName: MAIN },
     r => {
       const d = r as { deleted: boolean };
       return d.deleted ? null : 'Expected deleted';
@@ -1109,7 +699,7 @@ async function testRangeToolVariants(): Promise<void> {
   );
   // Cleanup
   try {
-    await callTool(rangeConfigs, 'unmerge_cells', { address: 'T1:U3', sheetName: MAIN });
+    await callTool(rangeConfigs, 'range', { action: 'unmerge', address: 'T1:U3', sheetName: MAIN });
   } catch {
     /* non-critical */
   }
@@ -1127,8 +717,8 @@ async function testRangeToolVariants(): Promise<void> {
   }
   await runTool(
     rangeConfigs,
-    'replace_values',
-    { find: 'ReplaceMe', replace: 'Replaced', sheetName: MAIN },
+    'range',
+    { action: 'replace', find: 'ReplaceMe', replace: 'Replaced', sheetName: MAIN },
     r => {
       const d = r as { replacements: number };
       return d.replacements >= 1 ? null : 'Expected ≥1 replacement without address';
@@ -1138,9 +728,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- auto_fit_columns: address omitted (getUsedRange fallback) ---
   await runTool(
-    rangeConfigs,
-    'auto_fit_columns',
-    { sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'auto_fit', fitTarget: 'columns', sheetName: MAIN },
     r => {
       const d = r as { autoFitted: boolean };
       return d.autoFitted ? null : 'Expected autoFitted';
@@ -1150,9 +740,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- auto_fit_rows: address omitted (getUsedRange fallback) ---
   await runTool(
-    rangeConfigs,
-    'auto_fit_rows',
-    { sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'auto_fit', fitTarget: 'rows', sheetName: MAIN },
     r => {
       const d = r as { autoFitted: boolean };
       return d.autoFitted ? null : 'Expected autoFitted';
@@ -1162,9 +752,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_hyperlink: tooltip ---
   await runTool(
-    rangeConfigs,
-    'set_hyperlink',
-    {
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_hyperlink',
       address: 'J2',
       url: 'https://example.com/tip',
       textToDisplay: 'Tip Link',
@@ -1180,9 +770,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_hyperlink: remove (url === "") ---
   await runTool(
-    rangeConfigs,
-    'set_hyperlink',
-    { address: 'J1', url: '', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_hyperlink', address: 'J1', url: '', sheetName: MAIN },
     r => {
       const d = r as { cleared: boolean } | { url: string };
       // The removal path returns different shape; just verify no error
@@ -1204,7 +794,7 @@ async function testRangeToolVariants(): Promise<void> {
   );
   // Unhide cleanup
   try {
-    await callTool(rangeConfigs, 'toggle_row_column_visibility', {
+    await callTool(rangeFormatConfigs, 'range_format', { action: 'toggle_visibility',
       address: '12:12',
       hidden: false,
       target: 'rows',
@@ -1216,9 +806,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_cell_borders: EdgeAll (loop over 4 sides) ---
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    {
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders',
       address: 'A2:C3',
       borderStyle: 'Thin',
       side: 'EdgeAll',
@@ -1234,9 +824,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_cell_borders: Medium style ---
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    { address: 'A4', borderStyle: 'Medium', side: 'EdgeTop', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders', address: 'A4', borderStyle: 'Medium', side: 'EdgeTop', sheetName: MAIN },
     r => {
       const d = r as { borderStyle: string };
       return d.borderStyle === 'Medium' ? null : `Expected 'Medium'`;
@@ -1246,9 +836,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_cell_borders: Dashed style ---
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    { address: 'A5', borderStyle: 'Dashed', side: 'EdgeLeft', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders', address: 'A5', borderStyle: 'Dashed', side: 'EdgeLeft', sheetName: MAIN },
     r => {
       const d = r as { borderStyle: string };
       return d.borderStyle === 'Dashed' ? null : `Expected 'Dashed'`;
@@ -1258,9 +848,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_cell_borders: Double style ---
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    { address: 'A6', borderStyle: 'Double', side: 'EdgeRight', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders', address: 'A6', borderStyle: 'Double', side: 'EdgeRight', sheetName: MAIN },
     r => {
       const d = r as { borderStyle: string };
       return d.borderStyle === 'Double' ? null : `Expected 'Double'`;
@@ -1271,8 +861,8 @@ async function testRangeToolVariants(): Promise<void> {
   // --- get_used_range: maxRows >= rowCount (no truncation) ---
   await runTool(
     rangeConfigs,
-    'get_used_range',
-    { sheetName: MAIN, maxRows: 9999 },
+    'range',
+    { action: 'get_used', sheetName: MAIN, maxRows: 9999 },
     r => {
       const d = r as { values: unknown[][]; truncated?: boolean };
       if (!d.values) return 'Expected values';
@@ -1284,9 +874,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- format_range: more horizontalAlignment values ---
   await runTool(
-    rangeConfigs,
-    'format_range',
-    { address: 'B2', horizontalAlignment: 'General', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'format', address: 'B2', horizontalAlignment: 'General', sheetName: MAIN },
     r => {
       const d = r as { formatted: boolean };
       return d.formatted ? null : 'Expected formatted';
@@ -1295,9 +885,9 @@ async function testRangeToolVariants(): Promise<void> {
   );
 
   await runTool(
-    rangeConfigs,
-    'format_range',
-    { address: 'B3', horizontalAlignment: 'Justify', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'format', address: 'B3', horizontalAlignment: 'Justify', sheetName: MAIN },
     r => {
       const d = r as { formatted: boolean };
       return d.formatted ? null : 'Expected formatted';
@@ -1307,9 +897,9 @@ async function testRangeToolVariants(): Promise<void> {
 
   // --- set_cell_borders: remaining styles ---
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    { address: 'B4', borderStyle: 'Thick', side: 'EdgeTop', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders', address: 'B4', borderStyle: 'Thick', side: 'EdgeTop', sheetName: MAIN },
     r => {
       const d = r as { borderStyle: string };
       return d.borderStyle === 'Thick' ? null : `Expected 'Thick'`;
@@ -1318,9 +908,9 @@ async function testRangeToolVariants(): Promise<void> {
   );
 
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    { address: 'B5', borderStyle: 'Dotted', side: 'EdgeLeft', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders', address: 'B5', borderStyle: 'Dotted', side: 'EdgeLeft', sheetName: MAIN },
     r => {
       const d = r as { borderStyle: string };
       return d.borderStyle === 'Dotted' ? null : `Expected 'Dotted'`;
@@ -1329,9 +919,9 @@ async function testRangeToolVariants(): Promise<void> {
   );
 
   await runTool(
-    rangeConfigs,
-    'set_cell_borders',
-    { address: 'B6', borderStyle: 'DashDot', side: 'EdgeRight', sheetName: MAIN },
+    rangeFormatConfigs,
+    'range_format',
+    { action: 'set_borders', address: 'B6', borderStyle: 'DashDot', side: 'EdgeRight', sheetName: MAIN },
     r => {
       const d = r as { borderStyle: string };
       return d.borderStyle === 'DashDot' ? null : `Expected 'DashDot'`;
@@ -1351,8 +941,8 @@ async function testRangeToolVariants(): Promise<void> {
   }
   await runTool(
     rangeConfigs,
-    'auto_fill_range',
-    { sourceAddress: 'L1:L2', destinationAddress: 'L1:L6', sheetName: MAIN },
+    'range',
+    { action: 'fill', sourceAddress: 'L1:L2', destinationAddress: 'L1:L6', sheetName: MAIN },
     r => {
       const d = r as { filled: boolean };
       return d.filled ? null : 'Expected filled';
@@ -1376,7 +966,7 @@ async function testRangeToolVariants(): Promise<void> {
     /* seed failure */
   }
   try {
-    const flashFillResult = await callTool(rangeConfigs, 'flash_fill_range', {
+    const flashFillResult = await callTool(rangeConfigs, 'range', { action: 'flash_fill',
       address: 'N1:N4',
       sheetName: MAIN,
     });
@@ -1425,19 +1015,19 @@ async function testRangeToolVariants(): Promise<void> {
   }
 
   // --- get_range_precedents ---
-  await runTool(rangeConfigs, 'get_range_precedents', { address: 'P2', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'get_precedents', address: 'P2', sheetName: MAIN }, r => {
     const d = r as { count: number };
     return d.count > 0 ? null : 'Expected at least one precedent';
   });
 
   // --- get_range_dependents ---
-  await runTool(rangeConfigs, 'get_range_dependents', { address: 'P2', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'get_dependents', address: 'P2', sheetName: MAIN }, r => {
     const d = r as { count: number };
     return d.count > 0 ? null : 'Expected at least one dependent';
   });
 
   // --- recalculate_range ---
-  await runTool(rangeConfigs, 'recalculate_range', { address: 'P2:Q2', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'recalculate', address: 'P2:Q2', sheetName: MAIN }, r => {
     const d = r as { recalculated: boolean };
     return d.recalculated ? null : 'Expected recalculated';
   });
@@ -1455,7 +1045,7 @@ async function testRangeToolVariants(): Promise<void> {
       ];
       await context.sync();
     });
-    await callTool(tableConfigs, 'create_table', {
+    await callTool(tableConfigs, 'table', { action: 'create',
       address: 'R1:S4',
       hasHeaders: true,
       name: RANGE_TABLE,
@@ -1464,12 +1054,12 @@ async function testRangeToolVariants(): Promise<void> {
   } catch {
     /* seed failure */
   }
-  await runTool(rangeConfigs, 'get_tables_for_range', { address: 'R1:S10', sheetName: MAIN }, r => {
+  await runTool(rangeConfigs, 'range', { action: 'get_tables', address: 'R1:S10', sheetName: MAIN }, r => {
     const d = r as { count: number };
     return d.count >= 1 ? null : 'Expected at least one table intersecting range';
   });
   try {
-    await callTool(tableConfigs, 'delete_table', { tableName: RANGE_TABLE });
+    await callTool(tableConfigs, 'table', { action: 'delete', tableName: RANGE_TABLE });
   } catch {
     /* cleanup failure */
   }
@@ -1495,7 +1085,7 @@ async function testTableTools(): Promise<void> {
   );
 
   // 2. list_tables
-  await runTool(tableConfigs, 'list_tables', { sheetName: MAIN }, r => {
+  await runTool(tableConfigs, 'table', { action: 'list', sheetName: MAIN }, r => {
     const d = r as { count: number; tables: { name: string }[] };
     const found = d.tables.some(t => t.name === TABLE);
     return found ? null : `Table '${TABLE}' not found in list`;
@@ -1504,8 +1094,8 @@ async function testTableTools(): Promise<void> {
   // 3. add_table_rows
   await runTool(
     tableConfigs,
-    'add_table_rows',
-    { tableName: TABLE, values: [['Sprocket', 7.99, 15]] },
+    'table',
+    { action: 'add_rows', tableName: TABLE, values: [['Sprocket', 7.99, 15]] },
     r => {
       const d = r as { rowsAdded: number };
       return d.rowsAdded === 1 ? null : `Expected 1 row added, got ${d.rowsAdded}`;
@@ -1513,7 +1103,7 @@ async function testTableTools(): Promise<void> {
   );
 
   // 4. get_table_data
-  await runTool(tableConfigs, 'get_table_data', { tableName: TABLE }, r => {
+  await runTool(tableConfigs, 'table', { action: 'get_data', tableName: TABLE }, r => {
     const d = r as { headers: unknown[]; rowCount: number };
     if (d.headers[0] !== 'Product') return `Expected header 'Product', got '${d.headers[0]}'`;
     if (d.rowCount < 5) return `Expected ≥5 rows, got ${d.rowCount}`;
@@ -1521,7 +1111,7 @@ async function testTableTools(): Promise<void> {
   });
 
   // 5. sort_table
-  await runTool(tableConfigs, 'sort_table', { tableName: TABLE, column: 1, ascending: true }, r => {
+  await runTool(tableConfigs, 'table', { action: 'sort', tableName: TABLE, column: 1, ascending: true }, r => {
     const d = r as { ascending: boolean };
     return d.ascending === true ? null : 'Expected ascending sort';
   });
@@ -1529,8 +1119,8 @@ async function testTableTools(): Promise<void> {
   // 6. filter_table
   await runTool(
     tableConfigs,
-    'filter_table',
-    { tableName: TABLE, column: 0, values: ['Widget', 'Gadget'] },
+    'table',
+    { action: 'filter', tableName: TABLE, column: 0, filterValues: ['Widget', 'Gadget'] },
     r => {
       const d = r as { filteredColumn: number };
       return d.filteredColumn === 0 ? null : 'Expected filtered column 0';
@@ -1538,13 +1128,13 @@ async function testTableTools(): Promise<void> {
   );
 
   // 7. clear_table_filters
-  await runTool(tableConfigs, 'clear_table_filters', { tableName: TABLE }, r => {
+  await runTool(tableConfigs, 'table', { action: 'clear_filters', tableName: TABLE }, r => {
     const d = r as { filtersCleared: boolean };
     return d.filtersCleared ? null : 'Expected filtersCleared';
   });
 
   // 8. add_table_column
-  await runTool(tableConfigs, 'add_table_column', { tableName: TABLE, columnName: 'Notes' }, r => {
+  await runTool(tableConfigs, 'table', { action: 'add_column', tableName: TABLE, columnName: 'Notes' }, r => {
     const d = r as { added: boolean; columnName: string };
     return d.added && d.columnName === 'Notes' ? null : 'Expected column added';
   });
@@ -1552,8 +1142,8 @@ async function testTableTools(): Promise<void> {
   // 9. delete_table_column
   await runTool(
     tableConfigs,
-    'delete_table_column',
-    { tableName: TABLE, columnName: 'Notes' },
+    'table',
+    { action: 'delete_column', tableName: TABLE, columnName: 'Notes' },
     r => {
       const d = r as { deleted: boolean };
       return d.deleted ? null : 'Expected column deleted';
@@ -1561,7 +1151,7 @@ async function testTableTools(): Promise<void> {
   );
 
   // 7b. reapply_table_filters
-  await runTool(tableConfigs, 'reapply_table_filters', { tableName: TABLE }, r => {
+  await runTool(tableConfigs, 'table', { action: 'reapply_filters', tableName: TABLE }, r => {
     const d = r as { reapplied: boolean };
     return d.reapplied ? null : 'Expected reapplied';
   });
@@ -1578,7 +1168,7 @@ async function testTableTools(): Promise<void> {
       await context.sync();
     });
     await sleep(300);
-    await callTool(tableConfigs, 'create_table', {
+    await callTool(tableConfigs, 'table', { action: 'create',
       address: 'O20:P22',
       hasHeaders: true,
       name: TABLE2,
@@ -1587,7 +1177,7 @@ async function testTableTools(): Promise<void> {
   } catch {
     /* setup failure */
   }
-  await runTool(tableConfigs, 'convert_table_to_range', { tableName: TABLE2 }, r => {
+  await runTool(tableConfigs, 'table', { action: 'convert_to_range', tableName: TABLE2 }, r => {
     const d = r as { converted: boolean };
     return d.converted ? null : 'Expected converted';
   });
@@ -1607,7 +1197,7 @@ async function testTableTools(): Promise<void> {
       ];
       await context.sync();
     });
-    await callTool(tableConfigs, 'create_table', {
+    await callTool(tableConfigs, 'table', { action: 'create',
       address: 'U20:W23',
       hasHeaders: true,
       name: TABLE3,
@@ -1617,15 +1207,15 @@ async function testTableTools(): Promise<void> {
     /* seed failure */
   }
 
-  await runTool(tableConfigs, 'resize_table', { tableName: TABLE3, newAddress: 'U20:W25' }, r => {
+  await runTool(tableConfigs, 'table', { action: 'resize', tableName: TABLE3, newAddress: 'U20:W25' }, r => {
     const d = r as { resized: boolean };
     return d.resized ? null : 'Expected resized';
   });
 
   await runTool(
     tableConfigs,
-    'set_table_style',
-    { tableName: TABLE3, style: 'TableStyleMedium2' },
+    'table',
+    { action: 'configure', tableName: TABLE3, style: 'TableStyleMedium2' },
     r => {
       const d = r as { style: string };
       return d.style === 'TableStyleMedium2' ? null : `Expected TableStyleMedium2, got ${d.style}`;
@@ -1634,21 +1224,21 @@ async function testTableTools(): Promise<void> {
 
   await runTool(
     tableConfigs,
-    'set_table_header_totals_visibility',
-    { tableName: TABLE3, showHeaders: true, showTotals: true },
+    'table',
+    { action: 'configure', tableName: TABLE3, showHeaders: true, showTotals: true },
     r => {
       const d = r as { showHeaders: boolean; showTotals: boolean };
       return d.showHeaders && d.showTotals ? null : 'Expected headers and totals visible';
     }
   );
   try {
-    await callTool(tableConfigs, 'delete_table', { tableName: TABLE3 });
+    await callTool(tableConfigs, 'table', { action: 'delete', tableName: TABLE3 });
   } catch {
     /* cleanup failure */
   }
 
   // 11. delete_table
-  await runTool(tableConfigs, 'delete_table', { tableName: TABLE }, r => {
+  await runTool(tableConfigs, 'table', { action: 'delete', tableName: TABLE }, r => {
     const d = r as { deleted: string };
     return d.deleted === TABLE ? null : `Expected deleted '${TABLE}'`;
   });
@@ -1707,13 +1297,13 @@ async function testTableToolVariants(): Promise<void> {
   );
   // Cleanup
   try {
-    await callTool(tableConfigs, 'delete_table', { tableName: TABLE_NH });
+    await callTool(tableConfigs, 'table', { action: 'delete', tableName: TABLE_NH });
   } catch {
     /* */
   }
 
   // --- create table for remaining variant tests ---
-  await callTool(tableConfigs, 'create_table', {
+  await callTool(tableConfigs, 'table', { action: 'create',
     address: 'A40:C44',
     hasHeaders: true,
     name: TABLE_V,
@@ -1723,8 +1313,8 @@ async function testTableToolVariants(): Promise<void> {
   // --- sort_table: descending ---
   await runTool(
     tableConfigs,
-    'sort_table',
-    { tableName: TABLE_V, column: 1, ascending: false },
+    'table',
+    { action: 'sort', tableName: TABLE_V, column: 1, ascending: false },
     r => {
       const d = r as { ascending: boolean };
       return d.ascending === false ? null : 'Expected descending';
@@ -1735,8 +1325,8 @@ async function testTableToolVariants(): Promise<void> {
   // --- add_table_column: columnName omitted (auto-generated) ---
   await runTool(
     tableConfigs,
-    'add_table_column',
-    { tableName: TABLE_V },
+    'table',
+    { action: 'add_column', tableName: TABLE_V },
     r => {
       const d = r as { added: boolean; columnName: string };
       return d.added ? null : 'Expected auto-named column added';
@@ -1747,8 +1337,8 @@ async function testTableToolVariants(): Promise<void> {
   // --- list_tables: sheetName omitted (workbook-wide) ---
   await runTool(
     tableConfigs,
-    'list_tables',
-    {},
+    'table',
+    { action: 'list' },
     r => {
       const d = r as { count: number };
       return d.count >= 1 ? null : 'Expected ≥1 table workbook-wide';
@@ -1758,7 +1348,7 @@ async function testTableToolVariants(): Promise<void> {
 
   // Cleanup
   try {
-    await callTool(tableConfigs, 'delete_table', { tableName: TABLE_V });
+    await callTool(tableConfigs, 'table', { action: 'delete', tableName: TABLE_V });
   } catch {
     /* */
   }
@@ -1774,8 +1364,8 @@ async function testChartTools(): Promise<void> {
   // 1. create_chart
   const createResult = await runTool(
     chartConfigs,
-    'create_chart',
-    { dataRange: 'M1:N4', chartType: 'ColumnClustered', title: 'E2E Chart', sheetName: MAIN },
+    'chart',
+    { action: 'create', dataRange: 'M1:N4', chartType: 'ColumnClustered', title: 'E2E Chart', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       chartName = d.name;
@@ -1785,7 +1375,7 @@ async function testChartTools(): Promise<void> {
   if (!createResult) return;
 
   // 2. list_charts
-  await runTool(chartConfigs, 'list_charts', { sheetName: MAIN }, r => {
+  await runTool(chartConfigs, 'chart', { action: 'list', sheetName: MAIN }, r => {
     const d = r as { count: number };
     return d.count >= 1 ? null : `Expected ≥1 chart, got ${d.count}`;
   });
@@ -1793,8 +1383,8 @@ async function testChartTools(): Promise<void> {
   // 3. set_chart_title
   await runTool(
     chartConfigs,
-    'set_chart_title',
-    { chartName, title: 'Updated Title', sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, title: 'Updated Title', sheetName: MAIN },
     r => {
       const d = r as { title: string };
       return d.title === 'Updated Title' ? null : `Expected title 'Updated Title'`;
@@ -1804,8 +1394,8 @@ async function testChartTools(): Promise<void> {
   // 4. set_chart_type
   await runTool(
     chartConfigs,
-    'set_chart_type',
-    { chartName, chartType: 'Line', sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, chartType: 'Line', sheetName: MAIN },
     r => {
       const d = r as { chartType: string };
       return d.chartType ? null : 'Expected chartType';
@@ -1815,8 +1405,8 @@ async function testChartTools(): Promise<void> {
   // 5. set_chart_data_source
   await runTool(
     chartConfigs,
-    'set_chart_data_source',
-    { chartName, dataRange: 'M1:N4', sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, dataRange: 'M1:N4', sheetName: MAIN },
     r => {
       const d = r as { updated: boolean };
       return d.updated ? null : 'Expected updated';
@@ -1826,8 +1416,8 @@ async function testChartTools(): Promise<void> {
   // 5b. set_chart_position
   await runTool(
     chartConfigs,
-    'set_chart_position',
-    { chartName, left: 30, top: 30, width: 420, height: 260, sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, left: 30, top: 30, width: 420, height: 260, sheetName: MAIN },
     r => {
       const d = r as { width: number; height: number };
       return d.width > 0 && d.height > 0 ? null : 'Expected chart dimensions > 0';
@@ -1837,8 +1427,8 @@ async function testChartTools(): Promise<void> {
   // 5c. set_chart_legend_visibility
   await runTool(
     chartConfigs,
-    'set_chart_legend_visibility',
-    { chartName, visible: true, position: 'Right', sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, visible: true, position: 'Right', sheetName: MAIN },
     r => {
       const d = r as { visible: boolean };
       return d.visible ? null : 'Expected legend visible';
@@ -1848,8 +1438,8 @@ async function testChartTools(): Promise<void> {
   // 5d. set_chart_axis_title
   await runTool(
     chartConfigs,
-    'set_chart_axis_title',
-    { chartName, axisType: 'Value', title: 'Amount', axisGroup: 'Primary', sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, axisType: 'Value', title: 'Amount', axisGroup: 'Primary', sheetName: MAIN },
     r => {
       const d = r as { title: string; titleVisible: boolean };
       return d.titleVisible && d.title === 'Amount' ? null : 'Expected visible value axis title';
@@ -1859,8 +1449,8 @@ async function testChartTools(): Promise<void> {
   // 5e. set_chart_axis_visibility
   await runTool(
     chartConfigs,
-    'set_chart_axis_visibility',
-    { chartName, axisType: 'Category', visible: true, axisGroup: 'Primary', sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, axisType: 'Category', visible: true, axisGroup: 'Primary', sheetName: MAIN },
     r => {
       const d = r as { visible: boolean };
       return d.visible ? null : 'Expected axis visible';
@@ -1870,8 +1460,8 @@ async function testChartTools(): Promise<void> {
   // 5f. set_chart_series_filtered
   await runTool(
     chartConfigs,
-    'set_chart_series_filtered',
-    { chartName, seriesIndex: 0, filtered: false, sheetName: MAIN },
+    'chart',
+    { action: 'configure', chartName, seriesIndex: 0, filtered: false, sheetName: MAIN },
     r => {
       const d = r as { filtered: boolean };
       return d.filtered === false ? null : 'Expected series filtered=false';
@@ -1879,7 +1469,7 @@ async function testChartTools(): Promise<void> {
   );
 
   // 6. delete_chart
-  await runTool(chartConfigs, 'delete_chart', { chartName, sheetName: MAIN }, r => {
+  await runTool(chartConfigs, 'chart', { action: 'delete', chartName, sheetName: MAIN }, r => {
     const d = r as { deleted: string };
     return d.deleted === chartName ? null : 'Expected chart deleted';
   });
@@ -1894,8 +1484,8 @@ async function testChartToolVariants(): Promise<void> {
   let lineChart = '';
   const lineResult = await runTool(
     chartConfigs,
-    'create_chart',
-    { dataRange: 'M1:N4', chartType: 'Line', title: 'Line Chart', sheetName: MAIN },
+    'chart',
+    { action: 'create', dataRange: 'M1:N4', chartType: 'Line', title: 'Line Chart', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       lineChart = d.name;
@@ -1908,8 +1498,8 @@ async function testChartToolVariants(): Promise<void> {
   let barChart = '';
   const barResult = await runTool(
     chartConfigs,
-    'create_chart',
-    { dataRange: 'M1:N4', chartType: 'BarClustered', sheetName: MAIN },
+    'chart',
+    { action: 'create', dataRange: 'M1:N4', chartType: 'BarClustered', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       barChart = d.name;
@@ -1922,8 +1512,8 @@ async function testChartToolVariants(): Promise<void> {
   let noTitleChart = '';
   await runTool(
     chartConfigs,
-    'create_chart',
-    { dataRange: 'M1:N4', chartType: 'Area', sheetName: MAIN },
+    'chart',
+    { action: 'create', dataRange: 'M1:N4', chartType: 'Area', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       noTitleChart = d.name;
@@ -1936,8 +1526,8 @@ async function testChartToolVariants(): Promise<void> {
   if (lineChart) {
     await runTool(
       chartConfigs,
-      'set_chart_type',
-      { chartName: lineChart, chartType: 'BarStacked', sheetName: MAIN },
+      'chart',
+      { action: 'configure', chartName: lineChart, chartType: 'BarStacked', sheetName: MAIN },
       r => {
         const d = r as { chartType: string };
         return d.chartType ? null : 'Expected chartType';
@@ -1950,8 +1540,8 @@ async function testChartToolVariants(): Promise<void> {
   if (barChart) {
     await runTool(
       chartConfigs,
-      'set_chart_type',
-      { chartName: barChart, chartType: 'Doughnut', sheetName: MAIN },
+      'chart',
+      { action: 'configure', chartName: barChart, chartType: 'Doughnut', sheetName: MAIN },
       r => {
         const d = r as { chartType: string };
         return d.chartType ? null : 'Expected chartType';
@@ -1964,8 +1554,8 @@ async function testChartToolVariants(): Promise<void> {
   if (noTitleChart) {
     await runTool(
       chartConfigs,
-      'set_chart_type',
-      { chartName: noTitleChart, chartType: 'XYScatter', sheetName: MAIN },
+      'chart',
+      { action: 'configure', chartName: noTitleChart, chartType: 'XYScatter', sheetName: MAIN },
       r => {
         const d = r as { chartType: string };
         return d.chartType ? null : 'Expected chartType';
@@ -1978,7 +1568,7 @@ async function testChartToolVariants(): Promise<void> {
   for (const name of [lineChart, barChart, noTitleChart]) {
     if (name) {
       try {
-        await callTool(chartConfigs, 'delete_chart', { chartName: name, sheetName: MAIN });
+        await callTool(chartConfigs, 'chart', { action: 'delete', chartName: name, sheetName: MAIN });
       } catch {
         /* */
       }
@@ -1989,8 +1579,8 @@ async function testChartToolVariants(): Promise<void> {
   let colStackChart = '';
   await runTool(
     chartConfigs,
-    'create_chart',
-    { dataRange: 'M1:N4', chartType: 'ColumnStacked', sheetName: MAIN },
+    'chart',
+    { action: 'create', dataRange: 'M1:N4', chartType: 'ColumnStacked', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       colStackChart = d.name;
@@ -2002,8 +1592,8 @@ async function testChartToolVariants(): Promise<void> {
   let lineMarkersChart = '';
   await runTool(
     chartConfigs,
-    'create_chart',
-    { dataRange: 'M1:N4', chartType: 'LineMarkers', sheetName: MAIN },
+    'chart',
+    { action: 'create', dataRange: 'M1:N4', chartType: 'LineMarkers', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       lineMarkersChart = d.name;
@@ -2016,7 +1606,7 @@ async function testChartToolVariants(): Promise<void> {
   for (const name of [colStackChart, lineMarkersChart]) {
     if (name) {
       try {
-        await callTool(chartConfigs, 'delete_chart', { chartName: name, sheetName: MAIN });
+        await callTool(chartConfigs, 'chart', { action: 'delete', chartName: name, sheetName: MAIN });
       } catch {
         /* */
       }
@@ -2030,19 +1620,19 @@ async function testSheetTools(): Promise<void> {
   log('── Sheet Tools (12) ──');
 
   // 1. list_sheets
-  await runTool(sheetConfigs, 'list_sheets', {}, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'list',}, r => {
     const d = r as { count: number };
     return d.count >= 1 ? null : 'Expected ≥1 sheet';
   });
 
   // 2. create_sheet
-  await runTool(sheetConfigs, 'create_sheet', { name: SHEET_OPS }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'create', name: SHEET_OPS }, r => {
     const d = r as { name: string };
     return d.name === SHEET_OPS ? null : `Expected '${SHEET_OPS}', got '${d.name}'`;
   });
 
   // 3. activate_sheet
-  await runTool(sheetConfigs, 'activate_sheet', { name: SHEET_OPS }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'activate', name: SHEET_OPS }, r => {
     const d = r as { activated: string };
     return d.activated === SHEET_OPS ? null : 'Expected activated';
   });
@@ -2051,8 +1641,8 @@ async function testSheetTools(): Promise<void> {
   const renamedName = 'E2E_Renamed';
   await runTool(
     sheetConfigs,
-    'rename_sheet',
-    { currentName: SHEET_OPS, newName: renamedName },
+    'sheet',
+    { action: 'rename', currentName: SHEET_OPS, newName: renamedName },
     r => {
       const d = r as { newName: string };
       return d.newName === renamedName ? null : `Expected '${renamedName}', got '${d.newName}'`;
@@ -2060,37 +1650,37 @@ async function testSheetTools(): Promise<void> {
   );
 
   // 5. copy_sheet
-  await runTool(sheetConfigs, 'copy_sheet', { name: renamedName, newName: COPY_SHEET }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'copy', name: renamedName, newName: COPY_SHEET }, r => {
     const d = r as { copiedSheet: string };
     return d.copiedSheet === COPY_SHEET ? null : `Expected '${COPY_SHEET}', got '${d.copiedSheet}'`;
   });
 
   // 6. move_sheet — move copy to position 0
-  await runTool(sheetConfigs, 'move_sheet', { name: COPY_SHEET, position: 0 }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'move', name: COPY_SHEET, position: 0 }, r => {
     const d = r as { position: number };
     return d.position === 0 ? null : `Expected position 0, got ${d.position}`;
   });
 
   // 7. freeze_panes — freeze at B2
-  await runTool(sheetConfigs, 'freeze_panes', { name: renamedName, freezeAt: 'B2' }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'freeze', name: renamedName, freezeAt: 'B2' }, r => {
     const d = r as { frozenAt: string };
     return d.frozenAt === 'B2' ? null : `Expected frozenAt 'B2'`;
   });
   // Unfreeze cleanup
   try {
-    await callTool(sheetConfigs, 'freeze_panes', { name: renamedName });
+    await callTool(sheetConfigs, 'sheet', { action: 'freeze', name: renamedName });
   } catch {
     /* non-critical */
   }
 
   // 8. protect_sheet
-  await runTool(sheetConfigs, 'protect_sheet', { name: renamedName }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'protect', name: renamedName }, r => {
     const d = r as { protected: boolean };
     return d.protected === true ? null : 'Expected protected';
   });
 
   // 9. unprotect_sheet
-  await runTool(sheetConfigs, 'unprotect_sheet', { name: renamedName }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'unprotect', name: renamedName }, r => {
     const d = r as { protected: boolean };
     return d.protected === false ? null : 'Expected unprotected';
   });
@@ -2107,7 +1697,7 @@ async function testSheetTools(): Promise<void> {
   );
   // Make visible again for cleanup
   try {
-    await callTool(sheetConfigs, 'set_sheet_visibility', {
+    await callTool(sheetConfigs, 'sheet', { action: 'set_visibility',
       name: COPY_SHEET,
       visibility: 'Visible',
     });
@@ -2118,8 +1708,8 @@ async function testSheetTools(): Promise<void> {
   // 11. set_page_layout
   await runTool(
     sheetConfigs,
-    'set_page_layout',
-    { name: renamedName, orientation: 'Landscape', leftMargin: 0.5, rightMargin: 0.5 },
+    'sheet',
+    { action: 'set_page_layout', name: renamedName, orientation: 'Landscape', leftMargin: 0.5, rightMargin: 0.5 },
     r => {
       const d = r as { orientation: string };
       return d.orientation === 'Landscape' ? null : `Expected Landscape, got ${d.orientation}`;
@@ -2129,8 +1719,8 @@ async function testSheetTools(): Promise<void> {
   // 11b. set_sheet_gridlines
   await runTool(
     sheetConfigs,
-    'set_sheet_gridlines',
-    { name: renamedName, showGridlines: false },
+    'sheet',
+    { action: 'set_gridlines', name: renamedName, showGridlines: false },
     r => {
       const d = r as { showGridlines: boolean };
       return d.showGridlines === false ? null : 'Expected gridlines hidden';
@@ -2140,8 +1730,8 @@ async function testSheetTools(): Promise<void> {
   // 11c. set_sheet_headings
   await runTool(
     sheetConfigs,
-    'set_sheet_headings',
-    { name: renamedName, showHeadings: false },
+    'sheet',
+    { action: 'set_headings', name: renamedName, showHeadings: false },
     r => {
       const d = r as { showHeadings: boolean };
       return d.showHeadings === false ? null : 'Expected headings hidden';
@@ -2149,25 +1739,25 @@ async function testSheetTools(): Promise<void> {
   );
 
   // 11d. recalculate_sheet
-  await runTool(sheetConfigs, 'recalculate_sheet', { name: renamedName, recalcType: 'Full' }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'recalculate', name: renamedName, recalcType: 'Full' }, r => {
     const d = r as { recalculated: boolean };
     return d.recalculated ? null : 'Expected recalculated';
   });
 
   // 12. delete_sheet — activate MAIN first, then clean up test sheets
   try {
-    await callTool(sheetConfigs, 'activate_sheet', { name: MAIN });
+    await callTool(sheetConfigs, 'sheet', { action: 'activate', name: MAIN });
   } catch {
     /* non-critical */
   }
 
-  await runTool(sheetConfigs, 'delete_sheet', { name: renamedName }, r => {
+  await runTool(sheetConfigs, 'sheet', { action: 'delete', name: renamedName }, r => {
     const d = r as { deleted: string };
     return d.deleted === renamedName ? null : 'Expected sheet deleted';
   });
   // Clean up copy sheet too
   try {
-    await callTool(sheetConfigs, 'delete_sheet', { name: COPY_SHEET });
+    await callTool(sheetConfigs, 'sheet', { action: 'delete', name: COPY_SHEET });
   } catch {
     /* non-critical */
   }
@@ -2182,7 +1772,7 @@ async function testSheetToolVariants(): Promise<void> {
 
   // Create a test sheet for variants
   try {
-    await callTool(sheetConfigs, 'create_sheet', { name: SHEET_V });
+    await callTool(sheetConfigs, 'sheet', { action: 'create', name: SHEET_V });
   } catch {
     /* */
   }
@@ -2215,7 +1805,7 @@ async function testSheetToolVariants(): Promise<void> {
   // Need to create a temp sheet since can't very-hide if it's the only/active one
   const VHIDDEN = 'E2E_VHide';
   try {
-    await callTool(sheetConfigs, 'create_sheet', { name: VHIDDEN });
+    await callTool(sheetConfigs, 'sheet', { action: 'create', name: VHIDDEN });
   } catch {
     /* */
   }
@@ -2231,8 +1821,8 @@ async function testSheetToolVariants(): Promise<void> {
   );
   // Make visible again for cleanup
   try {
-    await callTool(sheetConfigs, 'set_sheet_visibility', { name: VHIDDEN, visibility: 'Visible' });
-    await callTool(sheetConfigs, 'delete_sheet', { name: VHIDDEN });
+    await callTool(sheetConfigs, 'sheet', { action: 'set_visibility', name: VHIDDEN, visibility: 'Visible' });
+    await callTool(sheetConfigs, 'sheet', { action: 'delete', name: VHIDDEN });
   } catch {
     /* non-critical */
   }
@@ -2263,8 +1853,8 @@ async function testSheetToolVariants(): Promise<void> {
   // --- set_page_layout: Portrait + paperSize + topMargin + bottomMargin ---
   await runTool(
     sheetConfigs,
-    'set_page_layout',
-    { name: SHEET_V, orientation: 'Portrait', paperSize: 'A4', topMargin: 1.0, bottomMargin: 1.0 },
+    'sheet',
+    { action: 'set_page_layout', name: SHEET_V, orientation: 'Portrait', paperSize: 'A4', topMargin: 1.0, bottomMargin: 1.0 },
     r => {
       const d = r as { orientation: string };
       return d.orientation === 'Portrait' ? null : `Expected Portrait, got ${d.orientation}`;
@@ -2302,8 +1892,8 @@ async function testSheetToolVariants(): Promise<void> {
 
   // Cleanup variant sheet
   try {
-    await callTool(sheetConfigs, 'activate_sheet', { name: MAIN });
-    await callTool(sheetConfigs, 'delete_sheet', { name: SHEET_V });
+    await callTool(sheetConfigs, 'sheet', { action: 'activate', name: MAIN });
+    await callTool(sheetConfigs, 'sheet', { action: 'delete', name: SHEET_V });
   } catch {
     /* non-critical */
   }
@@ -2311,15 +1901,15 @@ async function testSheetToolVariants(): Promise<void> {
   // --- set_page_layout: additional paperSize values ---
   const PAPER_TEST = 'E2E_PaperTest';
   try {
-    await callTool(sheetConfigs, 'create_sheet', { name: PAPER_TEST });
+    await callTool(sheetConfigs, 'sheet', { action: 'create', name: PAPER_TEST });
   } catch {
     /* */
   }
 
   await runTool(
     sheetConfigs,
-    'set_page_layout',
-    { name: PAPER_TEST, paperSize: 'Letter', sheetName: MAIN },
+    'sheet',
+    { action: 'set_page_layout', name: PAPER_TEST, paperSize: 'Letter', sheetName: MAIN },
     r => {
       const d = r as { orientation?: string };
       return null; // Just verify no error
@@ -2329,8 +1919,8 @@ async function testSheetToolVariants(): Promise<void> {
 
   await runTool(
     sheetConfigs,
-    'set_page_layout',
-    { name: PAPER_TEST, paperSize: 'Legal', sheetName: MAIN },
+    'sheet',
+    { action: 'set_page_layout', name: PAPER_TEST, paperSize: 'Legal', sheetName: MAIN },
     r => {
       return null;
     },
@@ -2339,8 +1929,8 @@ async function testSheetToolVariants(): Promise<void> {
 
   await runTool(
     sheetConfigs,
-    'set_page_layout',
-    { name: PAPER_TEST, paperSize: 'Tabloid', sheetName: MAIN },
+    'sheet',
+    { action: 'set_page_layout', name: PAPER_TEST, paperSize: 'Tabloid', sheetName: MAIN },
     r => {
       return null;
     },
@@ -2349,8 +1939,8 @@ async function testSheetToolVariants(): Promise<void> {
 
   // Cleanup
   try {
-    await callTool(sheetConfigs, 'activate_sheet', { name: MAIN });
-    await callTool(sheetConfigs, 'delete_sheet', { name: PAPER_TEST });
+    await callTool(sheetConfigs, 'sheet', { action: 'activate', name: MAIN });
+    await callTool(sheetConfigs, 'sheet', { action: 'delete', name: PAPER_TEST });
   } catch {
     /* non-critical */
   }
@@ -2364,8 +1954,8 @@ async function testWorkbookToolVariants(): Promise<void> {
   // --- define_named_range: comment omitted ---
   await runTool(
     workbookConfigs,
-    'define_named_range',
-    { name: 'E2E_NoComment', address: 'A1:A3', sheetName: MAIN },
+    'workbook',
+    { action: 'define_named_range', name: 'E2E_NoComment', address: 'A1:A3', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       return d.name === 'E2E_NoComment' ? null : 'Expected name';
@@ -2418,20 +2008,20 @@ async function testWorkbookTools(): Promise<void> {
   log('── Workbook Tools (5) ──');
 
   try {
-    await callTool(sheetConfigs, 'activate_sheet', { name: MAIN });
+    await callTool(sheetConfigs, 'sheet', { action: 'activate', name: MAIN });
   } catch {
     /* non-critical */
   }
 
   // 1. get_workbook_info
-  await runTool(workbookConfigs, 'get_workbook_info', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'get_info',}, r => {
     const d = r as { sheetCount: number; activeSheet: string };
     if (d.sheetCount < 1) return `Expected ≥1 sheet, got ${d.sheetCount}`;
     return null;
   });
 
   // 2. get_selected_range
-  await runTool(workbookConfigs, 'get_selected_range', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'get_selected_range',}, r => {
     const d = r as { address: string };
     return d.address ? null : 'Expected address';
   });
@@ -2439,8 +2029,8 @@ async function testWorkbookTools(): Promise<void> {
   // 3. define_named_range
   await runTool(
     workbookConfigs,
-    'define_named_range',
-    { name: 'E2E_Names', address: 'A1:C6', comment: 'Test range', sheetName: MAIN },
+    'workbook',
+    { action: 'define_named_range', name: 'E2E_Names', address: 'A1:C6', comment: 'Test range', sheetName: MAIN },
     r => {
       const d = r as { name: string };
       return d.name === 'E2E_Names' ? null : `Expected 'E2E_Names', got '${d.name}'`;
@@ -2448,26 +2038,26 @@ async function testWorkbookTools(): Promise<void> {
   );
 
   // 4. list_named_ranges
-  await runTool(workbookConfigs, 'list_named_ranges', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'list_named_ranges',}, r => {
     const d = r as { count: number; namedRanges: { name: string }[] };
     const found = d.namedRanges.some(n => n.name === 'E2E_Names');
     return found ? null : 'Expected E2E_Names in list';
   });
 
   // 5. recalculate_workbook
-  await runTool(workbookConfigs, 'recalculate_workbook', { recalcType: 'Full' }, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'recalculate', recalcType: 'Full' }, r => {
     const d = r as { recalculated: boolean };
     return d.recalculated ? null : 'Expected recalculated';
   });
 
   // 6. save_workbook
-  await runTool(workbookConfigs, 'save_workbook', { saveBehavior: 'Save' }, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'save', saveBehavior: 'Save' }, r => {
     const d = r as { saved: boolean };
     return d.saved ? null : 'Expected saved';
   });
 
   // 7. get_workbook_properties
-  await runTool(workbookConfigs, 'get_workbook_properties', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'get_properties',}, r => {
     const d = r as { title?: string };
     return d !== null ? null : 'Expected workbook properties object';
   });
@@ -2475,8 +2065,8 @@ async function testWorkbookTools(): Promise<void> {
   // 8. set_workbook_properties
   await runTool(
     workbookConfigs,
-    'set_workbook_properties',
-    { title: 'E2E Workbook', subject: 'Automation Test', category: 'E2E' },
+    'workbook',
+    { action: 'set_properties', title: 'E2E Workbook', subject: 'Automation Test', category: 'E2E' },
     r => {
       const d = r as { updated: boolean; title: string };
       return d.updated && d.title === 'E2E Workbook' ? null : 'Expected updated workbook title';
@@ -2484,37 +2074,37 @@ async function testWorkbookTools(): Promise<void> {
   );
 
   // 9. get_workbook_protection
-  await runTool(workbookConfigs, 'get_workbook_protection', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'get_info',}, r => {
     const d = r as { protected: boolean };
     return typeof d.protected === 'boolean' ? null : 'Expected protection boolean';
   });
 
   // 10. protect_workbook
-  await runTool(workbookConfigs, 'protect_workbook', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'protect',}, r => {
     const d = r as { protected: boolean };
     return d.protected === true ? null : 'Expected protected true';
   });
 
   // 11. unprotect_workbook
-  await runTool(workbookConfigs, 'unprotect_workbook', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'unprotect',}, r => {
     const d = r as { protected: boolean };
     return d.protected === false ? null : 'Expected protected false';
   });
 
   // 12. refresh_data_connections
-  await runTool(workbookConfigs, 'refresh_data_connections', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'refresh_connections',}, r => {
     const d = r as { refreshed: boolean };
     return d.refreshed ? null : 'Expected refreshed';
   });
 
   // 13. list_queries
-  const listQueriesResult = await runTool(workbookConfigs, 'list_queries', {}, r => {
+  const listQueriesResult = await runTool(workbookConfigs, 'workbook', { action: 'list_queries',}, r => {
     const d = r as { count: number; queries: unknown[] };
     return Array.isArray(d.queries) && d.count >= 0 ? null : 'Expected queries array';
   });
 
   // 14. get_query_count
-  await runTool(workbookConfigs, 'get_query_count', {}, r => {
+  await runTool(workbookConfigs, 'workbook', { action: 'list_queries',}, r => {
     const d = r as { count: number };
     return typeof d.count === 'number' ? null : 'Expected numeric query count';
   });
@@ -2523,7 +2113,7 @@ async function testWorkbookTools(): Promise<void> {
   const queryList = listQueriesResult as { queries?: Array<{ name: string }> } | null;
   const firstQueryName = queryList?.queries?.[0]?.name;
   if (firstQueryName) {
-    await runTool(workbookConfigs, 'get_query', { queryName: firstQueryName }, r => {
+    await runTool(workbookConfigs, 'workbook', { action: 'get_query', queryName: firstQueryName }, r => {
       const d = r as { name: string };
       return d.name === firstQueryName ? null : `Expected query '${firstQueryName}'`;
     });
@@ -2542,8 +2132,8 @@ async function testCommentTools(): Promise<void> {
   // 1. add_comment
   await runTool(
     commentConfigs,
-    'add_comment',
-    { cellAddress: 'L1', text: 'E2E test comment', sheetName: MAIN },
+    'comment',
+    { action: 'add', cellAddress: 'L1', text: 'E2E test comment', sheetName: MAIN },
     r => {
       const d = r as { added: boolean };
       return d.added ? null : 'Expected added';
@@ -2552,7 +2142,7 @@ async function testCommentTools(): Promise<void> {
   await sleep(300);
 
   // 2. list_comments
-  await runTool(commentConfigs, 'list_comments', { sheetName: MAIN }, r => {
+  await runTool(commentConfigs, 'comment', { action: 'list', sheetName: MAIN }, r => {
     const d = r as { count: number };
     return d.count >= 1 ? null : `Expected ≥1 comment, got ${d.count}`;
   });
@@ -2560,8 +2150,8 @@ async function testCommentTools(): Promise<void> {
   // 3. edit_comment
   await runTool(
     commentConfigs,
-    'edit_comment',
-    { cellAddress: 'L1', newText: 'Updated comment', sheetName: MAIN },
+    'comment',
+    { action: 'edit', cellAddress: 'L1', text: 'Updated comment', sheetName: MAIN },
     r => {
       const d = r as { updated: boolean };
       return d.updated ? null : 'Expected updated';
@@ -2569,7 +2159,7 @@ async function testCommentTools(): Promise<void> {
   );
 
   // 4. delete_comment
-  await runTool(commentConfigs, 'delete_comment', { cellAddress: 'L1', sheetName: MAIN }, r => {
+  await runTool(commentConfigs, 'comment', { action: 'delete', cellAddress: 'L1', sheetName: MAIN }, r => {
     const d = r as { deleted: boolean };
     return d.deleted ? null : 'Expected deleted';
   });
@@ -2582,7 +2172,7 @@ async function testCommentToolVariants(): Promise<void> {
 
   // Activate MAIN so sheetName-omitted tests use correct sheet
   try {
-    await callTool(sheetConfigs, 'activate_sheet', { name: MAIN });
+    await callTool(sheetConfigs, 'sheet', { action: 'activate', name: MAIN });
   } catch {
     /* */
   }
@@ -2590,8 +2180,8 @@ async function testCommentToolVariants(): Promise<void> {
   // --- add_comment: sheetName omitted (active sheet fallback) ---
   await runTool(
     commentConfigs,
-    'add_comment',
-    { cellAddress: 'L5', text: 'No sheet comment' },
+    'comment',
+    { action: 'add', cellAddress: 'L5', text: 'No sheet comment' },
     r => {
       const d = r as { added: boolean };
       return d.added ? null : 'Expected added';
@@ -2603,8 +2193,8 @@ async function testCommentToolVariants(): Promise<void> {
   // --- list_comments: sheetName omitted ---
   await runTool(
     commentConfigs,
-    'list_comments',
-    {},
+    'comment',
+    { action: 'list' },
     r => {
       const d = r as { count: number };
       return d.count >= 1 ? null : 'Expected ≥1 comment';
@@ -2615,8 +2205,8 @@ async function testCommentToolVariants(): Promise<void> {
   // --- edit_comment: sheetName omitted (extra sync branch for sheet.name) ---
   await runTool(
     commentConfigs,
-    'edit_comment',
-    { cellAddress: 'L5', newText: 'Edited no sheet' },
+    'comment',
+    { action: 'edit', cellAddress: 'L5', text: 'Edited no sheet' },
     r => {
       const d = r as { updated: boolean };
       return d.updated ? null : 'Expected updated';
@@ -2627,8 +2217,8 @@ async function testCommentToolVariants(): Promise<void> {
   // --- delete_comment: sheetName omitted (extra sync branch) ---
   await runTool(
     commentConfigs,
-    'delete_comment',
-    { cellAddress: 'L5' },
+    'comment',
+    { action: 'delete', cellAddress: 'L5' },
     r => {
       const d = r as { deleted: boolean };
       return d.deleted ? null : 'Expected deleted';
@@ -2647,8 +2237,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 1. add_color_scale
   await runTool(
     conditionalFormatConfigs,
-    'add_color_scale',
-    { address: CF_RANGE, minColor: 'blue', maxColor: 'red', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'colorScale', address: CF_RANGE, minColor: 'blue', maxColor: 'red', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -2658,8 +2248,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 2. add_data_bar
   await runTool(
     conditionalFormatConfigs,
-    'add_data_bar',
-    { address: CF_RANGE, barColor: '#638EC6', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'dataBar', address: CF_RANGE, fillColor: '#638EC6', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -2669,12 +2259,12 @@ async function testConditionalFormatTools(): Promise<void> {
   // 3. add_cell_value_format
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'GreaterThan',
       formula1: '40',
-      fillColor: '#00FF00',
+      backgroundColor: '#00FF00',
       sheetName: MAIN,
     },
     r => {
@@ -2686,8 +2276,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 4. add_top_bottom_format
   await runTool(
     conditionalFormatConfigs,
-    'add_top_bottom_format',
-    { address: CF_RANGE, rank: 3, topOrBottom: 'TopItems', fillColor: 'green', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'topBottom', address: CF_RANGE, topBottomRank: 3, topBottomType: 'TopItems', backgroundColor: 'green', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -2697,8 +2287,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 5. add_contains_text_format
   await runTool(
     conditionalFormatConfigs,
-    'add_contains_text_format',
-    { address: 'B30:B36', text: 'Error', fontColor: 'red', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'containsText', address: 'B30:B36', containsText: 'Error', fontColor: 'red', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -2708,8 +2298,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 6. add_custom_format
   await runTool(
     conditionalFormatConfigs,
-    'add_custom_format',
-    { address: CF_RANGE, formula: '=A30>50', fillColor: '#FF00FF', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'custom', address: CF_RANGE, formula1: '=A30>50', backgroundColor: '#FF00FF', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -2719,8 +2309,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 7. list_conditional_formats
   await runTool(
     conditionalFormatConfigs,
-    'list_conditional_formats',
-    { address: CF_RANGE, sheetName: MAIN },
+    'conditional_format',
+    { action: 'list', address: CF_RANGE, sheetName: MAIN },
     r => {
       const d = r as { count: number };
       return d.count >= 4 ? null : `Expected ≥4 CFs, got ${d.count}`;
@@ -2730,8 +2320,8 @@ async function testConditionalFormatTools(): Promise<void> {
   // 8. clear_conditional_formats
   await runTool(
     conditionalFormatConfigs,
-    'clear_conditional_formats',
-    { address: CF_RANGE, sheetName: MAIN },
+    'conditional_format',
+    { action: 'clear', address: CF_RANGE, sheetName: MAIN },
     r => {
       const d = r as { cleared: boolean };
       return d.cleared ? null : 'Expected cleared';
@@ -2749,8 +2339,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_color_scale: 3-color scale (midColor) ---
   await runTool(
     conditionalFormatConfigs,
-    'add_color_scale',
-    { address: CF_RANGE, minColor: 'blue', midColor: 'yellow', maxColor: 'red', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'colorScale', address: CF_RANGE, minColor: 'blue', midColor: 'yellow', maxColor: 'red', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected 3-color scale applied';
@@ -2761,8 +2351,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_color_scale: defaults (minColor/maxColor omitted) ---
   await runTool(
     conditionalFormatConfigs,
-    'add_color_scale',
-    { address: CF_RANGE, sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'colorScale', address: CF_RANGE, sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected default color scale';
@@ -2773,8 +2363,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_data_bar: barColor omitted (default) ---
   await runTool(
     conditionalFormatConfigs,
-    'add_data_bar',
-    { address: CF_RANGE, sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'dataBar', address: CF_RANGE, sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected default data bar';
@@ -2785,14 +2375,14 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_cell_value_format: Between with formula2 + fontColor ---
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'Between',
       formula1: '20',
       formula2: '50',
       fontColor: '#0000FF',
-      fillColor: '#FFFF00',
+      backgroundColor: '#FFFF00',
       sheetName: MAIN,
     },
     r => {
@@ -2805,12 +2395,12 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_cell_value_format: LessThan ---
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'LessThan',
       formula1: '25',
-      fillColor: 'orange',
+      backgroundColor: 'orange',
       sheetName: MAIN,
     },
     r => {
@@ -2823,8 +2413,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_cell_value_format: EqualTo ---
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    { address: CF_RANGE, operator: 'EqualTo', formula1: '30', fillColor: 'cyan', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'cellValue', address: CF_RANGE, operator: 'EqualTo', formula1: '30', backgroundColor: 'cyan', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected EqualTo format applied';
@@ -2835,8 +2425,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_top_bottom_format: BottomItems ---
   await runTool(
     conditionalFormatConfigs,
-    'add_top_bottom_format',
-    { address: CF_RANGE, rank: 2, topOrBottom: 'BottomItems', fillColor: 'red', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'topBottom', address: CF_RANGE, topBottomRank: 2, topBottomType: 'BottomItems', backgroundColor: 'red', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected BottomItems applied';
@@ -2847,12 +2437,12 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_top_bottom_format: TopPercent ---
   await runTool(
     conditionalFormatConfigs,
-    'add_top_bottom_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'topBottom',
       address: CF_RANGE,
-      rank: 50,
-      topOrBottom: 'TopPercent',
-      fillColor: 'purple',
+      topBottomRank: 50,
+      topBottomType: 'TopPercent',
+      backgroundColor: 'purple',
       sheetName: MAIN,
     },
     r => {
@@ -2865,8 +2455,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_top_bottom_format: default rank/topOrBottom + fontColor ---
   await runTool(
     conditionalFormatConfigs,
-    'add_top_bottom_format',
-    { address: CF_RANGE, fontColor: 'white', fillColor: 'black', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'topBottom', address: CF_RANGE, fontColor: 'white', backgroundColor: 'black', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected default top/bottom applied';
@@ -2877,8 +2467,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_contains_text_format: fillColor + fontColor omitted (default) ---
   await runTool(
     conditionalFormatConfigs,
-    'add_contains_text_format',
-    { address: 'B30:B36', text: 'OK', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'containsText', address: 'B30:B36', containsText: 'OK', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected default font color';
@@ -2889,8 +2479,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_contains_text_format: fillColor ---
   await runTool(
     conditionalFormatConfigs,
-    'add_contains_text_format',
-    { address: 'B30:B36', text: 'Warning', fillColor: '#FFA500', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'containsText', address: 'B30:B36', containsText: 'Warning', backgroundColor: '#FFA500', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected contains text with fill';
@@ -2901,8 +2491,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_custom_format: fontColor ---
   await runTool(
     conditionalFormatConfigs,
-    'add_custom_format',
-    { address: CF_RANGE, formula: '=A30<20', fontColor: 'red', sheetName: MAIN },
+    'conditional_format',
+    { action: 'add', type: 'custom', address: CF_RANGE, formula1: '=A30<20', fontColor: 'red', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected custom format with fontColor';
@@ -2913,8 +2503,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- clear_conditional_formats: address omitted (whole sheet) ---
   await runTool(
     conditionalFormatConfigs,
-    'clear_conditional_formats',
-    { sheetName: MAIN },
+    'conditional_format',
+    { action: 'clear', sheetName: MAIN },
     r => {
       const d = r as { cleared: boolean };
       return d.cleared ? null : 'Expected whole-sheet clear';
@@ -2925,12 +2515,12 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_cell_value_format: additional operators ---
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'NotEqualTo',
       formula1: '50',
-      fillColor: 'pink',
+      backgroundColor: 'pink',
       sheetName: MAIN,
     },
     r => {
@@ -2942,12 +2532,12 @@ async function testConditionalFormatToolVariants(): Promise<void> {
 
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'GreaterThanOrEqual',
       formula1: '30',
-      fillColor: 'lime',
+      backgroundColor: 'lime',
       sheetName: MAIN,
     },
     r => {
@@ -2959,12 +2549,12 @@ async function testConditionalFormatToolVariants(): Promise<void> {
 
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'LessThanOrEqual',
       formula1: '40',
-      fillColor: 'navy',
+      backgroundColor: 'navy',
       sheetName: MAIN,
     },
     r => {
@@ -2976,13 +2566,13 @@ async function testConditionalFormatToolVariants(): Promise<void> {
 
   await runTool(
     conditionalFormatConfigs,
-    'add_cell_value_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'cellValue',
       address: CF_RANGE,
       operator: 'NotBetween',
       formula1: '25',
       formula2: '45',
-      fillColor: 'teal',
+      backgroundColor: 'teal',
       sheetName: MAIN,
     },
     r => {
@@ -2995,12 +2585,12 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // --- add_top_bottom_format: BottomPercent ---
   await runTool(
     conditionalFormatConfigs,
-    'add_top_bottom_format',
-    {
+    'conditional_format',
+    { action: 'add', type: 'topBottom',
       address: CF_RANGE,
-      rank: 25,
-      topOrBottom: 'BottomPercent',
-      fillColor: 'maroon',
+      topBottomRank: 25,
+      topBottomType: 'BottomPercent',
+      backgroundColor: 'maroon',
       sheetName: MAIN,
     },
     r => {
@@ -3013,8 +2603,8 @@ async function testConditionalFormatToolVariants(): Promise<void> {
   // Clear all the additional CF tests
   await runTool(
     conditionalFormatConfigs,
-    'clear_conditional_formats',
-    { sheetName: MAIN },
+    'conditional_format',
+    { action: 'clear', sheetName: MAIN },
     r => {
       const d = r as { cleared: boolean };
       return d.cleared ? null : 'Expected cleared';
@@ -3031,8 +2621,8 @@ async function testDataValidationTools(): Promise<void> {
   // 1. set_list_validation
   await runTool(
     dataValidationConfigs,
-    'set_list_validation',
-    { address: 'C30', source: 'Yes,No,Maybe', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'list', address: 'C30', listValues: ['Yes', 'No', 'Maybe'], sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -3042,8 +2632,8 @@ async function testDataValidationTools(): Promise<void> {
   // 2. set_number_validation
   await runTool(
     dataValidationConfigs,
-    'set_number_validation',
-    {
+    'data_validation',
+    { action: 'set',
       address: 'D30',
       numberType: 'wholeNumber',
       operator: 'Between',
@@ -3060,8 +2650,8 @@ async function testDataValidationTools(): Promise<void> {
   // 3. set_date_validation
   await runTool(
     dataValidationConfigs,
-    'set_date_validation',
-    { address: 'E30', operator: 'GreaterThan', formula1: '2024-01-01', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'date', address: 'E30', operator: 'GreaterThan', formula1: '2024-01-01', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -3071,8 +2661,8 @@ async function testDataValidationTools(): Promise<void> {
   // 4. set_text_length_validation
   await runTool(
     dataValidationConfigs,
-    'set_text_length_validation',
-    { address: 'F30', operator: 'LessThan', formula1: '50', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'textLength', address: 'F30', operator: 'LessThan', formula1: '50', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -3082,8 +2672,8 @@ async function testDataValidationTools(): Promise<void> {
   // 5. set_custom_validation
   await runTool(
     dataValidationConfigs,
-    'set_custom_validation',
-    { address: 'G30', formula: '=LEN(G30)<=100', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'custom', address: 'G30', formula: '=LEN(G30)<=100', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected applied';
@@ -3093,8 +2683,8 @@ async function testDataValidationTools(): Promise<void> {
   // 6. get_data_validation
   await runTool(
     dataValidationConfigs,
-    'get_data_validation',
-    { address: 'C30', sheetName: MAIN },
+    'data_validation',
+    { action: 'get', address: 'C30', sheetName: MAIN },
     r => {
       const d = r as { type: string };
       return d.type ? null : 'Expected validation type';
@@ -3104,8 +2694,8 @@ async function testDataValidationTools(): Promise<void> {
   // 7. clear_data_validation
   await runTool(
     dataValidationConfigs,
-    'clear_data_validation',
-    { address: 'C30:G30', sheetName: MAIN },
+    'data_validation',
+    { action: 'clear', address: 'C30:G30', sheetName: MAIN },
     r => {
       const d = r as { cleared: boolean };
       return d.cleared ? null : 'Expected cleared';
@@ -3121,11 +2711,10 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_list_validation: with alert/prompt params ---
   await runTool(
     dataValidationConfigs,
-    'set_list_validation',
-    {
+    'data_validation',
+    { action: 'set', type: 'list',
       address: 'C31',
-      source: 'A,B,C',
-      inCellDropDown: false,
+      listValues: ['A', 'B', 'C'],
       errorMessage: 'Must be A, B, or C',
       errorTitle: 'Invalid',
       promptMessage: 'Choose a letter',
@@ -3142,8 +2731,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_number_validation: decimal + EqualTo + alert params ---
   await runTool(
     dataValidationConfigs,
-    'set_number_validation',
-    {
+    'data_validation',
+    { action: 'set',
       address: 'D31',
       numberType: 'decimal',
       operator: 'EqualTo',
@@ -3164,8 +2753,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_number_validation: GreaterThan ---
   await runTool(
     dataValidationConfigs,
-    'set_number_validation',
-    {
+    'data_validation',
+    { action: 'set',
       address: 'D32',
       numberType: 'wholeNumber',
       operator: 'GreaterThan',
@@ -3182,8 +2771,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_number_validation: LessThanOrEqualTo ---
   await runTool(
     dataValidationConfigs,
-    'set_number_validation',
-    {
+    'data_validation',
+    { action: 'set',
       address: 'D33',
       numberType: 'wholeNumber',
       operator: 'LessThanOrEqualTo',
@@ -3200,8 +2789,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_date_validation: Between with formula2 ---
   await runTool(
     dataValidationConfigs,
-    'set_date_validation',
-    {
+    'data_validation',
+    { action: 'set', type: 'date',
       address: 'E31',
       operator: 'Between',
       formula1: '2024-01-01',
@@ -3219,8 +2808,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_text_length_validation: Between with formula2 ---
   await runTool(
     dataValidationConfigs,
-    'set_text_length_validation',
-    {
+    'data_validation',
+    { action: 'set', type: 'textLength',
       address: 'F31',
       operator: 'Between',
       formula1: '1',
@@ -3238,8 +2827,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_text_length_validation: GreaterThanOrEqualTo ---
   await runTool(
     dataValidationConfigs,
-    'set_text_length_validation',
-    { address: 'F32', operator: 'GreaterThanOrEqualTo', formula1: '5', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'textLength', address: 'F32', operator: 'GreaterThanOrEqualTo', formula1: '5', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected GTE applied';
@@ -3250,8 +2839,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- set_custom_validation: with all alert/prompt params ---
   await runTool(
     dataValidationConfigs,
-    'set_custom_validation',
-    {
+    'data_validation',
+    { action: 'set', type: 'custom',
       address: 'G31',
       formula: '=ISNUMBER(G31)',
       errorMessage: 'Must be number',
@@ -3269,7 +2858,7 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   // Cleanup all variant validations
   try {
-    await callTool(dataValidationConfigs, 'clear_data_validation', {
+    await callTool(dataValidationConfigs, 'data_validation', { action: 'clear',
       address: 'C31:G33',
       sheetName: MAIN,
     });
@@ -3280,8 +2869,8 @@ async function testDataValidationToolVariants(): Promise<void> {
   // --- Additional data validation operators ---
   await runTool(
     dataValidationConfigs,
-    'set_number_validation',
-    {
+    'data_validation',
+    { action: 'set',
       address: 'H31',
       numberType: 'wholeNumber',
       operator: 'NotEqualTo',
@@ -3297,8 +2886,8 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   await runTool(
     dataValidationConfigs,
-    'set_number_validation',
-    {
+    'data_validation',
+    { action: 'set',
       address: 'H32',
       numberType: 'decimal',
       operator: 'NotBetween',
@@ -3315,8 +2904,8 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   await runTool(
     dataValidationConfigs,
-    'set_date_validation',
-    { address: 'H33', operator: 'LessThan', formula1: '2030-12-31', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'date', address: 'H33', operator: 'LessThan', formula1: '2030-12-31', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected LessThan applied';
@@ -3326,8 +2915,8 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   await runTool(
     dataValidationConfigs,
-    'set_date_validation',
-    {
+    'data_validation',
+    { action: 'set', type: 'date',
       address: 'H34',
       operator: 'NotBetween',
       formula1: '2020-01-01',
@@ -3343,8 +2932,8 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   await runTool(
     dataValidationConfigs,
-    'set_text_length_validation',
-    { address: 'H35', operator: 'EqualTo', formula1: '10', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'textLength', address: 'H35', operator: 'EqualTo', formula1: '10', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected EqualTo applied';
@@ -3354,8 +2943,8 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   await runTool(
     dataValidationConfigs,
-    'set_text_length_validation',
-    { address: 'H36', operator: 'NotBetween', formula1: '5', formula2: '20', sheetName: MAIN },
+    'data_validation',
+    { action: 'set', type: 'textLength', address: 'H36', operator: 'NotBetween', formula1: '5', formula2: '20', sheetName: MAIN },
     r => {
       const d = r as { applied: boolean };
       return d.applied ? null : 'Expected NotBetween applied';
@@ -3365,7 +2954,7 @@ async function testDataValidationToolVariants(): Promise<void> {
 
   // Final cleanup
   try {
-    await callTool(dataValidationConfigs, 'clear_data_validation', {
+    await callTool(dataValidationConfigs, 'data_validation', { action: 'clear',
       address: 'H31:H36',
       sheetName: MAIN,
     });
@@ -3384,8 +2973,8 @@ async function testPivotTableTools(): Promise<void> {
   // 1. create_pivot_table
   const createResult = await runTool(
     pivotTableConfigs,
-    'create_pivot_table',
-    {
+    'pivot',
+    { action: 'create',
       name: PT_NAME,
       sourceAddress: 'A1:C7',
       destinationAddress: 'A1',
@@ -3406,13 +2995,13 @@ async function testPivotTableTools(): Promise<void> {
   await sleep(500);
 
   // 2. list_pivot_tables
-  await runTool(pivotTableConfigs, 'list_pivot_tables', { sheetName: PIVOT_DST }, r => {
+  await runTool(pivotTableConfigs, 'pivot', { action: 'list', sheetName: PIVOT_DST }, r => {
     const d = r as { count: number };
     return d.count >= 1 ? null : `Expected ≥1 PT, got ${d.count}`;
   });
 
   // 3. get_pivot_table_count
-  await runTool(pivotTableConfigs, 'get_pivot_table_count', { sheetName: PIVOT_DST }, r => {
+  await runTool(pivotTableConfigs, 'pivot', { action: 'list', sheetName: PIVOT_DST }, r => {
     const d = r as { count: number };
     return d.count >= 1 ? null : `Expected count >= 1, got ${d.count}`;
   });
@@ -3420,8 +3009,8 @@ async function testPivotTableTools(): Promise<void> {
   // 4. pivot_table_exists
   await runTool(
     pivotTableConfigs,
-    'pivot_table_exists',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'list', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { exists: boolean };
       return d.exists === true ? null : 'Expected exists === true';
@@ -3431,8 +3020,8 @@ async function testPivotTableTools(): Promise<void> {
   // 5. get_pivot_table_location
   await runTool(
     pivotTableConfigs,
-    'get_pivot_table_location',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'get_info', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { worksheetName?: string; rangeAddress?: string };
       return d.worksheetName === PIVOT_DST && !!d.rangeAddress
@@ -3444,8 +3033,8 @@ async function testPivotTableTools(): Promise<void> {
   // 6. refresh_pivot_table
   await runTool(
     pivotTableConfigs,
-    'refresh_pivot_table',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'refresh', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { refreshed: boolean };
       return d.refreshed ? null : 'Expected refreshed';
@@ -3453,7 +3042,7 @@ async function testPivotTableTools(): Promise<void> {
   );
 
   // 7. refresh_all_pivot_tables
-  await runTool(pivotTableConfigs, 'refresh_all_pivot_tables', { sheetName: PIVOT_DST }, r => {
+  await runTool(pivotTableConfigs, 'pivot', { action: 'refresh', sheetName: PIVOT_DST }, r => {
     const d = r as { refreshed: boolean };
     return d.refreshed ? null : 'Expected all pivots refreshed';
   });
@@ -3461,8 +3050,8 @@ async function testPivotTableTools(): Promise<void> {
   // 8. get_pivot_table_source_info
   await runTool(
     pivotTableConfigs,
-    'get_pivot_table_source_info',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'get_info', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { dataSourceType: string; dataSourceString: string | null };
       return d.dataSourceType ? null : 'Expected data source type';
@@ -3472,8 +3061,8 @@ async function testPivotTableTools(): Promise<void> {
   // 9. get_pivot_hierarchy_counts
   await runTool(
     pivotTableConfigs,
-    'get_pivot_hierarchy_counts',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'get_info', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { rowHierarchyCount?: number; dataHierarchyCount?: number };
       return typeof d.rowHierarchyCount === 'number' && typeof d.dataHierarchyCount === 'number'
@@ -3485,8 +3074,8 @@ async function testPivotTableTools(): Promise<void> {
   // 10. get_pivot_hierarchies
   await runTool(
     pivotTableConfigs,
-    'get_pivot_hierarchies',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'get_info', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { rowHierarchies?: unknown[]; dataHierarchies?: unknown[] };
       return Array.isArray(d.rowHierarchies) && Array.isArray(d.dataHierarchies)
@@ -3498,8 +3087,8 @@ async function testPivotTableTools(): Promise<void> {
   // 11. set_pivot_table_options
   await runTool(
     pivotTableConfigs,
-    'set_pivot_table_options',
-    {
+    'pivot',
+    { action: 'configure',
       pivotTableName: PT_NAME,
       allowMultipleFiltersPerField: true,
       useCustomSortLists: true,
@@ -3522,8 +3111,8 @@ async function testPivotTableTools(): Promise<void> {
   // 12. add_pivot_field
   await runTool(
     pivotTableConfigs,
-    'add_pivot_field',
-    { pivotTableName: PT_NAME, fieldName: 'Product', fieldType: 'column', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'add_field', pivotTableName: PT_NAME, fieldName: 'Product', fieldType: 'column', sheetName: PIVOT_DST },
     r => {
       const d = r as { added: boolean };
       return d.added ? null : 'Expected field added';
@@ -3533,8 +3122,8 @@ async function testPivotTableTools(): Promise<void> {
   // 13. set_pivot_layout
   await runTool(
     pivotTableConfigs,
-    'set_pivot_layout',
-    {
+    'pivot',
+    { action: 'configure',
       pivotTableName: PT_NAME,
       layoutType: 'Tabular',
       subtotalLocation: 'AtBottom',
@@ -3563,12 +3152,12 @@ async function testPivotTableTools(): Promise<void> {
   // 15. apply_pivot_label_filter
   await runTool(
     pivotTableConfigs,
-    'apply_pivot_label_filter',
-    {
+    'pivot',
+    { action: 'filter', filterType: 'label',
       pivotTableName: PT_NAME,
       fieldName: 'Region',
-      condition: 'Contains',
-      value1: 'North',
+      labelCondition: 'Contains',
+      labelValue1: 'North',
       sheetName: PIVOT_DST,
     },
     r => {
@@ -3580,8 +3169,8 @@ async function testPivotTableTools(): Promise<void> {
   // 16. sort_pivot_field_labels
   await runTool(
     pivotTableConfigs,
-    'sort_pivot_field_labels',
-    { pivotTableName: PT_NAME, fieldName: 'Region', sortBy: 'Descending', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'sort', pivotTableName: PT_NAME, fieldName: 'Region', sortBy: 'Descending', sheetName: PIVOT_DST },
     r => {
       const d = r as { sorted: boolean; sortBy: string };
       return d.sorted && d.sortBy === 'Descending' ? null : 'Expected descending label sort';
@@ -3591,8 +3180,8 @@ async function testPivotTableTools(): Promise<void> {
   // 17. apply_pivot_manual_filter
   await runTool(
     pivotTableConfigs,
-    'apply_pivot_manual_filter',
-    {
+    'pivot',
+    { action: 'filter',
       pivotTableName: PT_NAME,
       fieldName: 'Region',
       selectedItems: ['North'],
@@ -3607,8 +3196,8 @@ async function testPivotTableTools(): Promise<void> {
   // 18. sort_pivot_field_values
   await runTool(
     pivotTableConfigs,
-    'sort_pivot_field_values',
-    {
+    'pivot',
+    { action: 'sort',
       pivotTableName: PT_NAME,
       fieldName: 'Region',
       sortBy: 'Descending',
@@ -3732,8 +3321,8 @@ async function testPivotTableTools(): Promise<void> {
   // 26. clear_pivot_field_filters
   await runTool(
     pivotTableConfigs,
-    'clear_pivot_field_filters',
-    { pivotTableName: PT_NAME, fieldName: 'Region', filterType: 'Label', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'filter', filterType: 'clear', pivotTableName: PT_NAME, fieldName: 'Region', filterType: 'Label', sheetName: PIVOT_DST },
     r => {
       const d = r as { cleared: boolean };
       return d.cleared ? null : 'Expected label filter cleared';
@@ -3743,8 +3332,8 @@ async function testPivotTableTools(): Promise<void> {
   // 27. remove_pivot_field
   await runTool(
     pivotTableConfigs,
-    'remove_pivot_field',
-    { pivotTableName: PT_NAME, fieldName: 'Product', fieldType: 'column', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'remove_field', pivotTableName: PT_NAME, fieldName: 'Product', fieldType: 'column', sheetName: PIVOT_DST },
     r => {
       const d = r as { removed: boolean };
       return d.removed ? null : 'Expected field removed';
@@ -3754,8 +3343,8 @@ async function testPivotTableTools(): Promise<void> {
   // 28. delete_pivot_table
   await runTool(
     pivotTableConfigs,
-    'delete_pivot_table',
-    { pivotTableName: PT_NAME, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'delete', pivotTableName: PT_NAME, sheetName: PIVOT_DST },
     r => {
       const d = r as { deleted: boolean };
       return d.deleted ? null : 'Expected deleted';
@@ -3773,8 +3362,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- create_pivot_table: multiple row/value fields ---
   const createResult = await runTool(
     pivotTableConfigs,
-    'create_pivot_table',
-    {
+    'pivot',
+    { action: 'create',
       name: PT_V,
       sourceAddress: 'A1:C7',
       destinationAddress: 'E1',
@@ -3798,8 +3387,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- set_pivot_table_options: disable flags ---
   await runTool(
     pivotTableConfigs,
-    'set_pivot_table_options',
-    {
+    'pivot',
+    { action: 'configure',
       pivotTableName: PT_V,
       allowMultipleFiltersPerField: false,
       useCustomSortLists: false,
@@ -3827,8 +3416,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- add_pivot_field: filter ---
   await runTool(
     pivotTableConfigs,
-    'add_pivot_field',
-    { pivotTableName: PT_V, fieldName: 'Product', fieldType: 'filter', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'add_field', pivotTableName: PT_V, fieldName: 'Product', fieldType: 'filter', sheetName: PIVOT_DST },
     r => {
       const d = r as { added: boolean };
       return d.added ? null : 'Expected filter field added';
@@ -3839,8 +3428,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- set_pivot_layout: outline + subtotals off ---
   await runTool(
     pivotTableConfigs,
-    'set_pivot_layout',
-    {
+    'pivot',
+    { action: 'configure',
       pivotTableName: PT_V,
       layoutType: 'Outline',
       subtotalLocation: 'Off',
@@ -3866,13 +3455,13 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- apply_pivot_label_filter: between ---
   await runTool(
     pivotTableConfigs,
-    'apply_pivot_label_filter',
-    {
+    'pivot',
+    { action: 'filter', filterType: 'label',
       pivotTableName: PT_V,
       fieldName: 'Region',
-      condition: 'Between',
-      value1: 'A',
-      value2: 'Z',
+      labelCondition: 'Between',
+      labelValue1: 'A',
+      labelValue2: 'Z',
       sheetName: PIVOT_DST,
     },
     r => {
@@ -3885,8 +3474,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- sort_pivot_field_labels: ascending ---
   await runTool(
     pivotTableConfigs,
-    'sort_pivot_field_labels',
-    { pivotTableName: PT_V, fieldName: 'Region', sortBy: 'Ascending', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'sort', pivotTableName: PT_V, fieldName: 'Region', sortBy: 'Ascending', sheetName: PIVOT_DST },
     r => {
       const d = r as { sorted: boolean; sortBy: string };
       return d.sorted && d.sortBy === 'Ascending' ? null : 'Expected ascending label sort';
@@ -3897,8 +3486,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- apply_pivot_manual_filter: multi ---
   await runTool(
     pivotTableConfigs,
-    'apply_pivot_manual_filter',
-    {
+    'pivot',
+    { action: 'filter',
       pivotTableName: PT_V,
       fieldName: 'Region',
       selectedItems: ['North', 'South'],
@@ -3914,8 +3503,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- sort_pivot_field_values: ascending ---
   await runTool(
     pivotTableConfigs,
-    'sort_pivot_field_values',
-    {
+    'pivot',
+    { action: 'sort',
       pivotTableName: PT_V,
       fieldName: 'Region',
       sortBy: 'Ascending',
@@ -3946,8 +3535,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- clear_pivot_field_filters: all ---
   await runTool(
     pivotTableConfigs,
-    'clear_pivot_field_filters',
-    { pivotTableName: PT_V, fieldName: 'Region', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'filter', filterType: 'clear', pivotTableName: PT_V, fieldName: 'Region', sheetName: PIVOT_DST },
     r => {
       const d = r as { cleared: boolean };
       return d.cleared ? null : 'Expected all filters cleared';
@@ -3958,8 +3547,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // --- remove_pivot_field: filter ---
   await runTool(
     pivotTableConfigs,
-    'remove_pivot_field',
-    { pivotTableName: PT_V, fieldName: 'Product', fieldType: 'filter', sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'remove_field', pivotTableName: PT_V, fieldName: 'Product', fieldType: 'filter', sheetName: PIVOT_DST },
     r => {
       const d = r as { removed: boolean };
       return d.removed ? null : 'Expected filter field removed';
@@ -3985,8 +3574,8 @@ async function testPivotTableToolVariants(): Promise<void> {
   // Cleanup
   await runTool(
     pivotTableConfigs,
-    'delete_pivot_table',
-    { pivotTableName: PT_V, sheetName: PIVOT_DST },
+    'pivot',
+    { action: 'delete', pivotTableName: PT_V, sheetName: PIVOT_DST },
     r => {
       const d = r as { deleted: boolean };
       return d.deleted ? null : 'Expected deleted';
@@ -4106,7 +3695,7 @@ async function testAiRoundTrip(): Promise<void> {
       }
 
       const usedReadTool = toolCallsSeen.some(n =>
-        ['get_used_range', 'get_range_values', 'get_table_data', 'list_tables'].includes(n)
+        ['range', 'table', 'sheet', 'workbook'].includes(n)
       );
       if (usedReadTool) pass('ai_roundtrip_read', { tools: toolCallsSeen });
       else fail('ai_roundtrip_read', `No read tool called: ${toolCallsSeen.join(', ')}`);
@@ -4134,9 +3723,9 @@ async function testAiRoundTrip(): Promise<void> {
         }
       }
 
-      if (toolCallsSeen.includes('set_range_values'))
+      if (toolCallsSeen.includes('range'))
         pass('ai_roundtrip_write', { tools: toolCallsSeen });
-      else fail('ai_roundtrip_write', `set_range_values not called: ${toolCallsSeen.join(', ')}`);
+      else fail('ai_roundtrip_write', `range tool not called: ${toolCallsSeen.join(', ')}`);
 
       await sleep(500);
       let cellValue: unknown = null;
