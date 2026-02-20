@@ -1,39 +1,48 @@
-import { describe, it, expect, vi } from 'vitest';
-import Ajv from 'ajv';
-import { webFetchTool } from '@/tools/general';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { webFetchTool, createRunSubagentTool, getGeneralTools } from '@/tools/general';
+import type { LanguageModel, ToolSet } from 'ai';
 
 /**
- * General tools tests — validate schema and execution behaviour of
- * web_fetch without making real network calls.
+ * General tools tests — validate schemas and execution behaviour of
+ * web_fetch and run_subagent without making real network/model calls.
  */
 
-const ajv = new Ajv({ allErrors: true });
+// Mock generateText so run_subagent.execute doesn't need a real model
+vi.mock('ai', async () => {
+  const actual = await vi.importActual<typeof import('ai')>('ai');
+  return {
+    ...actual,
+    generateText: vi.fn().mockResolvedValue({ text: 'subagent result' }),
+  };
+});
 
-/** Validate data against a JSON Schema */
-function validate(schema: unknown, data: unknown): { success: boolean } {
-  const fn = ajv.compile(schema as object);
-  return { success: !!fn(data) };
+interface ZodLike {
+  safeParse: (data: unknown) => { success: boolean; error?: unknown };
 }
 
-/** Retrieve a tool's handler function, throwing if it's absent. */
-function getHandler(t: unknown) {
-  const tool = t as { handler?: ((args: unknown, invocation: unknown) => Promise<unknown>) | undefined };
-  const { handler } = tool;
-  if (!handler) throw new Error('Tool has no handler function');
-  return handler;
+function asZod(schema: unknown): ZodLike {
+  return schema as ZodLike;
+}
+
+/** Retrieve a tool's execute function, throwing if it's absent. */
+function getExecute(t: unknown) {
+  const tool = t as { execute?: ((input: Record<string, unknown>, opts: never) => Promise<unknown>) | undefined };
+  const { execute } = tool;
+  if (!execute) throw new Error('Tool has no execute function');
+  return execute;
 }
 
 // ─── web_fetch ────────────────────────────────────────────────────────────────
 
 describe('webFetchTool', () => {
-  describe('parameters', () => {
+  describe('inputSchema', () => {
     it('accepts a valid URL', () => {
-      const result = validate(webFetchTool.parameters, { url: 'https://example.com' });
+      const result = asZod(webFetchTool.inputSchema).safeParse({ url: 'https://example.com' });
       expect(result.success).toBe(true);
     });
 
     it('accepts url with optional maxLength', () => {
-      const result = validate(webFetchTool.parameters, {
+      const result = asZod(webFetchTool.inputSchema).safeParse({
         url: 'https://example.com/api',
         maxLength: 5000,
       });
@@ -41,17 +50,17 @@ describe('webFetchTool', () => {
     });
 
     it('rejects missing url', () => {
-      const result = validate(webFetchTool.parameters, { maxLength: 100 });
+      const result = asZod(webFetchTool.inputSchema).safeParse({ maxLength: 100 });
       expect(result.success).toBe(false);
     });
 
     it('rejects non-string url', () => {
-      const result = validate(webFetchTool.parameters, { url: 42 });
+      const result = asZod(webFetchTool.inputSchema).safeParse({ url: 42 });
       expect(result.success).toBe(false);
     });
 
     it('rejects non-numeric maxLength', () => {
-      const result = validate(webFetchTool.parameters, {
+      const result = asZod(webFetchTool.inputSchema).safeParse({
         url: 'https://example.com',
         maxLength: 'a lot',
       });
@@ -59,7 +68,7 @@ describe('webFetchTool', () => {
     });
   });
 
-  describe('handler', () => {
+  describe('execute', () => {
     it('returns text from a successful fetch', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -67,11 +76,9 @@ describe('webFetchTool', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      const result = await getHandler(webFetchTool)({ url: 'https://example.com' }, {});
+      const result = await getExecute(webFetchTool)({ url: 'https://example.com' }, {} as never);
       expect(result).toBe('Hello, world!');
-      expect(mockFetch).toHaveBeenCalledWith(
-        `/api/fetch?url=${encodeURIComponent('https://example.com')}`
-      );
+      expect(mockFetch).toHaveBeenCalledWith('https://example.com');
 
       vi.unstubAllGlobals();
     });
@@ -84,9 +91,9 @@ describe('webFetchTool', () => {
       });
       vi.stubGlobal('fetch', mockFetch);
 
-      const result = (await getHandler(webFetchTool)(
+      const result = (await getExecute(webFetchTool)(
         { url: 'https://example.com', maxLength: 100 },
-        {}
+        {} as never
       )) as string;
 
       expect(result).toHaveLength(100 + '… [truncated]'.length);
@@ -104,7 +111,7 @@ describe('webFetchTool', () => {
       vi.stubGlobal('fetch', mockFetch);
 
       await expect(
-        getHandler(webFetchTool)({ url: 'https://example.com/missing' }, {})
+        getExecute(webFetchTool)({ url: 'https://example.com/missing' }, {} as never)
       ).rejects.toThrow('HTTP 404: Not Found');
 
       vi.unstubAllGlobals();
@@ -112,3 +119,108 @@ describe('webFetchTool', () => {
   });
 });
 
+// ─── run_subagent ─────────────────────────────────────────────────────────────
+
+describe('createRunSubagentTool', () => {
+  const fakeModel = {} as LanguageModel;
+  const fakeHostTools: ToolSet = {};
+
+  describe('inputSchema', () => {
+    it('accepts a task string', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Summarise the data' });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts task with optional systemPrompt', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({
+        task: 'Analyse trends',
+        systemPrompt: 'You are a data analyst.',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts task with optional maxSteps', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Analyse trends', maxSteps: 3 });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects non-integer maxSteps', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Do stuff', maxSteps: 1.5 });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects maxSteps below 1', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 'Do stuff', maxSteps: 0 });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects missing task', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ systemPrompt: 'foo' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects non-string task', () => {
+      const tool = createRunSubagentTool(fakeModel, fakeHostTools);
+      const result = asZod(tool.inputSchema).safeParse({ task: 123 });
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+// ─── getGeneralTools ──────────────────────────────────────────────────────────
+
+describe('getGeneralTools', () => {
+  let generateText: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    const ai = await import('ai');
+    generateText = ai.generateText as ReturnType<typeof vi.fn>;
+    generateText.mockClear();
+  });
+
+  it('returns web_fetch and run_subagent tools', () => {
+    const tools = getGeneralTools({} as LanguageModel, {});
+    expect(Object.keys(tools)).toContain('web_fetch');
+    expect(Object.keys(tools)).toContain('run_subagent');
+  });
+
+  it('does not include run_subagent inside the subagent tools (no recursion)', async () => {
+    const tools = getGeneralTools({} as LanguageModel, {});
+    await getExecute(tools.run_subagent)({ task: 'test task' }, {} as never);
+
+    const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
+    expect(Object.keys(callOpts.tools ?? {})).not.toContain('run_subagent');
+  });
+
+  it('provides web_fetch to the subagent', async () => {
+    const tools = getGeneralTools({} as LanguageModel, {});
+    await getExecute(tools.run_subagent)({ task: 'test task' }, {} as never);
+
+    const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
+    expect(Object.keys(callOpts.tools ?? {})).toContain('web_fetch');
+  });
+
+  it('passes host tools through to the subagent', async () => {
+    const hostTools = { some_excel_tool: webFetchTool } as ToolSet;
+    const tools = getGeneralTools({} as LanguageModel, hostTools);
+    await getExecute(tools.run_subagent)({ task: 'test task' }, {} as never);
+
+    const callOpts = generateText.mock.calls[0]?.[0] as { tools?: Record<string, unknown> };
+    expect(Object.keys(callOpts.tools ?? {})).toContain('some_excel_tool');
+  });
+
+  it('forwards a custom maxSteps value to generateText', async () => {
+    const tools = getGeneralTools({} as LanguageModel, {});
+    await getExecute(tools.run_subagent)({ task: 'test task', maxSteps: 3 }, {} as never);
+
+    // generateText should have been called with stopWhen derived from maxSteps=3.
+    // We verify it was called (the exact stopWhen predicate is internal to the AI SDK).
+    expect(generateText).toHaveBeenCalledOnce();
+  });
+});

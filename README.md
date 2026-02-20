@@ -1,46 +1,53 @@
 # Office Coding Agent
 
-An Office add-in that embeds GitHub Copilot as an AI assistant in Excel (and other Office hosts). Built with React, [assistant-ui](https://github.com/assistant-ui/assistant-ui), Tailwind CSS, and the [GitHub Copilot SDK](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
+An Office add-in research project that provides an AI-powered coding assistant with support for multiple AI providers. The runtime is host-routed (tools and prompts per application), with Excel as the first supported host. Built with React, assistant-ui, Radix UI, Tailwind CSS, and the [Vercel AI SDK](https://ai-sdk.dev/). It supports per host Agent Skills and custom agents.
 
 > **Research Project Disclaimer**
 >
-> This repository is an independent **research project**. It is **not** affiliated with, endorsed by, sponsored by, or otherwise officially related to Microsoft or GitHub.
+> This repository is an independent **research project**. It is **not** affiliated with, endorsed by, sponsored by, or otherwise officially related to Microsoft.
 
-## How It Works
+## Current Scope
 
-```
-Excel Task Pane (React + assistant-ui)
-        ↓ WebSocket (wss://localhost:3000/api/copilot)
-Node.js proxy server  (src/server.js)
-        ↓ stdio LSP
-@github/copilot CLI  (authenticates via your GitHub account)
-        ↓ HTTPS
-GitHub Copilot API
-```
-
-The proxy server spawns the `@github/copilot` CLI process and bridges it to the browser task pane via WebSocket + JSON-RPC. Tool calls (Excel commands) flow back from the server to the browser.
+- Fully client-side coding agent runtime (no backend API route)
+- Agent skills support (skill context injection + skill toggles)
+- Custom agents support via frontmatter
+- Host-targeted agents via `hosts` and `defaultForHosts` frontmatter fields
+- Host-routed tools and system prompts (Excel implemented first)
 
 ## Features
 
-- **GitHub Copilot authentication** — sign in once with your GitHub account; no API keys or endpoint config
-- **10 Excel tool groups** — range, table, chart, sheet, workbook, comment, conditional format, data validation, pivot table, range format — covering ~83 actions the AI can perform
-- **Agent system** — host-targeted agents with YAML frontmatter (`hosts`, `defaultForHosts`)
-- **Skills system** — bundled skill files inject context into the system prompt, toggleable via SkillPicker
-- **Custom agents & skills** — import local ZIP files for custom agents and skills
-- **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
-- **Streaming responses** — real-time token streaming with Copilot-style progress indicators
-- **Web fetch tool** — proxied through the local server to avoid CORS restrictions
+- **AI Chat Panel** — conversational assistant embedded in Excel's task pane
+- **83 Excel tools** — the AI can read/write ranges, create charts, manage tables, format cells, add comments, create pivot tables, set data validation, and manipulate sheets
+- **Agent system** — split system prompt architecture + custom agents with host targeting (`hosts`, `defaultForHosts`)
+- **Skills system** — bundled skill files that inject additional context into the system prompt, toggleable via the SkillPicker (standard Agent Skills layout: one `SKILL.md` plus optional `references/` docs)
+- **Custom extension import** — import local ZIP files for custom agents and custom skills from Settings
+- **Extension management UX** — manage imported agents/skills in Settings, with bundled content shown as read-only
+- **Multi-model support** — add and configure models per endpoint; Azure AI Foundry uses manual deployment name entry, while other providers offer pre-populated known model lists
+- **Model management** — add, rename, and remove models per endpoint; switch models from the input toolbar
+- **Streaming responses** — real-time token streaming for fast, responsive interactions
+- **Copilot-style UX** — cycling dot progress indicators, collapsible tool progress, choice cards, tool result summaries
+- **API key authentication** — simple API key auth per endpoint
+- **Multiple providers** — Azure AI Foundry, OpenAI, Anthropic, Mistral AI, DeepSeek, and xAI
+- **Multiple endpoints** — configure and switch between multiple provider endpoints
 
 ## Agent Skills Format
 
-A skill is a folder containing `SKILL.md`. Optional supporting docs live under `references/` inside that skill folder.
+This project follows the standard Agent Skills model:
+
+- A skill is a folder containing `SKILL.md`.
+- Optional supporting docs live under `references/` inside that same skill.
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) >= 20
 - Microsoft Excel (desktop or Microsoft 365 web)
-- An active **GitHub Copilot** subscription (individual, business, or enterprise)
-- The `@github/copilot` CLI authenticated (`gh auth login` or equivalent)
+- An API key for at least one supported provider:
+  - [Azure AI Foundry](https://ai.azure.com/) resource with at least one model deployed
+  - [OpenAI](https://platform.openai.com/) API key
+  - [Anthropic](https://console.anthropic.com/) API key
+  - [Mistral AI](https://console.mistral.ai/) API key
+  - [DeepSeek](https://platform.deepseek.com/) API key
+  - [xAI](https://x.ai/) API key
 
 ## Getting Started
 
@@ -48,54 +55,115 @@ A skill is a folder containing `SKILL.md`. Optional supporting docs live under `
 # Install dependencies
 npm install
 
-# Terminal 1: start the Copilot proxy server
-npm run server
-
-# Terminal 2: sideload into Excel Desktop
+# Start the dev server and sideload into Excel Desktop
 npm run start:desktop
 ```
 
-The proxy server runs on `https://localhost:3000` and handles both the webpack-dev-server UI and the WebSocket Copilot proxy.
+This starts the webpack dev server on `https://localhost:3000` and opens Excel with the add-in sideloaded.
 
 For local shared-folder sideloading and staging manifest workflows, see [docs/SIDELOADING.md](./docs/SIDELOADING.md).
 
-## Available Scripts
+### Environment Variables
+
+Set these before starting the dev server to pre-populate the setup wizard:
+
+| Variable                | Description                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `AZURE_OPENAI_ENDPOINT` | Azure AI Foundry resource URL (e.g., `https://my-resource.openai.azure.com`) |
+| `AZURE_OPENAI_API_KEY`  | API key for the resource (pre-populates the wizard's API key field)          |
+
+```bash
+# Example: start with pre-populated endpoint
+$env:AZURE_OPENAI_ENDPOINT = "https://my-resource.openai.azure.com"
+$env:AZURE_OPENAI_API_KEY = "your-key-here"
+npm run start:desktop
+```
+
+#### Integration Test Credentials
+
+Integration tests that hit a live Azure AI Foundry endpoint read credentials from a `.env` file in the project root:
+
+| Variable           | Description                                             |
+| ------------------ | ------------------------------------------------------- |
+| `FOUNDRY_ENDPOINT` | Full resource URL (may include `/api/projects/...`)     |
+| `FOUNDRY_API_KEY`  | API key for the resource                                |
+| `FOUNDRY_MODEL`    | Model deployment name to test (default: `gpt-5.2-chat`) |
+
+```bash
+# .env (gitignored)
+FOUNDRY_ENDPOINT=https://your-resource.services.ai.azure.com/api/projects/proj-default
+FOUNDRY_API_KEY=your-key-here
+FOUNDRY_MODEL=gpt-5.2-chat
+```
+
+### First-Time Setup
+
+When you launch the add-in for the first time, a setup wizard guides you through configuration:
+
+#### Step 1 — Choose Your AI Provider
+
+Select the provider you want to connect to:
+
+| Provider | Base URL |
+| -------- | -------- |
+| **Azure AI Foundry** | Custom resource URL (you enter it) |
+| **OpenAI** | `https://api.openai.com/v1` |
+| **Anthropic** | `https://api.anthropic.com` |
+| **Mistral AI** | `https://api.mistral.ai` |
+| **DeepSeek** | `https://api.deepseek.com` |
+| **xAI** | `https://api.x.ai` |
+
+#### Step 2 — Connect Your Endpoint (Azure only)
+
+For Azure AI Foundry, enter your resource URL (e.g., `https://my-resource.openai.azure.com`). If the `AZURE_OPENAI_ENDPOINT` environment variable is set, this field is pre-populated. Other providers use a fixed URL.
+
+#### Step 3 — Authentication
+
+Enter your API key for the selected provider. If the `AZURE_OPENAI_API_KEY` environment variable is set (Azure), this field is pre-populated.
+
+#### Step 4 — Model Setup
+
+- **Azure AI Foundry**: Add model deployment names manually (e.g., `gpt-4.1`). The default model (`gpt-5.2-chat`) is auto-validated and pre-added when reachable.
+- **Other providers**: Well-known model IDs are pre-populated (e.g., `claude-opus-4-5` for Anthropic). You can deselect any or add custom model IDs.
+
+On subsequent launches, the wizard is skipped — you go straight to the chat interface. You can add, remove, or switch endpoints at any time from the Settings dialog (gear icon in the header). If all endpoints or models are removed, the wizard reappears automatically.
 
 ## Available Scripts
 
-| Script                           | Description                                           |
-| -------------------------------- | ----------------------------------------------------- |
-| `npm run server`                 | Start Copilot proxy + webpack dev server (port 3000)  |
-| `npm run dev`                    | Start webpack-dev-server only (UI, no Copilot proxy)  |
-| `npm run build`                  | Production build to `dist/`                           |
-| `npm run build:dev`              | Development build to `dist/`                          |
-| `npm run start:desktop`          | Sideload into Excel Desktop                           |
-| `npm run stop`                   | Stop debugging / unload the add-in                    |
-| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files       |
-| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows         |
-| `npm run sideload:share:trust`   | Register local share as trusted Office catalog        |
-| `npm run sideload:share:publish` | Copy staging manifest into local shared folder        |
-| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup          |
-| `npm run lint`                   | Run ESLint                                            |
-| `npm run lint:fix`               | Auto-fix ESLint issues                                |
-| `npm run format`                 | Format code with Prettier                             |
-| `npm run typecheck`              | Type-check without emitting                           |
-| `npm test`                       | Run all Vitest tests                                  |
-| `npm run test:watch`             | Run tests in watch mode                               |
-| `npm run test:coverage`          | Run tests with coverage                               |
-| `npm run test:e2e`               | Run E2E tests in Excel Desktop (~187)                 |
-| `npm run validate`               | Validate `manifests/manifest.dev.xml`                 |
+| Script                           | Description                                     |
+| -------------------------------- | ----------------------------------------------- |
+| `npm run dev`                    | Start webpack dev server (hot reload)           |
+| `npm run build`                  | Production build to `dist/`                     |
+| `npm run build:dev`              | Development build to `dist/`                    |
+| `npm run start:desktop`          | Build and sideload into Excel Desktop           |
+| `npm run stop`                   | Stop debugging / unload the add-in              |
+| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files |
+| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows   |
+| `npm run sideload:share:trust`   | Register local share as trusted Office catalog  |
+| `npm run sideload:share:publish` | Copy staging manifest into local shared folder  |
+| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup    |
+| `npm run lint`                   | Run ESLint                                      |
+| `npm run lint:fix`               | Auto-fix ESLint issues                          |
+| `npm run format`                 | Format code with Prettier                       |
+| `npm run typecheck`              | Type-check without emitting                     |
+| `npm test`                       | Run all Vitest tests                            |
+| `npm run test:watch`             | Run tests in watch mode                         |
+| `npm run test:coverage`          | Run tests with coverage                         |
+| `npm run test:e2e`               | Run E2E tests in Excel Desktop (~187)           |
+| `npm run validate`               | Validate `manifests/manifest.dev.xml`           |
+| `npm run validate:staging`       | Validate `manifests/manifest.staging.xml`       |
+| `npm run validate:prod`          | Validate `manifests/manifest.prod.xml`          |
 
 ## Testing
 
 The project has four layers of tests:
 
-| Layer           | Tool       | Count    | What it covers                                                          |
-| --------------- | ---------- | -------- | ----------------------------------------------------------------------- |
-| **Unit**        | Vitest     | ~12 files | Pure functions, Zustand store, JSON Schema tool configs, host/agent parsing |
-| **Integration** | Vitest     | ~10 files | Component wiring (no live API needed)                                   |
-| **UI**          | Playwright | ~14 tests | Browser taskpane flows                                                  |
-| **E2E**         | Mocha      | ~187     | Excel commands inside real Excel Desktop                                |
+| Layer           | Tool       | Count    | What it covers                                                                  |
+| --------------- | ---------- | -------- | ------------------------------------------------------------------------------- |
+| **Unit**        | Vitest     | 17 files | Pure functions, Zustand store logic, Zod tool schemas, host/agent parsing       |
+| **Integration** | Vitest     | 15 files | Real component wiring + live Azure AI Foundry API + LLM tool calling            |
+| **UI**          | Playwright | 14 tests | Browser taskpane flows (chat/settings/wizard)                                   |
+| **E2E**         | Mocha      | ~187     | 83 Excel tools + settings persistence + AI round-trip inside real Excel Desktop |
 
 ### Running Tests
 
@@ -112,7 +180,7 @@ npm run test:coverage
 # Browser UI tests
 npm run test:ui
 
-# E2E tests (requires Excel Desktop)
+# E2E tests (requires Excel Desktop, ~187 tests)
 npm run test:e2e
 
 # Validate the Office add-in manifest
@@ -121,35 +189,40 @@ npm run validate
 
 ### Unit Tests
 
-Unit tests in `tests/unit/` cover pure functions and store logic with **no** `Excel.run()` dependency:
+Unit tests in `tests/unit/` (17 files) cover pure functions and store logic that have **no** `Excel.run()` dependency:
 
-| File                                | What it tests                                                              |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| `agentService.test.ts`              | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions       |
-| `buildSkillContext.test.ts`         | `buildSkillContext` and related skill functions with bundled `.md` files   |
-| `chatErrorBoundary.test.tsx`        | Error boundary fallback rendering and recovery flow                        |
-| `chatPanel.test.tsx`                | ChatPanel component logic (mocks assistant-ui components for jsdom)        |
-| `humanizeToolName.test.ts`          | Tool-name formatting for user-facing progress labels                       |
-| `id.test.ts`                        | `generateId` unique ID generation utility                                  |
-| `manifest.test.ts`                  | Manifest and runtime host assumptions used by tests                        |
-| `officeStorage.test.ts`             | `officeStorage` localStorage fallback (OfficeRuntime undefined in jsdom)   |
-| `officeStorageRuntime.test.ts`      | `officeStorage` behavior when OfficeRuntime is present and throws          |
-| `parseFrontmatter.test.ts`          | YAML frontmatter parsing for skill files (delimiters, arrays)              |
-| `settingsStore.test.ts`             | Zustand store: activeModel, agent/skill management                         |
-| `toolSchemas.test.ts`               | JSON Schema validation for all tool definitions                            |
-| `useToolInvocations-patch.test.tsx` | assistant-ui patch for tool invocation argument streaming integrity        |
+| File                                | What it tests                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `agentService.test.ts`              | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions                          |
+| `aiClientFactory.test.ts`           | Provider creation, caching, invalidation, and clear-all behavior                              |
+| `buildSkillContext.test.ts`         | `buildSkillContext` and related skill functions with bundled `.md` files                      |
+| `chatErrorBoundary.test.tsx`        | Error boundary fallback rendering and recovery flow                                           |
+| `chatPanel.test.tsx`                | ChatPanel component logic (mocks assistant-ui components for jsdom)                           |
+| `humanizeToolName.test.ts`          | Tool-name formatting for user-facing progress labels                                          |
+| `id.test.ts`                        | `generateId` unique ID generation utility                                                     |
+| `manifest.test.ts`                  | Manifest and runtime host assumptions used by tests                                           |
+| `messagesToCoreMessages.test.ts`    | `messagesToCoreMessages` conversion from ChatMessage[] to core messages                       |
+| `modelDiscoveryHelpers.test.ts`     | `inferProvider`, `isEmbeddingOrUtilityModel`, `formatModelName` (table-driven with `it.each`) |
+| `normalizeEndpoint.test.ts`         | Endpoint URL normalization (trailing slashes, `/openai` suffixes, Foundry paths)              |
+| `officeStorage.test.ts`             | `officeStorage` localStorage fallback (OfficeRuntime undefined in jsdom)                      |
+| `officeStorageRuntime.test.ts`      | `officeStorage` behavior when OfficeRuntime is present and throws                             |
+| `parseFrontmatter.test.ts`          | YAML frontmatter parsing for skill files (delimiters, multiline scalars, tag arrays)          |
+| `settingsStore.test.ts`             | Zustand store: endpoint CRUD, model CRUD, cascade delete, auto-selection, URL dedup           |
+| `toolSchemas.test.ts`               | Zod `inputSchema` validation for all 83 tool definitions (valid accepts, invalid rejects)     |
+| `useToolInvocations-patch.test.tsx` | assistant-ui patch behavior for tool invocation argument streaming integrity                  |
 
 **Key principle:** unit tests run against the **real** Zustand store with localStorage (jsdom). No mocking.
 
 ### Integration Tests
 
-Integration tests in `tests/integration/` exercise **component wiring only** (no live API needed):
+Integration tests in `tests/integration/` (15 files) exercise three categories:
 
-- `agent-picker.test.tsx`, `skill-picker.test.tsx`, `chat-panel.test.tsx`, `chat-header-settings-flow.test.tsx`
-- `app-state.test.tsx`, `app-error-boundary.test.tsx`, `model-picker-interactions.test.tsx`
-- `stale-state.test.tsx` — store hydration recovery from stale localStorage
+- **Component wiring** (`chat-header-settings-flow.test.tsx`, `wizard-to-chat.test.tsx`, `agent-picker.test.tsx`, `skill-picker.test.tsx`, `chat-panel.test.tsx`, `settings-dialog.test.tsx`, `app-state.test.tsx`, `app-error-boundary.test.tsx`, `model-manager.test.tsx`, `model-picker-interactions.test.tsx`) — renders real components together (no child mocks), verifying cross-component state and interactions.
+- **Live API** (`foundry.integration.test.ts`, `chat-pipeline.integration.test.ts`, `multi-turn.integration.test.ts`) — hits a real Azure AI Foundry endpoint to validate client factory, model discovery, streaming, and multi-turn conversations. Requires `FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY` in `.env`.
+- **LLM tool calling** (`llm-tool-calling.integration.test.ts`) — exercises the full ToolLoopAgent pipeline: sends natural-language prompts to a live LLM and verifies it selects the correct Excel tools. Requires live API credentials.
+- **Store hydration** (`stale-state.test.tsx`) — tests recovery from stale localStorage data (deleted endpoints, orphaned model IDs).
 
-Integration tests run as part of the default `npm test` suite.
+Integration tests run as part of the default `npm test` suite. Live API tests are skipped automatically when environment variables are not set.
 
 ## E2E Testing
 
@@ -217,19 +290,28 @@ This command:
 
 ## Chat Architecture
 
-The add-in routes messages through a **local proxy server** — the browser task pane cannot call the GitHub Copilot API directly due to browser security restrictions.
+The add-in runs a fully **client-side AI agent** — no backend API route is needed. The Vercel AI SDK's `ToolLoopAgent` and `DirectChatTransport` run in-process inside the Excel task pane:
 
 ```
-useOfficeChat(host)
-      ↓ createWebSocketClient(wss://localhost:3000/api/copilot)
-BrowserCopilotSession.query({ prompt, tools })
-      ↓ SessionEvent stream
-assistant.message_delta / tool.* / session.idle
-      ↓
-ThreadMessage[] → useExternalStoreRuntime
-      ↓ wss://localhost:3000/api/copilot
-src/server.js (Express HTTPS, port 3000)
-src/copilotProxy.js → @github/copilot CLI → GitHub Copilot API
+┌──────────────────────────────────────────────────────────────┐
+│  useOfficeChat(provider, modelId, host)                      │
+│                                                              │
+│  ┌─────────────────┐    ┌──────────────────────────────────┐ │
+│  │  ToolLoopAgent   │    │  DirectChatTransport             │ │
+│  │  - model         │───►│  - runs agent in-process         │ │
+│  │  - instructions  │    │  - no server / API route needed  │ │
+│  │  - tools(host)   │    └──────────────┬───────────────────┘ │
+│  │  - stopWhen(10)  │                   │                     │
+│  └─────────────────┘                   ▼                     │
+│                              useChat (transport)             │
+│                              ─────────────────               │
+│                              Returns UseChatHelpers          │
+│                              (messages, input, handleSubmit) │
+└──────────────────────────────────────────────────────────────┘
+         │                              │
+         ▼                              ▼
+  Azure AI Foundry              ChatPanel / ChatHeader
+  (streaming LLM)               (React UI via props)
 ```
 
 ### Agent System
@@ -323,11 +405,12 @@ In chat pickers:
 
 ### Key Hooks and Components
 
-- **`useOfficeChat`** — creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, maps `SessionEvent` stream to `ThreadMessage[]` for `useExternalStoreRuntime`
-- **`BrowserCopilotSession.query()`** — async generator yielding `SessionEvent` objects (assistant.message_delta, tool.execution_start, session.idle, etc.)
-- **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host
+- **`useOfficeChat`** — custom hook that creates the host-routed agent, transport, and returns `useChat` helpers
+- **`ToolLoopAgent`** — auto-executes Excel tool calls (up to 10 steps) via Zod-typed `execute` handlers
+- **`DirectChatTransport`** — routes `useChat` through the agent without an HTTP backend
+- **`useChat`** — Vercel AI SDK React hook that manages messages, streaming, and input state
 
-State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill configuration; chat state is ephemeral.
+State is minimal: `useSettingsStore` (Zustand) persists endpoint/model/agent configuration; chat state lives entirely in `useChat`.
 
 ## UI Layout
 
@@ -335,26 +418,25 @@ The task pane is organized into three areas:
 
 - **ChatHeader** — "AI Chat" title + SkillPicker (icon-only with badge) + New Conversation button + Settings gear
 - **ChatPanel** — CopilotChat messages, Copilot-style progress indicators (cycling dots + phase labels), choice cards, error bar, ChatInput, and an **input toolbar** below the text box with AgentPicker + ModelPicker (GitHub Copilot-style)
-- **App** — root component that owns settings dialog state, detects system theme and Office host
+- **App** — root component that owns settings dialog state, routes between SetupWizard and chat UI, detects system theme
 
 ## Authentication
 
-Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copilot` package). Run `gh auth login` once and the CLI handles OAuth token management. No API keys or Azure AD configuration is needed.
+The API key is stored in the browser's `localStorage` as part of the endpoint configuration and sent directly as the `api-key` header to the Azure AI Foundry REST API. No Azure AD app registration is needed.
 
 ## Tech Stack
 
 - **React 18** — UI framework
 - **assistant-ui + Radix UI + Tailwind CSS v4** — task pane UI components and styling
-- **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
-- **WebSocket + JSON-RPC** (`vscode-jsonrpc`, `ws`) — browser-to-proxy transport
-- **Express + HTTPS** — local proxy server with webpack-dev-middleware
-- **Zustand 5** — lightweight state management with `OfficeRuntime.storage` persistence
+- **Vercel AI SDK** — `ai` (ToolLoopAgent, DirectChatTransport) + `@ai-sdk/react` (useChat) + `@ai-sdk/azure` for streaming, multi-step tool calling, and client-side agent execution
+- **Zustand 5** — lightweight state management with `localStorage` persistence
 - **Webpack 5** — bundling with HMR
 - **TypeScript 5** — type safety
 - **Vitest** — unit, component, and integration testing
 - **Playwright** — browser UI testing for task pane flows
 - **Mocha** — E2E testing inside Excel Desktop (~187 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
+- **dotenv** — environment variable loading for integration tests
 - **ESLint + Prettier** — code quality
 
 ## Community & Security
