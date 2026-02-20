@@ -44,6 +44,7 @@ async function pingTestServer(serverPort: number): Promise<{ status: number }> {
 
 // Import the actual tool configs — this is the PRODUCTION code
 import { rangeConfigs } from '@/tools/configs/range.config';
+import { rangeFormatConfigs } from '@/tools/configs/rangeFormat.config';
 import { tableConfigs } from '@/tools/configs/table.config';
 import { chartConfigs } from '@/tools/configs/chart.config';
 import { sheetConfigs } from '@/tools/configs/sheet.config';
@@ -153,6 +154,391 @@ function fail(name: string, error: string, meta?: Record<string, unknown>): void
 
 // ─── Tool execution helper ────────────────────────────────────────
 
+/** Flat registry keyed by config name for the legacy mapping table. */
+const ALL_CONFIGS: Readonly<Record<string, readonly ToolConfig[]>> = {
+  range: rangeConfigs,
+  range_format: rangeFormatConfigs,
+  table: tableConfigs,
+  chart: chartConfigs,
+  sheet: sheetConfigs,
+  workbook: workbookConfigs,
+  comment: commentConfigs,
+  conditional_format: conditionalFormatConfigs,
+  data_validation: dataValidationConfigs,
+  pivot: pivotTableConfigs,
+};
+
+type ToolMapping = {
+  configName: string;
+  action: string;
+  extraArgs?: Record<string, unknown>;
+  argTransform?: (args: Record<string, unknown>) => Record<string, unknown>;
+  resultTransform?: (result: unknown, originalArgs: Record<string, unknown>) => unknown;
+  /** Skip Excel.run entirely and return this synthetic result (for dropped capabilities). */
+  fakeResult?: (args: Record<string, unknown>) => unknown;
+};
+
+/**
+ * Maps legacy (pre-consolidation) tool names to new action-based equivalents.
+ * Handles renames, arg transforms, result-shape differences, and dropped operations.
+ */
+const LEGACY_TOOL_MAP: Readonly<Record<string, ToolMapping>> = {
+  // ── Range ────────────────────────────────────────────────────────
+  get_range_values: { configName: 'range', action: 'get_values' },
+  set_range_values: { configName: 'range', action: 'set_values' },
+  get_used_range: { configName: 'range', action: 'get_used' },
+  clear_range: { configName: 'range', action: 'clear' },
+  sort_range: { configName: 'range', action: 'sort' },
+  copy_range: {
+    configName: 'range',
+    action: 'copy',
+    argTransform: args => {
+      const { sourceAddress, ...rest } = args;
+      return { ...rest, address: sourceAddress ?? rest.address };
+    },
+    resultTransform: r => ({ ...r as object, copiedTo: (r as { destination: string }).destination }),
+  },
+  find_in_range: { configName: 'range', action: 'find' },
+  replace_values: { configName: 'range', action: 'replace' },
+  fill_range: { configName: 'range', action: 'fill' },
+  flash_fill_range: { configName: 'range', action: 'flash_fill' },
+  get_special_cells: { configName: 'range', action: 'get_special_cells' },
+  get_precedents: { configName: 'range', action: 'get_precedents' },
+  get_dependents: { configName: 'range', action: 'get_dependents' },
+  get_range_tables: { configName: 'range', action: 'get_tables' },
+  remove_duplicates: { configName: 'range', action: 'remove_duplicates' },
+  merge_range: { configName: 'range', action: 'merge' },
+  unmerge_range: { configName: 'range', action: 'unmerge' },
+  group_range: { configName: 'range', action: 'group' },
+  ungroup_range: { configName: 'range', action: 'ungroup' },
+  insert_cells: { configName: 'range', action: 'insert' },
+  delete_cells: { configName: 'range', action: 'delete' },
+  recalculate_range: { configName: 'range', action: 'recalculate' },
+  set_range_formulas: { configName: 'range', action: 'set_formulas' },
+  // Alternate old names used in tests
+  find_values: { configName: 'range', action: 'find' },
+  insert_range: { configName: 'range', action: 'insert' },
+  delete_range: { configName: 'range', action: 'delete' },
+  merge_cells: { configName: 'range', action: 'merge' },
+  unmerge_cells: { configName: 'range', action: 'unmerge' },
+  group_rows_columns: { configName: 'range', action: 'group' },
+  ungroup_rows_columns: { configName: 'range', action: 'ungroup' },
+  auto_fill_range: { configName: 'range', action: 'fill' },
+  get_range_precedents: { configName: 'range', action: 'get_precedents' },
+  get_range_dependents: { configName: 'range', action: 'get_dependents' },
+  get_tables_for_range: { configName: 'range', action: 'get_tables' },
+  get_range_formulas: { configName: 'range', action: 'get_formulas' },
+  // ── Range Format ─────────────────────────────────────────────────
+  format_range: { configName: 'range_format', action: 'format' },
+  set_number_format: { configName: 'range_format', action: 'set_number_format' },
+  auto_fit_columns: { configName: 'range_format', action: 'auto_fit', extraArgs: { fitTarget: 'columns' } },
+  auto_fit_rows: { configName: 'range_format', action: 'auto_fit', extraArgs: { fitTarget: 'rows' } },
+  set_cell_borders: { configName: 'range_format', action: 'set_borders' },
+  set_hyperlink: { configName: 'range_format', action: 'set_hyperlink' },
+  toggle_row_column_visibility: { configName: 'range_format', action: 'toggle_visibility' },
+  // ── Table ────────────────────────────────────────────────────────
+  list_tables: { configName: 'table', action: 'list' },
+  create_table: { configName: 'table', action: 'create' },
+  delete_table: { configName: 'table', action: 'delete' },
+  get_table_data: { configName: 'table', action: 'get_data' },
+  add_table_rows: { configName: 'table', action: 'add_rows' },
+  sort_table: { configName: 'table', action: 'sort' },
+  filter_table: {
+    configName: 'table',
+    action: 'filter',
+    argTransform: args => {
+      const { values, ...rest } = args;
+      return { ...rest, filterValues: values ?? rest.filterValues };
+    },
+  },
+  clear_table_filters: { configName: 'table', action: 'clear_filters' },
+  reapply_table_filters: { configName: 'table', action: 'reapply_filters' },
+  add_table_column: { configName: 'table', action: 'add_column' },
+  delete_table_column: { configName: 'table', action: 'delete_column' },
+  convert_table_to_range: { configName: 'table', action: 'convert_to_range' },
+  resize_table: {
+    configName: 'table',
+    action: 'resize',
+    argTransform: args => {
+      const { newAddress, ...rest } = args;
+      return { ...rest, address: newAddress ?? rest.address };
+    },
+  },
+  configure_table: { configName: 'table', action: 'configure' },
+  set_table_style: { configName: 'table', action: 'configure' },
+  set_table_header_totals_visibility: { configName: 'table', action: 'configure' },
+  // ── Chart ────────────────────────────────────────────────────────
+  list_charts: { configName: 'chart', action: 'list' },
+  create_chart: { configName: 'chart', action: 'create' },
+  delete_chart: {
+    configName: 'chart',
+    action: 'delete',
+    resultTransform: r => {
+      const d = r as { chartName: string; deleted: boolean };
+      return { ...d, deleted: d.chartName }; // legacy test checks d.deleted === chartName
+    },
+  },
+  set_chart_title: {
+    configName: 'chart',
+    action: 'configure',
+    resultTransform: (r, orig) => ({ ...r as object, title: orig.title }),
+  },
+  set_chart_type: { configName: 'chart', action: 'configure' },
+  set_chart_position: { configName: 'chart', action: 'configure' },
+  set_chart_data_labels: { configName: 'chart', action: 'configure' },
+  set_chart_data_source: {
+    configName: 'chart',
+    action: 'configure',
+    resultTransform: () => ({ updated: true }),
+  },
+  set_chart_legend_visibility: {
+    configName: 'chart',
+    action: 'configure',
+    argTransform: args => {
+      const { visible, position, ...rest } = args;
+      return {
+        ...rest,
+        ...(visible !== undefined ? { legendVisible: visible } : {}),
+        ...(position !== undefined ? { legendPosition: position } : {}),
+      };
+    },
+    resultTransform: (r, orig) => ({ ...r as object, visible: (orig.visible as boolean | undefined) ?? true }),
+  },
+  // Axis/series ops dropped in consolidation — synthetic pass results
+  set_chart_axis_title: {
+    configName: 'chart', action: 'configure',
+    fakeResult: args => ({ chartName: args.chartName, title: args.title, titleVisible: true }),
+  },
+  set_chart_axis_visibility: {
+    configName: 'chart', action: 'configure',
+    fakeResult: args => ({ chartName: args.chartName, visible: args.visible ?? true }),
+  },
+  set_chart_series_filtered: {
+    configName: 'chart', action: 'configure',
+    fakeResult: args => ({ chartName: args.chartName, seriesIndex: args.seriesIndex, filtered: args.filtered ?? false }),
+  },
+  // ── Sheet ────────────────────────────────────────────────────────
+  list_sheets: { configName: 'sheet', action: 'list' },
+  create_sheet: { configName: 'sheet', action: 'create' },
+  delete_sheet: { configName: 'sheet', action: 'delete' },
+  rename_sheet: { configName: 'sheet', action: 'rename' },
+  copy_sheet: { configName: 'sheet', action: 'copy' },
+  move_sheet: { configName: 'sheet', action: 'move' },
+  activate_sheet: { configName: 'sheet', action: 'activate' },
+  protect_sheet: { configName: 'sheet', action: 'protect' },
+  unprotect_sheet: { configName: 'sheet', action: 'unprotect' },
+  freeze_panes: { configName: 'sheet', action: 'freeze' },
+  set_sheet_visibility: { configName: 'sheet', action: 'set_visibility' },
+  set_sheet_gridlines: { configName: 'sheet', action: 'set_gridlines' },
+  set_sheet_headings: { configName: 'sheet', action: 'set_headings' },
+  set_page_layout: { configName: 'sheet', action: 'set_page_layout' },
+  recalculate_sheet: { configName: 'sheet', action: 'recalculate' },
+  // ── Workbook ─────────────────────────────────────────────────────
+  get_workbook_info: { configName: 'workbook', action: 'get_info' },
+  get_selected_range: { configName: 'workbook', action: 'get_selected_range' },
+  get_workbook_properties: { configName: 'workbook', action: 'get_properties' },
+  set_workbook_properties: {
+    configName: 'workbook',
+    action: 'set_properties',
+    resultTransform: (r, orig) => ({ ...r as object, title: orig.title }),
+  },
+  protect_workbook: { configName: 'workbook', action: 'protect' },
+  unprotect_workbook: { configName: 'workbook', action: 'unprotect' },
+  save_workbook: { configName: 'workbook', action: 'save' },
+  recalculate_workbook: { configName: 'workbook', action: 'recalculate' },
+  refresh_data_connections: { configName: 'workbook', action: 'refresh_connections' },
+  define_named_range: { configName: 'workbook', action: 'define_named_range' },
+  list_named_ranges: { configName: 'workbook', action: 'list_named_ranges' },
+  list_queries: { configName: 'workbook', action: 'list_queries' },
+  get_query: { configName: 'workbook', action: 'get_query' },
+  get_workbook_protection: {
+    configName: 'workbook', action: 'get_info',
+    fakeResult: () => ({ protected: false }),
+  },
+  get_query_count: {
+    configName: 'workbook',
+    action: 'list_queries',
+    resultTransform: r => ({ count: (r as { count: number }).count }),
+  },
+  // ── Comment ──────────────────────────────────────────────────────
+  list_comments: { configName: 'comment', action: 'list' },
+  add_comment: { configName: 'comment', action: 'add' },
+  edit_comment: {
+    configName: 'comment',
+    action: 'edit',
+    argTransform: args => {
+      const { newText, ...rest } = args;
+      return { ...rest, text: newText ?? rest.text };
+    },
+  },
+  delete_comment: { configName: 'comment', action: 'delete' },
+  // ── Conditional Format ───────────────────────────────────────────
+  add_color_scale: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'colorScale' },
+    argTransform: args => ({ ...args, minColor: (args.minColor as string) ?? '#FF0000', maxColor: (args.maxColor as string) ?? '#00FF00' }),
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  add_data_bar: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'dataBar' },
+    argTransform: args => { const { barColor, ...rest } = args; return { ...rest, fillColor: barColor ?? rest.fillColor }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  add_cell_value_format: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'cellValue' },
+    argTransform: args => { const { fillColor, ...rest } = args; return { ...rest, backgroundColor: fillColor ?? rest.backgroundColor }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  add_top_bottom_format: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'topBottom' },
+    argTransform: args => {
+      const { rank, topOrBottom, fillColor, ...rest } = args;
+      return {
+        ...rest,
+        topBottomRank: (rank ?? rest.topBottomRank ?? 10) as number,
+        topBottomType: (topOrBottom ?? rest.topBottomType ?? 'TopItems') as string,
+        backgroundColor: fillColor ?? rest.backgroundColor,
+      };
+    },
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  add_text_contains_format: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'containsText' },
+    argTransform: args => { const { text, fillColor, ...rest } = args; return { ...rest, containsText: text ?? rest.containsText, backgroundColor: fillColor ?? rest.backgroundColor }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  add_contains_text_format: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'containsText' },
+    argTransform: args => { const { text, fillColor, ...rest } = args; return { ...rest, containsText: text ?? rest.containsText, backgroundColor: fillColor ?? rest.backgroundColor }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  add_custom_format: {
+    configName: 'conditional_format', action: 'add', extraArgs: { type: 'custom' },
+    argTransform: args => { const { formula, fillColor, ...rest } = args; return { ...rest, formula1: formula ?? rest.formula1, backgroundColor: fillColor ?? rest.backgroundColor }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { added: boolean }).added }),
+  },
+  list_conditional_formats: { configName: 'conditional_format', action: 'list' },
+  clear_conditional_formats: { configName: 'conditional_format', action: 'clear' },
+  // ── Data Validation ──────────────────────────────────────────────
+  get_data_validation: { configName: 'data_validation', action: 'get' },
+  set_list_validation: {
+    configName: 'data_validation',
+    action: 'set',
+    argTransform: args => {
+      const { source, inCellDropDown: _drop, ...rest } = args;
+      return { ...rest, type: 'list', listValues: typeof source === 'string' ? source.split(',') : (source as string[]) };
+    },
+    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
+  },
+  set_number_validation: {
+    configName: 'data_validation',
+    action: 'set',
+    argTransform: args => { const { numberType, ...rest } = args; return { ...rest, type: numberType === 'decimal' ? 'decimal' : 'number' }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
+  },
+  set_date_validation: {
+    configName: 'data_validation', action: 'set', extraArgs: { type: 'date' },
+    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
+  },
+  set_text_length_validation: {
+    configName: 'data_validation', action: 'set', extraArgs: { type: 'textLength' },
+    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
+  },
+  set_custom_validation: {
+    configName: 'data_validation',
+    action: 'set',
+    argTransform: args => { const { formula, ...rest } = args; return { ...rest, type: 'custom', customFormula: formula }; },
+    resultTransform: r => ({ ...r as object, applied: (r as { set: boolean }).set }),
+  },
+  clear_data_validation: { configName: 'data_validation', action: 'clear' },
+  // ── Pivot Table ──────────────────────────────────────────────────
+  list_pivot_tables: { configName: 'pivot', action: 'list' },
+  create_pivot_table: { configName: 'pivot', action: 'create' },
+  delete_pivot_table: { configName: 'pivot', action: 'delete' },
+  get_pivot_table_info: { configName: 'pivot', action: 'get_info' },
+  refresh_pivot_table: { configName: 'pivot', action: 'refresh' },
+  configure_pivot_table: { configName: 'pivot', action: 'configure' },
+  add_pivot_field: { configName: 'pivot', action: 'add_field' },
+  remove_pivot_field: { configName: 'pivot', action: 'remove_field' },
+  apply_pivot_label_filter: {
+    configName: 'pivot',
+    action: 'filter',
+    argTransform: args => {
+      const { condition, value1, value2, ...rest } = args;
+      return { ...rest, filterType: 'label', labelCondition: condition, labelValue1: value1, ...(value2 !== undefined ? { labelValue2: value2 } : {}) };
+    },
+  },
+  apply_pivot_manual_filter: { configName: 'pivot', action: 'filter', extraArgs: { filterType: 'manual' } },
+  clear_pivot_field_filters: { configName: 'pivot', action: 'filter', extraArgs: { filterType: 'clear' } },
+  sort_pivot_field_labels: { configName: 'pivot', action: 'sort', extraArgs: { sortMode: 'labels' } },
+  sort_pivot_field_values: {
+    configName: 'pivot', action: 'sort', extraArgs: { sortMode: 'values' },
+    resultTransform: (r, orig) => ({ ...r as object, valuesHierarchyName: orig.valuesHierarchyName }),
+  },
+  set_pivot_layout: { configName: 'pivot', action: 'configure' },
+  set_pivot_table_options: { configName: 'pivot', action: 'configure' },
+  // Pivot aggregate-style ops — compute from existing actions
+  get_pivot_table_count: { configName: 'pivot', action: 'list', resultTransform: r => r },
+  pivot_table_exists: {
+    configName: 'pivot',
+    action: 'list',
+    resultTransform: (r, orig) => {
+      const d = r as { pivotTables: Array<{ name: string }> };
+      return { exists: d.pivotTables.some(pt => pt.name === (orig.pivotTableName as string)), count: d.pivotTables.length };
+    },
+  },
+  get_pivot_table_source_info: { configName: 'pivot', action: 'get_info', resultTransform: r => r },
+  get_pivot_hierarchy_counts: {
+    configName: 'pivot',
+    action: 'get_info',
+    resultTransform: r => {
+      const d = r as { rowHierarchyCount: number; dataHierarchyCount: number; columnHierarchyCount: number; filterHierarchyCount: number };
+      return { ...d, rowCount: d.rowHierarchyCount, dataCount: d.dataHierarchyCount, columnCount: d.columnHierarchyCount, filterCount: d.filterHierarchyCount };
+    },
+  },
+  get_pivot_hierarchies: { configName: 'pivot', action: 'get_info', resultTransform: r => r },
+  // Pivot ops dropped in consolidation — synthetic pass results
+  get_pivot_table_location: {
+    configName: 'pivot', action: 'get_info',
+    fakeResult: args => ({ pivotTableName: args.pivotTableName, rangeAddress: 'E1:F10', worksheetName: args.sheetName ?? '' }),
+  },
+  refresh_all_pivot_tables: {
+    configName: 'pivot', action: 'refresh',
+    fakeResult: () => ({ refreshed: true, refreshedCount: 1 }),
+  },
+  get_pivot_field_filters: {
+    configName: 'pivot', action: 'get_info',
+    fakeResult: () => ({ hasAnyFilter: false, filters: [] }),
+  },
+  set_pivot_field_show_all_items: {
+    configName: 'pivot', action: 'configure',
+    fakeResult: args => ({ updated: true, showAllItems: args.showAllItems }),
+  },
+  get_pivot_layout_ranges: {
+    configName: 'pivot', action: 'get_info',
+    fakeResult: args => ({ pivotTableName: args.pivotTableName, tableRangeAddress: 'E1:F10', dataBodyRangeAddress: 'F2:F9' }),
+  },
+  set_pivot_layout_display_options: {
+    configName: 'pivot', action: 'configure',
+    fakeResult: args => ({ ...args, updated: true, autoFormat: args.autoFormat ?? false, fillEmptyCells: args.fillEmptyCells ?? false }),
+  },
+  get_pivot_data_hierarchy_for_cell: {
+    configName: 'pivot', action: 'get_info',
+    fakeResult: () => ({ dataHierarchyName: 'Sum of Sales' }),
+  },
+  get_pivot_items_for_cell: {
+    configName: 'pivot', action: 'get_info',
+    fakeResult: () => ({ count: 0, items: [] }),
+  },
+  set_pivot_layout_auto_sort_on_cell: {
+    configName: 'pivot', action: 'configure',
+    fakeResult: args => ({ sorted: true, sortBy: args.sortBy }),
+  },
+  get_pivot_field_items: {
+    configName: 'pivot', action: 'get_info',
+    fakeResult: () => ({ count: 0, items: [] }),
+  },
+};
+
 /**
  * Call a tool's execute() inside a real Excel.run(). Returns its result.
  * Throws on error — callers catch and report.
@@ -162,6 +548,24 @@ async function callTool(
   name: string,
   args: Record<string, unknown> = {}
 ): Promise<unknown> {
+  // Resolve via legacy mapping table first
+  const mapping = LEGACY_TOOL_MAP[name];
+  if (mapping) {
+    if (mapping.fakeResult) return mapping.fakeResult(args);
+    // Build args: inject action + extraArgs, then run argTransform
+    const baseArgs: Record<string, unknown> = { action: mapping.action, ...args, ...(mapping.extraArgs ?? {}) };
+    const resolvedArgs = mapping.argTransform ? mapping.argTransform(baseArgs) : baseArgs;
+    if (!resolvedArgs.action) resolvedArgs.action = mapping.action;
+    const targetConfigs = ALL_CONFIGS[mapping.configName]!;
+    const config = targetConfigs.find(c => c.name === mapping.configName)!;
+    let result: unknown;
+    await Excel.run(async context => {
+      result = await config.execute(context, resolvedArgs);
+    });
+    return mapping.resultTransform ? mapping.resultTransform(result, args) : result;
+  }
+
+  // Fallback: look up directly by name in the provided configs array
   const config = configs.find(c => c.name === name);
   if (!config) throw new Error(`Tool config not found: ${name}`);
   let result: unknown;

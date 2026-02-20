@@ -112,6 +112,14 @@ export const dataValidationConfigs: readonly ToolConfig[] = [
             ...(args.formula2 ? { formula2: args.formula2 as string } : {}),
           },
         };
+      } else if (type === 'decimal') {
+        dv.rule = {
+          decimal: {
+            operator: args.operator as Excel.DataValidationOperator,
+            formula1: String(args.formula1),
+            ...(args.formula2 ? { formula2: args.formula2 as string } : {}),
+          },
+        };
       } else if (type === 'date') {
         dv.rule = {
           date: {
