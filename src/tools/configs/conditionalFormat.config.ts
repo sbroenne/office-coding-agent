@@ -191,8 +191,8 @@ export const conditionalFormatConfigs: readonly ToolConfig[] = [
         const cf = range.conditionalFormats.add(Excel.ConditionalFormatType.topBottom);
         const tb = cf.topBottom;
         tb.rule = {
-          rank: args.topBottomRank as number,
-          type: args.topBottomType as Excel.ConditionalTopBottomCriterionType,
+          rank: (args.topBottomRank as number) ?? 10,
+          type: (args.topBottomType as Excel.ConditionalTopBottomCriterionType) ?? 'TopItems',
         };
         if (args.fontColor) tb.format.font.color = args.fontColor as string;
         if (args.backgroundColor) tb.format.fill.color = args.backgroundColor as string;

@@ -21,7 +21,7 @@ export const dataValidationConfigs: readonly ToolConfig[] = [
         type: 'string',
         required: false,
         description: 'Validation type for action=set.',
-        enum: ['list', 'number', 'date', 'textLength', 'custom'],
+        enum: ['list', 'number', 'decimal', 'date', 'textLength', 'custom'],
       },
       // list
       listValues: {

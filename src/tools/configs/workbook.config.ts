@@ -21,6 +21,7 @@ export const workbookConfigs: readonly ToolConfig[] = [
           'get_selected_range',
           'get_properties',
           'set_properties',
+          'get_protection',
           'protect',
           'unprotect',
           'save',
@@ -157,6 +158,13 @@ export const workbookConfigs: readonly ToolConfig[] = [
         if (args.title !== undefined) props.title = args.title as string;
         await context.sync();
         return { updated: true };
+      }
+
+      if (action === 'get_protection') {
+        const prot = context.workbook.protection;
+        prot.load('protected');
+        await context.sync();
+        return { protected: prot.protected };
       }
 
       if (action === 'protect') {

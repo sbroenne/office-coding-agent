@@ -271,8 +271,19 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
       }
 
       const sheet = getSheet(context, args.sheetName as string | undefined);
-      const pivotTableName = args.pivotTableName as string;
-      const pt = sheet.pivotTables.getItem(pivotTableName);
+      const pivotTableName = args.pivotTableName as string | undefined;
+
+      // refresh all pivot tables in the sheet (no pivotTableName specified)
+      if (action === 'refresh' && !pivotTableName) {
+        const all = sheet.pivotTables;
+        all.load('items');
+        await context.sync();
+        for (const p of all.items) p.refresh();
+        await context.sync();
+        return { refreshed: true, count: all.items.length };
+      }
+
+      const pt = sheet.pivotTables.getItem(pivotTableName!);
 
       if (action === 'delete') {
         pt.delete();
