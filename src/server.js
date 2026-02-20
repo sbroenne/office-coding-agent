@@ -14,6 +14,7 @@
  */
 
 const express = require('express');
+const cors = require('cors');
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
@@ -25,6 +26,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 async function createServer() {
   const app = express();
+  app.use(cors({ origin: '*' }));
 
   // ─── API Routes ──────────────────────────────────────────────────────────────
   const apiRouter = express.Router();
@@ -32,6 +34,10 @@ async function createServer() {
 
   apiRouter.get('/hello', (_req, res) => {
     res.json({ message: 'Copilot proxy running', timestamp: new Date().toISOString() });
+  });
+
+  apiRouter.get('/ping', (_req, res) => {
+    res.json({ ok: true });
   });
 
   // CORS proxy for web_fetch tool (avoids CORS from Office add-in WebView)
@@ -92,6 +98,7 @@ async function createServer() {
   });
 
   app.use('/api', apiRouter);
+  app.get('/ping', (_req, res) => res.json({ ok: true }));
 
   // ─── Frontend ────────────────────────────────────────────────────────────────
   if (isDev) {
