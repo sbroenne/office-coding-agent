@@ -137,6 +137,11 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
         required: false,
         description: 'Allow multiple filters per field (configure).',
       },
+      useCustomSortLists: {
+        type: 'boolean',
+        required: false,
+        description: 'Use custom sort lists for sorting (configure).',
+      },
       refreshOnOpen: {
         type: 'boolean',
         required: false,
@@ -322,6 +327,8 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
           layout.showColumnGrandTotals = args.showColumnGrandTotals as boolean;
         if (args.allowMultipleFiltersPerField !== undefined)
           pt.allowMultipleFiltersPerField = args.allowMultipleFiltersPerField as boolean;
+        if (args.useCustomSortLists !== undefined)
+          pt.useCustomSortLists = args.useCustomSortLists as boolean;
         if (args.refreshOnOpen !== undefined) pt.refreshOnOpen = args.refreshOnOpen as boolean;
         layout.load([
           'layoutType',
@@ -330,6 +337,7 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
           'showRowGrandTotals',
           'showColumnGrandTotals',
         ]);
+        pt.load(['name', 'allowMultipleFiltersPerField', 'useCustomSortLists']);
         await context.sync();
         return {
           pivotTableName,
@@ -338,6 +346,8 @@ export const pivotTableConfigs: readonly ToolConfig[] = [
           showFieldHeaders: layout.showFieldHeaders,
           showRowGrandTotals: layout.showRowGrandTotals,
           showColumnGrandTotals: layout.showColumnGrandTotals,
+          allowMultipleFiltersPerField: pt.allowMultipleFiltersPerField,
+          useCustomSortLists: pt.useCustomSortLists,
           updated: true,
         };
       }

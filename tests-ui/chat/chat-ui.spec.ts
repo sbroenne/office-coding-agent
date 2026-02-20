@@ -1,21 +1,13 @@
 import { test, expect } from '../fixtures';
 
 test.describe('Chat UI (configured state)', () => {
-  test('renders the chat header with title and controls', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByText('AI Chat')).toBeVisible();
+  test('renders the chat header controls', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
-  test('shows the settings gear that opens the dialog', async ({ configuredTaskpane: page }) => {
-    // SettingsDialog renders its own trigger button with a gear icon
-    // Find the gear button — it's in the header, after the "New conversation" button and divider
-    const header = page.locator('div.flex.items-center.justify-between');
-    const buttons = header.locator('button');
-    // The last button in the header is the settings gear
-    await buttons.last().click();
-
-    // Settings dialog should open — check for the heading
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 3000 });
+  test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
@@ -32,8 +24,8 @@ test.describe('Chat UI (configured state)', () => {
     const btn = page.getByRole('button', { name: 'New conversation' });
     await expect(btn).toBeVisible();
     await btn.click();
-    // No crash — page should still be functional
-    await expect(page.getByText('AI Chat')).toBeVisible();
+    // No crash — composer input should still be functional
+    await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
   test('agent manager dialog supports keyboard open/close', async ({ configuredTaskpane: page }) => {
