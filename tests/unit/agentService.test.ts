@@ -62,8 +62,8 @@ Body content.`;
 name: InvalidHosts
 description: Agent with invalid host entries
 version: 1.0.0
-hosts: [excel, word, powerpoint]
-defaultForHosts: [word, excel]
+hosts: [excel, outlook, powerpoint]
+defaultForHosts: [outlook, excel]
 ---
 
 Body content.`;
@@ -155,8 +155,11 @@ describe('getAgents', () => {
     expect(excel!.metadata.hosts).toContain('excel');
   });
 
-  it('returns no agents for PowerPoint until one is added', () => {
-    expect(getAgents('powerpoint')).toEqual([]);
+  it('returns the PowerPoint agent', () => {
+    const agents = getAgents('powerpoint');
+    const ppt = agents.find(a => a.metadata.name === 'PowerPoint');
+    expect(ppt).toBeDefined();
+    expect(ppt!.metadata.hosts).toContain('powerpoint');
   });
 });
 
@@ -198,7 +201,7 @@ describe('default and active resolution', () => {
   });
 
   it('returns undefined default for host with no configured agents', () => {
-    expect(getDefaultAgent('powerpoint')).toBeUndefined();
+    expect(getDefaultAgent('unknown')).toBeUndefined();
   });
 
   it('falls back to host default when active agent does not match host', () => {
