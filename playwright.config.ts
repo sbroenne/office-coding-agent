@@ -17,8 +17,8 @@ export default defineConfig({
     },
   ],
   // Dev server is started separately — don't auto-start it here
-  // because webpack-dev-server with office-addin-dev-certs is complex.
-  // Run `npm run dev` in another terminal first.
+  // because Vite dev server with office-addin-dev-certs is complex.
+  // Run `npm run dev` in another terminal first (starts proxy + Vite).
   expect: {
     timeout: 5_000,
   },

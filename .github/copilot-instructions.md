@@ -9,9 +9,9 @@
 - **React 18** + **assistant-ui** + **Radix UI** + **Tailwind CSS v4** — task pane UI (Thread, ToolFallback, Popovers)
 - **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
 - **WebSocket + JSON-RPC** — browser-to-proxy transport (`src/lib/websocket-client.ts`, `src/lib/websocket-transport.ts`)
-- **Express + HTTPS** — local proxy server (`src/server.js`) that bridges WebSocket to the Copilot CLI
+- **Express + HTTPS** — local proxy server (`src/server.mjs`) that bridges WebSocket to the Copilot CLI
 - **Zustand 5** — state management with persistence via `officeStorage` (OfficeRuntime.storage)
-- **Webpack 5** — bundling (ts-loader, full type-checking during builds)
+- **Vite 7** — bundling, dev server (HMR via middleware mode in Express)
 - **TypeScript 5** — type safety
 - **Vitest** — unit + integration testing (jsdom env)
 - **Mocha** — E2E tests inside Excel Desktop (current host runtime E2E)
@@ -24,10 +24,8 @@ The add-in routes messages through a **local proxy server** — the browser cann
 ```
 Browser task pane (React + assistant-ui)
          ↓ WebSocket (wss://localhost:3000/api/copilot)
-Node.js proxy server  (src/server.js + src/copilotProxy.js)
-         ↓ stdio LSP
-@github/copilot CLI  (authenticates via GitHub account)
-         ↓ HTTPS
+Node.js proxy server  (src/server.mjs + src/copilotProxy.mjs)
+         ↓ @github/copilot-sdk (manages CLI lifecycle internally)
 GitHub Copilot API
 ```
 
@@ -120,12 +118,12 @@ The task pane is split into three areas:
 
 ### Test Tiers
 
-| Tier            | Runner     | Directory            | Count | What it tests                                               |
-| --------------- | ---------- | -------------------- | ----- | ----------------------------------------------------------- |
-| **Unit**        | Vitest     | `tests/unit/`        | 18    | Pure functions, store logic, JSON Schema tool configs       |
-| **Integration** | Vitest     | `tests/integration/` | 12    | Component wiring; live Copilot WebSocket (auto-skipped)     |
-| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                     |
-| **E2E**         | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                    |
+| Tier            | Runner     | Directory            | Count | What it tests                                           |
+| --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------- |
+| **Unit**        | Vitest     | `tests/unit/`        | 18    | Pure functions, store logic, JSON Schema tool configs   |
+| **Integration** | Vitest     | `tests/integration/` | 12    | Component wiring; live Copilot WebSocket (auto-skipped) |
+| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                 |
+| **E2E**         | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                |
 
 ### Unit Test Principles
 
@@ -137,48 +135,48 @@ The task pane is split into three areas:
 
 ### Current Unit Test Files (18)
 
-| File                                  | What it covers                                                                  |
-| ------------------------------------- | ------------------------------------------------------------------------------- |
-| `agentService.test.ts`                | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions            |
-| `buildSkillContext.test.ts`           | `buildSkillContext` and related skill functions with bundled `.md` files        |
-| `chatErrorBoundary.test.tsx`          | Error boundary fallback rendering and recovery flow                             |
-| `chatPanel.test.tsx`                  | ChatPanel component logic (mocks assistant-ui components for jsdom)             |
-| `chatStore.test.ts`                   | Chat message store: append, clear, tool invocations                             |
-| `generalTools.test.ts`               | General-purpose tool definitions (web_fetch, etc.)                              |
-| `hostToolsLimit.test.ts`             | Host tool count limits per host                                                 |
-| `humanizeToolName.test.ts`           | Tool-name → human-readable progress label formatting                           |
-| `id.test.ts`                          | `generateId` unique ID generation utility                                       |
-| `manifest.test.ts`                    | Office manifest / runtime host assumptions                                      |
-| `mcpService.test.ts`                  | MCP server config parsing; HTTP/SSE transport filtering (no stdio)              |
-| `officeStorage.test.ts`               | `officeStorage` with `OfficeRuntime` mock (via tests/setup.ts)                  |
-| `parseFrontmatter.test.ts`            | YAML frontmatter parsing (skill files)                                          |
-| `settingsStore.test.ts`               | Zustand store: activeModel, agent/skill CRUD, reset                             |
-| `toolSchemas.test.ts`                 | JSON Schema validation for all tool definitions (toCopilotTools)                |
-| `useOfficeChat.test.tsx`              | useOfficeChat hook: mocked WebSocket session → ThreadMessage[] mapping          |
-| `useToolInvocations-patch.test.tsx`   | assistant-ui patch for tool invocation argument streaming integrity             |
-| `zipImportService.test.ts`            | ZIP import service for custom agents/skills                                     |
+| File                                | What it covers                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------ |
+| `agentService.test.ts`              | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions     |
+| `buildSkillContext.test.ts`         | `buildSkillContext` and related skill functions with bundled `.md` files |
+| `chatErrorBoundary.test.tsx`        | Error boundary fallback rendering and recovery flow                      |
+| `chatPanel.test.tsx`                | ChatPanel component logic (mocks assistant-ui components for jsdom)      |
+| `chatStore.test.ts`                 | Chat message store: append, clear, tool invocations                      |
+| `generalTools.test.ts`              | General-purpose tool definitions (web_fetch, etc.)                       |
+| `hostToolsLimit.test.ts`            | Host tool count limits per host                                          |
+| `humanizeToolName.test.ts`          | Tool-name → human-readable progress label formatting                     |
+| `id.test.ts`                        | `generateId` unique ID generation utility                                |
+| `manifest.test.ts`                  | Office manifest / runtime host assumptions                               |
+| `mcpService.test.ts`                | MCP server config parsing; HTTP/SSE transport filtering (no stdio)       |
+| `officeStorage.test.ts`             | `officeStorage` with `OfficeRuntime` mock (via tests/setup.ts)           |
+| `parseFrontmatter.test.ts`          | YAML frontmatter parsing (skill files)                                   |
+| `settingsStore.test.ts`             | Zustand store: activeModel, agent/skill CRUD, reset                      |
+| `toolSchemas.test.ts`               | JSON Schema validation for all tool definitions (toCopilotTools)         |
+| `useOfficeChat.test.tsx`            | useOfficeChat hook: mocked WebSocket session → ThreadMessage[] mapping   |
+| `useToolInvocations-patch.test.tsx` | assistant-ui patch for tool invocation argument streaming integrity      |
+| `zipImportService.test.ts`          | ZIP import service for custom agents/skills                              |
 
 ### Current Integration Test Files (12)
 
-| File                                          | Category                   | Requires server? |
-| --------------------------------------------- | -------------------------- | ---------------- |
-| `agent-picker.test.tsx`                       | Component wiring           | No               |
-| `app-error-boundary.test.tsx`                 | Component wiring           | No               |
-| `app-state.test.tsx`                          | Component wiring           | No               |
-| `chat-header-settings-flow.test.tsx`          | Component wiring           | No               |
-| `chat-panel.test.tsx`                         | Component wiring           | No               |
-| `copilot-websocket.integration.test.ts`       | Live Copilot WebSocket E2E | Yes (auto-skip)  |
-| `mcp-manager-dialog.test.tsx`                 | Component wiring           | No               |
-| `model-manager.test.tsx`                      | Component wiring           | No               |
-| `model-picker-interactions.test.tsx`          | Component wiring           | No               |
-| `settings-dialog.test.tsx`                    | Component wiring           | No               |
-| `skill-picker.test.tsx`                       | Component wiring           | No               |
-| `stale-state.test.tsx`                        | Store hydration            | No               |
+| File                                    | Category                   | Requires server? |
+| --------------------------------------- | -------------------------- | ---------------- |
+| `agent-picker.test.tsx`                 | Component wiring           | No               |
+| `app-error-boundary.test.tsx`           | Component wiring           | No               |
+| `app-state.test.tsx`                    | Component wiring           | No               |
+| `chat-header-settings-flow.test.tsx`    | Component wiring           | No               |
+| `chat-panel.test.tsx`                   | Component wiring           | No               |
+| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E | Yes (auto-skip)  |
+| `mcp-manager-dialog.test.tsx`           | Component wiring           | No               |
+| `model-manager.test.tsx`                | Component wiring           | No               |
+| `model-picker-interactions.test.tsx`    | Component wiring           | No               |
+| `settings-dialog.test.tsx`              | Component wiring           | No               |
+| `skill-picker.test.tsx`                 | Component wiring           | No               |
+| `stale-state.test.tsx`                  | Store hydration            | No               |
 
 ### Integration Test Categories
 
 - **Component wiring** — renders real components together (no child mocks)
-- **Live Copilot WebSocket** — hits real GitHub Copilot API via proxy (requires `npm run server`; auto-skips when unavailable)
+- **Live Copilot WebSocket** — hits real GitHub Copilot API via proxy (requires `npm run dev`; auto-skips when unavailable)
 
 ### When to Write What
 
@@ -228,13 +226,12 @@ The task pane is split into three areas:
 
 ```bash
 npm install
-npm run server            # Start Copilot proxy + webpack dev server (port 3000)
-npm run dev               # Webpack-dev-server only (UI, no Copilot proxy)
+npm run dev               # Start Copilot proxy + Vite dev server (port 3000)
 npm run build:dev         # Development build
 npm run build             # Production build
 npm run start:desktop     # Sideload into Excel
-npm test                  # All Vitest unit tests (265)
-npm run test:integration  # Integration tests (47)
+npm test                  # All Vitest unit tests (267)
+npm run test:integration  # Integration tests (48)
 npm run test:ui           # Playwright UI tests
 npm run test:e2e          # E2E in Excel Desktop (~187 tests)
 npm run validate          # Validate manifests/manifest.dev.xml
@@ -246,13 +243,13 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/hooks/useOfficeChat.ts` — main hook: WebSocket session lifecycle → `useExternalStoreRuntime`
 - `src/lib/websocket-client.ts` — `WebSocketCopilotClient`, `BrowserCopilotSession`, `createWebSocketClient`
 - `src/lib/websocket-transport.ts` — JSON-RPC WebSocket transport (browser-compatible)
-- `src/server.js` — Express HTTPS server (port 3000): webpack-dev-middleware + Copilot WebSocket proxy
-- `src/copilotProxy.js` — spawns `@github/copilot` CLI and bridges its stdio to WebSocket
+- `src/server.mjs` — Express HTTPS server (port 3000): Vite dev middleware + Copilot WebSocket proxy
+- `src/copilotProxy.mjs` — bridges WebSocket to `@github/copilot-sdk` CopilotClient
 - `src/components/ChatHeader.tsx` — header: title, SkillPicker, new convo, Settings
 - `src/components/ChatPanel.tsx` — messages, progress, input, AgentPicker, ModelPicker
 - `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI
 - `src/components/AgentPicker.tsx` — single-select agent dropdown (Radix Popover)
-- `src/components/ModelPicker.tsx` — model selection dropdown (hardcoded `COPILOT_MODELS`)
+- `src/components/ModelPicker.tsx` — model selection dropdown (dynamic, fetched from Copilot API)
 - `src/components/SkillPicker.tsx` — icon-only skill toggle with badge count
 - `src/components/SettingsDialog.tsx` — settings/preferences dialog
 - `src/services/ai/BASE_PROMPT.md` — universal base system prompt
@@ -264,8 +261,10 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/stores/settingsStore.ts` — Zustand store (activeModel, agent/skill CRUD, reset)
 - `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
 - `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
-- `src/types/settings.ts` — `CopilotModel`, `COPILOT_MODELS`, `UserSettings`
+- `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
+- `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
+- `taskpane.html` — Vite HTML entry point (root level, references `src/taskpane/index.tsx`)
 - `vitest.config.ts` — unit test config (jsdom, `@/` alias, setup file, globals)
 - `vitest.integration.config.ts` — integration test config (jsdom, setup file, globals, 60s timeout)
 - `tests/setup.ts` — `OfficeRuntime.storage` mock + polyfills (ResizeObserver, matchMedia, etc.)

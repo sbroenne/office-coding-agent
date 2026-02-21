@@ -2,11 +2,11 @@
 /**
  * Live integration test: WebSocket → Copilot proxy → GitHub Copilot API
  *
- * Requires `npm run server` to be running on https://localhost:3000.
+ * Requires `npm run dev` to be running on https://localhost:3000.
  * Skips automatically when the server is unreachable.
  *
  * Run manually:
- *   npm run server          # terminal 1
+ *   npm run dev             # terminal 1
  *   npm test -- copilot-websocket   # terminal 2
  */
 
@@ -65,7 +65,7 @@ describe('Copilot WebSocket integration', () => {
     'connects to the proxy server',
     async () => {
       if (!serverAvailable) {
-        console.log('Skipping — start `npm run server` to run live Copilot tests');
+        console.log('Skipping — start `npm run dev` to run live Copilot tests');
         return;
       }
       const client = await createWebSocketClient(SERVER_URL);
@@ -79,7 +79,7 @@ describe('Copilot WebSocket integration', () => {
     'creates a session and gets a response to a simple prompt',
     async () => {
       if (!serverAvailable) {
-        console.log('Skipping — start `npm run server` to run live Copilot tests');
+        console.log('Skipping — start `npm run dev` to run live Copilot tests');
         return;
       }
 
@@ -114,10 +114,39 @@ describe('Copilot WebSocket integration', () => {
   );
 
   it(
+    'lists available models from the Copilot API',
+    async () => {
+      if (!serverAvailable) {
+        console.log('Skipping — start `npm run dev` to run live Copilot tests');
+        return;
+      }
+
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        // listModels requires an active session (CLI must be initialized)
+        await client.createSession({ systemMessage: SYSTEM });
+        const models = await client.listModels();
+        console.log('>>> listModels returned', models.length, 'models:');
+        for (const m of models) {
+          console.log(`  - ${m.id} (${m.name})`);
+        }
+
+        expect(Array.isArray(models)).toBe(true);
+        expect(models.length).toBeGreaterThan(0);
+        expect(models[0]).toHaveProperty('id');
+        expect(models[0]).toHaveProperty('name');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
     'executes a tool call and returns the result to the model',
     async () => {
       if (!serverAvailable) {
-        console.log('Skipping — start `npm run server` to run live Copilot tests');
+        console.log('Skipping — start `npm run dev` to run live Copilot tests');
         return;
       }
 
@@ -128,7 +157,8 @@ describe('Copilot WebSocket integration', () => {
         const session = await client.createSession({
           systemMessage: {
             mode: 'append',
-            content: 'You must call the echo tool with the text "hello". Do not answer without calling it.',
+            content:
+              'You must call the echo tool with the text "hello". Do not answer without calling it.',
           },
           tools: [
             {
@@ -154,7 +184,9 @@ describe('Copilot WebSocket integration', () => {
           ],
         });
 
-        for await (const event of session.query({ prompt: 'Please call the echo tool with "hello".' })) {
+        for await (const event of session.query({
+          prompt: 'Please call the echo tool with "hello".',
+        })) {
           if (event.type === 'session.idle') break;
         }
 

@@ -20,8 +20,8 @@ test.describe('App fresh launch', () => {
   });
 
   test('shows the default model picker', async ({ taskpane }) => {
-    // Default model is claude-sonnet-4.5 → displayed as "Claude Sonnet 4.5"
-    await expect(taskpane.getByText('Claude Sonnet 4.5')).toBeVisible({ timeout: 10_000 });
+    // Default model is claude-sonnet-4 → displayed as "Claude Sonnet 4"
+    await expect(taskpane.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 10_000 });
   });
 
   test('shows the default agent picker', async ({ taskpane }) => {

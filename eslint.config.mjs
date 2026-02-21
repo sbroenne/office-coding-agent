@@ -126,7 +126,7 @@ export default [
 
   // Office Add-in specific overrides
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx,mjs}'],
     languageOptions: {
       globals: {
         Excel: 'readonly',

@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Excel AI E2E Tests</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 16px;
+        background: #fafafa;
+        font-size: 13px;
+      }
+      h2 {
+        margin: 0 0 12px;
+        color: #0078d4;
+      }
+      .status {
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+      .status-running {
+        background: #fff4ce;
+        color: #6d5700;
+      }
+      .status-success {
+        background: #dff6dd;
+        color: #107c10;
+      }
+      .status-error {
+        background: #fde7e9;
+        color: #d13438;
+      }
+      #test-log {
+        max-height: 400px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid #e1e1e1;
+        border-radius: 4px;
+        padding: 8px;
+        font-family: 'Cascadia Code', 'Consolas', monospace;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      #test-log p {
+        margin: 2px 0;
+      }
+      #results-summary {
+        display: none;
+        margin-top: 12px;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #e1e1e1;
+        border-radius: 4px;
+      }
+      #sideload-msg {
+        padding: 24px;
+        text-align: center;
+        color: #666;
+      }
+      #app-body {
+        display: none;
+      }
+    </style>
+
+    <!-- Office.js MUST load in head before taskpane script -->
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+  </head>
+  <body>
+    <div id="sideload-msg">
+      <h2>Please sideload your add-in to see the test runner.</h2>
+    </div>
+    <div id="app-body">
+      <h2>Excel AI E2E Tests</h2>
+      <div id="status" class="status status-running">
+        <span id="status-text">Initializing...</span>
+      </div>
+      <div id="test-log"></div>
+      <div id="results-summary">
+        <h3>Results</h3>
+        <div id="results-content"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/test-taskpane.ts"></script>
+  </body>
+</html>

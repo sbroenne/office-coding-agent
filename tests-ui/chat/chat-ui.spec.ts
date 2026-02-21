@@ -11,8 +11,8 @@ test.describe('Chat UI (configured state)', () => {
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
-    // The model picker shows the active model name (default: Claude Sonnet 4.5)
-    await expect(page.getByText('Claude Sonnet 4.5')).toBeVisible({ timeout: 5000 });
+    // The model picker shows the active model name (default: Claude Sonnet 4)
+    await expect(page.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 5000 });
   });
 
   test('displays the agent picker', async ({ configuredTaskpane: page }) => {
@@ -28,7 +28,9 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('agent manager dialog supports keyboard open/close', async ({ configuredTaskpane: page }) => {
+  test('agent manager dialog supports keyboard open/close', async ({
+    configuredTaskpane: page,
+  }) => {
     await page.getByRole('button', { name: 'Select agent' }).click();
 
     const manageAgents = page.getByRole('button', { name: 'Manage agents…' });
@@ -40,7 +42,9 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('heading', { name: 'Manage Agents' })).not.toBeVisible();
   });
 
-  test('skill manager dialog supports keyboard open/close', async ({ configuredTaskpane: page }) => {
+  test('skill manager dialog supports keyboard open/close', async ({
+    configuredTaskpane: page,
+  }) => {
     await page.getByRole('button', { name: 'Agent skills' }).click();
 
     const manageSkills = page.getByRole('button', { name: 'Manage skills…' });

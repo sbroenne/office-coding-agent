@@ -8,8 +8,52 @@ import { buildSkillContext } from '@/services/skills';
 import { resolveActiveAgent } from '@/services/agents';
 import { useSettingsStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
+import { inferProvider } from '@/types';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
+
+const MODEL_FETCH_TIMEOUT_MS = 10_000;
+
+/** Race a promise against a timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      v => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      e => {
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    );
+  });
+}
+
+/** Fetch available models from the Copilot SDK and update the store. */
+async function loadAvailableModels(client: WebSocketCopilotClient): Promise<void> {
+  try {
+    const modelInfos = await withTimeout(client.listModels(), MODEL_FETCH_TIMEOUT_MS, 'listModels');
+    const models = modelInfos.map(m => ({
+      id: m.id,
+      name: m.name,
+      provider: inferProvider(m.id),
+    }));
+    useSettingsStore.getState().setAvailableModels(models);
+
+    // Auto-correct activeModel if it's not in the fetched list
+    const { activeModel } = useSettingsStore.getState();
+    if (models.length > 0 && !models.some(m => m.id === activeModel)) {
+      console.warn(
+        `[useOfficeChat] activeModel '${activeModel}' not in available models, switching to '${models[0].id}'`
+      );
+      useSettingsStore.getState().setActiveModel(models[0].id);
+    }
+  } catch (err) {
+    console.warn('[useOfficeChat] Failed to load available models:', err);
+  }
+}
 
 function getWsUrl(): string {
   if (typeof window === 'undefined') return 'wss://localhost:3000/api/copilot';
@@ -29,6 +73,7 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
+  const [isConnecting, setIsConnecting] = useState(true);
 
   const initSession = useCallback(async () => {
     if (clientRef.current) {
@@ -41,24 +86,41 @@ export function useOfficeChat(host: OfficeHostApp) {
       sessionRef.current = null;
     }
 
+    const wsUrl = getWsUrl();
+    console.log('[chat] initSession: connecting to', wsUrl);
+    setIsConnecting(true);
+    setSessionError(null);
+
     try {
-      const client = await createWebSocketClient(getWsUrl());
+      const client = await withTimeout(createWebSocketClient(wsUrl), 15_000, 'WebSocket connect');
       clientRef.current = client;
+      console.log('[chat] WebSocket connected');
 
       const resolvedAgent = resolveActiveAgent(activeAgentId, host);
       const agentInstructions = resolvedAgent?.instructions ?? '';
       const skillContext = buildSkillContext(activeSkillNames ?? undefined);
       const systemContent = `${buildSystemPrompt(host)}\n\n${agentInstructions}${skillContext}`;
 
-      const session = await client.createSession({
-        model: activeModel,
-        systemMessage: { mode: 'replace', content: systemContent },
-        tools: getToolsForHost(host),
-      });
+      const session = await withTimeout(
+        client.createSession({
+          model: activeModel,
+          systemMessage: { mode: 'replace', content: systemContent },
+          tools: getToolsForHost(host),
+        }),
+        60_000,
+        'session.create'
+      );
       sessionRef.current = session;
       setSessionError(null);
+      console.log('[chat] Session created:', session.sessionId);
+
+      // Fetch available models (non-blocking, with timeout)
+      void loadAvailableModels(client);
     } catch (err) {
+      console.error('[chat] initSession failed:', err);
       setSessionError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setIsConnecting(false);
     }
   }, [activeModel, host, activeSkillNames, activeAgentId]);
 
@@ -82,7 +144,33 @@ export function useOfficeChat(host: OfficeHostApp) {
       .map(c => c.text)
       .join('\n');
 
-    if (!userText.trim() || !sessionRef.current) return;
+    if (!userText.trim()) return;
+
+    if (!sessionRef.current) {
+      const errorMsg: ThreadMessageLike = {
+        id: generateId(),
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: 'Not connected to Copilot. Check that the server is running and try clicking **Retry** above, or start a new conversation.',
+          },
+        ],
+        status: { type: 'incomplete', reason: 'error' },
+        createdAt: new Date(),
+      };
+      setMessages(prev => [
+        ...prev,
+        {
+          id: generateId(),
+          role: 'user',
+          content: [{ type: 'text', text: userText }],
+          createdAt: new Date(),
+        },
+        errorMsg,
+      ]);
+      return;
+    }
 
     const assistantId = generateId();
     cancelRef.current = false;
@@ -157,6 +245,10 @@ export function useOfficeChat(host: OfficeHostApp) {
         } else if (event.type === 'assistant.message') {
           streamText = event.data.content;
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
+        } else if (event.type === 'session.idle') {
+          // Stream ended — finalize message if it wasn't already completed by
+          // an assistant.message event (e.g. streaming-only responses).
+          updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.error') {
           updateAssistant({
             status: { type: 'incomplete', reason: 'error', error: event.data.message },
@@ -195,5 +287,5 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
-  return { runtime, sessionError, clearMessages };
+  return { runtime, sessionError, isConnecting, clearMessages };
 }

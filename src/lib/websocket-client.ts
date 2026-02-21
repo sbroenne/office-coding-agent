@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------------------------
  *  WebSocket-based CopilotClient for browser environments
- *  Connects to the Copilot CLI via WebSocket proxy (src/server.js)
+ *  Connects to the Copilot CLI via WebSocket proxy (src/server.mjs)
  *  Source: https://github.com/patniko/github-copilot-office
  *--------------------------------------------------------------------------------------------*/
 
@@ -55,6 +55,7 @@ export class BrowserCopilotSession {
     const queue: SessionEvent[] = [];
     let resolve: (() => void) | null = null;
     let done = false;
+    let sendError: Error | undefined;
 
     const unsubscribe = this.on(event => {
       queue.push(event);
@@ -64,8 +65,10 @@ export class BrowserCopilotSession {
       }
     });
 
-    this.send(options).catch(() => {
+    this.send(options).catch(err => {
+      sendError = err instanceof Error ? err : new Error(String(err));
       done = true;
+      resolve?.();
     });
 
     try {
@@ -80,6 +83,7 @@ export class BrowserCopilotSession {
           resolve = null;
         }
       }
+      if (sendError !== undefined) throw sendError;
     } finally {
       unsubscribe();
     }
@@ -141,6 +145,7 @@ export class WebSocketCopilotClient {
       this.wsSocket = new WebSocket(this.url);
 
       this.wsSocket.addEventListener('open', () => {
+        console.log('[ws] Connected to', this.url);
         const socket = this.wsSocket;
         if (!socket) return;
         const reader = new WebSocketMessageReader(socket);
@@ -151,7 +156,8 @@ export class WebSocketCopilotClient {
         resolve();
       });
 
-      this.wsSocket.addEventListener('error', () => {
+      this.wsSocket.addEventListener('error', event => {
+        console.error('[ws] Connection error to', this.url, event);
         reject(new Error(`Failed to connect to ${this.url}`));
       });
     });
@@ -178,6 +184,17 @@ export class WebSocketCopilotClient {
     session.registerTools(config.tools);
     this.sessions.set(sessionId, session);
     return session;
+  }
+
+  async listModels(): Promise<ListModelsResult[]> {
+    if (!this.connection) {
+      throw new Error('Client not connected. Call start() first.');
+    }
+    const result = await this.connection.sendRequest<{ models: ListModelsResult[] }>(
+      'models.list',
+      {}
+    );
+    return result.models;
   }
 
   async stop(): Promise<void> {
@@ -249,6 +266,12 @@ export class WebSocketCopilotClient {
       }
     );
   }
+}
+
+/** Model info returned by the Copilot CLI */
+export interface ListModelsResult {
+  id: string;
+  name: string;
 }
 
 /** Creates and connects a WebSocketCopilotClient. */

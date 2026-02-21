@@ -3,7 +3,7 @@
  *
  * Orchestrates E2E testing by:
  * 1. Starting a custom test server to receive results from Excel (via POST body)
- * 2. Building and serving the test add-in via webpack (port 3001)
+ * 2. Building and serving the test add-in via Vite (port 3001)
  * 3. Sideloading into Excel Desktop
  * 4. Collecting and validating test results
  *
@@ -430,8 +430,7 @@ describe('Excel AI E2E Tests', function () {
     console.log(`Test server started on port ${port}`);
 
     // Build test add-in and sideload into Excel
-    const devServerCmd =
-      'npx webpack serve --mode development --config ./tests-e2e/webpack.config.js';
+    const devServerCmd = 'npx vite --config ./tests-e2e/vite.config.ts';
     const options = {
       appType: AppType.Desktop,
       app: toOfficeApp(host),

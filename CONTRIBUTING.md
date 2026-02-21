@@ -5,11 +5,10 @@ Thanks for your interest in contributing to Office Coding Agent.
 ## Development Setup
 
 - Install dependencies: `npm install`
-- Start the Copilot proxy server: `npm run server` (requires GitHub Copilot subscription)
-- Or start the webpack-only dev server (UI only): `npm run dev`
+- Start the dev server (Copilot proxy + Vite): `npm run dev` (requires GitHub Copilot subscription)
 - Sideload in Excel Desktop: `npm run start:desktop`
 
-> **Note:** For full AI functionality you need an active GitHub Copilot subscription and must authenticate with `gh auth login` (or equivalent). For UI-only work (`npm run dev`) no subscription is required.
+> **Note:** For full AI functionality you need an active GitHub Copilot subscription and must authenticate with `gh auth login` (or equivalent).
 
 ## Before Submitting a PR
 

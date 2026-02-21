@@ -1,6 +1,6 @@
 /**
  * Node.js-only helpers for the E2E test runner.
- * NOT bundled by webpack — used only by runner.test.ts (Mocha/Node).
+ * NOT bundled by Vite — used only by runner.test.ts (Mocha/Node).
  */
 
 import * as childProcess from 'child_process';
@@ -25,8 +25,8 @@ export async function closeDesktopApplication(): Promise<boolean> {
  * Execute a command line command.
  */
 function executeCommandLine(cmdLine: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    childProcess.exec(cmdLine, (error) => {
+  return new Promise(resolve => {
+    childProcess.exec(cmdLine, error => {
       resolve(!error);
     });
   });

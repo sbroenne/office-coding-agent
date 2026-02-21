@@ -1,5 +1,5 @@
 import React, { useEffect, useSyncExternalStore } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
@@ -9,12 +9,39 @@ import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { detectOfficeHost } from '@/services/office/host';
 import type { OfficeHostApp } from '@/services/office/host';
 
+const ConnectingBanner: React.FC = () => (
+  <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+    <Loader2 className="size-3.5 animate-spin shrink-0" />
+    <span>Connecting to Copilot...</span>
+  </div>
+);
+
+const SessionErrorBanner: React.FC<{ error: Error; onRetry: () => void }> = ({
+  error,
+  onRetry,
+}) => (
+  <div className="flex items-center gap-2 border-b border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-200">
+    <span className="min-w-0 flex-1 truncate" title={error.message}>
+      Connection failed: {error.message}
+    </span>
+    <button
+      onClick={onRetry}
+      className="flex items-center gap-1 shrink-0 rounded-md border border-destructive/30 px-2 py-0.5 text-xs font-medium hover:bg-destructive/20 transition-colors"
+    >
+      <RefreshCw className="size-3" />
+      Retry
+    </button>
+  </div>
+);
+
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
-  const { runtime, clearMessages } = useOfficeChat(host);
+  const { runtime, sessionError, isConnecting, clearMessages } = useOfficeChat(host);
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
         <ChatHeader onClearMessages={clearMessages} />
+        {isConnecting && !sessionError && <ConnectingBanner />}
+        {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
         <ChatErrorBoundary>
           <ChatPanel />
         </ChatErrorBoundary>
