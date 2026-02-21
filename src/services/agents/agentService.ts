@@ -3,6 +3,8 @@ import type { OfficeHostApp } from '@/services/office/host';
 
 // Import bundled agent files as raw strings (via Vite md-raw plugin)
 import excelAgentRaw from '@/agents/excel/AGENT.md';
+import powerpointAgentRaw from '@/agents/powerpoint/AGENT.md';
+import wordAgentRaw from '@/agents/word/AGENT.md';
 
 /**
  * Parse YAML frontmatter from an agent markdown file.
@@ -133,7 +135,7 @@ function parseInlineArray(value: string): string[] {
   return [trimmed];
 }
 
-const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint'];
+const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint', 'word'];
 
 function isAgentHost(value: string): value is AgentHost {
   return SUPPORTED_AGENT_HOSTS.includes(value as AgentHost);
@@ -152,7 +154,11 @@ function setAgentArrayField(metadata: AgentMetadata, key: string, values: string
 }
 
 /** All bundled agents, parsed at module load time. */
-const bundledAgents: AgentConfig[] = [parseAgentFrontmatter(excelAgentRaw)];
+const bundledAgents: AgentConfig[] = [
+  parseAgentFrontmatter(excelAgentRaw),
+  parseAgentFrontmatter(powerpointAgentRaw),
+  parseAgentFrontmatter(wordAgentRaw),
+];
 let importedAgents: AgentConfig[] = [];
 
 export function getBundledAgents(): AgentConfig[] {
@@ -168,7 +174,7 @@ export function setImportedAgents(agents: AgentConfig[]): void {
 }
 
 function toAgentHost(host: OfficeHostApp): AgentHost | undefined {
-  if (host === 'excel' || host === 'powerpoint') return host;
+  if (host === 'excel' || host === 'powerpoint' || host === 'word') return host;
   return undefined;
 }
 

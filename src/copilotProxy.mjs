@@ -230,7 +230,7 @@ async function handleConnection(ws) {
 
         sessions.set(session.sessionId, session);
         markHealthy();
-        console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`); 
+        console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
 
         // Subscribe to all session events and forward them to the browser
         const unsub = session.on(event => {

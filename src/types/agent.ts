@@ -1,4 +1,4 @@
-export type AgentHost = 'excel' | 'powerpoint';
+export type AgentHost = 'excel' | 'powerpoint' | 'word';
 
 /** Parsed metadata from an agent's YAML frontmatter. */
 export interface AgentMetadata {
