@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { UserSettings } from '@/types';
-import { DEFAULT_SETTINGS, COPILOT_MODELS } from '@/types';
+import type { CopilotModel, UserSettings } from '@/types';
+import { DEFAULT_SETTINGS } from '@/types';
 import { getAllAgents, getBundledAgents, setImportedAgents } from '@/services/agents';
 import { getBundledSkills, getSkills, setImportedSkills } from '@/services/skills';
 import type { AgentConfig, AgentSkill, McpServerConfig } from '@/types';
@@ -22,6 +22,9 @@ function ensureUniqueImportedName(baseName: string, existingNames: Set<string>):
 
 interface SettingsState extends UserSettings {
   // ─── Model management ───
+  /** Models fetched from the Copilot SDK (cached across sessions) */
+  availableModels: CopilotModel[] | null;
+  setAvailableModels: (models: CopilotModel[]) => void;
   setActiveModel: (modelId: string) => void;
 
   // ─── Agent management ───
@@ -53,10 +56,16 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       // ─── Initial state ───
       ...DEFAULT_SETTINGS,
+      availableModels: null,
 
       // ─── Model management ───
+      setAvailableModels: models => {
+        set({ availableModels: models });
+      },
+
       setActiveModel: modelId => {
-        if (COPILOT_MODELS.some(m => m.id === modelId)) {
+        const models = get().availableModels;
+        if (!models || models.some(m => m.id === modelId)) {
           set({ activeModel: modelId });
         }
       },
@@ -228,8 +237,6 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'office-coding-agent-settings',
-      version: 2,
-      migrate: () => DEFAULT_SETTINGS,
       storage: createJSONStorage(() => officeStorage),
       partialize: state => ({
         activeModel: state.activeModel,
@@ -239,6 +246,8 @@ export const useSettingsStore = create<SettingsState>()(
         importedAgents: state.importedAgents,
         importedMcpServers: state.importedMcpServers,
         activeMcpServerNames: state.activeMcpServerNames,
+        // availableModels is NOT persisted — it's always fetched fresh from the
+        // Copilot CLI on connect, so a stale cached list never survives restarts.
       }),
       onRehydrateStorage: () => state => {
         setImportedSkills(state?.importedSkills ?? []);

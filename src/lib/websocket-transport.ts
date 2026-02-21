@@ -107,7 +107,12 @@ export class WebSocketMessageWriter extends AbstractMessageWriter implements Mes
   write(msg: Message): Promise<void> {
     try {
       const content = JSON.stringify(msg);
-      const header = `Content-Length: ${new TextEncoder().encode(content).length}\r\n\r\n`;
+      // Use string character count, not UTF-8 byte count (TextEncoder).
+      // The server parses Content-Length as a character offset in the JS string
+      // it accumulates from WebSocket frames — both sides must use the same unit.
+      // TextEncoder byte count is larger for multi-byte chars (em dashes, etc.),
+      // which causes the server to wait indefinitely for data that never arrives.
+      const header = `Content-Length: ${content.length}\r\n\r\n`;
       this.socket.send(header + content);
     } catch (error) {
       this.errorCount++;
