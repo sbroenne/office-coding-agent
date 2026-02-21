@@ -36,10 +36,14 @@ function makeFakeSession(events: SessionEvent[]) {
   };
 }
 
-function makeFakeClient(session: ReturnType<typeof makeFakeSession>) {
+function makeFakeClient(
+  session: ReturnType<typeof makeFakeSession>,
+  models: Array<{ id: string; name: string }> = []
+) {
   return {
     start: vi.fn().mockResolvedValue(undefined),
     createSession: vi.fn().mockResolvedValue(session),
+    listModels: vi.fn().mockResolvedValue(models),
     stop: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -58,7 +62,13 @@ function makeEvent<T extends SessionEvent['type']>(
   type: T,
   data: Extract<SessionEvent, { type: T }>['data']
 ): SessionEvent {
-  return { id: 'e1', timestamp: new Date().toISOString(), parentId: null, type, data } as SessionEvent;
+  return {
+    id: 'e1',
+    timestamp: new Date().toISOString(),
+    parentId: null,
+    type,
+    data,
+  } as SessionEvent;
 }
 
 const IDLE_EVENT = makeEvent('session.idle', {});
@@ -212,6 +222,84 @@ describe('useOfficeChat', () => {
 
     expect(result.current.sessionError).toBeInstanceOf(Error);
     expect(result.current.sessionError?.message).toBe('server unavailable');
+  });
+
+  it('populates availableModels in the store after session init', async () => {
+    const FAKE_MODELS = [
+      { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
+      { id: 'gpt-4.1', name: 'GPT-4.1' },
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+    ];
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session, FAKE_MODELS);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const available = useSettingsStore.getState().availableModels;
+    expect(available).toHaveLength(3);
+    expect(available![0]).toEqual({
+      id: 'claude-sonnet-4',
+      name: 'Claude Sonnet 4',
+      provider: 'Anthropic',
+    });
+    expect(available![1]).toEqual({ id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' });
+    expect(available![2]).toEqual({
+      id: 'gemini-2.5-pro',
+      name: 'Gemini 2.5 Pro',
+      provider: 'Google',
+    });
+  });
+
+  it('shows error message when sending with no session', async () => {
+    mockCreate.mockRejectedValue(new Error('server unavailable'));
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // Session failed — now try to send a message
+    await act(async () => {
+      await result.current.runtime.thread.append(APPEND_MSG('Hello'));
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const messages = result.current.runtime.thread.getState().messages;
+    expect(messages).toHaveLength(2);
+    expect(messages[0].role).toBe('user');
+    expect(messages[1].role).toBe('assistant');
+    const textPart = messages[1].content.find(c => c.type === 'text');
+    if (textPart?.type === 'text') {
+      expect(textPart.text).toContain('Not connected');
+    }
+  });
+
+  it('auto-corrects activeModel when not in fetched models', async () => {
+    // Set activeModel to something not in the available models
+    useSettingsStore.setState({ activeModel: 'nonexistent-model' });
+
+    const MODELS = [
+      { id: 'gpt-4.1', name: 'GPT-4.1' },
+      { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
+    ];
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session, MODELS);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    // Should have auto-corrected to the first available model
+    expect(useSettingsStore.getState().activeModel).toBe('gpt-4.1');
   });
 
   it('clears messages and reinitialises session on clearMessages', async () => {

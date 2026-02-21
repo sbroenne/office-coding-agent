@@ -5,7 +5,7 @@ import type { Plugin } from 'vite';
 
 /**
  * Vite plugin that imports .md files as raw strings.
- * Matches webpack's `asset/source` behavior for markdown files.
+ * Matches Vite's md-raw plugin behavior for markdown files.
  */
 function rawMarkdownPlugin(): Plugin {
   return {

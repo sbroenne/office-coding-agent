@@ -1,7 +1,7 @@
 import type { AgentConfig, AgentHost, AgentMetadata } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 
-// Import bundled agent files as raw strings (via webpack asset/source)
+// Import bundled agent files as raw strings (via Vite md-raw plugin)
 import excelAgentRaw from '@/agents/excel/AGENT.md';
 
 /**

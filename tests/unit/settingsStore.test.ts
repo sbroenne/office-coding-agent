@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { COPILOT_MODELS } from '@/types';
-import type { AgentConfig, AgentSkill, McpServerConfig } from '@/types';
+import type { AgentConfig, AgentSkill, McpServerConfig, CopilotModel } from '@/types';
+
+const TEST_MODELS: CopilotModel[] = [
+  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+  { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
+];
 
 beforeEach(() => {
   useSettingsStore.getState().reset();
@@ -10,25 +14,32 @@ beforeEach(() => {
 // ─── Model management ───
 
 describe('settingsStore — model', () => {
-  it('starts with the default model (claude-sonnet-4.5)', () => {
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.5');
+  it('starts with the default model (claude-sonnet-4.6)', () => {
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
   });
 
-  it('setActiveModel accepts a valid COPILOT_MODELS ID', () => {
-    const id = COPILOT_MODELS[1].id;
+  it('setActiveModel accepts any model when availableModels is null', () => {
+    useSettingsStore.getState().setActiveModel('any-model-id');
+    expect(useSettingsStore.getState().activeModel).toBe('any-model-id');
+  });
+
+  it('setActiveModel validates against availableModels when set', () => {
+    useSettingsStore.getState().setAvailableModels(TEST_MODELS);
+    useSettingsStore.getState().setActiveModel('unknown-model-xyz');
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+  });
+
+  it('setActiveModel accepts a valid model ID from availableModels', () => {
+    useSettingsStore.getState().setAvailableModels(TEST_MODELS);
+    const id = TEST_MODELS[1].id;
     useSettingsStore.getState().setActiveModel(id);
     expect(useSettingsStore.getState().activeModel).toBe(id);
-  });
-
-  it('setActiveModel ignores unknown model IDs', () => {
-    useSettingsStore.getState().setActiveModel('unknown-model-xyz');
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.5');
   });
 
   it('reset restores the default model', () => {
     useSettingsStore.getState().setActiveModel('gpt-4.1');
     useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.5');
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
   });
 });
 

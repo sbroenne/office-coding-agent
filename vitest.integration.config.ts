@@ -23,7 +23,7 @@ function rawMarkdownPlugin(): Plugin {
 /**
  * Vitest configuration for integration tests.
  *
- * Copilot WebSocket tests require `npm run server` to be running on localhost:3000.
+ * Copilot WebSocket tests require `npm run dev` to be running on localhost:3000.
  * They skip automatically when the server is unreachable.
  * Other integration tests are pure component/store wiring with no network calls.
  */

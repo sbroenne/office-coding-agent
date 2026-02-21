@@ -25,7 +25,6 @@ coverage/
 
 # Cache directories
 .cache/
-.webpack-cache/
 
 # Playwright
 test-results/

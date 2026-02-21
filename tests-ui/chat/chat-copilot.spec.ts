@@ -1,34 +1,41 @@
 /**
  * Full E2E chat test: browser UI → WebSocket proxy → GitHub Copilot API.
  *
- * Requires `npm run server` to be running on https://localhost:3000.
+ * Requires `npm run dev` to be running on https://localhost:3000.
  * Skips automatically when the proxy is unreachable.
  *
  * Run manually:
- *   npm run server          # terminal 1
+ *   npm run dev             # terminal 1
  *   npm run test:ui         # terminal 2  (or --grep "Copilot")
  */
 
 import { test, expect } from '../fixtures';
 
-const SERVER_PING = 'https://localhost:3000/ping';
+const COPILOT_HEALTH = 'https://localhost:3000/api/copilot-health';
 const AI_TIMEOUT = 45_000;
 
 test.describe('Chat E2E with Copilot (requires server)', () => {
-  let serverAvailable = false;
+  let copilotAvailable = false;
 
   test.beforeAll(async ({ request }) => {
     try {
-      const resp = await request.get(SERVER_PING, { ignoreHTTPSErrors: true, timeout: 3000 });
-      serverAvailable = resp.ok();
+      const resp = await request.get(COPILOT_HEALTH, {
+        ignoreHTTPSErrors: true,
+        timeout: 15_000,
+      });
+      if (resp.ok()) {
+        const body = await resp.json();
+        copilotAvailable = body.ok === true;
+      }
     } catch {
-      serverAvailable = false;
+      copilotAvailable = false;
     }
   });
 
   test('sends a message and receives a Copilot response', async ({ configuredTaskpane: page }) => {
-    if (!serverAvailable) {
-      test.skip(true, 'Start `npm run server` to run live Copilot E2E tests');
+    test.setTimeout(AI_TIMEOUT + 30_000);
+    if (!copilotAvailable) {
+      test.skip(true, 'Copilot API not reachable — start `npm run dev` with valid auth');
     }
 
     // Type a prompt in the Composer
@@ -49,8 +56,9 @@ test.describe('Chat E2E with Copilot (requires server)', () => {
   test('tool call result appears as progress in the thread', async ({
     configuredTaskpane: page,
   }) => {
-    if (!serverAvailable) {
-      test.skip(true, 'Start `npm run server` to run live Copilot E2E tests');
+    test.setTimeout(AI_TIMEOUT + 30_000);
+    if (!copilotAvailable) {
+      test.skip(true, 'Copilot API not reachable — start `npm run dev` with valid auth');
     }
 
     const composer = page.getByPlaceholder('Send a message...');

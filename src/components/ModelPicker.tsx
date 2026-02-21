@@ -3,24 +3,32 @@ import * as Popover from '@radix-ui/react-popover';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
-import { COPILOT_MODELS } from '@/types';
-import type { CopilotModel } from '@/types';
+import type { CopilotModel, ModelProvider } from '@/types';
 
-const PROVIDER_ORDER: CopilotModel['provider'][] = ['Anthropic', 'OpenAI', 'Google', 'Other'];
+const PROVIDER_ORDER: ModelProvider[] = ['Anthropic', 'OpenAI', 'Google', 'Other'];
+
+/** Convert a raw model ID like 'claude-sonnet-4' to 'Claude Sonnet 4' */
+function formatModelId(id: string): string {
+  return id
+    .split('-')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
 
 export const ModelPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
-  const { activeModel, setActiveModel } = useSettingsStore();
+  const { activeModel, setActiveModel, availableModels } = useSettingsStore();
 
-  const currentModel = COPILOT_MODELS.find(m => m.id === activeModel);
-  const displayLabel = currentModel?.name ?? 'Select model';
+  const models = availableModels ?? [];
+  const currentModel = models.find(m => m.id === activeModel);
+  const displayLabel = currentModel?.name ?? formatModelId(activeModel);
 
-  const groupedModels = COPILOT_MODELS.reduce((groups, model) => {
+  const groupedModels = models.reduce((groups, model) => {
     const group = groups.get(model.provider) ?? [];
     group.push(model);
     groups.set(model.provider, group);
     return groups;
-  }, new Map<CopilotModel['provider'], CopilotModel[]>());
+  }, new Map<ModelProvider, CopilotModel[]>());
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -41,38 +49,47 @@ export const ModelPicker: React.FC = () => {
           sideOffset={4}
           align="start"
         >
-          {PROVIDER_ORDER.filter(p => groupedModels.get(p)?.length).map((provider, idx, arr) => {
-            const providerModels = groupedModels.get(provider) ?? [];
-            return (
-              <div key={provider}>
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                  {provider}
+          {models.length === 0 ? (
+            <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+              Connecting to Copilot…
+            </div>
+          ) : (
+            PROVIDER_ORDER.filter(p => groupedModels.get(p)?.length).map((provider, idx, arr) => {
+              const providerModels = groupedModels.get(provider) ?? [];
+              return (
+                <div key={provider}>
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {provider}
+                  </div>
+                  {providerModels.map(model => {
+                    const isActive = model.id === activeModel;
+                    return (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          setActiveModel(model.id);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
+                          isActive && 'bg-accent/50'
+                        )}
+                      >
+                        <Check
+                          className={cn(
+                            'size-3.5 shrink-0',
+                            isActive ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        <span className="truncate text-foreground">{model.name}</span>
+                      </button>
+                    );
+                  })}
+                  {idx < arr.length - 1 && <div className="my-1 h-px bg-border" />}
                 </div>
-                {providerModels.map(model => {
-                  const isActive = model.id === activeModel;
-                  return (
-                    <button
-                      key={model.id}
-                      onClick={() => {
-                        setActiveModel(model.id);
-                        setOpen(false);
-                      }}
-                      className={cn(
-                        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
-                        isActive && 'bg-accent/50'
-                      )}
-                    >
-                      <Check
-                        className={cn('size-3.5 shrink-0', isActive ? 'opacity-100' : 'opacity-0')}
-                      />
-                      <span className="truncate text-foreground">{model.name}</span>
-                    </button>
-                  );
-                })}
-                {idx < arr.length - 1 && <div className="my-1 h-px bg-border" />}
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

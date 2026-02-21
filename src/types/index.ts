@@ -1,5 +1,5 @@
-export type { CopilotModel, UserSettings } from './settings';
-export { COPILOT_MODELS, DEFAULT_SETTINGS } from './settings';
+export type { CopilotModel, ModelProvider, UserSettings } from './settings';
+export { DEFAULT_SETTINGS, inferProvider } from './settings';
 export type { ChatMessage, Suggestion, ToolCall } from './chat';
 export type {
   RangeData,

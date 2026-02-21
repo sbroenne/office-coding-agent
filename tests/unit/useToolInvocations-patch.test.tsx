@@ -1,13 +1,10 @@
 /**
- * Unit test for the @assistant-ui/react patch.
+ * Unit test for @assistant-ui/react useToolInvocations argsText handling.
  *
- * Validates the fix in patches/@assistant-ui+react+0.12.10.patch:
- * When streaming tool call argsText transitions from incomplete JSON
- * (keys in LLM generation order) to complete JSON (keys reordered by
- * JSON.stringify), the hook should NOT throw.
- *
- * Before the patch this threw:
- *   "Tool call argsText can only be appended, not updated"
+ * Validates that when streaming tool call argsText transitions from
+ * incomplete JSON (keys in LLM generation order) to complete JSON
+ * (keys reordered by JSON.stringify), or to entirely different text,
+ * the hook does NOT throw — it gracefully restarts the args stream.
  */
 import { describe, it, expect, vi } from 'vitest';
 import React, { useState } from 'react';
@@ -152,7 +149,7 @@ describe('useToolInvocations patch', () => {
     // No error expected
   });
 
-  it('still throws for genuinely corrupted argsText (not appendable, not complete JSON)', () => {
+  it('does not throw for non-appendable argsText (handled via replacement stream)', () => {
     const stateRef = { current: makeState([]) } as any;
 
     const { rerender } = render(<HookDriver stateRef={stateRef} />);
@@ -169,7 +166,7 @@ describe('useToolInvocations patch', () => {
       rerender(<HookDriver stateRef={stateRef} />);
     });
 
-    // Corrupted chunk — not appendable AND not complete JSON
+    // Non-appendable chunk — handled gracefully via replacement stream
     expect(() => {
       act(() => {
         stateRef.current = makeState([
@@ -181,6 +178,6 @@ describe('useToolInvocations patch', () => {
         ]);
         rerender(<HookDriver stateRef={stateRef} />);
       });
-    }).toThrow('can only be appended');
+    }).not.toThrow();
   });
 });
