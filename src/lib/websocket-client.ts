@@ -55,7 +55,7 @@ export class BrowserCopilotSession {
     const queue: SessionEvent[] = [];
     let resolve: (() => void) | null = null;
     let done = false;
-    let sendError: Error | null = null;
+    let sendError: Error | undefined;
 
     const unsubscribe = this.on(event => {
       queue.push(event);
@@ -83,7 +83,7 @@ export class BrowserCopilotSession {
           resolve = null;
         }
       }
-      if (sendError) throw sendError instanceof Error ? sendError : new Error(String(sendError));
+      if (sendError !== undefined) throw sendError;
     } finally {
       unsubscribe();
     }
