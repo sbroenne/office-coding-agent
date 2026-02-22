@@ -9,6 +9,7 @@ import { resolveActiveAgent } from '@/services/agents';
 import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
+import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider } from '@/types';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
@@ -255,6 +256,7 @@ export function useOfficeChat(host: OfficeHostApp) {
             }
             continue;
           }
+          setThinkingText(`${humanizeToolName(toolName)}…`);
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
