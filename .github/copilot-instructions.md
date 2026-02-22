@@ -49,7 +49,7 @@ Agents are targeted per host via frontmatter fields:
 - `name`
 - `description`
 - `version`
-- `hosts` (array; supported values: `excel`, `powerpoint`)
+- `hosts` (array; supported values: `excel`, `powerpoint`, `word`)
 - `defaultForHosts` (array; subset of supported hosts)
 
 Example:
@@ -72,7 +72,7 @@ Rules:
 
 ### Skills System
 
-Bundled skill files in `src/skills/` provide additional context injected into the system prompt. Skills can be toggled on/off via the SkillPicker. Active skills are stored as `activeSkillNames` in the settings store (`null` = all ON).
+Bundled skill files in `src/skills/` provide additional context injected into the system prompt. Skills are **host-targeted** via an optional `hosts` field in their YAML frontmatter (same pattern as agents — empty `hosts` = available to all hosts). `buildSkillContext(activeNames?, host?)` filters skills by both active state and host compatibility. Skills can be toggled on/off via the SkillPicker. Active skills are stored as `activeSkillNames` in the settings store (`null` = all ON).
 
 ### The Host Runtime Boundary
 
@@ -102,6 +102,7 @@ Bundled skill files in `src/skills/` provide additional context injected into th
 │  • chartCommands, workbookCommands, commentCommands  │
 │  • conditionalFormatCommands, dataValidationCommands │
 │  • pivotTableCommands                                │
+│  • PowerPoint / Word commands                        │
 │  • OfficeRuntime.storage (real runtime)              │
 └──────────────────────────────────────────────────────┘
 ```
@@ -129,7 +130,7 @@ The task pane is split into three areas:
 
 | Tier            | Runner     | Directory            | Count | What it tests                                                                        |
 | --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------------------------------------ |
-| **Integration** | Vitest     | `tests/integration/` | 34    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket (auto-skipped) |
+| **Integration** | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket (auto-skipped) |
 | **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                                              |
 | **E2E (Excel)** | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                                             |
 | **E2E (PPT)**   | Mocha      | `tests-e2e-ppt/`     | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
@@ -150,7 +151,7 @@ The task pane is split into three areas:
 
 > `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
-### Current Integration Test Files (34)
+### Current Integration Test Files (36)
 
 | File                                    | Category                            | Requires server? |
 | --------------------------------------- | ----------------------------------- | ---------------- |
@@ -164,12 +165,14 @@ The task pane is split into three areas:
 | `chat-header-settings-flow.test.tsx`    | Component wiring                    | No               |
 | `chat-panel.test.tsx`                   | Component wiring                    | No               |
 | `chat-store.test.ts`                    | Chat message store                  | No               |
+| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes (auto-skip)  |
 | `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes (auto-skip)  |
 | `excel-tools.test.ts`                   | Tool schema + factory (Excel)       | No               |
 | `general-tools.test.ts`                 | General-purpose tool definitions    | No               |
 | `host-tools-limit.test.ts`              | Host tool count limits              | No               |
 | `humanize-tool-name.test.ts`            | Tool-name → human-readable labels   | No               |
 | `id.test.ts`                            | `generateId` utility                | No               |
+| `management-tools.test.ts`              | Management tool schemas + handlers  | No               |
 | `manifest.test.ts`                      | Office manifest / host assumptions  | No               |
 | `mcp-manager-dialog.test.tsx`           | Component wiring                    | No               |
 | `mcp-service.test.ts`                   | MCP server config parsing           | No               |
@@ -225,7 +228,8 @@ The task pane is split into three areas:
 - Excel tools are defined across 9 config modules (range, table, chart, sheet, workbook, comment, conditionalFormat, dataValidation, pivotTable)
 - Each config module in `src/tools/configs/` defines tool schemas and handlers
 - Tool factory in `src/tools/codegen/factory.ts` generates JSON Schema `Tool[]` for the Copilot SDK
-- Host routing is in `src/tools/index.ts` via `getToolsForHost(host)` → `Tool[]`
+- **General-purpose tools** (`src/tools/general.ts` — `web_fetch`) and **management tools** (`src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers`) are included for all hosts
+- Host routing is in `src/tools/index.ts` via `getToolsForHost(host)` → `Tool[]` (host tools + general tools)
 
 ### UX Patterns
 
@@ -250,7 +254,7 @@ npm run build:dev         # Development build
 npm run build             # Production build
 npm run start:desktop     # Sideload into Excel
 npm test                  # All Vitest unit tests
-npm run test:integration  # Integration tests (388)
+npm run test:integration  # Integration tests (429)
 npm run test:ui           # Playwright UI tests
 npm run test:e2e          # E2E in Excel Desktop (~187 tests)
 npm run validate          # Validate manifests/manifest.dev.xml
@@ -273,14 +277,18 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/components/SkillPicker.tsx` — icon-only skill toggle with badge count
 - `src/components/SettingsDialog.tsx` — settings/preferences dialog
 - `src/services/ai/BASE_PROMPT.md` — universal base system prompt
-- `src/services/ai/prompts/` — host-level app prompts (`EXCEL_APP_PROMPT.md`, `POWERPOINT_APP_PROMPT.md`)
-- `src/services/office/host.ts` — Office host detection (`excel`, `powerpoint`, `unknown`)
+- `src/services/ai/prompts/` — host-level app prompts (`EXCEL_APP_PROMPT.md`, `POWERPOINT_APP_PROMPT.md`, `WORD_APP_PROMPT.md`)
+- `src/services/office/host.ts` — Office host detection (`excel`, `powerpoint`, `word`, `unknown`)
 - `src/services/agents/agentService.ts` — parses/filters host-targeted agent frontmatter
 - `src/agents/excel/AGENT.md` — default Excel agent definition (host-targeted frontmatter)
-- `src/services/skills/skillService.ts` — parses bundled skill files
+- `src/agents/powerpoint/AGENT.md` — default PowerPoint agent definition
+- `src/agents/word/AGENT.md` — default Word agent definition
+- `src/services/skills/skillService.ts` — parses bundled skill files + host filtering via `buildSkillContext(activeNames?, host?)`
 - `src/stores/settingsStore.ts` — Zustand store (activeModel, agent/skill CRUD, reset)
 - `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
 - `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
+- `src/tools/general.ts` — `webFetchTool` (general-purpose, all hosts)
+- `src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers` tools
 - `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
 - `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
