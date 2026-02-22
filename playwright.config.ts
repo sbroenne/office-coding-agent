@@ -16,9 +16,13 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  // Dev server is started separately — don't auto-start it here
-  // because Vite dev server with office-addin-dev-certs is complex.
-  // Run `npm run dev` in another terminal first (starts proxy + Vite).
+  webServer: {
+    command: 'node src/server.mjs',
+    url: 'https://localhost:3000/api/ping',
+    reuseExistingServer: true,
+    ignoreHTTPSErrors: true,
+    timeout: 60_000,
+  },
   expect: {
     timeout: 5_000,
   },
