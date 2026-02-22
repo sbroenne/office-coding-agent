@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Loader2, Trash2, Upload } from 'lucide-react';
+import { Download, Loader2, Trash2, Upload } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getBundledAgents } from '@/services/agents';
-import { parseAgentsZipFile } from '@/services/extensions/zipImportService';
+import { parseAgentsZipFile, parseAgentMarkdownFile } from '@/services/extensions/zipImportService';
+import { downloadAgent, downloadAgentsZip } from '@/services/extensions/zipExportService';
 import { useSettingsStore } from '@/stores';
 
 interface AgentManagerDialogProps {
@@ -21,7 +22,9 @@ export const AgentManagerDialog: React.FC<AgentManagerDialogProps> = ({ open, on
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const mdInputRef = useRef<HTMLInputElement>(null);
 
   const importedAgents = useSettingsStore(s => s.importedAgents);
   const importAgents = useSettingsStore(s => s.importAgents);
@@ -54,6 +57,39 @@ export const AgentManagerDialog: React.FC<AgentManagerDialogProps> = ({ open, on
     [importAgents]
   );
 
+  const handleImportMd = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setImportStatus(null);
+      setImportError(null);
+      setIsImporting(true);
+
+      try {
+        const agent = await parseAgentMarkdownFile(file);
+        importAgents([agent]);
+        setImportStatus(`Imported agent "${agent.metadata.name}" from ${file.name}.`);
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Failed to import agent file.');
+      } finally {
+        setIsImporting(false);
+        event.target.value = '';
+      }
+    },
+    [importAgents]
+  );
+
+  const handleDownloadAll = useCallback(async () => {
+    if (importedAgents.length === 0) return;
+    setIsDownloadingAll(true);
+    try {
+      await downloadAgentsZip(importedAgents);
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  }, [importedAgents]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] max-h-[85vh] flex flex-col">
@@ -65,32 +101,53 @@ export const AgentManagerDialog: React.FC<AgentManagerDialogProps> = ({ open, on
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {/* Import toolbar */}
           <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-medium text-muted-foreground">Custom Agents (ZIP)</h4>
-            <>
+            <h4 className="text-xs font-medium text-muted-foreground">Custom Agents</h4>
+            <div className="flex items-center gap-1">
               <input
-                ref={inputRef}
+                ref={zipInputRef}
                 type="file"
                 accept=".zip,application/zip"
                 className="hidden"
                 aria-label="Import agents ZIP file"
                 onChange={event => void handleImportZip(event)}
               />
+              <input
+                ref={mdInputRef}
+                type="file"
+                accept=".md,text/markdown"
+                className="hidden"
+                aria-label="Import agent Markdown file"
+                onChange={event => void handleImportMd(event)}
+              />
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => inputRef.current?.click()}
+                onClick={() => zipInputRef.current?.click()}
                 disabled={isImporting}
                 aria-busy={isImporting}
+                title="Import agents from ZIP"
               >
                 {isImporting ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <Upload className="size-3.5" />
                 )}
-                {isImporting ? 'Importing…' : 'Import Agents ZIP'}
+                ZIP
               </Button>
-            </>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => mdInputRef.current?.click()}
+                disabled={isImporting}
+                aria-busy={isImporting}
+                title="Import a single agent .md file"
+              >
+                <Upload className="size-3.5" />
+                .md
+              </Button>
+            </div>
           </div>
 
           {importStatus && (
@@ -112,6 +169,7 @@ export const AgentManagerDialog: React.FC<AgentManagerDialogProps> = ({ open, on
             </div>
           )}
 
+          {/* Bundled agents */}
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Bundled (read-only)</p>
             {bundledAgents.length === 0 ? (
@@ -128,14 +186,43 @@ export const AgentManagerDialog: React.FC<AgentManagerDialogProps> = ({ open, on
                       {agent.metadata.description}
                     </p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground">Bundled</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0"
+                    onClick={() => downloadAgent(agent)}
+                    aria-label={`Download ${agent.metadata.name} as template`}
+                    title="Download as template"
+                  >
+                    <Download className="size-3.5" />
+                  </Button>
                 </div>
               ))
             )}
           </div>
 
+          {/* Imported agents */}
           <div className="space-y-1">
-            <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
+              {importedAgents.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-1.5 text-[11px]"
+                  onClick={() => void handleDownloadAll()}
+                  disabled={isDownloadingAll}
+                  title="Download all custom agents as ZIP"
+                >
+                  {isDownloadingAll ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Download className="size-3" />
+                  )}
+                  Download all
+                </Button>
+              )}
+            </div>
             {importedAgents.length === 0 ? (
               <p className="text-xs text-muted-foreground">No imported agents.</p>
             ) : (
@@ -150,15 +237,28 @@ export const AgentManagerDialog: React.FC<AgentManagerDialogProps> = ({ open, on
                       {agent.metadata.description}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-destructive hover:text-destructive"
-                    onClick={() => removeImportedAgent(agent.metadata.name)}
-                  >
-                    <Trash2 className="size-3.5" />
-                    Remove
-                  </Button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => downloadAgent(agent)}
+                      aria-label={`Download ${agent.metadata.name}`}
+                      title="Download as .md"
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive hover:text-destructive"
+                      onClick={() => removeImportedAgent(agent.metadata.name)}
+                      aria-label={`Remove ${agent.metadata.name}`}
+                      title="Remove"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))
             )}

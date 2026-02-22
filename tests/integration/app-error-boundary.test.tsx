@@ -12,15 +12,15 @@ import { useSettingsStore } from '@/stores/settingsStore';
 let chatPanelShouldCrash = false;
 
 vi.mock('@/components/ChatHeader', () => ({
-  ChatHeader: ({
-    onClearMessages,
-  }: {
-    onClearMessages: () => void;
-  }) =>
+  ChatHeader: ({ onClearMessages }: { onClearMessages: () => void }) =>
     React.createElement(
       'div',
       { 'data-testid': 'chat-header' },
-      React.createElement('button', { 'data-testid': 'clear-btn', onClick: onClearMessages }, 'New conversation')
+      React.createElement(
+        'button',
+        { 'data-testid': 'clear-btn', onClick: onClearMessages },
+        'New conversation'
+      )
     ),
 }));
 
@@ -39,7 +39,9 @@ describe('App — error boundary integration', () => {
   beforeEach(() => {
     useSettingsStore.getState().reset();
     chatPanelShouldCrash = false;
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation((_err, ..._args) => {
+      /* suppress in tests */
+    });
   });
 
   it('shows chat normally when ChatPanel does not crash', async () => {

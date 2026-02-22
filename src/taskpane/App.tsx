@@ -6,6 +6,7 @@ import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { useSettingsStore } from '@/stores';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
+import { ThinkingContext } from '@/contexts/ThinkingContext';
 import { detectOfficeHost } from '@/services/office/host';
 import type { OfficeHostApp } from '@/services/office/host';
 
@@ -35,17 +36,19 @@ const SessionErrorBanner: React.FC<{ error: Error; onRetry: () => void }> = ({
 );
 
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
-  const { runtime, sessionError, isConnecting, clearMessages } = useOfficeChat(host);
+  const { runtime, sessionError, isConnecting, clearMessages, thinkingText } = useOfficeChat(host);
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-        <ChatHeader onClearMessages={clearMessages} />
-        {isConnecting && !sessionError && <ConnectingBanner />}
-        {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
-        <ChatErrorBoundary>
-          <ChatPanel />
-        </ChatErrorBoundary>
-      </div>
+      <ThinkingContext.Provider value={thinkingText}>
+        <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+          <ChatHeader onClearMessages={clearMessages} />
+          {isConnecting && !sessionError && <ConnectingBanner />}
+          {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
+          <ChatErrorBoundary>
+            <ChatPanel />
+          </ChatErrorBoundary>
+        </div>
+      </ThinkingContext.Provider>
     </AssistantRuntimeProvider>
   );
 };

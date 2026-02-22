@@ -6,6 +6,7 @@ import type { AgentConfig } from '@/types/agent';
 
 const MAX_ZIP_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_MARKDOWN_BYTES = 2 * 1024 * 1024;
+const MAX_SINGLE_FILE_BYTES = 1 * 1024 * 1024;
 
 interface ZipMarkdownEntry {
   path: string;
@@ -93,4 +94,45 @@ export async function parseAgentsZipFile(file: File): Promise<AgentConfig[]> {
   });
 
   return agents;
+}
+
+/** Parse a single agent `.md` file (max 1 MB). */
+export async function parseAgentMarkdownFile(file: File): Promise<AgentConfig> {
+  if (file.size > MAX_SINGLE_FILE_BYTES) {
+    throw new Error('File is too large. Maximum size is 1 MB.');
+  }
+  if (!file.name.toLowerCase().endsWith('.md')) {
+    throw new Error('File must be a .md (Markdown) file.');
+  }
+
+  const content = await file.text();
+  const parsed = parseAgentFrontmatter(content);
+
+  if (!parsed.metadata.name.trim() || parsed.metadata.name === 'unknown') {
+    throw new Error('Agent file is missing a valid frontmatter name.');
+  }
+  if (parsed.metadata.hosts.length === 0) {
+    throw new Error('Agent file must include at least one supported host.');
+  }
+
+  return parsed;
+}
+
+/** Parse a single skill `.md` file (max 1 MB). */
+export async function parseSkillMarkdownFile(file: File): Promise<AgentSkill> {
+  if (file.size > MAX_SINGLE_FILE_BYTES) {
+    throw new Error('File is too large. Maximum size is 1 MB.');
+  }
+  if (!file.name.toLowerCase().endsWith('.md')) {
+    throw new Error('File must be a .md (Markdown) file.');
+  }
+
+  const content = await file.text();
+  const parsed = parseFrontmatter(content);
+
+  if (!parsed.metadata.name.trim() || parsed.metadata.name === 'unknown') {
+    throw new Error('Skill file is missing a valid frontmatter name.');
+  }
+
+  return parsed;
 }

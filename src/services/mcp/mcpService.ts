@@ -1,3 +1,4 @@
+import type { MCPRemoteServerConfig } from '@github/copilot-sdk';
 import type { McpServerConfig, McpTransportType } from '@/types';
 
 /** Shape accepted from both Claude Desktop and VS Code mcp.json formats */
@@ -83,4 +84,22 @@ export function resolveActiveMcpServers(
 ): McpServerConfig[] {
   if (activeNames === null) return servers;
   return servers.filter(s => activeNames.includes(s.name));
+}
+
+/**
+ * Convert our internal McpServerConfig format to the SDK's MCPRemoteServerConfig record.
+ * All servers get `tools: ['*']` so the model can access every tool each server exports.
+ */
+export function toSdkMcpServers(configs: McpServerConfig[]): Record<string, MCPRemoteServerConfig> {
+  return Object.fromEntries(
+    configs.map(c => [
+      c.name,
+      {
+        type: c.transport as 'http' | 'sse',
+        url: c.url,
+        ...(c.headers !== undefined && { headers: c.headers }),
+        tools: ['*'],
+      } satisfies MCPRemoteServerConfig,
+    ])
+  );
 }

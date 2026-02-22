@@ -1,4 +1,6 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
+import type { AgentHost } from '@/types/agent';
+import type { OfficeHostApp } from '@/services/office/host';
 import excelSkillRaw from '@/skills/excel/SKILL.md';
 
 /**
@@ -10,7 +12,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
 
   if (!trimmed.startsWith('---')) {
     return {
-      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [] },
+      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [], hosts: [] },
       content: trimmed,
     };
   }
@@ -18,7 +20,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
   const endIndex = trimmed.indexOf('---', 3);
   if (endIndex === -1) {
     return {
-      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [] },
+      metadata: { name: 'unknown', description: '', version: '0.0.0', tags: [], hosts: [] },
       content: trimmed,
     };
   }
@@ -32,6 +34,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
     description: '',
     version: '0.0.0',
     tags: [],
+    hosts: [],
   };
 
   let currentKey = '';
@@ -42,9 +45,13 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
     const trimmedLine = line.trim();
 
     // Array items: "  - value"
-    if (trimmedLine.startsWith('- ') && currentKey === 'tags') {
+    if (trimmedLine.startsWith('- ') && (currentKey === 'tags' || currentKey === 'hosts')) {
       const itemValue = trimmedLine.slice(2).trim();
-      metadata.tags.push(itemValue);
+      if (currentKey === 'tags') {
+        metadata.tags.push(itemValue);
+      } else {
+        metadata.hosts.push(itemValue as AgentHost);
+      }
       continue;
     }
 
@@ -73,8 +80,10 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
       isMultilineValue = true;
       multilineValue = '';
     } else if (value === '') {
-      // Could be start of array (tags:) — handled by "- " check above
+      // Could be start of array (tags: / hosts:) — handled by "- " check above
       continue;
+    } else if (currentKey === 'hosts') {
+      metadata.hosts = parseInlineArray(value) as AgentHost[];
     } else {
       setMetadataField(metadata, currentKey, value);
     }
@@ -86,6 +95,18 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
   }
 
   return { metadata, content };
+}
+
+function parseInlineArray(value: string): string[] {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return trimmed
+      .slice(1, -1)
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+  return [trimmed];
 }
 
 function setMetadataField(metadata: SkillMetadata, key: string, value: string): void {
@@ -155,14 +176,23 @@ export function getSkill(name: string): AgentSkill | undefined {
  * Build the combined skill context string for injection into the system prompt.
  * @param activeNames — if provided, only include skills whose names are in this list.
  *                       If omitted or empty, all bundled skills are included.
+ * @param host — if provided, only include skills compatible with this host.
+ *               Skills with empty hosts array are included for all hosts.
  * Returns an empty string if no skills match.
  */
-export function buildSkillContext(activeNames?: string[]): string {
+export function buildSkillContext(activeNames?: string[], host?: OfficeHostApp): string {
   let skills = getSkills();
 
   // Filter to active names if provided (empty array = none active)
   if (activeNames !== undefined) {
     skills = skills.filter(s => activeNames.includes(s.metadata.name));
+  }
+
+  // Filter by host if provided (empty hosts = available to all hosts)
+  if (host) {
+    skills = skills.filter(
+      s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost)
+    );
   }
 
   if (skills.length === 0) return '';

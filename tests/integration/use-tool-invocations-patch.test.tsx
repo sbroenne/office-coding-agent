@@ -1,5 +1,5 @@
 /**
- * Unit test for @assistant-ui/react useToolInvocations argsText handling.
+ * Integration test for @assistant-ui/react useToolInvocations argsText handling.
  *
  * Validates that when streaming tool call argsText transitions from
  * incomplete JSON (keys in LLM generation order) to complete JSON
@@ -19,12 +19,12 @@ const { useToolInvocations } = INTERNAL;
  * `.argsText`, and `.result`.
  */
 function makeState(
-  toolCalls: Array<{
+  toolCalls: {
     toolCallId: string;
     toolName: string;
     argsText: string;
     result?: unknown;
-  }>,
+  }[],
   isRunning = true
 ) {
   return {
@@ -135,18 +135,18 @@ describe('useToolInvocations patch', () => {
     });
 
     // Stream chunk 2 (appends to chunk 1)
-    act(() => {
-      stateRef.current = makeState([
-        {
-          toolCallId: 'tc-2',
-          toolName: 'setRange',
-          argsText: '{"address":"A1","value":"hello"}',
-        },
-      ]);
-      rerender(<HookDriver stateRef={stateRef} />);
-    });
-
-    // No error expected
+    expect(() => {
+      act(() => {
+        stateRef.current = makeState([
+          {
+            toolCallId: 'tc-2',
+            toolName: 'setRange',
+            argsText: '{"address":"A1","value":"hello"}',
+          },
+        ]);
+        rerender(<HookDriver stateRef={stateRef} />);
+      });
+    }).not.toThrow();
   });
 
   it('does not throw for non-appendable argsText (handled via replacement stream)', () => {

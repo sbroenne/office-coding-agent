@@ -3,8 +3,8 @@ import Ajv from 'ajv';
 import { webFetchTool } from '@/tools/general';
 
 /**
- * General tools tests — validate schema and execution behaviour of
- * web_fetch without making real network calls.
+ * Integration tests for general tools — validate schema and execution behaviour
+ * of web_fetch without making real network calls.
  */
 
 const ajv = new Ajv({ allErrors: true });
@@ -17,7 +17,9 @@ function validate(schema: unknown, data: unknown): { success: boolean } {
 
 /** Retrieve a tool's handler function, throwing if it's absent. */
 function getHandler(t: unknown) {
-  const tool = t as { handler?: ((args: unknown, invocation: unknown) => Promise<unknown>) | undefined };
+  const tool = t as {
+    handler?: ((args: unknown, invocation: unknown) => Promise<unknown>) | undefined;
+  };
   const { handler } = tool;
   if (!handler) throw new Error('Tool has no handler function');
   return handler;
@@ -111,4 +113,3 @@ describe('webFetchTool', () => {
     });
   });
 });
-

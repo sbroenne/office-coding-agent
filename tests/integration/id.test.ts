@@ -1,7 +1,5 @@
 /**
- * Unit tests for generateId.
- *
- * Tests the unique ID generation utility.
+ * Integration tests for generateId.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -35,6 +33,7 @@ describe('generateId', () => {
   });
 
   it('falls back to Date.now + random when crypto.randomUUID is undefined', () => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     const original = crypto.randomUUID;
     // Temporarily remove randomUUID
     Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });

@@ -1,5 +1,5 @@
 /**
- * Unit tests for officeStorage.
+ * Integration tests for officeStorage.
  *
  * officeStorage exclusively uses OfficeRuntime.storage (no localStorage fallback).
  * Tests run against the in-memory mock supplied by tests/setup.ts, which resets

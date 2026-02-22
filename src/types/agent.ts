@@ -12,6 +12,10 @@ export interface AgentMetadata {
   hosts: AgentHost[];
   /** Hosts where this agent should be used as the default choice. */
   defaultForHosts: AgentHost[];
+  /** Allowlist of built-in tool names available in this agent (omit = all active tools). */
+  tools?: string[];
+  /** Allowlist of MCP server names available in this agent (omit = all active servers). */
+  mcpServers?: string[];
 }
 
 /** A loaded agent configuration with metadata and instructions. */

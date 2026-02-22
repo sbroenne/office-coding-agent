@@ -97,6 +97,7 @@ describe('settingsStore — skills', () => {
         description: 'Imported from zip.',
         version: '1.0.0',
         tags: [],
+        hosts: [],
       },
       content: 'Skill body',
     };
@@ -114,6 +115,7 @@ describe('settingsStore — skills', () => {
         description: 'Imported from zip.',
         version: '1.0.0',
         tags: [],
+        hosts: [],
       },
       content: 'Skill body',
     };
@@ -247,5 +249,116 @@ describe('settingsStore — MCP servers', () => {
     useSettingsStore.getState().reset();
     expect(useSettingsStore.getState().importedMcpServers).toEqual([]);
     expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
+  });
+});
+
+// ─── Deduplication / name collision ───
+
+describe('settingsStore — name deduplication', () => {
+  it('importAgents renames an agent whose name collides with a bundled agent', () => {
+    // 'Excel' is the bundled Excel agent — importing it should get a unique name
+    const agent: AgentConfig = {
+      metadata: {
+        name: 'Excel',
+        description: 'duplicate of bundled',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
+      instructions: 'Custom override.',
+    };
+
+    useSettingsStore.getState().importAgents([agent]);
+
+    const imported = useSettingsStore.getState().importedAgents;
+    expect(imported).toHaveLength(1);
+    expect(imported[0].metadata.name).toBe('Excel (imported)');
+  });
+
+  it('importAgents renames second import of same name with incrementing suffix', () => {
+    const makeAgent = (name: string): AgentConfig => ({
+      metadata: { name, description: 'desc', version: '1.0.0', hosts: ['excel'], defaultForHosts: [] },
+      instructions: '',
+    });
+
+    useSettingsStore.getState().importAgents([makeAgent('Custom'), makeAgent('Custom')]);
+
+    const names = useSettingsStore.getState().importedAgents.map(a => a.metadata.name);
+    expect(names[0]).toBe('Custom');
+    expect(names[1]).toBe('Custom (imported)');
+  });
+
+  it('importAgents applies incrementing index beyond "(imported)"', () => {
+    const makeAgent = (name: string): AgentConfig => ({
+      metadata: { name, description: 'desc', version: '1.0.0', hosts: ['excel'], defaultForHosts: [] },
+      instructions: '',
+    });
+
+    useSettingsStore.getState().importAgents([
+      makeAgent('Dupe'),
+      makeAgent('Dupe'),
+      makeAgent('Dupe'),
+    ]);
+
+    const names = useSettingsStore.getState().importedAgents.map(a => a.metadata.name);
+    expect(names[0]).toBe('Dupe');
+    expect(names[1]).toBe('Dupe (imported)');
+    expect(names[2]).toBe('Dupe (imported 2)');
+  });
+
+  it('importSkills renames a skill whose name collides with a bundled skill', () => {
+    // 'excel' is a bundled skill
+    const skill: AgentSkill = {
+      metadata: { name: 'excel', description: 'duplicate', version: '1.0.0', tags: [], hosts: [] },
+      content: 'Custom excel skill.',
+    };
+
+    useSettingsStore.getState().importSkills([skill]);
+
+    const imported = useSettingsStore.getState().importedSkills;
+    expect(imported).toHaveLength(1);
+    expect(imported[0].metadata.name).toBe('excel (imported)');
+  });
+
+  it('importSkills renames second import of same name', () => {
+    const makeSkill = (name: string): AgentSkill => ({
+      metadata: { name, description: 'desc', version: '1.0.0', tags: [], hosts: [] },
+      content: 'content',
+    });
+
+    useSettingsStore.getState().importSkills([makeSkill('MySkill'), makeSkill('MySkill')]);
+
+    const names = useSettingsStore.getState().importedSkills.map(s => s.metadata.name);
+    expect(names[0]).toBe('MySkill');
+    expect(names[1]).toBe('MySkill (imported)');
+  });
+
+  it('importMcpServers renames duplicate server names on re-import', () => {
+    const server: McpServerConfig = { name: 'srv', url: 'https://srv.com/mcp', transport: 'http' };
+
+    useSettingsStore.getState().importMcpServers([server]);
+    useSettingsStore.getState().importMcpServers([server]);
+
+    const names = useSettingsStore.getState().importedMcpServers.map(s => s.name);
+    expect(names[0]).toBe('srv');
+    expect(names[1]).toBe('srv (imported)');
+  });
+
+  it('setActiveAgent accepts an imported agent after it is imported', () => {
+    const agent: AgentConfig = {
+      metadata: {
+        name: 'Custom Agent',
+        description: 'desc',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
+      instructions: '',
+    };
+
+    useSettingsStore.getState().importAgents([agent]);
+    useSettingsStore.getState().setActiveAgent('Custom Agent');
+
+    expect(useSettingsStore.getState().activeAgentId).toBe('Custom Agent');
   });
 });

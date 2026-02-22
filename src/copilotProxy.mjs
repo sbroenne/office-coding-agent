@@ -193,9 +193,9 @@ async function handleConnection(ws) {
 
     switch (method) {
       case 'session.create': {
-        const { model, sessionId, systemMessage, tools: toolDefs } = params || {};
+        const { model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools } = params || {};
         console.log(
-          `[proxy] session.create requested (model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length})`
+          `[proxy] session.create requested (model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -221,6 +221,8 @@ async function handleConnection(ws) {
             sessionId,
             systemMessage,
             tools,
+            mcpServers,
+            availableTools,
           });
         } catch (err) {
           console.error('[proxy] session.create failed:', err);

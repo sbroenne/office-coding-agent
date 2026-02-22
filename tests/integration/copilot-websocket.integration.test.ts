@@ -3,14 +3,13 @@
  * Live integration test: WebSocket → Copilot proxy → GitHub Copilot API
  *
  * Requires `npm run dev` to be running on https://localhost:3000.
- * Skips automatically when the server is unreachable.
  *
  * Run manually:
  *   npm run dev             # terminal 1
  *   npm test -- copilot-websocket   # terminal 2
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import WS from 'ws';
 import type { SystemMessageConfig } from '@github/copilot-sdk';
 import { createWebSocketClient } from '@/lib/websocket-client';
@@ -29,31 +28,7 @@ global.WebSocket = class PatchedWebSocket extends WS {
   }
 } as unknown as typeof WebSocket;
 
-let serverAvailable = false;
 
-beforeAll(async () => {
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(SERVER_URL);
-      const t = setTimeout(() => {
-        ws.close();
-        reject(new Error('timeout'));
-      }, 3000);
-      ws.addEventListener('open', () => {
-        clearTimeout(t);
-        ws.close();
-        resolve();
-      });
-      ws.addEventListener('error', () => {
-        clearTimeout(t);
-        reject(new Error('connection refused'));
-      });
-    });
-    serverAvailable = true;
-  } catch {
-    serverAvailable = false;
-  }
-});
 
 const SYSTEM: SystemMessageConfig = {
   mode: 'append',
@@ -64,10 +39,6 @@ describe('Copilot WebSocket integration', () => {
   it(
     'connects to the proxy server',
     async () => {
-      if (!serverAvailable) {
-        console.log('Skipping — start `npm run dev` to run live Copilot tests');
-        return;
-      }
       const client = await createWebSocketClient(SERVER_URL);
       expect(client).toBeTruthy();
       await client.stop();
@@ -78,11 +49,6 @@ describe('Copilot WebSocket integration', () => {
   it(
     'creates a session and gets a response to a simple prompt',
     async () => {
-      if (!serverAvailable) {
-        console.log('Skipping — start `npm run dev` to run live Copilot tests');
-        return;
-      }
-
       const client = await createWebSocketClient(SERVER_URL);
       try {
         const session = await client.createSession({ systemMessage: SYSTEM });
@@ -116,11 +82,6 @@ describe('Copilot WebSocket integration', () => {
   it(
     'lists available models from the Copilot API',
     async () => {
-      if (!serverAvailable) {
-        console.log('Skipping — start `npm run dev` to run live Copilot tests');
-        return;
-      }
-
       const client = await createWebSocketClient(SERVER_URL);
       try {
         // listModels requires an active session (CLI must be initialized)
@@ -145,11 +106,6 @@ describe('Copilot WebSocket integration', () => {
   it(
     'executes a tool call and returns the result to the model',
     async () => {
-      if (!serverAvailable) {
-        console.log('Skipping — start `npm run dev` to run live Copilot tests');
-        return;
-      }
-
       const client = await createWebSocketClient(SERVER_URL);
       try {
         let toolWasCalled = false;
@@ -171,14 +127,14 @@ describe('Copilot WebSocket integration', () => {
                 },
                 required: ['text'],
               },
-              handler: async (args: unknown) => {
+              handler: (args: unknown) => {
                 toolWasCalled = true;
                 const { text } = args as { text: string };
-                return {
+                return Promise.resolve({
                   textResultForLlm: `Echo: ${text}`,
                   resultType: 'success' as const,
                   toolTelemetry: {},
-                };
+                });
               },
             },
           ],

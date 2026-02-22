@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Loader2, Trash2, Upload } from 'lucide-react';
+import { Download, Loader2, Trash2, Upload } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { getBundledSkills } from '@/services/skills';
-import { parseSkillsZipFile } from '@/services/extensions/zipImportService';
+import { parseSkillsZipFile, parseSkillMarkdownFile } from '@/services/extensions/zipImportService';
+import { downloadSkill, downloadSkillsZip } from '@/services/extensions/zipExportService';
 import { useSettingsStore } from '@/stores';
 
 interface SkillManagerDialogProps {
@@ -21,7 +22,9 @@ export const SkillManagerDialog: React.FC<SkillManagerDialogProps> = ({ open, on
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const mdInputRef = useRef<HTMLInputElement>(null);
 
   const importedSkills = useSettingsStore(s => s.importedSkills);
   const importSkills = useSettingsStore(s => s.importSkills);
@@ -54,6 +57,39 @@ export const SkillManagerDialog: React.FC<SkillManagerDialogProps> = ({ open, on
     [importSkills]
   );
 
+  const handleImportMd = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setImportStatus(null);
+      setImportError(null);
+      setIsImporting(true);
+
+      try {
+        const skill = await parseSkillMarkdownFile(file);
+        importSkills([skill]);
+        setImportStatus(`Imported skill "${skill.metadata.name}" from ${file.name}.`);
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Failed to import skill file.');
+      } finally {
+        setIsImporting(false);
+        event.target.value = '';
+      }
+    },
+    [importSkills]
+  );
+
+  const handleDownloadAll = useCallback(async () => {
+    if (importedSkills.length === 0) return;
+    setIsDownloadingAll(true);
+    try {
+      await downloadSkillsZip(importedSkills);
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  }, [importedSkills]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] max-h-[85vh] flex flex-col">
@@ -65,32 +101,53 @@ export const SkillManagerDialog: React.FC<SkillManagerDialogProps> = ({ open, on
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {/* Import toolbar */}
           <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-medium text-muted-foreground">Custom Skills (ZIP)</h4>
-            <>
+            <h4 className="text-xs font-medium text-muted-foreground">Custom Skills</h4>
+            <div className="flex items-center gap-1">
               <input
-                ref={inputRef}
+                ref={zipInputRef}
                 type="file"
                 accept=".zip,application/zip"
                 className="hidden"
                 aria-label="Import skills ZIP file"
                 onChange={event => void handleImportZip(event)}
               />
+              <input
+                ref={mdInputRef}
+                type="file"
+                accept=".md,text/markdown"
+                className="hidden"
+                aria-label="Import skill Markdown file"
+                onChange={event => void handleImportMd(event)}
+              />
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => inputRef.current?.click()}
+                onClick={() => zipInputRef.current?.click()}
                 disabled={isImporting}
                 aria-busy={isImporting}
+                title="Import skills from ZIP"
               >
                 {isImporting ? (
                   <Loader2 className="size-3.5 animate-spin" />
                 ) : (
                   <Upload className="size-3.5" />
                 )}
-                {isImporting ? 'Importing…' : 'Import Skills ZIP'}
+                ZIP
               </Button>
-            </>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => mdInputRef.current?.click()}
+                disabled={isImporting}
+                aria-busy={isImporting}
+                title="Import a single skill .md file"
+              >
+                <Upload className="size-3.5" />
+                .md
+              </Button>
+            </div>
           </div>
 
           {importStatus && (
@@ -112,6 +169,7 @@ export const SkillManagerDialog: React.FC<SkillManagerDialogProps> = ({ open, on
             </div>
           )}
 
+          {/* Bundled skills */}
           <div className="space-y-1">
             <p className="text-[11px] font-medium text-muted-foreground">Bundled (read-only)</p>
             {bundledSkills.length === 0 ? (
@@ -128,14 +186,43 @@ export const SkillManagerDialog: React.FC<SkillManagerDialogProps> = ({ open, on
                       {skill.metadata.description}
                     </p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground">Bundled</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0"
+                    onClick={() => downloadSkill(skill)}
+                    aria-label={`Download ${skill.metadata.name} as template`}
+                    title="Download as template"
+                  >
+                    <Download className="size-3.5" />
+                  </Button>
                 </div>
               ))
             )}
           </div>
 
+          {/* Imported skills */}
           <div className="space-y-1">
-            <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
+              {importedSkills.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-1.5 text-[11px]"
+                  onClick={() => void handleDownloadAll()}
+                  disabled={isDownloadingAll}
+                  title="Download all custom skills as ZIP"
+                >
+                  {isDownloadingAll ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Download className="size-3" />
+                  )}
+                  Download all
+                </Button>
+              )}
+            </div>
             {importedSkills.length === 0 ? (
               <p className="text-xs text-muted-foreground">No imported skills.</p>
             ) : (
@@ -150,15 +237,28 @@ export const SkillManagerDialog: React.FC<SkillManagerDialogProps> = ({ open, on
                       {skill.metadata.description}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-destructive hover:text-destructive"
-                    onClick={() => removeImportedSkill(skill.metadata.name)}
-                  >
-                    <Trash2 className="size-3.5" />
-                    Remove
-                  </Button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
+                      onClick={() => downloadSkill(skill)}
+                      aria-label={`Download ${skill.metadata.name}`}
+                      title="Download as .md"
+                    >
+                      <Download className="size-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-destructive hover:text-destructive"
+                      onClick={() => removeImportedSkill(skill.metadata.name)}
+                      aria-label={`Remove ${skill.metadata.name}`}
+                      title="Remove"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
               ))
             )}

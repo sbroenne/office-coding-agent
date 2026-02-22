@@ -6,6 +6,7 @@ import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { buildSkillContext } from '@/services/skills';
 import { resolveActiveAgent } from '@/services/agents';
+import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider } from '@/types';
@@ -65,6 +66,8 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
   const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
+  const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
+  const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
 
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
@@ -74,6 +77,7 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [thinkingText, setThinkingText] = useState<string | null>(null);
 
   const initSession = useCallback(async () => {
     if (clientRef.current) {
@@ -98,14 +102,27 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       const resolvedAgent = resolveActiveAgent(activeAgentId, host);
       const agentInstructions = resolvedAgent?.instructions ?? '';
-      const skillContext = buildSkillContext(activeSkillNames ?? undefined);
+      const skillContext = buildSkillContext(activeSkillNames ?? undefined, host);
       const systemContent = `${buildSystemPrompt(host)}\n\n${agentInstructions}${skillContext}`;
+
+      // Resolve active MCP servers, intersect with agent allowlist if specified
+      let activeServers = resolveActiveMcpServers(importedMcpServers, activeMcpServerNames);
+      if (resolvedAgent?.metadata.mcpServers !== undefined) {
+        const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
+        activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
+      }
+      const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
+
+      // Per-agent tool restriction (omit = all tools available)
+      const availableTools = resolvedAgent?.metadata.tools;
 
       const session = await withTimeout(
         client.createSession({
           model: activeModel,
           systemMessage: { mode: 'replace', content: systemContent },
           tools: getToolsForHost(host),
+          mcpServers,
+          availableTools,
         }),
         60_000,
         'session.create'
@@ -122,7 +139,14 @@ export function useOfficeChat(host: OfficeHostApp) {
     } finally {
       setIsConnecting(false);
     }
-  }, [activeModel, host, activeSkillNames, activeAgentId]);
+  }, [
+    activeModel,
+    host,
+    activeSkillNames,
+    activeAgentId,
+    importedMcpServers,
+    activeMcpServerNames,
+  ]);
 
   useEffect(() => {
     void initSession();
@@ -223,6 +247,14 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_start') {
           const { toolCallId, toolName, arguments: args } = event.data;
+          // report_intent is an internal SDK tool — surface intent as thinking text
+          if (toolName === 'report_intent') {
+            const intent = (args as Record<string, unknown> | undefined)?.intent;
+            if (typeof intent === 'string' && intent) {
+              setThinkingText(intent);
+            }
+            continue;
+          }
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
@@ -244,12 +276,15 @@ export function useOfficeChat(host: OfficeHostApp) {
           }
         } else if (event.type === 'assistant.message') {
           streamText = event.data.content;
+          setThinkingText(null);
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.idle') {
           // Stream ended — finalize message if it wasn't already completed by
           // an assistant.message event (e.g. streaming-only responses).
+          setThinkingText(null);
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.error') {
+          setThinkingText(null);
           updateAssistant({
             status: { type: 'incomplete', reason: 'error', error: event.data.message },
           });
@@ -266,6 +301,7 @@ export function useOfficeChat(host: OfficeHostApp) {
         )
       );
     } finally {
+      setThinkingText(null);
       setIsRunning(false);
     }
   }, []);
@@ -287,5 +323,5 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
-  return { runtime, sessionError, isConnecting, clearMessages };
+  return { runtime, sessionError, isConnecting, clearMessages, thinkingText };
 }
