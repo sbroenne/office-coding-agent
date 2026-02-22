@@ -20,6 +20,7 @@ import {
   SquareIcon,
 } from 'lucide-react';
 import type { FC } from 'react';
+import { useThinkingText } from '@/contexts/ThinkingContext';
 
 export const Thread: FC = () => {
   return (
@@ -162,11 +163,12 @@ const MessageError: FC = () => {
 };
 
 const ThinkingIndicator: FC = () => {
+  const thinkingText = useThinkingText();
   return (
     <AuiIf condition={s => s.message.isLast && s.thread.isRunning}>
       <div className="aui-thinking-indicator flex items-center gap-2 px-1 py-1 text-muted-foreground text-sm">
         <LoaderIcon className="size-3.5 animate-spin" />
-        <span className="animate-pulse">Thinking…</span>
+        <span className="animate-pulse">{thinkingText ?? 'Thinking…'}</span>
       </div>
     </AuiIf>
   );

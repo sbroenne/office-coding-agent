@@ -129,7 +129,7 @@ The task pane is split into three areas:
 
 | Tier            | Runner     | Directory            | Count | What it tests                                                                        |
 | --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------------------------------------ |
-| **Integration** | Vitest     | `tests/integration/` | 31    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket (auto-skipped) |
+| **Integration** | Vitest     | `tests/integration/` | 34    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket (auto-skipped) |
 | **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                                              |
 | **E2E (Excel)** | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                                             |
 | **E2E (PPT)**   | Mocha      | `tests-e2e-ppt/`     | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
@@ -150,10 +150,11 @@ The task pane is split into three areas:
 
 > `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
-### Current Integration Test Files (31)
+### Current Integration Test Files (34)
 
 | File                                    | Category                            | Requires server? |
 | --------------------------------------- | ----------------------------------- | ---------------- |
+| `agent-manager-dialog.test.tsx`         | Component wiring                    | No               |
 | `agent-picker.test.tsx`                 | Component wiring                    | No               |
 | `agent-service.test.ts`                 | Agent service + frontmatter parsing | No               |
 | `app-error-boundary.test.tsx`           | Component wiring                    | No               |
@@ -178,12 +179,14 @@ The task pane is split into three areas:
 | `powerpoint-tools.test.ts`              | Tool schema + factory (PPT)         | No               |
 | `settings-dialog.test.tsx`              | Component wiring                    | No               |
 | `settings-store.test.ts`                | Zustand store (model/agent/skills)  | No               |
+| `skill-manager-dialog.test.tsx`         | Component wiring                    | No               |
 | `skill-picker.test.tsx`                 | Component wiring                    | No               |
 | `skill-service.test.ts`                 | Skill service + context building    | No               |
 | `stale-state.test.tsx`                  | Store hydration                     | No               |
 | `use-office-chat.test.tsx`              | useOfficeChat hook                  | No               |
 | `use-tool-invocations-patch.test.tsx`   | Tool invocation argument streaming  | No               |
 | `word-tools.test.ts`                    | Tool schema + factory (Word)        | No               |
+| `zip-export-service.test.ts`            | ZIP export service                  | No               |
 | `zip-import-service.test.ts`            | ZIP import service                  | No               |
 
 ### Integration Test Categories
@@ -226,6 +229,7 @@ The task pane is split into three areas:
 
 ### UX Patterns
 
+- **Dynamic thinking indicator** — `ThinkingIndicator` in `thread.tsx` displays intent text from the SDK's `report_intent` tool (e.g. "Reading the spreadsheet…"). When no intent is available, falls back to "Thinking…". Intent text is provided via `ThinkingContext` (`src/contexts/ThinkingContext.ts`), populated by `useOfficeChat` from `report_intent` events, and cleared on stream completion.
 - **Copilot-style progress indicators** — cycling dot animation + phase labels (auto-derived via `humanizeToolName()`)
 - **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners
@@ -245,8 +249,8 @@ npm run dev               # Start Copilot proxy + Vite dev server (port 3000)
 npm run build:dev         # Development build
 npm run build             # Production build
 npm run start:desktop     # Sideload into Excel
-npm test                  # All Vitest unit tests (267)
-npm run test:integration  # Integration tests (48)
+npm test                  # All Vitest unit tests
+npm run test:integration  # Integration tests (388)
 npm run test:ui           # Playwright UI tests
 npm run test:e2e          # E2E in Excel Desktop (~187 tests)
 npm run validate          # Validate manifests/manifest.dev.xml
@@ -254,8 +258,9 @@ npm run validate          # Validate manifests/manifest.dev.xml
 
 ## Key Files
 
-- `src/taskpane/App.tsx` — root component, settings dialog state, theme detection, Office host detection
-- `src/hooks/useOfficeChat.ts` — main hook: WebSocket session lifecycle → `useExternalStoreRuntime`
+- `src/taskpane/App.tsx` — root component, settings dialog state, theme detection, Office host detection, `ThinkingContext` provider
+- `src/hooks/useOfficeChat.ts` — main hook: WebSocket session lifecycle → `useExternalStoreRuntime`, `report_intent` → `thinkingText`
+- `src/contexts/ThinkingContext.ts` — React context for dynamic thinking indicator text (populated from `report_intent`)
 - `src/lib/websocket-client.ts` — `WebSocketCopilotClient`, `BrowserCopilotSession`, `createWebSocketClient`
 - `src/lib/websocket-transport.ts` — JSON-RPC WebSocket transport (browser-compatible)
 - `src/server.mjs` — Express HTTPS server (port 3000): Vite dev middleware + Copilot WebSocket proxy

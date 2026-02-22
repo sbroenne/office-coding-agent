@@ -77,6 +77,7 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [thinkingText, setThinkingText] = useState<string | null>(null);
 
   const initSession = useCallback(async () => {
     if (clientRef.current) {
@@ -246,8 +247,14 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_start') {
           const { toolCallId, toolName, arguments: args } = event.data;
-          // report_intent is an internal SDK tool — don't surface it in the UI
-          if (toolName === 'report_intent') continue;
+          // report_intent is an internal SDK tool — surface intent as thinking text
+          if (toolName === 'report_intent') {
+            const intent = (args as Record<string, unknown> | undefined)?.intent;
+            if (typeof intent === 'string' && intent) {
+              setThinkingText(intent);
+            }
+            continue;
+          }
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
@@ -269,12 +276,15 @@ export function useOfficeChat(host: OfficeHostApp) {
           }
         } else if (event.type === 'assistant.message') {
           streamText = event.data.content;
+          setThinkingText(null);
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.idle') {
           // Stream ended — finalize message if it wasn't already completed by
           // an assistant.message event (e.g. streaming-only responses).
+          setThinkingText(null);
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.error') {
+          setThinkingText(null);
           updateAssistant({
             status: { type: 'incomplete', reason: 'error', error: event.data.message },
           });
@@ -291,6 +301,7 @@ export function useOfficeChat(host: OfficeHostApp) {
         )
       );
     } finally {
+      setThinkingText(null);
       setIsRunning(false);
     }
   }, []);
@@ -312,5 +323,5 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
-  return { runtime, sessionError, isConnecting, clearMessages };
+  return { runtime, sessionError, isConnecting, clearMessages, thinkingText };
 }
