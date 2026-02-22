@@ -177,6 +177,8 @@ export class WebSocketCopilotClient {
         description: tool.description,
         parameters: tool.parameters,
       })),
+      mcpServers: config.mcpServers,
+      availableTools: config.availableTools,
     });
 
     const sessionId = response.sessionId;

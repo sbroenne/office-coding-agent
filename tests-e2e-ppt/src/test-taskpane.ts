@@ -54,14 +54,18 @@ window.onerror = (message, source, lineno, _colno, _error) => {
     source: String(source ?? ''),
     line: lineno,
   });
-  finishAndSend().catch((_err) => { /* ignore finishAndSend error */ });
+  finishAndSend().catch(_err => {
+    /* ignore finishAndSend error */
+  });
   return false;
 };
 
 window.onunhandledrejection = (event: PromiseRejectionEvent) => {
   console.error(`[PPT-E2E] Unhandled rejection: ${String(event.reason)}`);
   addTestResult(testValues, 'unhandled_rejection', null, 'fail', { error: String(event.reason) });
-  finishAndSend().catch((_err) => { /* ignore finishAndSend error */ });
+  finishAndSend().catch(_err => {
+    /* ignore finishAndSend error */
+  });
 };
 
 // ─── Logging ──────────────────────────────────────────────────────
@@ -114,10 +118,7 @@ async function finishAndSend(): Promise<void> {
   const passCount = testValues.filter(r => r.Type === 'pass').length;
   const failCount = testValues.filter(r => r.Type === 'fail').length;
   log(`Sending ${testValues.length} results (${passCount}P/${failCount}F)...`);
-  setStatus(
-    `Done! ${passCount} passed, ${failCount} failed`,
-    failCount > 0 ? 'error' : 'success'
-  );
+  setStatus(`Done! ${passCount} passed, ${failCount} failed`, failCount > 0 ? 'error' : 'success');
   await sendTestResults(testValues);
 }
 
@@ -133,7 +134,11 @@ function fail(name: string, error: string): void {
 
 // ─── Tool helpers ─────────────────────────────────────────────────
 
-async function callTool(configs: readonly PptToolConfig[], name: string, args: Record<string, unknown> = {}): Promise<unknown> {
+async function callTool(
+  configs: readonly PptToolConfig[],
+  name: string,
+  args: Record<string, unknown> = {}
+): Promise<unknown> {
   const config = configs.find(c => c.name === name);
   if (!config) throw new Error(`Tool config not found: ${name}`);
   let result: unknown;
@@ -222,7 +227,9 @@ async function testPptTools(): Promise<void> {
   // 1. get_presentation_overview
   await runTool(powerPointConfigs, 'get_presentation_overview', {}, r => {
     const s = safeString(r);
-    return s.includes('Total slides') ? null : `Expected "Total slides" in result, got: ${s.substring(0, 100)}`;
+    return s.includes('Total slides')
+      ? null
+      : `Expected "Total slides" in result, got: ${s.substring(0, 100)}`;
   });
 
   // 2. get_presentation_content (all slides)
@@ -238,7 +245,9 @@ async function testPptTools(): Promise<void> {
     { slideIndex: 0 },
     r => {
       const s = safeString(r);
-      return s.includes('Slide 1') ? null : `Expected "Slide 1" in result, got: ${s.substring(0, 100)}`;
+      return s.includes('Slide 1')
+        ? null
+        : `Expected "Slide 1" in result, got: ${s.substring(0, 100)}`;
     },
     'get_presentation_content:single'
   );
@@ -250,7 +259,9 @@ async function testPptTools(): Promise<void> {
     { startIndex: 0, endIndex: 0 },
     r => {
       const s = safeString(r);
-      return s.includes('Slide') ? null : `Expected "Slide" in range result, got: ${s.substring(0, 100)}`;
+      return s.includes('Slide')
+        ? null
+        : `Expected "Slide" in range result, got: ${s.substring(0, 100)}`;
     },
     'get_presentation_content:range'
   );
@@ -312,30 +323,20 @@ async function testPptTools(): Promise<void> {
     'slide.addText("Created by e2e automated tests", { x: 1, y: 3, w: 8, h: 1, fontSize: 18 });',
   ].join('\n');
 
-  await runTool(
-    powerPointConfigs,
-    'add_slide_from_code',
-    { code: simpleSlideCode },
-    r => {
-      const s = safeString(r);
-      return s.toLowerCase().includes('success') || s.includes('slide')
-        ? null
-        : `Expected success message from add_slide_from_code, got: ${s.substring(0, 100)}`;
-    }
-  );
+  await runTool(powerPointConfigs, 'add_slide_from_code', { code: simpleSlideCode }, r => {
+    const s = safeString(r);
+    return s.toLowerCase().includes('success') || s.includes('slide')
+      ? null
+      : `Expected success message from add_slide_from_code, got: ${s.substring(0, 100)}`;
+  });
 
   // 11. duplicate_slide
-  await runTool(
-    powerPointConfigs,
-    'duplicate_slide',
-    { sourceIndex: 0 },
-    r => {
-      const s = safeString(r);
-      return s.includes('Duplicated') || s.includes('slide')
-        ? null
-        : `Expected success message from duplicate_slide, got: ${s.substring(0, 100)}`;
-    }
-  );
+  await runTool(powerPointConfigs, 'duplicate_slide', { sourceIndex: 0 }, r => {
+    const s = safeString(r);
+    return s.includes('Duplicated') || s.includes('slide')
+      ? null
+      : `Expected success message from duplicate_slide, got: ${s.substring(0, 100)}`;
+  });
 
   // 12. get_slide_image (may not be supported on older Office versions)
   try {
@@ -370,30 +371,20 @@ async function testPptTools(): Promise<void> {
 
   if (currentSlideCount > 1) {
     const lastIdx = currentSlideCount - 1;
-    await runTool(
-      powerPointConfigs,
-      'clear_slide',
-      { slideIndex: lastIdx },
-      r => {
-        const s = safeString(r);
-        return s.includes('Cleared') || s.includes('slide')
-          ? null
-          : `Expected success message from clear_slide, got: ${s.substring(0, 100)}`;
-      }
-    );
+    await runTool(powerPointConfigs, 'clear_slide', { slideIndex: lastIdx }, r => {
+      const s = safeString(r);
+      return s.includes('Cleared') || s.includes('slide')
+        ? null
+        : `Expected success message from clear_slide, got: ${s.substring(0, 100)}`;
+    });
   } else {
     // Use slide 0 if only one slide
-    await runTool(
-      powerPointConfigs,
-      'clear_slide',
-      { slideIndex: 0 },
-      r => {
-        const s = safeString(r);
-        return s.includes('Cleared') || s.includes('slide')
-          ? null
-          : `Expected success message from clear_slide, got: ${s.substring(0, 100)}`;
-      }
-    );
+    await runTool(powerPointConfigs, 'clear_slide', { slideIndex: 0 }, r => {
+      const s = safeString(r);
+      return s.includes('Cleared') || s.includes('slide')
+        ? null
+        : `Expected success message from clear_slide, got: ${s.substring(0, 100)}`;
+    });
   }
 }
 
@@ -416,7 +407,9 @@ if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
   console.error(`[PPT-E2E] ${diagnostic}`);
   heartbeat('office_runtime_missing');
   addTestResult(testValues, 'office_runtime_missing', null, 'fail', { error: diagnostic });
-  finishAndSend().catch((_err) => { /* ignore finishAndSend error */ });
+  finishAndSend().catch(_err => {
+    /* ignore finishAndSend error */
+  });
 } else {
   void Office.onReady(async () => {
     heartbeat('ppt_onready_fired');
@@ -429,7 +422,9 @@ if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
     }, 120000);
 
     try {
-      await (Office as Record<string, unknown> & { addin: { showAsTaskpane: () => Promise<void> } }).addin.showAsTaskpane();
+      await (
+        Office as Record<string, unknown> & { addin: { showAsTaskpane: () => Promise<void> } }
+      ).addin.showAsTaskpane();
     } catch {
       /* already visible or not supported */
     }

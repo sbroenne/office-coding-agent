@@ -54,14 +54,18 @@ window.onerror = (message, source, lineno, _colno, _error) => {
     source: String(source ?? ''),
     line: lineno,
   });
-  finishAndSend().catch((_err) => { /* ignore finishAndSend error */ });
+  finishAndSend().catch(_err => {
+    /* ignore finishAndSend error */
+  });
   return false;
 };
 
 window.onunhandledrejection = (event: PromiseRejectionEvent) => {
   console.error(`[WORD-E2E] Unhandled rejection: ${String(event.reason)}`);
   addTestResult(testValues, 'unhandled_rejection', null, 'fail', { error: String(event.reason) });
-  finishAndSend().catch((_err) => { /* ignore finishAndSend error */ });
+  finishAndSend().catch(_err => {
+    /* ignore finishAndSend error */
+  });
 };
 
 // ─── Logging ──────────────────────────────────────────────────────
@@ -114,10 +118,7 @@ async function finishAndSend(): Promise<void> {
   const passCount = testValues.filter(r => r.Type === 'pass').length;
   const failCount = testValues.filter(r => r.Type === 'fail').length;
   log(`Sending ${testValues.length} results (${passCount}P/${failCount}F)...`);
-  setStatus(
-    `Done! ${passCount} passed, ${failCount} failed`,
-    failCount > 0 ? 'error' : 'success'
-  );
+  setStatus(`Done! ${passCount} passed, ${failCount} failed`, failCount > 0 ? 'error' : 'success');
   await sendTestResults(testValues);
 }
 
@@ -133,7 +134,11 @@ function fail(name: string, error: string): void {
 
 // ─── Tool helpers ─────────────────────────────────────────────────
 
-async function callTool(configs: readonly WordToolConfig[], name: string, args: Record<string, unknown> = {}): Promise<unknown> {
+async function callTool(
+  configs: readonly WordToolConfig[],
+  name: string,
+  args: Record<string, unknown> = {}
+): Promise<unknown> {
   const config = configs.find(c => c.name === name);
   if (!config) throw new Error(`Tool config not found: ${name}`);
   let result: unknown;
@@ -245,21 +250,14 @@ async function testWordTools(): Promise<void> {
   // 2. get_document_content
   await runTool(wordConfigs, 'get_document_content', {}, r => {
     const s = safeString(r);
-    return s.length > 20
-      ? null
-      : `Expected non-trivial HTML content, got: ${s.substring(0, 100)}`;
+    return s.length > 20 ? null : `Expected non-trivial HTML content, got: ${s.substring(0, 100)}`;
   });
 
   // 3. get_document_section
-  await runTool(
-    wordConfigs,
-    'get_document_section',
-    { headingText: 'Introduction' },
-    r => {
-      const s = safeString(r);
-      return s.length > 0 ? null : 'Expected section content, got empty result';
-    }
-  );
+  await runTool(wordConfigs, 'get_document_section', { headingText: 'Introduction' }, r => {
+    const s = safeString(r);
+    return s.length > 0 ? null : 'Expected section content, got empty result';
+  });
 
   // 4. get_selection — select known text first
   await selectText('Word E2E Test Content');
@@ -408,7 +406,9 @@ if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
   console.error(`[WORD-E2E] ${diagnostic}`);
   heartbeat('office_runtime_missing');
   addTestResult(testValues, 'office_runtime_missing', null, 'fail', { error: diagnostic });
-  finishAndSend().catch((_err) => { /* ignore finishAndSend error */ });
+  finishAndSend().catch(_err => {
+    /* ignore finishAndSend error */
+  });
 } else {
   void Office.onReady(async () => {
     heartbeat('word_onready_fired');

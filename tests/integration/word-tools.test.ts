@@ -126,7 +126,12 @@ describe('Integration: Word schema — insert_content_at_selection', () => {
   });
 
   it('rejects invalid location value', () => {
-    expect(validate(toolsByName.insert_content_at_selection.parameters, { html: '<p>x</p>', location: 'Invalid' })).toBe(false);
+    expect(
+      validate(toolsByName.insert_content_at_selection.parameters, {
+        html: '<p>x</p>',
+        location: 'Invalid',
+      })
+    ).toBe(false);
   });
 });
 
@@ -165,6 +170,8 @@ describe('Integration: Word schema — apply_style_to_selection', () => {
   });
 
   it('accepts style name', () => {
-    expect(validate(toolsByName.apply_style_to_selection.parameters, { styleName: 'Heading 1' })).toBe(true);
+    expect(
+      validate(toolsByName.apply_style_to_selection.parameters, { styleName: 'Heading 1' })
+    ).toBe(true);
   });
 });

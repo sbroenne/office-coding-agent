@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { parseAgentsZipFile, parseSkillsZipFile } from '@/services/extensions/zipImportService';
+import {
+  parseAgentsZipFile,
+  parseSkillsZipFile,
+  parseAgentMarkdownFile,
+  parseSkillMarkdownFile,
+} from '@/services/extensions/zipImportService';
 
 async function createZipFile(name: string, entries: Record<string, string>): Promise<File> {
   const zip = new JSZip();
@@ -74,5 +79,101 @@ Agent instructions`,
     await expect(parseAgentsZipFile(file)).rejects.toThrow(
       "Agent file 'agents/custom-agent.md' must include at least one supported host."
     );
+  });
+});
+
+describe('parseAgentMarkdownFile', () => {
+  function makeMdFile(content: string, name = 'agent.md'): File {
+    return new File([content], name, { type: 'text/markdown' });
+  }
+
+  it('parses a valid agent .md file', async () => {
+    const file = makeMdFile(`---
+name: My Agent
+description: A custom agent
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: [excel]
+---
+
+Agent instructions here.`);
+    const agent = await parseAgentMarkdownFile(file);
+    expect(agent.metadata.name).toBe('My Agent');
+    expect(agent.metadata.hosts).toEqual(['excel']);
+    expect(agent.instructions).toContain('Agent instructions here.');
+  });
+
+  it('parses tools and mcpServers fields', async () => {
+    const file = makeMdFile(`---
+name: Scoped Agent
+description: desc
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+tools: [create_chart, format_range]
+mcpServers: [my-server]
+---
+Instructions`);
+    const agent = await parseAgentMarkdownFile(file);
+    expect(agent.metadata.tools).toEqual(['create_chart', 'format_range']);
+    expect(agent.metadata.mcpServers).toEqual(['my-server']);
+  });
+
+  it('rejects a non-.md file', async () => {
+    const file = new File(['content'], 'agent.zip');
+    await expect(parseAgentMarkdownFile(file)).rejects.toThrow('.md');
+  });
+
+  it('rejects when name is missing', async () => {
+    const file = makeMdFile(`---
+description: no name here
+version: 1.0.0
+hosts: [excel]
+---
+Instructions`);
+    await expect(parseAgentMarkdownFile(file)).rejects.toThrow('name');
+  });
+
+  it('rejects when hosts are missing', async () => {
+    const file = makeMdFile(`---
+name: No Hosts Agent
+description: desc
+version: 1.0.0
+---
+Instructions`);
+    await expect(parseAgentMarkdownFile(file)).rejects.toThrow('host');
+  });
+});
+
+describe('parseSkillMarkdownFile', () => {
+  function makeMdFile(content: string, name = 'skill.md'): File {
+    return new File([content], name, { type: 'text/markdown' });
+  }
+
+  it('parses a valid skill .md file', async () => {
+    const file = makeMdFile(`---
+name: My Skill
+description: A custom skill
+version: 1.0.0
+---
+
+Skill content here.`);
+    const skill = await parseSkillMarkdownFile(file);
+    expect(skill.metadata.name).toBe('My Skill');
+    expect(skill.content).toContain('Skill content here.');
+  });
+
+  it('rejects a non-.md file', async () => {
+    const file = new File(['content'], 'skill.zip');
+    await expect(parseSkillMarkdownFile(file)).rejects.toThrow('.md');
+  });
+
+  it('rejects when name is missing', async () => {
+    const file = makeMdFile(`---
+description: no name
+version: 1.0.0
+---
+Content`);
+    await expect(parseSkillMarkdownFile(file)).rejects.toThrow('name');
   });
 });

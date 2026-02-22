@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMcpJsonFile, resolveActiveMcpServers } from '@/services/mcp';
+import { parseMcpJsonFile, resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import type { McpServerConfig } from '@/types';
 
 function makeFile(content: unknown, name = 'mcp.json'): File {
@@ -15,7 +15,11 @@ describe('parseMcpJsonFile', () => {
     });
     const result = await parseMcpJsonFile(file);
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ name: 'my-server', url: 'https://example.com/mcp', transport: 'http' });
+    expect(result[0]).toMatchObject({
+      name: 'my-server',
+      url: 'https://example.com/mcp',
+      transport: 'http',
+    });
   });
 
   it('parses VS Code servers format', async () => {
@@ -100,8 +104,24 @@ describe('parseMcpJsonFile', () => {
   });
 
   it.each([
-    ['mcpServers', { mcpServers: { a: { url: 'https://a.com', type: 'http' }, b: { url: 'https://b.com', type: 'sse' } } }],
-    ['servers', { servers: { a: { url: 'https://a.com', type: 'http' }, b: { url: 'https://b.com', type: 'sse' } } }],
+    [
+      'mcpServers',
+      {
+        mcpServers: {
+          a: { url: 'https://a.com', type: 'http' },
+          b: { url: 'https://b.com', type: 'sse' },
+        },
+      },
+    ],
+    [
+      'servers',
+      {
+        servers: {
+          a: { url: 'https://a.com', type: 'http' },
+          b: { url: 'https://b.com', type: 'sse' },
+        },
+      },
+    ],
   ])('handles multiple servers in %s format', async (_fmt, content) => {
     const file = makeFile(content);
     const result = await parseMcpJsonFile(file);
@@ -127,5 +147,46 @@ describe('resolveActiveMcpServers', () => {
 
   it('returns empty when activeNames is empty array', () => {
     expect(resolveActiveMcpServers(servers, [])).toHaveLength(0);
+  });
+});
+
+describe('toSdkMcpServers', () => {
+  it('converts an HTTP server correctly', () => {
+    const result = toSdkMcpServers([{ name: 'my-server', url: 'https://example.com/mcp', transport: 'http' }]);
+    expect(result).toHaveProperty('my-server');
+    expect(result['my-server']).toMatchObject({ type: 'http', url: 'https://example.com/mcp', tools: ['*'] });
+  });
+
+  it('converts an SSE server correctly', () => {
+    const result = toSdkMcpServers([{ name: 'sse-srv', url: 'https://sse.example.com', transport: 'sse' }]);
+    expect(result['sse-srv'].type).toBe('sse');
+    expect(result['sse-srv'].tools).toEqual(['*']);
+  });
+
+  it('includes headers when present', () => {
+    const result = toSdkMcpServers([{
+      name: 'auth-server',
+      url: 'https://example.com/mcp',
+      transport: 'http',
+      headers: { Authorization: 'Bearer tok' },
+    }]);
+    expect(result['auth-server'].headers).toEqual({ Authorization: 'Bearer tok' });
+  });
+
+  it('omits headers key when headers is undefined', () => {
+    const result = toSdkMcpServers([{ name: 'bare', url: 'https://example.com', transport: 'http' }]);
+    expect(Object.keys(result['bare'])).not.toContain('headers');
+  });
+
+  it('returns a record with one key per server', () => {
+    const result = toSdkMcpServers([
+      { name: 'a', url: 'https://a.com', transport: 'http' },
+      { name: 'b', url: 'https://b.com', transport: 'sse' },
+    ]);
+    expect(Object.keys(result)).toEqual(['a', 'b']);
+  });
+
+  it('returns empty object for empty input', () => {
+    expect(toSdkMcpServers([])).toEqual({});
   });
 });

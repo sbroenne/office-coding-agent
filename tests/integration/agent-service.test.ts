@@ -117,6 +117,66 @@ describe('agentService — getDefaultAgent', () => {
   });
 });
 
+describe('agentService — parseAgentFrontmatter tools/mcpServers', () => {
+  it('parses inline tools array', () => {
+    const md = `---
+name: Scoped Agent
+description: desc
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+tools: [create_chart, format_range]
+---
+Instructions`;
+    const result = parseAgentFrontmatter(md);
+    expect(result.metadata.tools).toEqual(['create_chart', 'format_range']);
+  });
+
+  it('parses inline mcpServers array', () => {
+    const md = `---
+name: MCP Agent
+description: desc
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+mcpServers: [my-server, other-server]
+---
+Instructions`;
+    const result = parseAgentFrontmatter(md);
+    expect(result.metadata.mcpServers).toEqual(['my-server', 'other-server']);
+  });
+
+  it('parses block-style tools list', () => {
+    const md = `---
+name: Block Agent
+description: desc
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+tools:
+  - create_chart
+  - delete_sheet
+---
+Instructions`;
+    const result = parseAgentFrontmatter(md);
+    expect(result.metadata.tools).toEqual(['create_chart', 'delete_sheet']);
+  });
+
+  it('leaves tools undefined when not specified', () => {
+    const md = `---
+name: Plain Agent
+description: desc
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+---
+Instructions`;
+    const result = parseAgentFrontmatter(md);
+    expect(result.metadata.tools).toBeUndefined();
+    expect(result.metadata.mcpServers).toBeUndefined();
+  });
+});
+
 describe('agentService — resolveActiveAgent', () => {
   it('returns the named agent when valid for the host', () => {
     const agents = getAgents('excel');

@@ -46,7 +46,9 @@ const TestHarness: React.FC<{ initialThrow?: boolean }> = ({ initialThrow = fals
 describe('ChatErrorBoundary', () => {
   beforeEach(() => {
     // Suppress React's console.error for error boundary — it's expected
-    vi.spyOn(console, 'error').mockImplementation((_err, ..._args) => { /* suppress in tests */ });
+    vi.spyOn(console, 'error').mockImplementation((_err, ..._args) => {
+      /* suppress in tests */
+    });
   });
 
   it('renders children normally when no error occurs', () => {
