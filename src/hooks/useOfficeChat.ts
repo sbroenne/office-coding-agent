@@ -246,6 +246,8 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_start') {
           const { toolCallId, toolName, arguments: args } = event.data;
+          // report_intent is an internal SDK tool — don't surface it in the UI
+          if (toolName === 'report_intent') continue;
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
