@@ -33,6 +33,8 @@ describe('ChatPanel — integration', () => {
     expect(screen.getByTestId('thread')).toBeInTheDocument();
     // AgentPicker renders agent name (default agent "Excel")
     expect(screen.getByText('Excel')).toBeInTheDocument();
+    // ModelPicker renders with its aria-label and default model display
+    expect(screen.getByLabelText('Select model')).toBeInTheDocument();
   });
 
   it('renders toolbar border between thread and pickers', () => {

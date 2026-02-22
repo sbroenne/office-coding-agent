@@ -86,7 +86,7 @@ describe('parseMcpJsonFile', () => {
 
   it('throws when no mcpServers/servers key exists', async () => {
     const file = makeFile({ foo: 'bar' });
-    await expect(parseMcpJsonFile(file)).rejects.toThrow();
+    await expect(parseMcpJsonFile(file)).rejects.toThrow(/mcpServers|servers/);
   });
 
   it('throws when all entries are skipped (no valid HTTP/SSE servers)', async () => {

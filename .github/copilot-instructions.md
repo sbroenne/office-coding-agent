@@ -130,7 +130,7 @@ The task pane is split into three areas:
 
 | Tier            | Runner     | Directory            | Count | What it tests                                                                        |
 | --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------------------------------------ |
-| **Integration** | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket (auto-skipped) |
+| **Integration** | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket |
 | **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                                              |
 | **E2E (Excel)** | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                                             |
 | **E2E (PPT)**   | Mocha      | `tests-e2e-ppt/`     | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
@@ -141,13 +141,17 @@ The task pane is split into three areas:
 
 **ALWAYS run integration and E2E tests after making code changes — these are the only tests that matter:**
 
-1. `npm run test:integration` — integration tests (must pass)
+1. `npm run test:integration` — integration tests (**ALL must pass — 0 failures is the only acceptable result**)
 2. `npm run test:e2e` — E2E tests inside real Excel Desktop (requires `npm run start:desktop` first; **must pass before marking work complete**)
 3. `npm run test:e2e:ppt` — E2E tests inside real PowerPoint Desktop (requires PPT open; **must pass before marking PPT work complete**)
 4. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
 5. `npm run test:ui` — Playwright UI tests when task pane flows are changed
 
 **Never consider work done until integration and E2E tests pass for the affected host(s).** If E2E tests cannot be run (Office app not open), explicitly flag this as a blocker to the user — do not silently skip them.
+
+> ### ⛔ ZERO FAILURES POLICY
+>
+> **0 test failures is the only acceptable result.** Any failure — including live Copilot WebSocket tests — is a blocker that must be flagged to the user. Never dismiss failures as "expected" or "needs server". If live Copilot tests fail because the dev server isn't running, tell the user: "9 live Copilot tests are failing because `npm run dev` is not running. Start the server or these failures block completion."
 
 > `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
@@ -165,8 +169,8 @@ The task pane is split into three areas:
 | `chat-header-settings-flow.test.tsx`    | Component wiring                    | No               |
 | `chat-panel.test.tsx`                   | Component wiring                    | No               |
 | `chat-store.test.ts`                    | Chat message store                  | No               |
-| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes (auto-skip)  |
-| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes (auto-skip)  |
+| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes (fails without server) |
+| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes (fails without server) |
 | `excel-tools.test.ts`                   | Tool schema + factory (Excel)       | No               |
 | `general-tools.test.ts`                 | General-purpose tool definitions    | No               |
 | `host-tools-limit.test.ts`              | Host tool count limits              | No               |
@@ -195,7 +199,7 @@ The task pane is split into three areas:
 ### Integration Test Categories
 
 - **Component wiring** — renders real components together (no child mocks)
-- **Live Copilot WebSocket** — hits real GitHub Copilot API via proxy (requires `npm run dev`; auto-skips when unavailable)
+- **Live Copilot WebSocket** — hits real GitHub Copilot API via proxy (requires `npm run dev`; **fails when server is unavailable — these failures are real and must be flagged**)
 
 ### When to Write What
 
@@ -233,7 +237,7 @@ The task pane is split into three areas:
 
 ### UX Patterns
 
-- **Dynamic thinking indicator** — `ThinkingIndicator` in `thread.tsx` displays intent text from the SDK's `report_intent` tool (e.g. "Reading the spreadsheet…"). When no intent is available, falls back to "Thinking…". Intent text is provided via `ThinkingContext` (`src/contexts/ThinkingContext.ts`), populated by `useOfficeChat` from `report_intent` events, and cleared on stream completion.
+- **Dynamic thinking indicator** — `ThinkingIndicator` in `thread.tsx` displays dynamic text during tool execution. Text sources: (1) `report_intent` SDK events set the raw intent string (e.g. "Reading the spreadsheet"); (2) every `tool.execution_start` sets the humanized tool name via `humanizeToolName()` (e.g. "Get range values…"). When no text is set, falls back to "Thinking…". Text is provided via `ThinkingContext` (`src/contexts/ThinkingContext.ts`), populated by `useOfficeChat`, and cleared on stream completion.
 - **Copilot-style progress indicators** — cycling dot animation + phase labels (auto-derived via `humanizeToolName()`)
 - **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners

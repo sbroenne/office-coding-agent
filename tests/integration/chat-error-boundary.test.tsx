@@ -83,6 +83,12 @@ describe('ChatErrorBoundary', () => {
     );
 
     expect(console.error).toHaveBeenCalled();
+    // Verify the error object was passed to console.error
+    const calls = (console.error as ReturnType<typeof vi.fn>).mock.calls;
+    const hasSimulatedCrash = calls.some(args =>
+      args.some(arg => arg instanceof Error && arg.message === 'Simulated render crash')
+    );
+    expect(hasSimulatedCrash).toBe(true);
   });
 
   it('"Try again" button resets the error boundary', async () => {
