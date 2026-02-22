@@ -332,4 +332,203 @@ describe('useOfficeChat', () => {
     expect(result.current.runtime.thread.getState().messages).toHaveLength(0);
     expect(mockCreate).toHaveBeenCalledTimes(2);
   });
+
+  // ─── MCP wiring ────────────────────────────────────────────────────────────
+
+  it('passes mcpServers to createSession when servers are active in the store', async () => {
+    useSettingsStore.getState().importMcpServers([
+      { name: 'my-server', url: 'https://example.com/mcp', transport: 'http' },
+    ]);
+    // activeMcpServerNames null = all enabled
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.mcpServers).toBeDefined();
+    expect(config.mcpServers).toHaveProperty('my-server');
+    expect((config.mcpServers as Record<string, unknown>)['my-server']).toMatchObject({
+      url: 'https://example.com/mcp',
+      tools: ['*'],
+    });
+  });
+
+  it('does not pass mcpServers when no MCP servers are imported', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.mcpServers).toBeUndefined();
+  });
+
+  it('does not pass mcpServers when all servers are toggled off', async () => {
+    useSettingsStore.getState().importMcpServers([
+      { name: 'srv', url: 'https://example.com/mcp', transport: 'http' },
+    ]);
+    useSettingsStore.setState({ activeMcpServerNames: [] });
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.mcpServers).toBeUndefined();
+  });
+
+  it('SSE server is mapped with type:sse in mcpServers config', async () => {
+    useSettingsStore.getState().importMcpServers([
+      { name: 'sse-srv', url: 'https://sse.example.com', transport: 'sse' },
+    ]);
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const servers = config.mcpServers as Record<string, { type: string }>;
+    expect(servers['sse-srv'].type).toBe('sse');
+  });
+
+  // ─── Per-agent tool scoping ─────────────────────────────────────────────────
+
+  it('passes availableTools to createSession when active agent specifies tools', async () => {
+    useSettingsStore.getState().importAgents([
+      {
+        metadata: {
+          name: 'Scoped',
+          description: 'desc',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+          tools: ['create_chart', 'format_range'],
+        },
+        instructions: 'Use only these tools.',
+      },
+    ]);
+    useSettingsStore.getState().setActiveAgent('Scoped');
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.availableTools).toEqual(['create_chart', 'format_range']);
+  });
+
+  it('does not pass availableTools when active agent has no tools restriction', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.availableTools).toBeUndefined();
+  });
+
+  it("agent's mcpServers allowlist filters active servers to only permitted ones", async () => {
+    useSettingsStore.getState().importMcpServers([
+      { name: 'allowed', url: 'https://allowed.com/mcp', transport: 'http' },
+      { name: 'blocked', url: 'https://blocked.com/mcp', transport: 'http' },
+    ]);
+    useSettingsStore.getState().importAgents([
+      {
+        metadata: {
+          name: 'Filtered',
+          description: 'desc',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+          mcpServers: ['allowed'],
+        },
+        instructions: '',
+      },
+    ]);
+    useSettingsStore.getState().setActiveAgent('Filtered');
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const serverKeys = Object.keys(config.mcpServers as object);
+    expect(serverKeys).toContain('allowed');
+    expect(serverKeys).not.toContain('blocked');
+  });
+
+  it('agent with empty mcpServers allowlist blocks all MCP servers', async () => {
+    useSettingsStore.getState().importMcpServers([
+      { name: 'srv', url: 'https://srv.com/mcp', transport: 'http' },
+    ]);
+    useSettingsStore.getState().importAgents([
+      {
+        metadata: {
+          name: 'NoMcp',
+          description: 'desc',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+          mcpServers: [],
+        },
+        instructions: '',
+      },
+    ]);
+    useSettingsStore.getState().setActiveAgent('NoMcp');
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    // empty allowlist → no servers should be forwarded
+    expect(config.mcpServers).toBeUndefined();
+  });
 });

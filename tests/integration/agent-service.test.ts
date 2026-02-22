@@ -1,12 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   parseAgentFrontmatter,
   getAgents,
+  getAllAgents,
   getAgent,
   getAgentInstructions,
   getDefaultAgent,
   resolveActiveAgent,
+  setImportedAgents,
 } from '@/services/agents/agentService';
+import type { AgentConfig } from '@/types/agent';
 
 describe('agentService — parseAgentFrontmatter', () => {
   it('parses valid frontmatter', () => {
@@ -194,5 +197,94 @@ describe('agentService — resolveActiveAgent', () => {
   it('falls back to default when agent not valid for host', () => {
     const resolved = resolveActiveAgent('NonExistent__xyz', 'excel');
     expect(resolved).toBeDefined();
+  });
+});
+
+// ─── Imported agent visibility ────────────────────────────────────────────────
+
+describe('agentService — imported agents', () => {
+  const importedAgent: AgentConfig = {
+    metadata: {
+      name: 'Imported Excel Agent',
+      description: 'Imported custom agent',
+      version: '1.0.0',
+      hosts: ['excel'],
+      defaultForHosts: [],
+    },
+    instructions: 'Imported instructions.',
+  };
+
+  const pptOnlyAgent: AgentConfig = {
+    metadata: {
+      name: 'PPT Only Agent',
+      description: 'Only for PowerPoint',
+      version: '1.0.0',
+      hosts: ['powerpoint'],
+      defaultForHosts: [],
+    },
+    instructions: 'PPT instructions.',
+  };
+
+  afterEach(() => {
+    setImportedAgents([]);
+  });
+
+  it('getAllAgents includes both bundled and imported agents', () => {
+    setImportedAgents([importedAgent]);
+
+    const all = getAllAgents();
+    expect(all.some(a => a.metadata.name === 'Imported Excel Agent')).toBe(true);
+    expect(all.some(a => a.metadata.name === 'Excel')).toBe(true);
+  });
+
+  it('getAllAgents returns only bundled agents when no imported agents are set', () => {
+    const all = getAllAgents();
+    expect(all.some(a => a.metadata.name === 'Excel')).toBe(true);
+    expect(all.some(a => a.metadata.name === 'Imported Excel Agent')).toBe(false);
+  });
+
+  it('getAgents includes imported agent for matching host', () => {
+    setImportedAgents([importedAgent]);
+
+    const excelAgents = getAgents('excel');
+    expect(excelAgents.some(a => a.metadata.name === 'Imported Excel Agent')).toBe(true);
+  });
+
+  it('getAgents excludes imported agent when host does not match', () => {
+    setImportedAgents([pptOnlyAgent]);
+
+    const excelAgents = getAgents('excel');
+    expect(excelAgents.some(a => a.metadata.name === 'PPT Only Agent')).toBe(false);
+  });
+
+  it('getAgent finds an imported agent by name', () => {
+    setImportedAgents([importedAgent]);
+
+    const found = getAgent('Imported Excel Agent', 'excel');
+    expect(found).toBeDefined();
+    expect(found?.metadata.name).toBe('Imported Excel Agent');
+    expect(found?.instructions).toBe('Imported instructions.');
+  });
+
+  it('getAgentInstructions returns instructions for an imported agent', () => {
+    setImportedAgents([importedAgent]);
+
+    const instructions = getAgentInstructions('Imported Excel Agent', 'excel');
+    expect(instructions).toBe('Imported instructions.');
+  });
+
+  it('resolveActiveAgent returns imported agent when it matches the activeAgentId', () => {
+    setImportedAgents([importedAgent]);
+
+    const resolved = resolveActiveAgent('Imported Excel Agent', 'excel');
+    expect(resolved?.metadata.name).toBe('Imported Excel Agent');
+  });
+
+  it('resolveActiveAgent falls back to default when imported agent is not for current host', () => {
+    setImportedAgents([pptOnlyAgent]);
+
+    // PPT Only Agent is not valid for excel
+    const resolved = resolveActiveAgent('PPT Only Agent', 'excel');
+    expect(resolved?.metadata.name).toBe('Excel'); // falls back to default Excel agent
   });
 });

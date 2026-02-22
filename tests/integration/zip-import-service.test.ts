@@ -177,3 +177,39 @@ Content`);
     await expect(parseSkillMarkdownFile(file)).rejects.toThrow('name');
   });
 });
+
+// ─── File size limits ─────────────────────────────────────────────────────────
+
+describe('file size limits', () => {
+  it('parseAgentMarkdownFile rejects a file larger than 1 MB', async () => {
+    // 1 MB + 1 byte of valid-looking content
+    const content = 'x'.repeat(1024 * 1024 + 1);
+    const file = new File([content], 'large.md', { type: 'text/markdown' });
+
+    await expect(parseAgentMarkdownFile(file)).rejects.toThrow(/too large/i);
+  });
+
+  it('parseSkillMarkdownFile rejects a file larger than 1 MB', async () => {
+    const content = 'x'.repeat(1024 * 1024 + 1);
+    const file = new File([content], 'large.md', { type: 'text/markdown' });
+
+    await expect(parseSkillMarkdownFile(file)).rejects.toThrow(/too large/i);
+  });
+
+  it('parseAgentsZipFile rejects a ZIP larger than 5 MB', async () => {
+    // The size check happens before ZIP parsing, so any large binary blob works
+    const buf = new Uint8Array(5 * 1024 * 1024 + 1).fill(0x50); // 'P' — not valid ZIP
+    const file = new File([buf], 'large.zip', { type: 'application/zip' });
+
+    await expect(parseAgentsZipFile(file)).rejects.toThrow(/too large/i);
+  });
+
+  it('parseSkillsZipFile rejects a ZIP larger than 5 MB', async () => {
+    const buf = new Uint8Array(5 * 1024 * 1024 + 1).fill(0x50);
+    const file = new File([buf], 'large.zip', { type: 'application/zip' });
+
+    await expect(parseSkillsZipFile(file)).rejects.toThrow(/too large/i);
+  });
+});
+
+
