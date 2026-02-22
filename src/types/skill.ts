@@ -1,9 +1,13 @@
+import type { AgentHost } from './agent';
+
 /** Parsed metadata from a skill's YAML frontmatter. */
 export interface SkillMetadata {
   name: string;
   description: string;
   version: string;
   tags: string[];
+  /** Office hosts where this skill is available. Empty = all hosts. */
+  hosts: AgentHost[];
   license?: string;
   repository?: string;
   documentation?: string;

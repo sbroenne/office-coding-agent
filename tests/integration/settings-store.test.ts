@@ -97,6 +97,7 @@ describe('settingsStore — skills', () => {
         description: 'Imported from zip.',
         version: '1.0.0',
         tags: [],
+        hosts: [],
       },
       content: 'Skill body',
     };
@@ -114,6 +115,7 @@ describe('settingsStore — skills', () => {
         description: 'Imported from zip.',
         version: '1.0.0',
         tags: [],
+        hosts: [],
       },
       content: 'Skill body',
     };
@@ -307,7 +309,7 @@ describe('settingsStore — name deduplication', () => {
   it('importSkills renames a skill whose name collides with a bundled skill', () => {
     // 'excel' is a bundled skill
     const skill: AgentSkill = {
-      metadata: { name: 'excel', description: 'duplicate', version: '1.0.0', tags: [] },
+      metadata: { name: 'excel', description: 'duplicate', version: '1.0.0', tags: [], hosts: [] },
       content: 'Custom excel skill.',
     };
 
@@ -320,7 +322,7 @@ describe('settingsStore — name deduplication', () => {
 
   it('importSkills renames second import of same name', () => {
     const makeSkill = (name: string): AgentSkill => ({
-      metadata: { name, description: 'desc', version: '1.0.0', tags: [] },
+      metadata: { name, description: 'desc', version: '1.0.0', tags: [], hosts: [] },
       content: 'content',
     });
 

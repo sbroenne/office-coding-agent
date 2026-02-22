@@ -40,7 +40,7 @@ const testAgentMinimal: AgentConfig = {
 };
 
 const testSkill: AgentSkill = {
-  metadata: { name: 'My Test Skill', description: 'A test skill', version: '1.1.0', tags: [] },
+  metadata: { name: 'My Test Skill', description: 'A test skill', version: '1.1.0', tags: [], hosts: [] },
   content: 'Skill instructions here.',
 };
 

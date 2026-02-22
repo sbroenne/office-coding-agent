@@ -58,6 +58,7 @@ describe('buildSkillContext', () => {
         description: 'Skill with plain @references text.',
         version: '1.0.0',
         tags: [],
+        hosts: [],
       },
       content: `Intro for references\n@references skill:excel, agent:Excel\nEnd of skill`,
     };

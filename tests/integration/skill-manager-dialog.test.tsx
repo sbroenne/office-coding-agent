@@ -32,7 +32,7 @@ Custom skill instructions.`;
 
 function makeSkill(name: string): AgentSkill {
   return {
-    metadata: { name, description: `${name} description`, version: '1.0.0', tags: [] },
+    metadata: { name, description: `${name} description`, version: '1.0.0', tags: [], hosts: [] },
     content: `${name} content.`,
   };
 }
