@@ -11,17 +11,17 @@ import {
   dataValidationConfigs,
   pivotTableConfigs,
 } from './configs';
-import type { ToolConfig } from './codegen/types';
+import type { ToolConfig, ToolConfigBase } from './codegen/types';
 import type { Tool } from '@github/copilot-sdk';
 import type { OfficeHostApp } from '@/services/office/host';
-import { powerPointTools } from './powerpoint';
-import { wordTools } from './word';
+import { powerPointTools, powerPointConfigs } from './powerpoint';
+import { wordTools, wordConfigs } from './word';
 
 export { webFetchTool } from './general';
 
 export const MAX_TOOLS_PER_REQUEST = 128;
 
-/** All tool configs combined for manifest generation */
+/** All Excel tool configs combined for manifest generation */
 export const allConfigs: readonly (readonly ToolConfig[])[] = [
   rangeConfigs,
   rangeFormatConfigs,
@@ -35,11 +35,18 @@ export const allConfigs: readonly (readonly ToolConfig[])[] = [
   pivotTableConfigs,
 ];
 
+/** All tool configs across all hosts — for manifest generation */
+export const allConfigsByHost: Record<string, readonly (readonly ToolConfigBase[])[]> = {
+  excel: allConfigs,
+  powerpoint: [powerPointConfigs],
+  word: [wordConfigs],
+};
+
 /** All Excel tools combined into a single array for Copilot SDK */
 export const excelTools: Tool[] = allConfigs.flatMap(configs => createTools(configs));
 
-export { powerPointTools } from './powerpoint';
-export { wordTools } from './word';
+export { powerPointTools, powerPointConfigs } from './powerpoint';
+export { wordTools, wordConfigs } from './word';
 
 export function getToolsForHost(host: OfficeHostApp): Tool[] {
   switch (host) {

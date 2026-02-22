@@ -3,8 +3,8 @@ import Ajv from 'ajv';
 import { webFetchTool } from '@/tools/general';
 
 /**
- * General tools tests — validate schema and execution behaviour of
- * web_fetch without making real network calls.
+ * Integration tests for general tools — validate schema and execution behaviour
+ * of web_fetch without making real network calls.
  */
 
 const ajv = new Ajv({ allErrors: true });
@@ -111,4 +111,3 @@ describe('webFetchTool', () => {
     });
   });
 });
-

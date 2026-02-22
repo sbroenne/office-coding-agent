@@ -1,5 +1,5 @@
 /**
- * Unit tests for buildSkillContext and related skill functions.
+ * Integration tests for buildSkillContext and related skill functions.
  *
  * These exercise the real `skillService` module which imports
  * bundled `.md` skill files via the rawMarkdownPlugin in vitest.config.ts.

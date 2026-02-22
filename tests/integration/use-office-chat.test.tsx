@@ -1,5 +1,5 @@
 /**
- * Unit tests for useOfficeChat hook.
+ * Integration tests for useOfficeChat hook.
  *
  * Mocks createWebSocketClient to return a fake client/session so we can
  * simulate Copilot session events and verify the hook maps them correctly
@@ -21,6 +21,7 @@ type EventEmitter = (event: SessionEvent) => void;
 function makeFakeSession(events: SessionEvent[]) {
   return {
     sessionId: 'test-session-id',
+    // eslint-disable-next-line @typescript-eslint/require-await
     async *query() {
       for (const event of events) {
         yield event;
@@ -38,7 +39,7 @@ function makeFakeSession(events: SessionEvent[]) {
 
 function makeFakeClient(
   session: ReturnType<typeof makeFakeSession>,
-  models: Array<{ id: string; name: string }> = []
+  models: { id: string; name: string }[] = []
 ) {
   return {
     start: vi.fn().mockResolvedValue(undefined),
@@ -99,7 +100,7 @@ describe('useOfficeChat', () => {
   it('starts in idle state with no messages', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
-    mockCreate.mockResolvedValue(client as ReturnType<typeof makeFakeClient> as never);
+    mockCreate.mockResolvedValue(client as never);
 
     const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
 
@@ -127,7 +128,7 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      await result.current.runtime.thread.append(APPEND_MSG('Say hello'));
+      result.current.runtime.thread.append(APPEND_MSG('Say hello'));
       await new Promise(r => setTimeout(r, 100));
     });
 
@@ -161,7 +162,7 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      await result.current.runtime.thread.append(APPEND_MSG('Say hello'));
+      result.current.runtime.thread.append(APPEND_MSG('Say hello'));
       await new Promise(r => setTimeout(r, 100));
     });
 
@@ -198,7 +199,7 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      await result.current.runtime.thread.append(APPEND_MSG('Read A1:B2'));
+      result.current.runtime.thread.append(APPEND_MSG('Read A1:B2'));
       await new Promise(r => setTimeout(r, 100));
     });
 
@@ -242,13 +243,13 @@ describe('useOfficeChat', () => {
 
     const available = useSettingsStore.getState().availableModels;
     expect(available).toHaveLength(3);
-    expect(available![0]).toEqual({
+    expect(available?.[0]).toEqual({
       id: 'claude-sonnet-4',
       name: 'Claude Sonnet 4',
       provider: 'Anthropic',
     });
-    expect(available![1]).toEqual({ id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' });
-    expect(available![2]).toEqual({
+    expect(available?.[1]).toEqual({ id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' });
+    expect(available?.[2]).toEqual({
       id: 'gemini-2.5-pro',
       name: 'Gemini 2.5 Pro',
       provider: 'Google',
@@ -266,7 +267,7 @@ describe('useOfficeChat', () => {
 
     // Session failed — now try to send a message
     await act(async () => {
-      await result.current.runtime.thread.append(APPEND_MSG('Hello'));
+      result.current.runtime.thread.append(APPEND_MSG('Hello'));
       await new Promise(r => setTimeout(r, 100));
     });
 
@@ -317,7 +318,7 @@ describe('useOfficeChat', () => {
 
     // Send a message to populate messages
     await act(async () => {
-      await result.current.runtime.thread.append(APPEND_MSG('Hi'));
+      result.current.runtime.thread.append(APPEND_MSG('Hi'));
       await new Promise(r => setTimeout(r, 100));
     });
 

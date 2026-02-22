@@ -39,7 +39,7 @@ describe('App — error boundary integration', () => {
   beforeEach(() => {
     useSettingsStore.getState().reset();
     chatPanelShouldCrash = false;
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation((_err, ..._args) => { /* suppress in tests */ });
   });
 
   it('shows chat normally when ChatPanel does not crash', async () => {

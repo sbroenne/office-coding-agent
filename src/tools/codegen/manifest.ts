@@ -7,10 +7,10 @@
  * identical tools backed by an in-memory spreadsheet simulator.
  */
 
-import type { ToolConfig, ToolManifest, ManifestTool, ManifestParam } from './types';
+import type { ToolConfigBase, ToolManifest, ManifestTool, ManifestParam } from './types';
 
-/** Convert a ToolConfig to a JSON-serializable ManifestTool */
-function toManifestTool(config: ToolConfig): ManifestTool {
+/** Convert a ToolConfigBase to a JSON-serializable ManifestTool */
+function toManifestTool(config: ToolConfigBase): ManifestTool {
   const params: Record<string, ManifestParam> = {};
 
   for (const [key, def] of Object.entries(config.params)) {
@@ -34,7 +34,7 @@ function toManifestTool(config: ToolConfig): ManifestTool {
  * Generate a ToolManifest from multiple config arrays.
  * Called by the manifest generation script at build time.
  */
-export function generateManifest(...configArrays: (readonly ToolConfig[])[]): ToolManifest {
+export function generateManifest(...configArrays: (readonly ToolConfigBase[])[]): ToolManifest {
   const tools: ManifestTool[] = [];
 
   for (const configs of configArrays) {

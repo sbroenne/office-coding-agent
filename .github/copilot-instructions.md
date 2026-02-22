@@ -116,62 +116,73 @@ The task pane is split into three areas:
 
 ## Testing Strategy
 
+> ### ⛔ CRITICAL RULE: DO NOT WRITE UNIT TESTS
+> Unit tests that mock Office APIs or fabricate fake contexts provide zero confidence that code works in a real host. They test the mock, not the code.
+> **Integration tests and E2E tests are the ONLY acceptable test forms for new functionality.**
+> - Writing a unit test when an integration or E2E test is possible is forbidden.
+> - If you are tempted to write a unit test, write an integration test instead.
+> - If the feature touches Office APIs, write an E2E test.
+
 ### Test Tiers
 
 | Tier            | Runner     | Directory            | Count | What it tests                                           |
 | --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------- |
-| **Unit**        | Vitest     | `tests/unit/`        | 18    | Pure functions, store logic, JSON Schema tool configs   |
-| **Integration** | Vitest     | `tests/integration/` | 12    | Component wiring; live Copilot WebSocket (auto-skipped) |
-| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                 |
-| **E2E**         | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                |
+| **Integration** | Vitest     | `tests/integration/`  | 31   | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket (auto-skipped) |
+| **UI**          | Playwright | `tests-ui/`           |      | Browser task pane flows                                                               |
+| **E2E (Excel)** | Mocha      | `tests-e2e/`          | ~187 | Excel commands inside real Excel Desktop                                              |
+| **E2E (PPT)**   | Mocha      | `tests-e2e-ppt/`      | ~13  | PowerPoint commands inside real PowerPoint Desktop                                    |
+| **E2E (Word)**  | Mocha      | `tests-e2e-word/`     | ~12  | Word commands inside real Word Desktop                                                |
+| ~~Unit~~        | ~~Vitest~~ | ~~`tests/unit/`~~     |      | ~~DO NOT ADD NEW UNIT TESTS~~                                                         |
 
-### Unit Test Principles
+### Required Test Execution After Any Code Change
 
-- **DO NOT mock Zustand stores** — test against the real store (jsdom + OfficeRuntime mock from `tests/setup.ts`)
-- **DO NOT mock pure functions** — call them directly with test inputs
-- **Pure functions get unit tests, not integration tests** — they have no external dependencies
-- **Use table-driven tests** (`it.each`) for functions with many input→output mappings
-- **Reset store state** in `beforeEach` via `useSettingsStore.getState().reset()`
+**ALWAYS run integration and E2E tests after making code changes — these are the only tests that matter:**
 
-### Current Unit Test Files (18)
+1. `npm run test:integration` — integration tests (must pass)
+2. `npm run test:e2e` — E2E tests inside real Excel Desktop (requires `npm run start:desktop` first; **must pass before marking work complete**)
+3. `npm run test:e2e:ppt` — E2E tests inside real PowerPoint Desktop (requires PPT open; **must pass before marking PPT work complete**)
+4. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
+5. `npm run test:ui` — Playwright UI tests when task pane flows are changed
 
-| File                                | What it covers                                                           |
-| ----------------------------------- | ------------------------------------------------------------------------ |
-| `agentService.test.ts`              | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions     |
-| `buildSkillContext.test.ts`         | `buildSkillContext` and related skill functions with bundled `.md` files |
-| `chatErrorBoundary.test.tsx`        | Error boundary fallback rendering and recovery flow                      |
-| `chatPanel.test.tsx`                | ChatPanel component logic (mocks assistant-ui components for jsdom)      |
-| `chatStore.test.ts`                 | Chat message store: append, clear, tool invocations                      |
-| `generalTools.test.ts`              | General-purpose tool definitions (web_fetch, etc.)                       |
-| `hostToolsLimit.test.ts`            | Host tool count limits per host                                          |
-| `humanizeToolName.test.ts`          | Tool-name → human-readable progress label formatting                     |
-| `id.test.ts`                        | `generateId` unique ID generation utility                                |
-| `manifest.test.ts`                  | Office manifest / runtime host assumptions                               |
-| `mcpService.test.ts`                | MCP server config parsing; HTTP/SSE transport filtering (no stdio)       |
-| `officeStorage.test.ts`             | `officeStorage` with `OfficeRuntime` mock (via tests/setup.ts)           |
-| `parseFrontmatter.test.ts`          | YAML frontmatter parsing (skill files)                                   |
-| `settingsStore.test.ts`             | Zustand store: activeModel, agent/skill CRUD, reset                      |
-| `toolSchemas.test.ts`               | JSON Schema validation for all tool definitions (toCopilotTools)         |
-| `useOfficeChat.test.tsx`            | useOfficeChat hook: mocked WebSocket session → ThreadMessage[] mapping   |
-| `useToolInvocations-patch.test.tsx` | assistant-ui patch for tool invocation argument streaming integrity      |
-| `zipImportService.test.ts`          | ZIP import service for custom agents/skills                              |
+**Never consider work done until integration and E2E tests pass for the affected host(s).** If E2E tests cannot be run (Office app not open), explicitly flag this as a blocker to the user — do not silently skip them.
 
-### Current Integration Test Files (12)
+> `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
-| File                                    | Category                   | Requires server? |
-| --------------------------------------- | -------------------------- | ---------------- |
-| `agent-picker.test.tsx`                 | Component wiring           | No               |
-| `app-error-boundary.test.tsx`           | Component wiring           | No               |
-| `app-state.test.tsx`                    | Component wiring           | No               |
-| `chat-header-settings-flow.test.tsx`    | Component wiring           | No               |
-| `chat-panel.test.tsx`                   | Component wiring           | No               |
-| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E | Yes (auto-skip)  |
-| `mcp-manager-dialog.test.tsx`           | Component wiring           | No               |
-| `model-manager.test.tsx`                | Component wiring           | No               |
-| `model-picker-interactions.test.tsx`    | Component wiring           | No               |
-| `settings-dialog.test.tsx`              | Component wiring           | No               |
-| `skill-picker.test.tsx`                 | Component wiring           | No               |
-| `stale-state.test.tsx`                  | Store hydration            | No               |
+### Current Integration Test Files (31)
+
+| File                                      | Category                            | Requires server? |
+| ----------------------------------------- | ----------------------------------- | ---------------- |
+| `agent-picker.test.tsx`                   | Component wiring                    | No               |
+| `agent-service.test.ts`                   | Agent service + frontmatter parsing | No               |
+| `app-error-boundary.test.tsx`             | Component wiring                    | No               |
+| `app-session-error.test.tsx`              | Component wiring                    | No               |
+| `app-state.test.tsx`                      | Component wiring                    | No               |
+| `chat-error-boundary.test.tsx`            | Component wiring                    | No               |
+| `chat-header-settings-flow.test.tsx`      | Component wiring                    | No               |
+| `chat-panel.test.tsx`                     | Component wiring                    | No               |
+| `chat-store.test.ts`                      | Chat message store                  | No               |
+| `copilot-websocket.integration.test.ts`   | Live Copilot WebSocket E2E          | Yes (auto-skip)  |
+| `excel-tools.test.ts`                     | Tool schema + factory (Excel)       | No               |
+| `general-tools.test.ts`                   | General-purpose tool definitions    | No               |
+| `host-tools-limit.test.ts`                | Host tool count limits              | No               |
+| `humanize-tool-name.test.ts`              | Tool-name → human-readable labels   | No               |
+| `id.test.ts`                              | `generateId` utility                | No               |
+| `manifest.test.ts`                        | Office manifest / host assumptions  | No               |
+| `mcp-manager-dialog.test.tsx`             | Component wiring                    | No               |
+| `mcp-service.test.ts`                     | MCP server config parsing           | No               |
+| `model-manager.test.tsx`                  | Component wiring                    | No               |
+| `model-picker-interactions.test.tsx`      | Component wiring                    | No               |
+| `office-storage.test.ts`                  | `officeStorage` with OfficeRuntime  | No               |
+| `powerpoint-tools.test.ts`                | Tool schema + factory (PPT)         | No               |
+| `settings-dialog.test.tsx`                | Component wiring                    | No               |
+| `settings-store.test.ts`                  | Zustand store (model/agent/skills)  | No               |
+| `skill-picker.test.tsx`                   | Component wiring                    | No               |
+| `skill-service.test.ts`                   | Skill service + context building    | No               |
+| `stale-state.test.tsx`                    | Store hydration                     | No               |
+| `use-office-chat.test.tsx`                | useOfficeChat hook                  | No               |
+| `use-tool-invocations-patch.test.tsx`     | Tool invocation argument streaming  | No               |
+| `word-tools.test.ts`                      | Tool schema + factory (Word)        | No               |
+| `zip-import-service.test.ts`              | ZIP import service                  | No               |
 
 ### Integration Test Categories
 
@@ -180,12 +191,14 @@ The task pane is split into three areas:
 
 ### When to Write What
 
-- **New pure function?** → Unit test in `tests/unit/`
 - **New Excel command?** → E2E test in `tests-e2e/`
-- **New host routing rule?** → Unit/integration tests (`tests/unit/`, `tests/integration/`)
+- **New PowerPoint command?** → E2E test in `tests-e2e-ppt/`
+- **New Word command?** → E2E test in `tests-e2e-word/`
 - **New task pane interaction flow?** → UI test in `tests-ui/`
-- **New React component interaction?** → Integration test in `tests/integration/`
-- **New tool definition?** → Add schema case to `tests/unit/toolSchemas.test.ts`
+- **New React component or hook behavior?** → Integration test in `tests/integration/`
+- **New host routing rule?** → Integration test in `tests/integration/`
+- **New tool definition?** → Integration test in `tests/integration/`
+- **New pure function?** → Integration test — do NOT write a unit test
 
 ## Code Conventions
 

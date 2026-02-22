@@ -1,15 +1,14 @@
+/**
+ * Integration test: Excel tool configs and factory output.
+ *
+ * Validates that every tool's JSON Schema parameters accepts valid inputs
+ * and rejects invalid ones. Does NOT execute tools (no Excel.run needed) —
+ * exercise of execute() is covered by E2E tests running in Excel Desktop.
+ */
 import { describe, it, expect } from 'vitest';
 import Ajv from 'ajv';
 import { excelTools, allConfigs } from '@/tools';
 import { createTools } from '@/tools/codegen';
-
-/**
- * Tool schema tests — validate that every tool's JSON Schema parameters
- * accepts valid inputs and rejects invalid ones.
- *
- * These DON'T execute the tools (no Excel.run needed), they only
- * exercise the JSON schemas that guard the AI function-call contract.
- */
 
 const ajv = new Ajv({ allErrors: true });
 
@@ -36,13 +35,13 @@ const ALL_TOOL_NAMES = [
   'pivot',
 ] as const;
 
-describe('tool schemas — structural', () => {
+describe('Integration: Excel tool configs — structural', () => {
   it('excelTools array is non-empty and every tool has parameters and handler', () => {
     expect(excelTools.length).toBeGreaterThan(0);
     for (const t of excelTools) {
-      expect(t, `${t.name} is defined`).toBeDefined();
-      expect(t.parameters, `${t.name} has parameters`).toBeDefined();
-      expect(typeof t.handler, `${t.name} has handler fn`).toBe('function');
+      expect(t).toBeDefined();
+      expect(t.parameters).toBeDefined();
+      expect(typeof t.handler).toBe('function');
     }
   });
 
@@ -56,15 +55,15 @@ describe('tool schemas — structural', () => {
     for (const configs of allConfigs) {
       const tools = createTools(configs);
       for (const tool of tools) {
-        expect(tool, `${tool.name} was created`).toBeDefined();
-        expect(tool.parameters, `${tool.name} has parameters`).toBeDefined();
-        expect(typeof tool.handler, `${tool.name} has handler`).toBe('function');
+        expect(tool).toBeDefined();
+        expect(tool.parameters).toBeDefined();
+        expect(typeof tool.handler).toBe('function');
       }
     }
   });
 });
 
-describe('tool schemas — range', () => {
+describe('Integration: Excel schema — range', () => {
   it('requires action', () => {
     const schema = toolsByName.range.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -149,7 +148,7 @@ describe('tool schemas — range', () => {
   });
 });
 
-describe('tool schemas — range_format', () => {
+describe('Integration: Excel schema — range_format', () => {
   it('requires action', () => {
     const schema = toolsByName.range_format.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -187,7 +186,7 @@ describe('tool schemas — range_format', () => {
   });
 });
 
-describe('tool schemas — sheet', () => {
+describe('Integration: Excel schema — sheet', () => {
   it('requires action', () => {
     const schema = toolsByName.sheet.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -230,7 +229,7 @@ describe('tool schemas — sheet', () => {
   });
 });
 
-describe('tool schemas — workbook', () => {
+describe('Integration: Excel schema — workbook', () => {
   it('requires action', () => {
     const schema = toolsByName.workbook.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -257,7 +256,7 @@ describe('tool schemas — workbook', () => {
   });
 });
 
-describe('tool schemas — table', () => {
+describe('Integration: Excel schema — table', () => {
   it('requires action', () => {
     const schema = toolsByName.table.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -294,7 +293,7 @@ describe('tool schemas — table', () => {
   });
 });
 
-describe('tool schemas — chart', () => {
+describe('Integration: Excel schema — chart', () => {
   it('requires action', () => {
     const schema = toolsByName.chart.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -322,7 +321,7 @@ describe('tool schemas — chart', () => {
   });
 });
 
-describe('tool schemas — comment', () => {
+describe('Integration: Excel schema — comment', () => {
   it('requires action', () => {
     const schema = toolsByName.comment.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -349,7 +348,7 @@ describe('tool schemas — comment', () => {
   });
 });
 
-describe('tool schemas — conditional_format', () => {
+describe('Integration: Excel schema — conditional_format', () => {
   it('requires action', () => {
     const schema = toolsByName.conditional_format.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -377,7 +376,7 @@ describe('tool schemas — conditional_format', () => {
   });
 });
 
-describe('tool schemas — data_validation', () => {
+describe('Integration: Excel schema — data_validation', () => {
   it('requires action + address', () => {
     const schema = toolsByName.data_validation.parameters;
     expect(validate(schema, {}).success).toBe(false);
@@ -404,7 +403,7 @@ describe('tool schemas — data_validation', () => {
   });
 });
 
-describe('tool schemas — pivot', () => {
+describe('Integration: Excel schema — pivot', () => {
   it('requires action', () => {
     const schema = toolsByName.pivot.parameters;
     expect(validate(schema, {}).success).toBe(false);

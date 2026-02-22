@@ -171,14 +171,14 @@ describe('Copilot WebSocket integration', () => {
                 },
                 required: ['text'],
               },
-              handler: async (args: unknown) => {
+              handler: (args: unknown) => {
                 toolWasCalled = true;
                 const { text } = args as { text: string };
-                return {
+                return Promise.resolve({
                   textResultForLlm: `Echo: ${text}`,
                   resultType: 'success' as const,
                   toolTelemetry: {},
-                };
+                });
               },
             },
           ],
