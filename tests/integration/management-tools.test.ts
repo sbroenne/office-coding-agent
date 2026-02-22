@@ -168,8 +168,7 @@ describe('manage_skills handler', () => {
     }) as { toggled: boolean; name: string; active: boolean };
     expect(toggled.toggled).toBe(true);
     expect(toggled.name).toBe('ToggleSkill');
-    // active state depends on store logic — just verify the field exists
-    expect(typeof toggled.active).toBe('boolean');
+    expect(toggled.active).toBe(false);
   });
 
   it('toggle requires name', () => {
@@ -355,7 +354,7 @@ describe('manage_mcp_servers handler', () => {
       name: 'toggle-server',
     }) as { toggled: boolean; name: string; active: boolean };
     expect(toggled.toggled).toBe(true);
-    expect(typeof toggled.active).toBe('boolean');
+    expect(toggled.active).toBe(false);
   });
 
   it('toggle requires name', () => {

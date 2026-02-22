@@ -139,10 +139,9 @@ describe('useOfficeChat', () => {
 
     const assistantContent = messages[1].content;
     const textPart = assistantContent.find(c => c.type === 'text');
-    expect(textPart).toBeTruthy();
-    if (textPart?.type === 'text') {
-      expect(textPart.text).toBe('Hello!');
-    }
+    expect(textPart).toBeDefined();
+    expect(textPart!.type).toBe('text');
+    expect((textPart as { type: 'text'; text: string }).text).toBe('Hello!');
   });
 
   it('accumulates streaming delta text', async () => {
@@ -167,11 +166,12 @@ describe('useOfficeChat', () => {
     });
 
     const messages = result.current.runtime.thread.getState().messages;
+    expect(messages.length).toBeGreaterThanOrEqual(2);
     const assistantContent = messages[1].content;
     const textPart = assistantContent.find(c => c.type === 'text');
-    if (textPart?.type === 'text') {
-      expect(textPart.text).toBe('Hello!');
-    }
+    expect(textPart).toBeDefined();
+    expect(textPart!.type).toBe('text');
+    expect((textPart as { type: 'text'; text: string }).text).toBe('Hello!');
   });
 
   it('includes tool-call parts when tool events fire', async () => {
@@ -206,10 +206,121 @@ describe('useOfficeChat', () => {
     const messages = result.current.runtime.thread.getState().messages;
     const assistantContent = messages[1].content;
     const toolPart = assistantContent.find(c => c.type === 'tool-call');
-    expect(toolPart).toBeTruthy();
-    if (toolPart?.type === 'tool-call') {
-      expect(toolPart.toolName).toBe('get_range_values');
-    }
+    expect(toolPart).toBeDefined();
+    expect(toolPart!.type).toBe('tool-call');
+    expect((toolPart as { type: 'tool-call'; toolName: string }).toolName).toBe('get_range_values');
+  });
+
+  it('sets thinkingText to humanized tool name on tool.execution_start', async () => {
+    // Use a slow session so we can observe thinkingText mid-stream
+    let resolveIdle: () => void;
+    const idlePromise = new Promise<void>(r => {
+      resolveIdle = r;
+    });
+
+    const session = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { range: 'A1:B2' },
+        });
+        // Pause here so the test can observe thinkingText
+        await idlePromise;
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1,2]]' },
+        });
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // Send a message — the stream will pause after tool.execution_start
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Read'));
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // thinkingText should show humanized tool name
+    expect(result.current.thinkingText).toBe('Get range values…');
+
+    // Release the stream to complete
+    await act(async () => {
+      resolveIdle!();
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // After completion, thinkingText should be cleared
+    expect(result.current.thinkingText).toBeNull();
+  });
+
+  it('report_intent overrides tool name in thinkingText', async () => {
+    let resolveIdle: () => void;
+    const idlePromise = new Promise<void>(r => {
+      resolveIdle = r;
+    });
+
+    const session = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'ri1',
+          toolName: 'report_intent',
+          arguments: { intent: 'Reading the spreadsheet' },
+        });
+        // Pause so the test can observe thinkingText
+        await idlePromise;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Here you go' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Read'));
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // report_intent should surface the raw intent text
+    expect(result.current.thinkingText).toBe('Reading the spreadsheet');
+
+    // Release the stream to complete
+    await act(async () => {
+      resolveIdle!();
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    expect(result.current.thinkingText).toBeNull();
   });
 
   it('sets session error when createWebSocketClient rejects', async () => {
@@ -276,9 +387,9 @@ describe('useOfficeChat', () => {
     expect(messages[0].role).toBe('user');
     expect(messages[1].role).toBe('assistant');
     const textPart = messages[1].content.find(c => c.type === 'text');
-    if (textPart?.type === 'text') {
-      expect(textPart.text).toContain('Not connected');
-    }
+    expect(textPart).toBeDefined();
+    expect(textPart!.type).toBe('text');
+    expect((textPart as { type: 'text'; text: string }).text).toContain('Not connected');
   });
 
   it('auto-corrects activeModel when not in fetched models', async () => {

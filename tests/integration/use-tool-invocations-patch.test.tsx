@@ -115,6 +115,10 @@ describe('useToolInvocations patch', () => {
         rerender(<HookDriver stateRef={stateRef} />);
       });
     }).not.toThrow();
+
+    // Positive assertion: component still renders with the updated tool call
+    expect(stateRef.current.messages[0].content[0].argsText).toBe(completeArgsText);
+    expect(stateRef.current.messages[0].content[0].toolCallId).toBe('tc-1');
   });
 
   it('still works for normal append-only streaming (no key reorder)', () => {
@@ -147,6 +151,9 @@ describe('useToolInvocations patch', () => {
         rerender(<HookDriver stateRef={stateRef} />);
       });
     }).not.toThrow();
+
+    // Positive assertion: tool call state reflects the appended argsText
+    expect(stateRef.current.messages[0].content[0].argsText).toBe('{"address":"A1","value":"hello"}');
   });
 
   it('does not throw for non-appendable argsText (handled via replacement stream)', () => {
@@ -179,5 +186,8 @@ describe('useToolInvocations patch', () => {
         rerender(<HookDriver stateRef={stateRef} />);
       });
     }).not.toThrow();
+
+    // Positive assertion: tool call state reflects the replacement argsText
+    expect(stateRef.current.messages[0].content[0].argsText).toBe('CORRUPTED_GARBAGE');
   });
 });

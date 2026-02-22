@@ -37,7 +37,7 @@ const ALL_TOOL_NAMES = [
 
 describe('Integration: Excel tool configs — structural', () => {
   it('excelTools array is non-empty and every tool has parameters and handler', () => {
-    expect(excelTools.length).toBeGreaterThan(0);
+    expect(excelTools).toHaveLength(ALL_TOOL_NAMES.length);
     for (const t of excelTools) {
       expect(t).toBeDefined();
       expect(t.parameters).toBeDefined();

@@ -135,6 +135,7 @@ describe('buildAgentsZip', () => {
     const blob = await buildAgentsZip([testAgent]);
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
     const paths = Object.keys(zip.files).filter(p => !zip.files[p].dir);
+    expect(paths.length).toBeGreaterThan(0);
     expect(paths.every(p => p.startsWith('agents/'))).toBe(true);
     expect(paths[0]).toMatch(/\.md$/);
   });
@@ -157,6 +158,7 @@ describe('buildSkillsZip', () => {
     const blob = await buildSkillsZip([testSkill]);
     const zip = await JSZip.loadAsync(await blob.arrayBuffer());
     const paths = Object.keys(zip.files).filter(p => !zip.files[p].dir);
+    expect(paths.length).toBeGreaterThan(0);
     expect(paths.every(p => p.startsWith('skills/'))).toBe(true);
   });
 });

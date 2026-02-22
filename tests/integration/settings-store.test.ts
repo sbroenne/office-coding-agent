@@ -210,7 +210,7 @@ describe('settingsStore — MCP servers', () => {
     useSettingsStore.getState().importMcpServers([server1]);
     const names = useSettingsStore.getState().importedMcpServers.map(s => s.name);
     expect(names[0]).toBe('srv1');
-    expect(names[1]).not.toBe('srv1');
+    expect(names[1]).toBe('srv1 (imported)');
   });
 
   it('removes a MCP server by name', () => {
