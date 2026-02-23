@@ -60,8 +60,14 @@ async function loadAvailableModels(client: WebSocketCopilotClient): Promise<void
 
 function getWsUrl(): string {
   if (typeof window === 'undefined') return 'wss://localhost:3000/api/copilot';
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}/api/copilot`;
+  const { hostname, protocol, host } = window.location;
+  // When served from GitHub Pages (staging) or any non-localhost origin,
+  // the WebSocket proxy is always on localhost:3000.
+  if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    return 'wss://localhost:3000/api/copilot';
+  }
+  const proto = protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${host}/api/copilot`;
 }
 
 export function useOfficeChat(host: OfficeHostApp) {
