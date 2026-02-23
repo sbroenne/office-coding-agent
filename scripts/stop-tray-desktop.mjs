@@ -1,10 +1,9 @@
 import { spawn } from 'node:child_process';
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-
 function runNpmScript(scriptName) {
   return new Promise((resolve, reject) => {
-    const child = spawn(npmCommand, ['run', scriptName], {
+    const child = spawn(`npm run ${scriptName}`, {
+      shell: true,
       stdio: 'inherit',
       windowsHide: false,
     });

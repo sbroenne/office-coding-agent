@@ -1,7 +1,5 @@
 import https from 'node:https';
 import { spawn } from 'node:child_process';
-
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const serverUrl = 'https://localhost:3000/api/ping';
 
 function checkServerReady() {
@@ -37,7 +35,8 @@ async function waitForServer(timeoutMs = 90_000) {
 }
 
 function startTrayDetached() {
-  const tray = spawn(npmCommand, ['run', 'start:tray'], {
+  const tray = spawn('npm run start:tray', {
+    shell: true,
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
@@ -62,7 +61,8 @@ async function main() {
   }
 
   console.log('[start:tray:desktop] Launching Excel sideload...');
-  const sideload = spawn(npmCommand, ['run', 'start:desktop'], {
+  const sideload = spawn('npm run start:desktop', {
+    shell: true,
     stdio: 'inherit',
     windowsHide: false,
   });
