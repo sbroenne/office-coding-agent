@@ -30,10 +30,12 @@ function makeFakeSession(events: SessionEvent[]) {
       }
     },
     on: vi.fn(),
+    onPermissionRequest: vi.fn(() => () => undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
     send: vi.fn().mockResolvedValue('msg-id'),
     registerTools: vi.fn(),
     getToolHandler: vi.fn(),
+    respondPermission: vi.fn().mockResolvedValue(undefined),
     _dispatchEvent: vi.fn() as EventEmitter,
   };
 }
@@ -239,10 +241,12 @@ describe('useOfficeChat', () => {
         yield IDLE_EVENT;
       },
       on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue('msg-id'),
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(session);
@@ -293,10 +297,12 @@ describe('useOfficeChat', () => {
         yield IDLE_EVENT;
       },
       on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue('msg-id'),
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(session);

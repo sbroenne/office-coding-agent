@@ -28,6 +28,15 @@ interface ToolCallResponsePayload {
   result: ToolResultObject;
 }
 
+export interface PermissionRequestPayload {
+  sessionId: string;
+  requestId: string;
+  request: {
+    kind: string;
+    [key: string]: unknown;
+  };
+}
+
 /** Skill data sent from browser to proxy for writing to disk. */
 export interface SkillPayload {
   name: string;
@@ -62,6 +71,7 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools'> {
 export class BrowserCopilotSession {
   private eventHandlers = new Set<SessionEventHandler>();
   private toolHandlers = new Map<string, ToolHandler>();
+  private permissionHandlers = new Set<(payload: PermissionRequestPayload) => void>();
 
   constructor(
     public readonly sessionId: string,
@@ -147,12 +157,38 @@ export class BrowserCopilotSession {
     return this.toolHandlers.get(name);
   }
 
+  onPermissionRequest(handler: (payload: PermissionRequestPayload) => void): () => void {
+    this.permissionHandlers.add(handler);
+    return () => {
+      this.permissionHandlers.delete(handler);
+    };
+  }
+
+  _dispatchPermissionRequest(payload: PermissionRequestPayload): void {
+    for (const handler of this.permissionHandlers) {
+      try {
+        handler(payload);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async respondPermission(requestId: string, decision: 'approved' | 'denied'): Promise<void> {
+    await this.connection.sendRequest('permission.respond', {
+      sessionId: this.sessionId,
+      requestId,
+      decision,
+    });
+  }
+
   async destroy(): Promise<void> {
     await this.connection.sendRequest('session.destroy', {
       sessionId: this.sessionId,
     });
     this.eventHandlers.clear();
     this.toolHandlers.clear();
+    this.permissionHandlers.clear();
   }
 }
 
@@ -260,6 +296,12 @@ export class WebSocketCopilotClient {
       if (n.sessionId && n.event) {
         this.sessions.get(n.sessionId)?._dispatchEvent(n.event);
       }
+    });
+
+    this.connection.onNotification('permission.request', (notification: unknown) => {
+      const payload = notification as PermissionRequestPayload;
+      if (!payload?.sessionId || !payload?.requestId) return;
+      this.sessions.get(payload.sessionId)?._dispatchPermissionRequest(payload);
     });
 
     this.connection.onRequest(

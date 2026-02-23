@@ -35,6 +35,30 @@ const SessionErrorBanner: React.FC<{ error: Error; onRetry: () => void }> = ({
   </div>
 );
 
+const PermissionBanner: React.FC<{
+  kind: string;
+  onApprove: () => void;
+  onDeny: () => void;
+}> = ({ kind, onApprove, onDeny }) => (
+  <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+    <span className="min-w-0 flex-1 truncate" title={kind}>
+      Permission requested: {kind}
+    </span>
+    <button
+      onClick={onDeny}
+      className="shrink-0 rounded-md border border-amber-500/40 px-2 py-0.5 text-xs font-medium hover:bg-amber-200/60 dark:hover:bg-amber-900/40"
+    >
+      Deny
+    </button>
+    <button
+      onClick={onApprove}
+      className="shrink-0 rounded-md border border-amber-600/40 bg-amber-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-amber-700"
+    >
+      Approve
+    </button>
+  </div>
+);
+
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
   const {
     runtime,
@@ -44,6 +68,9 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     restoreSession,
     sessions,
     activeSessionId,
+    pendingPermission,
+    approvePermission,
+    denyPermission,
     thinkingText,
   } = useOfficeChat(host);
   return (
@@ -58,6 +85,13 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
           />
           {isConnecting && !sessionError && <ConnectingBanner />}
           {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
+          {pendingPermission && (
+            <PermissionBanner
+              kind={pendingPermission.request.kind}
+              onApprove={approvePermission}
+              onDeny={denyPermission}
+            />
+          )}
           <ChatErrorBoundary>
             <ChatPanel />
           </ChatErrorBoundary>

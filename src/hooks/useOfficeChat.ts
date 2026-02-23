@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { useExternalStoreRuntime } from '@assistant-ui/react';
 import type { ThreadMessageLike, AppendMessage } from '@assistant-ui/react';
 import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
+import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { getSkills, getImportedSkills, skillToMarkdown } from '@/services/skills';
@@ -96,6 +97,8 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
+  const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
+  const activePermissionRequestRef = useRef<string | null>(null);
 
   const deserializeMessages = useCallback((rawMessages: unknown[]): ThreadMessageLike[] => {
     return rawMessages
@@ -236,7 +239,14 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       sessionRef.current = session;
       setSessionError(null);
+      setPendingPermission(null);
+      activePermissionRequestRef.current = null;
       console.log('[chat] Session created:', session.sessionId);
+
+      session.onPermissionRequest(payload => {
+        activePermissionRequestRef.current = payload.requestId;
+        setPendingPermission(payload);
+      });
 
       // Fetch available models (non-blocking, with timeout)
       void loadAvailableModels(client);
@@ -496,6 +506,8 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setPendingPermission(null);
+    activePermissionRequestRef.current = null;
     createSession(host);
     void initSession();
   }, [createSession, host, initSession]);
@@ -506,10 +518,34 @@ export function useOfficeChat(host: OfficeHostApp) {
       if (!session) return;
       setActiveSession(sessionId);
       setMessages(deserializeMessages(session.messages));
+      setPendingPermission(null);
+      activePermissionRequestRef.current = null;
       void initSession();
     },
     [deserializeMessages, initSession, sessions, setActiveSession]
   );
+
+  const respondPermission = useCallback(async (decision: 'approved' | 'denied') => {
+    const session = sessionRef.current;
+    const requestId = activePermissionRequestRef.current;
+    if (!session || !requestId) return;
+    try {
+      await session.respondPermission(requestId, decision);
+    } finally {
+      if (activePermissionRequestRef.current === requestId) {
+        activePermissionRequestRef.current = null;
+        setPendingPermission(null);
+      }
+    }
+  }, []);
+
+  const approvePermission = useCallback(() => {
+    void respondPermission('approved');
+  }, [respondPermission]);
+
+  const denyPermission = useCallback(() => {
+    void respondPermission('denied');
+  }, [respondPermission]);
 
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     isRunning,
@@ -531,6 +567,9 @@ export function useOfficeChat(host: OfficeHostApp) {
     restoreSession,
     sessions,
     activeSessionId,
+    pendingPermission,
+    approvePermission,
+    denyPermission,
     thinkingText,
   };
 }
