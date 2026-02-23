@@ -16,10 +16,8 @@ import type { Tool } from '@github/copilot-sdk';
 import type { OfficeHostApp } from '@/services/office/host';
 import { powerPointTools, powerPointConfigs } from './powerpoint';
 import { wordTools, wordConfigs } from './word';
-import { webFetchTool } from './general';
 import { managementTools } from './management';
 
-export { webFetchTool } from './general';
 export { managementTools } from './management';
 
 export const MAX_TOOLS_PER_REQUEST = 128;
@@ -52,7 +50,7 @@ export { powerPointTools, powerPointConfigs } from './powerpoint';
 export { wordTools, wordConfigs } from './word';
 
 /** General-purpose tools included for all hosts */
-const generalTools: Tool[] = [webFetchTool, ...managementTools];
+const generalTools: Tool[] = [...managementTools];
 
 export function getToolsForHost(host: OfficeHostApp): Tool[] {
   let hostTools: Tool[];

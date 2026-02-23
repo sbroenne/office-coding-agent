@@ -131,7 +131,7 @@ The task pane is split into three areas:
 | Tier            | Runner     | Directory            | Count | What it tests                                                                        |
 | --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------------------------------------ |
 | **Integration** | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket |
-| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows                                                              |
+| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows (real Copilot API, NO mocking)                                |
 | **E2E (Excel)** | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                                             |
 | **E2E (PPT)**   | Mocha      | `tests-e2e-ppt/`     | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
 | **E2E (Word)**  | Mocha      | `tests-e2e-word/`    | ~12   | Word commands inside real Word Desktop                                               |
@@ -153,9 +153,13 @@ The task pane is split into three areas:
 >
 > **0 test failures is the only acceptable result.** Any failure — including live Copilot WebSocket tests — is a blocker that must be flagged to the user. Never dismiss failures as "expected" or "needs server". If live Copilot tests fail because the dev server isn't running, tell the user: "9 live Copilot tests are failing because `npm run dev` is not running. Start the server or these failures block completion."
 
+> ### ⛔ NO MOCKING IN PLAYWRIGHT TESTS
+>
+> Playwright UI tests (`tests-ui/`) exist to verify end-to-end flows through the **real** Copilot API and proxy server. **Never mock, stub, intercept, or fake** any network request, WebSocket connection, API response, or server behavior in Playwright tests. No `page.route()`, no mock WebSocket servers, no fake session events. If the dev server must be running for a test to work, that is a prerequisite — not a reason to mock. Mocking in Playwright defeats the entire purpose of these tests.
+
 > `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
-### Current Integration Test Files (36)
+### Current Integration Test Files (35)
 
 | File                                    | Category                            | Requires server? |
 | --------------------------------------- | ----------------------------------- | ---------------- |
@@ -172,7 +176,6 @@ The task pane is split into three areas:
 | `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes (fails without server) |
 | `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes (fails without server) |
 | `excel-tools.test.ts`                   | Tool schema + factory (Excel)       | No               |
-| `general-tools.test.ts`                 | General-purpose tool definitions    | No               |
 | `host-tools-limit.test.ts`              | Host tool count limits              | No               |
 | `humanize-tool-name.test.ts`            | Tool-name → human-readable labels   | No               |
 | `id.test.ts`                            | `generateId` utility                | No               |
@@ -232,7 +235,7 @@ The task pane is split into three areas:
 - Excel tools are defined across 9 config modules (range, table, chart, sheet, workbook, comment, conditionalFormat, dataValidation, pivotTable)
 - Each config module in `src/tools/configs/` defines tool schemas and handlers
 - Tool factory in `src/tools/codegen/factory.ts` generates JSON Schema `Tool[]` for the Copilot SDK
-- **General-purpose tools** (`src/tools/general.ts` — `web_fetch`) and **management tools** (`src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers`) are included for all hosts
+- **Management tools** (`src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers`) are included for all hosts
 - Host routing is in `src/tools/index.ts` via `getToolsForHost(host)` → `Tool[]` (host tools + general tools)
 
 ### UX Patterns
@@ -291,7 +294,6 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/stores/settingsStore.ts` — Zustand store (activeModel, agent/skill CRUD, reset)
 - `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
 - `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
-- `src/tools/general.ts` — `webFetchTool` (general-purpose, all hosts)
 - `src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers` tools
 - `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results

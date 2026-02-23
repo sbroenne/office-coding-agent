@@ -1,5 +1,26 @@
 import { test, expect } from '../fixtures';
 
+test.describe('Chat UI (fresh launch)', () => {
+  test('renders header controls with no pre-seeded settings', async ({ taskpane }) => {
+    await expect(taskpane.getByRole('button', { name: 'Agent skills' })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(taskpane.getByRole('button', { name: 'New conversation' })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test('shows the Composer input', async ({ taskpane }) => {
+    await expect(taskpane.getByPlaceholder('Send a message...')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('shows the default agent picker', async ({ taskpane }) => {
+    await expect(taskpane.getByRole('button', { name: 'Select agent' })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+});
+
 test.describe('Chat UI (configured state)', () => {
   test('renders the chat header controls', async ({ configuredTaskpane: page }) => {
     await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();

@@ -7,14 +7,12 @@
  * The server:
  *  1. Serves the frontend via Vite (dev) or static dist (production)
  *  2. Proxies /api/copilot WebSocket to the @github/copilot-sdk
- *  3. Provides /api/fetch?url=... CORS proxy for the web_fetch tool
- *  4. Handles /api/upload-image for image attachments
+ *  3. Handles /api/upload-image for image attachments
  */
 
 import express from 'express';
 import cors from 'cors';
 import https from 'node:https';
-import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -66,64 +64,6 @@ async function createServer() {
   apiRouter.get('/copilot-health', (_req, res) => {
     const health = checkCopilotHealth();
     res.json(health);
-  });
-
-  // CORS proxy for web_fetch tool (avoids CORS from Office add-in WebView)
-  apiRouter.get('/fetch', (req, res) => {
-    const url = req.query.url;
-    if (!url) {
-      res.status(400).json({ error: 'Missing url parameter' });
-      return;
-    }
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
-      res.status(400).json({ error: 'Invalid URL' });
-      return;
-    }
-    // Only allow public HTTP/HTTPS — block SSRF to private/internal addresses
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      res.status(400).json({ error: 'Only http and https URLs are allowed' });
-      return;
-    }
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const BLOCKED = [
-      /^localhost$/,
-      /^127\./,
-      /^0\.0\.0\.0$/,
-      /^::1$/,
-      /^10\./,
-      /^172\.(1[6-9]|2\d|3[01])\./,
-      /^192\.168\./,
-      /^169\.254\./, // link-local / cloud metadata (AWS, Azure IMDS)
-      /^fd[0-9a-f]{2}:/i, // IPv6 ULA
-    ];
-    if (BLOCKED.some(r => r.test(hostname))) {
-      res.status(403).json({ error: 'Request to private or internal addresses is not allowed' });
-      return;
-    }
-    try {
-      const client = parsedUrl.protocol === 'https:' ? https : http;
-      const options = {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.pathname + parsedUrl.search,
-        headers: { 'User-Agent': 'OfficeAddinFetch/1.0' },
-      };
-      client
-        .get(options, response => {
-          let data = '';
-          response.on('data', chunk => (data += chunk));
-          response.on('end', () => {
-            res.type('text/plain').send(data);
-          });
-        })
-        .on('error', e => {
-          res.status(500).json({ error: e.message });
-        });
-    } catch (e) {
-      res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
-    }
   });
 
   // Image upload for multimodal prompts

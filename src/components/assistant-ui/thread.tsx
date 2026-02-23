@@ -40,6 +40,8 @@ export const Thread: FC = () => {
           }}
         />
 
+        <ThinkingIndicator />
+
         <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-3 overflow-visible rounded-t-2xl bg-background pb-3">
           <ThreadScrollToBottom />
           <Composer />
@@ -164,13 +166,12 @@ const MessageError: FC = () => {
 
 const ThinkingIndicator: FC = () => {
   const thinkingText = useThinkingText();
+  if (thinkingText === null) return null;
   return (
-    <AuiIf condition={s => s.message.isLast && s.thread.isRunning}>
-      <div className="aui-thinking-indicator flex items-center gap-2 px-1 py-1 text-muted-foreground text-sm">
-        <LoaderIcon className="size-3.5 animate-spin" />
-        <span className="animate-pulse">{thinkingText ?? 'Thinking…'}</span>
-      </div>
-    </AuiIf>
+    <div className="aui-thinking-indicator fade-in animate-in duration-150 flex items-center gap-2 px-2 py-1 text-muted-foreground text-sm">
+      <LoaderIcon className="size-3.5 animate-spin" />
+      <span className="animate-pulse">{thinkingText}</span>
+    </div>
   );
 };
 
@@ -187,7 +188,6 @@ const AssistantMessage: FC = () => {
             tools: { Fallback: ToolFallback },
           }}
         />
-        <ThinkingIndicator />
         <MessageError />
       </div>
 

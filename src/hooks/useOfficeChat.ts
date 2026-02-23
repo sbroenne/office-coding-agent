@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useExternalStoreRuntime } from '@assistant-ui/react';
 import type { ThreadMessageLike, AppendMessage } from '@assistant-ui/react';
 import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
@@ -73,6 +74,8 @@ export function useOfficeChat(host: OfficeHostApp) {
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
   const cancelRef = useRef(false);
+  // Guard against concurrent/stale initSession calls (React StrictMode double-mount)
+  const initCounterRef = useRef(0);
 
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -81,6 +84,9 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [thinkingText, setThinkingText] = useState<string | null>(null);
 
   const initSession = useCallback(async () => {
+    // Increment counter — any in-flight init with a stale counter will be discarded
+    const thisInit = ++initCounterRef.current;
+
     if (clientRef.current) {
       try {
         await clientRef.current.stop();
@@ -98,6 +104,15 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     try {
       const client = await withTimeout(createWebSocketClient(wsUrl), 15_000, 'WebSocket connect');
+
+      // If a newer initSession started while we were connecting, discard this one
+      if (initCounterRef.current !== thisInit) {
+        void client.stop().catch(() => {
+          /* discard */
+        });
+        return;
+      }
+
       clientRef.current = client;
       console.log('[chat] WebSocket connected');
 
@@ -128,6 +143,15 @@ export function useOfficeChat(host: OfficeHostApp) {
         60_000,
         'session.create'
       );
+
+      // If a newer initSession started while we were creating the session, discard
+      if (initCounterRef.current !== thisInit) {
+        void client.stop().catch(() => {
+          /* discard */
+        });
+        return;
+      }
+
       sessionRef.current = session;
       setSessionError(null);
       console.log('[chat] Session created:', session.sessionId);
@@ -135,10 +159,14 @@ export function useOfficeChat(host: OfficeHostApp) {
       // Fetch available models (non-blocking, with timeout)
       void loadAvailableModels(client);
     } catch (err) {
+      // If superseded by a newer init, silently bail
+      if (initCounterRef.current !== thisInit) return;
       console.error('[chat] initSession failed:', err);
       setSessionError(err instanceof Error ? err : new Error(String(err)));
     } finally {
-      setIsConnecting(false);
+      if (initCounterRef.current === thisInit) {
+        setIsConnecting(false);
+      }
     }
   }, [
     activeModel,
@@ -217,6 +245,10 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsRunning(true);
+    // Set explicit default text so the standalone ThinkingIndicator renders
+    // immediately via React context — no dependency on the runtime's deferred
+    // useEffect adapter sync.
+    setThinkingText('Thinking…');
 
     const toolParts = new Map<
       string,
@@ -240,7 +272,21 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     try {
       const session = sessionRef.current;
+
+      // Stale-response watchdog: if no event arrives within 30s, warn the user.
+      // Reset on every event; cleared when the stream ends.
+      const STALE_TIMEOUT = 30_000;
+      let staleTimer: ReturnType<typeof setTimeout> | null = null;
+      const resetStaleTimer = () => {
+        if (staleTimer) clearTimeout(staleTimer);
+        staleTimer = setTimeout(() => {
+          setThinkingText('Still waiting for a response…');
+        }, STALE_TIMEOUT);
+      };
+      resetStaleTimer();
+
       for await (const event of session.query({ prompt: userText })) {
+        resetStaleTimer();
         if (cancelRef.current) break;
 
         if (event.type === 'assistant.message_delta') {
@@ -252,11 +298,16 @@ export function useOfficeChat(host: OfficeHostApp) {
           if (toolName === 'report_intent') {
             const intent = (args as Record<string, unknown> | undefined)?.intent;
             if (typeof intent === 'string' && intent) {
-              setThinkingText(intent);
+              // flushSync forces React to commit this state update to the DOM
+              // immediately, before the for-await loop processes the next
+              // buffered event.  Without it, React 18 automatic batching can
+              // merge this update with a later setThinkingText(null), so the
+              // intermediate text never appears on screen.
+              flushSync(() => setThinkingText(intent));
             }
             continue;
           }
-          setThinkingText(`${humanizeToolName(toolName)}…`);
+          flushSync(() => setThinkingText(`${humanizeToolName(toolName)}…`));
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
@@ -293,6 +344,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           break;
         }
       }
+      if (staleTimer) clearTimeout(staleTimer);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       setMessages(prev =>

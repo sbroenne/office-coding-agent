@@ -383,7 +383,6 @@ describe('management tools wiring', () => {
     expect(names).toContain('manage_skills');
     expect(names).toContain('manage_agents');
     expect(names).toContain('manage_mcp_servers');
-    expect(names).toContain('web_fetch');
   });
 
   it('getToolsForHost("powerpoint") includes management tools', async () => {
