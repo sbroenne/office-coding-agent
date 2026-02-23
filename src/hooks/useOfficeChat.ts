@@ -9,6 +9,7 @@ import { getSkills, getImportedSkills, skillToMarkdown } from '@/services/skills
 import { resolveActiveAgent } from '@/services/agents';
 import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
+import { useSessionHistoryStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider } from '@/types';
@@ -77,18 +78,56 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
+  const sessions = useSessionHistoryStore(s => s.sessions);
+  const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
+  const createSession = useSessionHistoryStore(s => s.createSession);
+  const setActiveSession = useSessionHistoryStore(s => s.setActiveSession);
+  const upsertActiveSession = useSessionHistoryStore(s => s.upsertActiveSession);
 
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
   const cancelRef = useRef(false);
   // Guard against concurrent/stale initSession calls (React StrictMode double-mount)
   const initCounterRef = useRef(0);
+  const restoredInitialSessionRef = useRef(false);
 
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
+
+  const deserializeMessages = useCallback((rawMessages: unknown[]): ThreadMessageLike[] => {
+    return rawMessages
+      .filter((msg): msg is Record<string, unknown> => typeof msg === 'object' && msg !== null)
+      .map(msg => {
+        const createdAtRaw = msg.createdAt;
+        const createdAt =
+          typeof createdAtRaw === 'string' || typeof createdAtRaw === 'number'
+            ? new Date(createdAtRaw)
+            : new Date();
+        return {
+          ...(msg as ThreadMessageLike),
+          createdAt,
+        };
+      });
+  }, []);
+
+  const deriveSessionTitle = useCallback((nextMessages: ThreadMessageLike[]): string => {
+    const firstUser = nextMessages.find(m => m.role === 'user');
+    const contentParts: unknown[] = Array.isArray(firstUser?.content) ? firstUser.content : [];
+    const textPart = contentParts.find(
+      (part): part is { type: 'text'; text?: string } =>
+        typeof part === 'object' &&
+        part !== null &&
+        'type' in part &&
+        (part as { type?: unknown }).type === 'text'
+    );
+    const text = textPart ? String(textPart.text ?? '') : '';
+    const trimmed = text.trim();
+    if (!trimmed) return 'New conversation';
+    return trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
+  }, []);
 
   // Stable ref so onNew can call the latest initSession without adding it to deps
   const initSessionRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -223,6 +262,33 @@ export function useOfficeChat(host: OfficeHostApp) {
   useEffect(() => {
     initSessionRef.current = initSession;
   }, [initSession]);
+
+  useEffect(() => {
+    if (restoredInitialSessionRef.current) return;
+
+    if (!activeSessionId) {
+      createSession(host);
+      restoredInitialSessionRef.current = true;
+      return;
+    }
+
+    const active = sessions.find(s => s.id === activeSessionId);
+    if (active && active.messages.length > 0) {
+      setMessages(deserializeMessages(active.messages));
+    }
+
+    restoredInitialSessionRef.current = true;
+  }, [activeSessionId, createSession, deserializeMessages, host, sessions]);
+
+  useEffect(() => {
+    if (!restoredInitialSessionRef.current) return;
+    const title = deriveSessionTitle(messages);
+    upsertActiveSession({
+      host,
+      title,
+      messages,
+    });
+  }, [deriveSessionTitle, host, messages, upsertActiveSession]);
 
   useEffect(() => {
     void initSession();
@@ -430,8 +496,20 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    createSession(host);
     void initSession();
-  }, [initSession]);
+  }, [createSession, host, initSession]);
+
+  const restoreSession = useCallback(
+    (sessionId: string) => {
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) return;
+      setActiveSession(sessionId);
+      setMessages(deserializeMessages(session.messages));
+      void initSession();
+    },
+    [deserializeMessages, initSession, sessions, setActiveSession]
+  );
 
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     isRunning,
@@ -445,5 +523,14 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
-  return { runtime, sessionError, isConnecting, clearMessages, thinkingText };
+  return {
+    runtime,
+    sessionError,
+    isConnecting,
+    clearMessages,
+    restoreSession,
+    sessions,
+    activeSessionId,
+    thinkingText,
+  };
 }

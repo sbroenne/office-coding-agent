@@ -20,14 +20,28 @@ describe('Integration: ChatHeader', () => {
   });
 
   it('renders skill picker and new conversation button', () => {
-    renderWithProviders(<ChatHeader onClearMessages={mockClearMessages} />);
+    renderWithProviders(
+      <ChatHeader
+        onClearMessages={mockClearMessages}
+        sessions={[]}
+        activeSessionId={null}
+        onRestoreSession={vi.fn()}
+      />
+    );
 
     expect(screen.getByLabelText('Agent skills')).toBeInTheDocument();
     expect(screen.getByLabelText('New conversation')).toBeInTheDocument();
   });
 
   it('calls onClearMessages when New conversation is clicked', async () => {
-    renderWithProviders(<ChatHeader onClearMessages={mockClearMessages} />);
+    renderWithProviders(
+      <ChatHeader
+        onClearMessages={mockClearMessages}
+        sessions={[]}
+        activeSessionId={null}
+        onRestoreSession={vi.fn()}
+      />
+    );
 
     await userEvent.click(screen.getByLabelText('New conversation'));
     expect(mockClearMessages).toHaveBeenCalledOnce();

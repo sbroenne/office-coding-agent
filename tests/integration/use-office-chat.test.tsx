@@ -13,6 +13,7 @@ import type { AppendMessage } from '@assistant-ui/react';
 import type { SessionEvent } from '@github/copilot-sdk';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
 
 // ─── Fake session builder ─────────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ describe('useOfficeChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
   });
 
   it('starts in idle state with no messages', async () => {

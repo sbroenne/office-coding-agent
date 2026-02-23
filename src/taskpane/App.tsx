@@ -36,12 +36,26 @@ const SessionErrorBanner: React.FC<{ error: Error; onRetry: () => void }> = ({
 );
 
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
-  const { runtime, sessionError, isConnecting, clearMessages, thinkingText } = useOfficeChat(host);
+  const {
+    runtime,
+    sessionError,
+    isConnecting,
+    clearMessages,
+    restoreSession,
+    sessions,
+    activeSessionId,
+    thinkingText,
+  } = useOfficeChat(host);
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ThinkingContext.Provider value={thinkingText}>
         <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-          <ChatHeader onClearMessages={clearMessages} />
+          <ChatHeader
+            onClearMessages={clearMessages}
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onRestoreSession={restoreSession}
+          />
           {isConnecting && !sessionError && <ConnectingBanner />}
           {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
           <ChatErrorBoundary>
