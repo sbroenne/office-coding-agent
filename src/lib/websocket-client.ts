@@ -28,6 +28,32 @@ interface ToolCallResponsePayload {
   result: ToolResultObject;
 }
 
+/** Skill data sent from browser to proxy for writing to disk. */
+export interface SkillPayload {
+  name: string;
+  content: string;
+}
+
+/** Custom agent config sent from browser to proxy. */
+export interface CustomAgentPayload {
+  name: string;
+  displayName?: string;
+  description?: string;
+  prompt: string;
+  tools?: string[] | null;
+}
+
+/** Extended session config for browser → proxy communication. */
+export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools'> {
+  tools?: Tool[];
+  /** Imported skill files for the proxy to write to disk and pass as skillDirectories. */
+  skills?: SkillPayload[];
+  /** Skill names to disable (SDK disabledSkills). */
+  disabledSkills?: string[];
+  /** Custom agent configs passed natively to the SDK. */
+  customAgents?: CustomAgentPayload[];
+}
+
 /**
  * Browser-compatible Copilot session over WebSocket.
  */
@@ -163,7 +189,7 @@ export class WebSocketCopilotClient {
     });
   }
 
-  async createSession(config: SessionConfig = {}): Promise<BrowserCopilotSession> {
+  async createSession(config: BrowserSessionConfig = {}): Promise<BrowserCopilotSession> {
     if (!this.connection) {
       throw new Error('Client not connected. Call start() first.');
     }
@@ -179,6 +205,9 @@ export class WebSocketCopilotClient {
       })),
       mcpServers: config.mcpServers,
       availableTools: config.availableTools,
+      skills: config.skills,
+      disabledSkills: config.disabledSkills,
+      customAgents: config.customAgents,
     });
 
     const sessionId = response.sessionId;

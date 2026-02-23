@@ -5,13 +5,15 @@ import type { ThreadMessageLike, AppendMessage } from '@assistant-ui/react';
 import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { buildSkillContext } from '@/services/skills';
+import { getSkills, getImportedSkills } from '@/services/skills';
 import { resolveActiveAgent } from '@/services/agents';
 import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider } from '@/types';
+import { skillToMarkdown } from '@/services/extensions/zipExportService';
+import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
 
@@ -123,9 +125,38 @@ export function useOfficeChat(host: OfficeHostApp) {
       console.log('[chat] WebSocket connected');
 
       const resolvedAgent = resolveActiveAgent(activeAgentId, host);
-      const agentInstructions = resolvedAgent?.instructions ?? '';
-      const skillContext = buildSkillContext(activeSkillNames ?? undefined, host);
-      const systemContent = `${buildSystemPrompt(host)}\n\n${agentInstructions}${skillContext}`;
+
+      // System prompt: only base + app prompt (no agent/skill concatenation)
+      const systemContent = buildSystemPrompt(host);
+
+      // Build imported skill payloads for the proxy to write to disk
+      const importedHostSkills = getImportedSkills().filter(
+        s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost)
+      );
+      const skills = importedHostSkills.map(s => ({
+        name: s.metadata.name,
+        content: skillToMarkdown(s),
+      }));
+
+      // Compute disabled skill names from activeSkillNames
+      const allHostSkillNames = getSkills()
+        .filter(s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost))
+        .map(s => s.metadata.name);
+      const disabledSkills =
+        activeSkillNames !== null
+          ? allHostSkillNames.filter(name => !activeSkillNames.includes(name))
+          : [];
+
+      // Build custom agent config for the SDK
+      const customAgents = resolvedAgent
+        ? [
+            {
+              name: resolvedAgent.metadata.name,
+              description: resolvedAgent.metadata.description,
+              prompt: resolvedAgent.instructions,
+            },
+          ]
+        : undefined;
 
       // Resolve active MCP servers, intersect with agent allowlist if specified
       let activeServers = resolveActiveMcpServers(importedMcpServers, activeMcpServerNames);
@@ -145,6 +176,9 @@ export function useOfficeChat(host: OfficeHostApp) {
           tools: getToolsForHost(host),
           mcpServers,
           availableTools,
+          skills,
+          disabledSkills,
+          customAgents,
         }),
         60_000,
         'session.create'

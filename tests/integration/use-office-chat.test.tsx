@@ -642,4 +642,94 @@ describe('useOfficeChat', () => {
     // empty allowlist → no servers should be forwarded
     expect(config.mcpServers).toBeUndefined();
   });
+
+  // ─── Native SDK skills and agents ───────────────────────────────────────────
+
+  it('passes customAgents with resolved agent to createSession', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const agents = config.customAgents as Array<{ name: string; prompt: string }>;
+    expect(agents).toBeDefined();
+    expect(agents).toHaveLength(1);
+    expect(agents[0].name).toBe('Excel');
+    expect(agents[0].prompt).toContain('AI assistant');
+  });
+
+  it('systemMessage contains only base + app prompt, not agent instructions', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const sysMsg = config.systemMessage as { content: string };
+    // Should NOT contain agent-specific instructions (those are in customAgents)
+    expect(sysMsg.content).not.toContain('The workbook is already open');
+    expect(sysMsg.content).not.toContain('Core Behavior');
+    // Should contain the base prompt
+    expect(sysMsg.content).toContain('Progress narration');
+  });
+
+  it('passes imported skills in the skills array', async () => {
+    useSettingsStore.getState().importSkills([
+      {
+        metadata: {
+          name: 'TestSkill',
+          description: 'A test skill',
+          version: '1.0.0',
+          hosts: ['excel'],
+          tags: [],
+        },
+        content: 'Test skill instructions.',
+      },
+    ]);
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const skills = config.skills as Array<{ name: string; content: string }>;
+    expect(skills).toBeDefined();
+    expect(skills.some(s => s.name === 'TestSkill')).toBe(true);
+  });
+
+  it('computes disabledSkills from activeSkillNames', async () => {
+    // Toggle off a skill by setting activeSkillNames to exclude it
+    useSettingsStore.getState().toggleSkill('excel');
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const disabled = config.disabledSkills as string[];
+    expect(disabled).toContain('excel');
+  });
 });
