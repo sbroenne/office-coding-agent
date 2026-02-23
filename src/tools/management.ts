@@ -1,7 +1,7 @@
 /**
  * Management tools for installing, removing, and toggling skills, agents, and MCP servers.
  *
- * These are general-purpose tools (like web_fetch) — not tied to any Office host.
+ * These are general-purpose tools — not tied to any Office host.
  * They call into the Zustand settings store to persist changes.
  * Changes take effect on the next conversation (session restart).
  */
