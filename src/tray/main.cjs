@@ -51,10 +51,6 @@ function updateMenu() {
       enabled: false,
     },
     {
-      label: 'Open Add-in URL',
-      click: () => shell.openExternal('https://localhost:3000/taskpane.html'),
-    },
-    {
       label: 'Open API Health',
       click: () => shell.openExternal('https://localhost:3000/api/ping'),
     },
