@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Build production bundle
-        run: npm run build
+        run: npx vite build --base /office-coding-agent/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

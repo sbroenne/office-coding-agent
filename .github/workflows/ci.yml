@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality
     # Run on all pushes and PRs from the same repo.
-    # Copilot WebSocket tests skip when no proxy server is available (no CI server needed).
+    # Live Copilot WebSocket tests (*.integration.test.ts) are excluded — they require a dev server.
     # Component wiring tests run unconditionally.
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
 
@@ -102,4 +102,4 @@ jobs:
         run: npm ci
 
       - name: Run integration tests
-        run: npm run test:integration
+        run: npx vitest run --config vitest.integration.config.ts --exclude 'tests/**/*.integration.test.ts'
