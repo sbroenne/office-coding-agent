@@ -40,10 +40,9 @@ export const Thread: FC = () => {
           }}
         />
 
-        <ThinkingIndicator />
-
         <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-3 overflow-visible rounded-t-2xl bg-background pb-3">
           <ThreadScrollToBottom />
+          <ThinkingIndicator />
           <Composer />
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
