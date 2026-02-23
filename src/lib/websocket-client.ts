@@ -46,6 +46,8 @@ export interface CustomAgentPayload {
 /** Extended session config for browser → proxy communication. */
 export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools'> {
   tools?: Tool[];
+  /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
+  host?: string;
   /** Imported skill files for the proxy to write to disk and pass as skillDirectories. */
   skills?: SkillPayload[];
   /** Skill names to disable (SDK disabledSkills). */
@@ -205,6 +207,7 @@ export class WebSocketCopilotClient {
       })),
       mcpServers: config.mcpServers,
       availableTools: config.availableTools,
+      host: config.host,
       skills: config.skills,
       disabledSkills: config.disabledSkills,
       customAgents: config.customAgents,
