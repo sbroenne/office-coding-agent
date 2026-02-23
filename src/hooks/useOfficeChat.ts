@@ -77,6 +77,7 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
+  const npmSkillPackages = useSettingsStore(s => s.npmSkillPackages);
 
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
@@ -179,6 +180,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           skills,
           disabledSkills,
           customAgents,
+          npmSkillPackages: npmSkillPackages.length > 0 ? npmSkillPackages : undefined,
         }),
         60_000,
         'session.create'

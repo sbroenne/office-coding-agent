@@ -185,6 +185,48 @@ describe('manage_skills handler', () => {
     const result = call(manageSkillsTool, { action: 'delete' }) as { error: string };
     expect(result.error).toContain('Unknown action');
   });
+
+  it('install_from_npm registers a package and appears in list', () => {
+    const result = call(manageSkillsTool, {
+      action: 'install_from_npm',
+      package: '@myorg/my-skills',
+    }) as { registered: boolean; package: string };
+    expect(result.registered).toBe(true);
+    expect(result.package).toBe('@myorg/my-skills');
+
+    // Should appear in list
+    const listed = call(manageSkillsTool, { action: 'list' }) as {
+      npmSkillPackages: string[];
+    };
+    expect(listed.npmSkillPackages).toContain('@myorg/my-skills');
+  });
+
+  it('install_from_npm requires package', () => {
+    const result = call(manageSkillsTool, { action: 'install_from_npm' }) as { error: string };
+    expect(result.error).toContain('package');
+  });
+
+  it('remove_npm_package removes a registered package', () => {
+    // Register first
+    call(manageSkillsTool, { action: 'install_from_npm', package: 'my-skill-pkg' });
+    // Remove
+    const removed = call(manageSkillsTool, {
+      action: 'remove_npm_package',
+      package: 'my-skill-pkg',
+    }) as { removed: boolean; package: string };
+    expect(removed.removed).toBe(true);
+
+    // Should be gone from list
+    const listed = call(manageSkillsTool, { action: 'list' }) as {
+      npmSkillPackages: string[];
+    };
+    expect(listed.npmSkillPackages).not.toContain('my-skill-pkg');
+  });
+
+  it('remove_npm_package requires package', () => {
+    const result = call(manageSkillsTool, { action: 'remove_npm_package' }) as { error: string };
+    expect(result.error).toContain('package');
+  });
 });
 
 // ─── manage_agents handler ──────────────────────────────────────────────────
@@ -334,12 +376,45 @@ describe('manage_mcp_servers handler', () => {
     expect(result.error).toContain('name');
   });
 
-  it('install requires url', () => {
+  it('install http requires url', () => {
     const result = call(manageMcpServersTool, {
       action: 'install',
       name: 'server',
+      transport: 'http',
     }) as { error: string };
     expect(result.error).toContain('url');
+  });
+
+  it('install stdio requires command', () => {
+    const result = call(manageMcpServersTool, {
+      action: 'install',
+      name: 'local-server',
+      transport: 'stdio',
+    }) as { error: string };
+    expect(result.error).toContain('command');
+  });
+
+  it('install stdio server roundtrip', () => {
+    const installed = call(manageMcpServersTool, {
+      action: 'install',
+      name: 'npx-server',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@some/mcp-server'],
+      description: 'A local npx MCP server',
+    }) as { installed: boolean; name: string };
+    expect(installed.installed).toBe(true);
+    expect(installed.name).toBe('npx-server');
+
+    const listed = call(manageMcpServersTool, { action: 'list' }) as {
+      servers: { name: string; transport: string; command: string; args: string[] }[];
+    };
+    expect(listed.servers[0]).toMatchObject({
+      name: 'npx-server',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@some/mcp-server'],
+    });
   });
 
   it('toggle changes active state', () => {

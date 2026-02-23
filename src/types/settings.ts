@@ -42,6 +42,12 @@ export interface UserSettings {
   importedMcpServers: McpServerConfig[];
   /** Names of currently active MCP servers. null = all servers enabled (default). */
   activeMcpServerNames: string[] | null;
+  /**
+   * npm package names whose SKILL.md files are loaded at session start.
+   * The proxy installs each package at session creation time and adds
+   * its directory to the SDK's skillDirectories parameter.
+   */
+  npmSkillPackages: string[];
 }
 
 /** Default settings applied on first run */
@@ -53,4 +59,5 @@ export const DEFAULT_SETTINGS: UserSettings = {
   importedAgents: [],
   importedMcpServers: [],
   activeMcpServerNames: null,
+  npmSkillPackages: [],
 };

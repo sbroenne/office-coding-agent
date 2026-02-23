@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
 
@@ -107,6 +108,9 @@ async function handleConnection(ws) {
 
   /** @type {Map<string, string>} Temp skill directories keyed by sessionId for cleanup. */
   const sessionTempDirs = new Map();
+
+  /** @type {Map<string, string[]>} All npm temp dirs keyed by sessionId for cleanup. */
+  const sessionNpmTempDirs = new Map();
 
   /** Send a JSON-RPC response back to the browser. */
   function sendResponse(id, result) {
@@ -214,9 +218,9 @@ async function handleConnection(ws) {
 
     switch (method) {
       case 'session.create': {
-        const { host, model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents } = params || {};
+        const { host, model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents, npmSkillPackages } = params || {};
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, npmSkillPackages=${(npmSkillPackages || []).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -254,6 +258,53 @@ async function handleConnection(ws) {
           skillDirectories.push(tempSkillDir);
         }
 
+        // Install npm skill packages and add their directories to skillDirectories
+        // Uses the SDK's own skillDirectories mechanism — no custom HTTP endpoint needed.
+        const npmTempDirs = [];
+        if (npmSkillPackages && npmSkillPackages.length > 0) {
+          // Regex: allow scoped (@org/name) and plain package names, with optional @version suffix
+          const NPM_PKG_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(@[^\s/]+)?$/i;
+          for (const pkg of npmSkillPackages) {
+            if (typeof pkg !== 'string' || !NPM_PKG_RE.test(pkg.trim())) {
+              console.warn(`[proxy] Skipping invalid npm skill package name: "${pkg}"`);
+              continue;
+            }
+            const installDir = join(tmpdir(), `oca-npm-skill-${randomUUID()}`);
+            await mkdir(installDir, { recursive: true });
+            npmTempDirs.push(installDir);
+            try {
+              const result = spawnSync('npm', ['install', '--prefix', installDir, '--no-save', pkg.trim()], {
+                encoding: 'utf8',
+                timeout: 60_000,
+              });
+              if (result.status !== 0) {
+                console.warn(`[proxy] npm install failed for "${pkg}":`, result.stderr?.trim() || result.stdout?.trim());
+                continue;
+              }
+              // Extract base package name (strip optional @version suffix from the end)
+              // Scoped: @org/name[@version] → @org/name
+              // Plain:  name[@version]      → name
+              const pkgTrimmed = pkg.trim();
+              let pkgBaseName;
+              if (pkgTrimmed.startsWith('@')) {
+                const slashIdx = pkgTrimmed.indexOf('/');
+                const afterSlash = pkgTrimmed.slice(slashIdx + 1);
+                const nameOnly = afterSlash.split('@')[0];
+                pkgBaseName = `${pkgTrimmed.slice(0, slashIdx + 1)}${nameOnly}`;
+              } else {
+                pkgBaseName = pkgTrimmed.split('@')[0];
+              }
+              const pkgDir = join(installDir, 'node_modules', pkgBaseName);
+              if (existsSync(pkgDir)) {
+                skillDirectories.push(pkgDir);
+                console.log(`[proxy] Added npm skill package "${pkg}" from ${pkgDir}`);
+              }
+            } catch (err) {
+              console.warn(`[proxy] Failed to install npm skill package "${pkg}":`, err.message);
+            }
+          }
+        }
+
         let session;
         try {
           await ensureStarted();
@@ -269,9 +320,12 @@ async function handleConnection(ws) {
             customAgents: customAgents?.length > 0 ? customAgents : undefined,
           });
         } catch (err) {
-          // Clean up temp skill directory on failure
+          // Clean up temp directories on failure
           if (tempSkillDir) {
             void rm(tempSkillDir, { recursive: true, force: true }).catch(() => {});
+          }
+          for (const dir of npmTempDirs) {
+            void rm(dir, { recursive: true, force: true }).catch(() => {});
           }
           console.error('[proxy] session.create failed:', err);
           sendError(id, -32603, err.message || 'Failed to create session');
@@ -281,6 +335,10 @@ async function handleConnection(ws) {
         sessions.set(session.sessionId, session);
         if (tempSkillDir) {
           sessionTempDirs.set(session.sessionId, tempSkillDir);
+        }
+        // Track ALL npm temp dirs for cleanup on session destroy
+        if (npmTempDirs.length > 0) {
+          sessionNpmTempDirs.set(session.sessionId, npmTempDirs);
         }
         markHealthy();
         console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
@@ -324,6 +382,14 @@ async function handleConnection(ws) {
           if (tempDir) {
             sessionTempDirs.delete(sessionId);
             void rm(tempDir, { recursive: true, force: true }).catch(() => {});
+          }
+          // Clean up all npm skill temp directories
+          const npmDirs = sessionNpmTempDirs.get(sessionId);
+          if (npmDirs) {
+            sessionNpmTempDirs.delete(sessionId);
+            for (const dir of npmDirs) {
+              void rm(dir, { recursive: true, force: true }).catch(() => {});
+            }
           }
         }
         sendResponse(id, {});
@@ -385,6 +451,14 @@ async function handleConnection(ws) {
       void rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
     sessionTempDirs.clear();
+
+    // Clean up all npm skill temp directories for this connection
+    for (const npmDirs of sessionNpmTempDirs.values()) {
+      for (const dir of npmDirs) {
+        void rm(dir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+    sessionNpmTempDirs.clear();
   }
 
   ws.on('close', () => {
