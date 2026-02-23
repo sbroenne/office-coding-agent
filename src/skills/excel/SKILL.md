@@ -1,8 +1,9 @@
 ---
 name: excel
 description: General-purpose Excel skill for workbook analysis, transformation, reporting, and visualization tasks.
-hosts: [excel]
 license: MIT
+metadata:
+  hosts: [excel]
 ---
 
 # Excel Default Skill

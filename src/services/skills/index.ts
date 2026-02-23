@@ -6,4 +6,5 @@ export {
   setImportedSkills,
   buildSkillContext,
   parseFrontmatter,
+  skillToMarkdown,
 } from './skillService';

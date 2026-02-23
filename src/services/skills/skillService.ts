@@ -204,3 +204,16 @@ export function buildSkillContext(activeNames?: string[], host?: OfficeHostApp):
 
   return `\n\n# Agent Skills\nThe following agent skills provide domain-specific knowledge. Use them to help the user with specialized tasks.${sections.join('')}`;
 }
+
+/** Serialize a skill to its YAML-frontmatter markdown format. */
+export function skillToMarkdown(skill: AgentSkill): string {
+  const { metadata, content } = skill;
+  const lines: string[] = ['---'];
+  lines.push(`name: ${metadata.name}`);
+  lines.push(`description: ${metadata.description}`);
+  lines.push(`version: ${metadata.version}`);
+  lines.push('---');
+  lines.push('');
+  lines.push(content);
+  return lines.join('\n');
+}
