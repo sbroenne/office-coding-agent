@@ -267,6 +267,13 @@ async function handleConnection(ws) {
             skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
             customAgents: customAgents?.length > 0 ? customAgents : undefined,
+            // Auto-approve all permission requests in the Office add-in context.
+            // The add-in manifest already declares the permissions the agent needs;
+            // prompting the user for each individual operation would be disruptive.
+            onPermissionRequest: (request) => {
+              console.log(`[proxy] permission.request auto-approved: ${request.kind}`);
+              return { kind: 'approved' };
+            },
           });
         } catch (err) {
           // Clean up temp skill directory on failure

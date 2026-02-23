@@ -90,6 +90,9 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [isConnecting, setIsConnecting] = useState(true);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
 
+  // Stable ref so onNew can call the latest initSession without adding it to deps
+  const initSessionRef = useRef<() => Promise<void>>(() => Promise.resolve());
+
   const initSession = useCallback(async () => {
     // Increment counter — any in-flight init with a stale counter will be discarded
     const thisInit = ++initCounterRef.current;
@@ -216,6 +219,10 @@ export function useOfficeChat(host: OfficeHostApp) {
     importedMcpServers,
     activeMcpServerNames,
   ]);
+
+  useEffect(() => {
+    initSessionRef.current = initSession;
+  }, [initSession]);
 
   useEffect(() => {
     void initSession();
@@ -387,13 +394,34 @@ export function useOfficeChat(host: OfficeHostApp) {
       if (staleTimer) clearTimeout(staleTimer);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === assistantId
-            ? { ...m, status: { type: 'incomplete', reason: 'error', error: errMsg } }
-            : m
-        )
-      );
+      // Auto-reconnect if the Copilot session was lost (e.g. proxy restart, laptop sleep)
+      const isSessionLost =
+        errMsg.includes('Session') ||
+        errMsg.includes('not connected') ||
+        errMsg.includes('disconnected') ||
+        errMsg.includes('WebSocket closed');
+      if (isSessionLost) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: [{ type: 'text', text: '🔄 Session lost — reconnecting…' }],
+                  status: { type: 'complete', reason: 'stop' },
+                }
+              : m
+          )
+        );
+        void initSessionRef.current();
+      } else {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? { ...m, status: { type: 'incomplete', reason: 'error', error: errMsg } }
+              : m
+          )
+        );
+      }
     } finally {
       setThinkingText(null);
       setIsRunning(false);

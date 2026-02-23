@@ -92,4 +92,51 @@ test.describe('Thinking indicator (live Copilot)', () => {
       await expect(toolCards.nth(i)).not.toContainText(/report.intent/i);
     }
   });
+
+  test('thinking indicator renders inline in message stream, not inside the sticky footer', async ({
+    configuredTaskpane: page,
+  }) => {
+    test.setTimeout(AI_TIMEOUT + 30_000);
+
+    const composer = page.getByPlaceholder('Send a message...');
+    await expect(composer).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Connection failed')).not.toBeVisible();
+
+    await composer.fill('Use the manage_skills tool with action "list" and tell me how many skills you have.');
+    await composer.press('Enter');
+
+    // Wait for the thinking indicator to appear
+    const indicator = page.locator('.aui-thinking-indicator');
+    await expect(indicator).toBeVisible({ timeout: AI_TIMEOUT });
+
+    // The indicator must NOT be a descendant of the viewport footer
+    const isInsideFooter = await indicator.evaluate(el =>
+      !!el.closest('.aui-thread-viewport-footer')
+    );
+    expect(isInsideFooter).toBe(false);
+
+    // The indicator must be a descendant of the scrollable viewport
+    const isInsideViewport = await indicator.evaluate(el =>
+      !!el.closest('.aui-thread-viewport')
+    );
+    expect(isInsideViewport).toBe(true);
+
+    // The indicator must appear BELOW the last message in DOM order
+    const isAfterMessages = await page.evaluate(() => {
+      const messages = document.querySelector('[data-role="user"]');
+      const ind = document.querySelector('.aui-thinking-indicator');
+      if (!messages || !ind) return false;
+      return !!(messages.compareDocumentPosition(ind) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(isAfterMessages).toBe(true);
+
+    // Wait for response to finish
+    await expect(page.getByRole('button', { name: 'Cancel' })).not.toBeVisible({
+      timeout: AI_TIMEOUT,
+    });
+
+    // After completion, indicator must be gone
+    await expect(indicator).not.toBeVisible();
+  });
 });

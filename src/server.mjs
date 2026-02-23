@@ -60,6 +60,18 @@ async function createServer() {
     res.json({ ok: true });
   });
 
+  // Remote log relay — client errors are printed to the server console
+  apiRouter.post('/log', (req, res) => {
+    const { level = 'error', tag = 'client', message, detail } = req.body || {};
+    const prefix = `[${String(tag)}]`;
+    if (level === 'error') {
+      console.error(prefix, message, detail ?? '');
+    } else {
+      console.log(prefix, message, detail ?? '');
+    }
+    res.sendStatus(204);
+  });
+
   // Copilot health check — reports whether any active session is connected
   apiRouter.get('/copilot-health', (_req, res) => {
     const health = checkCopilotHealth();
