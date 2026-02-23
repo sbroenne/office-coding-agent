@@ -11,6 +11,9 @@
     "dev": "node scripts/kill-port.mjs && node src/server.mjs",
     "start:prod-server": "node src/server-prod.mjs",
     "start:tray": "npm run build && electron .",
+    "build:installer": "npm run build && electron-builder",
+    "build:installer:win": "npm run build && electron-builder --win",
+    "build:installer:dir": "npm run build && electron-builder --dir",
     "start": "office-addin-debugging start manifests/manifest.dev.xml",
     "start:desktop": "office-addin-debugging start manifests/manifest.dev.xml desktop --app excel",
     "stop": "office-addin-debugging stop manifests/manifest.dev.xml && node scripts/kill-port.mjs",
@@ -93,6 +96,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "dotenv": "^17.3.1",
     "electron": "^36.9.0",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vitest": "^0.5.4",
@@ -123,6 +127,32 @@
   "overrides": {
     "tmp": "0.2.4",
     "@noble/hashes": "2.0.1"
+  },
+  "build": {
+    "appId": "com.officecodingagent.tray",
+    "productName": "Office Coding Agent",
+    "directories": {
+      "output": "build/electron"
+    },
+    "files": [
+      "dist/**/*",
+      "src/tray/**/*",
+      "src/server-prod.mjs",
+      "src/copilotProxy.mjs",
+      "src/skills/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
