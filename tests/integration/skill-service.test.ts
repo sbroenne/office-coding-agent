@@ -101,6 +101,7 @@ describe('getSkill', () => {
     const skill = getSkill('excel');
     expect(skill).toBeDefined();
     expect(skill?.metadata.name).toBe('excel');
+    expect(skill?.metadata.hosts).toEqual(['excel']);
   });
 });
 
@@ -152,5 +153,19 @@ references:
 Content`;
     const { metadata } = parseFrontmatter(raw);
     expect(metadata).not.toHaveProperty('references');
+  });
+
+  it('parses hosts nested under metadata: block', () => {
+    const raw = `---
+name: nested-host-skill
+description: Test
+version: 1.0.0
+license: MIT
+metadata:
+  hosts: [excel, word]
+---
+Content`;
+    const { metadata } = parseFrontmatter(raw);
+    expect(metadata.hosts).toEqual(['excel', 'word']);
   });
 });

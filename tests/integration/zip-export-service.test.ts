@@ -3,10 +3,10 @@ import JSZip from 'jszip';
 import {
   slugify,
   agentToMarkdown,
-  skillToMarkdown,
   buildAgentsZip,
   buildSkillsZip,
 } from '@/services/extensions/zipExportService';
+import { skillToMarkdown } from '@/services/skills';
 import { parseAgentFrontmatter } from '@/services/agents';
 import { parseFrontmatter } from '@/services/skills';
 import { parseAgentsZipFile, parseSkillsZipFile } from '@/services/extensions/zipImportService';

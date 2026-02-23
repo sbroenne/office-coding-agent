@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import type { AgentConfig } from '@/types/agent';
 import type { AgentSkill } from '@/types/skill';
+import { skillToMarkdown } from '@/services/skills';
 
 /** Convert a display name to a safe lowercase filename slug. */
 export function slugify(name: string): string {
@@ -28,19 +29,6 @@ export function agentToMarkdown(agent: AgentConfig): string {
   lines.push('---');
   lines.push('');
   lines.push(instructions);
-  return lines.join('\n');
-}
-
-/** Serialize a skill back to its YAML-frontmatter markdown format. */
-export function skillToMarkdown(skill: AgentSkill): string {
-  const { metadata, content } = skill;
-  const lines: string[] = ['---'];
-  lines.push(`name: ${metadata.name}`);
-  lines.push(`description: ${metadata.description}`);
-  lines.push(`version: ${metadata.version}`);
-  lines.push('---');
-  lines.push('');
-  lines.push(content);
   return lines.join('\n');
 }
 
