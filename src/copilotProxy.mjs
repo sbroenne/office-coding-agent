@@ -10,8 +10,22 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
+import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
+
+/** Convert a name to a safe lowercase directory slug. */
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Bundled skills directory (relative to project root). */
+const BUNDLED_SKILLS_DIR = resolve('src/skills');
 
 /** Wrap a JSON payload in an LSP Content-Length frame. */
 function lspFrame(obj) {
@@ -86,6 +100,9 @@ async function handleConnection(ws) {
 
   /** @type {Map<string, () => void>} */
   const eventUnsubs = new Map();
+
+  /** @type {Map<string, string>} Temp skill directories keyed by sessionId for cleanup. */
+  const sessionTempDirs = new Map();
 
   /** Send a JSON-RPC response back to the browser. */
   function sendResponse(id, result) {
@@ -193,9 +210,9 @@ async function handleConnection(ws) {
 
     switch (method) {
       case 'session.create': {
-        const { model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools } = params || {};
+        const { model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents } = params || {};
         console.log(
-          `[proxy] session.create requested (model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length})`
+          `[proxy] session.create requested (model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -213,6 +230,20 @@ async function handleConnection(ws) {
           },
         }));
 
+        // Write imported skills to a temp directory so the SDK can load them
+        const skillDirectories = [BUNDLED_SKILLS_DIR];
+        let tempSkillDir = null;
+        if (skills && skills.length > 0) {
+          tempSkillDir = join(tmpdir(), `oca-skills-${Date.now()}`);
+          await mkdir(tempSkillDir, { recursive: true });
+          for (const skill of skills) {
+            const skillDir = join(tempSkillDir, slugify(skill.name));
+            await mkdir(skillDir, { recursive: true });
+            await writeFile(join(skillDir, 'SKILL.md'), skill.content, 'utf8');
+          }
+          skillDirectories.push(tempSkillDir);
+        }
+
         let session;
         try {
           await ensureStarted();
@@ -223,14 +254,24 @@ async function handleConnection(ws) {
             tools,
             mcpServers,
             availableTools,
+            skillDirectories,
+            disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
+            customAgents: customAgents?.length > 0 ? customAgents : undefined,
           });
         } catch (err) {
+          // Clean up temp skill directory on failure
+          if (tempSkillDir) {
+            void rm(tempSkillDir, { recursive: true, force: true }).catch(() => {});
+          }
           console.error('[proxy] session.create failed:', err);
           sendError(id, -32603, err.message || 'Failed to create session');
           break;
         }
 
         sessions.set(session.sessionId, session);
+        if (tempSkillDir) {
+          sessionTempDirs.set(session.sessionId, tempSkillDir);
+        }
         markHealthy();
         console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
 
@@ -268,6 +309,12 @@ async function handleConnection(ws) {
           eventUnsubs.delete(sessionId);
           await session.destroy();
           sessions.delete(sessionId);
+          // Clean up temp skill directory
+          const tempDir = sessionTempDirs.get(sessionId);
+          if (tempDir) {
+            sessionTempDirs.delete(sessionId);
+            void rm(tempDir, { recursive: true, force: true }).catch(() => {});
+          }
         }
         sendResponse(id, {});
         break;
@@ -322,6 +369,12 @@ async function handleConnection(ws) {
       }
     }
     sessions.clear();
+
+    // Clean up all temp skill directories for this connection
+    for (const tempDir of sessionTempDirs.values()) {
+      void rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
+    sessionTempDirs.clear();
   }
 
   ws.on('close', () => {
