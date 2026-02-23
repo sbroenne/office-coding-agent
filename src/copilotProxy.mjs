@@ -11,21 +11,25 @@
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
 
 /** Convert a name to a safe lowercase directory slug. */
 function slugify(name) {
-  return name
+  const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+  return slug || 'skill';
 }
 
-/** Bundled skills directory (relative to project root). */
-const BUNDLED_SKILLS_DIR = resolve('src/skills');
+/** Root directory for bundled skills; each host has its own subdirectory. */
+const BUNDLED_SKILLS_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), 'skills');
 
 /** Wrap a JSON payload in an LSP Content-Length frame. */
 function lspFrame(obj) {
@@ -210,9 +214,9 @@ async function handleConnection(ws) {
 
     switch (method) {
       case 'session.create': {
-        const { model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents } = params || {};
+        const { host, model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents } = params || {};
         console.log(
-          `[proxy] session.create requested (model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -230,11 +234,17 @@ async function handleConnection(ws) {
           },
         }));
 
+        // Point to the host-specific bundled skills directory if it exists
+        const skillDirectories = [];
+        const hostSkillDir = host ? join(BUNDLED_SKILLS_ROOT, slugify(host)) : null;
+        if (hostSkillDir && existsSync(hostSkillDir)) {
+          skillDirectories.push(hostSkillDir);
+        }
+
         // Write imported skills to a temp directory so the SDK can load them
-        const skillDirectories = [BUNDLED_SKILLS_DIR];
         let tempSkillDir = null;
         if (skills && skills.length > 0) {
-          tempSkillDir = join(tmpdir(), `oca-skills-${Date.now()}`);
+          tempSkillDir = join(tmpdir(), `oca-skills-${randomUUID()}`);
           await mkdir(tempSkillDir, { recursive: true });
           for (const skill of skills) {
             const skillDir = join(tempSkillDir, slugify(skill.name));

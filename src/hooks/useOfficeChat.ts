@@ -176,6 +176,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           tools: getToolsForHost(host),
           mcpServers,
           availableTools,
+          host,
           skills,
           disabledSkills,
           customAgents,
