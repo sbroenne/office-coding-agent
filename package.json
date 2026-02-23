@@ -11,6 +11,7 @@
     "dev": "node scripts/kill-port.mjs && node src/server.mjs",
     "start:prod-server": "node src/server-prod.mjs",
     "start:tray": "npm run build && electron .",
+    "start:tray:desktop": "node scripts/start-tray-desktop.mjs",
     "build:installer": "npm run build && electron-builder",
     "build:installer:win": "npm run build && electron-builder --win",
     "build:installer:dir": "npm run build && electron-builder --dir",

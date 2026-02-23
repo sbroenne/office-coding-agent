@@ -66,6 +66,7 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run dev`                    | Start Copilot proxy + Vite dev server (port 3000) |
 | `npm run start:prod-server`      | Start production HTTPS server from `dist/`         |
 | `npm run start:tray`             | Build + run Electron system tray app               |
+| `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop |
 | `npm run build:installer`        | Build desktop installer artifacts via electron-builder |
 | `npm run build:installer:win`    | Build Windows installer (NSIS)                     |
 | `npm run build:installer:dir`    | Build unpacked desktop app directory               |
