@@ -35,7 +35,7 @@ function checkServerReady() {
   });
 }
 
-async function waitForServer(timeoutMs = 90_000) {
+async function waitForServer(timeoutMs = 120_000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (await checkServerReady()) {
@@ -56,6 +56,16 @@ function startTrayDetached() {
   tray.unref();
 }
 
+function startDevServerDetached() {
+  const dev = spawn('npm run dev:start', {
+    shell: true,
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  dev.unref();
+}
+
 async function main() {
   const app = resolveAppArg();
   const alreadyRunning = await checkServerReady();
@@ -64,9 +74,17 @@ async function main() {
     console.log('[start:tray:desktop] Starting tray app...');
     startTrayDetached();
 
-    const ready = await waitForServer();
+    let ready = await waitForServer();
     if (!ready) {
-      console.error('[start:tray:desktop] Tray server did not become ready at https://localhost:3000.');
+      console.warn(
+        '[start:tray:desktop] Tray server did not become ready in time; falling back to dev server startup...'
+      );
+      startDevServerDetached();
+      ready = await waitForServer(45_000);
+    }
+
+    if (!ready) {
+      console.error('[start:tray:desktop] Server did not become ready at https://localhost:3000.');
       process.exit(1);
     }
   } else {

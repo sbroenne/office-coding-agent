@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const { app, Tray, Menu, shell, nativeImage } = require('electron');
 
@@ -30,12 +31,23 @@ function startServer() {
   updateMenu();
 
   const serverPath = path.resolve(__dirname, '../server-prod.mjs');
-  serverProcess = spawn(process.execPath, [serverPath], {
+  const preferredNode = process.env.ORIGINAL_NODE_EXE;
+  const useRealNode = Boolean(preferredNode && fs.existsSync(preferredNode));
+  const runtime = useRealNode ? preferredNode : process.execPath;
+
+  const env = {
+    ...process.env,
+  };
+
+  if (useRealNode) {
+    delete env.ELECTRON_RUN_AS_NODE;
+  } else {
+    env.ELECTRON_RUN_AS_NODE = '1';
+  }
+
+  serverProcess = spawn(runtime, [serverPath], {
     cwd: path.resolve(__dirname, '../..'),
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: '1',
-    },
+    env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
