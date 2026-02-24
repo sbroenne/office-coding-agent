@@ -3,8 +3,13 @@ import { spawn } from 'node:child_process';
 const serverUrl = 'https://localhost:3000/api/ping';
 
 function resolveAppArg() {
-  const arg = process.argv.find(v => v.startsWith('--app='));
-  const value = arg?.split('=')[1]?.toLowerCase() ?? 'excel';
+  const eqArg = process.argv.find(v => v.startsWith('--app='));
+  const eqValue = eqArg?.split('=')[1]?.toLowerCase();
+
+  const appIndex = process.argv.findIndex(v => v === '--app');
+  const nextValue = appIndex >= 0 ? process.argv[appIndex + 1]?.toLowerCase() : undefined;
+
+  const value = eqValue ?? nextValue ?? 'excel';
   if (value === 'excel' || value === 'powerpoint' || value === 'word') return value;
   return 'excel';
 }

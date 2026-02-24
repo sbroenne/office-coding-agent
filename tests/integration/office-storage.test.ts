@@ -1,9 +1,8 @@
 /**
  * Integration tests for officeStorage.
  *
- * officeStorage exclusively uses OfficeRuntime.storage (no localStorage fallback).
- * Tests run against the in-memory mock supplied by tests/setup.ts, which resets
- * the mock store before each test via a global beforeEach hook.
+ * officeStorage prefers OfficeRuntime.storage and falls back to localStorage
+ * when OfficeRuntime.storage is unavailable in a host runtime.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -43,19 +42,14 @@ describe('officeStorage', () => {
     expect(await officeStorage.getItem('large')).toBe(large);
   });
 
-  it('throws a clear error when OfficeRuntime is not available', async () => {
+  it('falls back to localStorage when OfficeRuntime is not available', async () => {
     const saved = (globalThis as Record<string, unknown>).OfficeRuntime;
     delete (globalThis as Record<string, unknown>).OfficeRuntime;
 
-    await expect(officeStorage.getItem('key')).rejects.toThrow(
-      'OfficeRuntime.storage is not available'
-    );
-    await expect(officeStorage.setItem('key', 'v')).rejects.toThrow(
-      'OfficeRuntime.storage is not available'
-    );
-    await expect(officeStorage.removeItem('key')).rejects.toThrow(
-      'OfficeRuntime.storage is not available'
-    );
+    await officeStorage.setItem('key', 'v');
+    await expect(officeStorage.getItem('key')).resolves.toBe('v');
+    await officeStorage.removeItem('key');
+    await expect(officeStorage.getItem('key')).resolves.toBeNull();
 
     (globalThis as Record<string, unknown>).OfficeRuntime = saved;
   });

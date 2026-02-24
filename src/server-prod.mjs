@@ -132,7 +132,9 @@ export async function createServer() {
 
   await new Promise(resolve => {
     httpsServer.listen(PORT, () => {
-      console.log(`\n  Copilot Office Add-in production server running on https://localhost:${PORT}`);
+      console.log(
+        `\n  Copilot Office Add-in production server running on https://localhost:${PORT}`
+      );
       console.log(`  API: https://localhost:${PORT}/api\n`);
       resolve(undefined);
     });
