@@ -26,7 +26,7 @@ export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root className="aui-root aui-thread-root flex flex-1 min-h-0 flex-col bg-background">
       <ThreadPrimitive.Viewport
-        turnAnchor="top"
+        turnAnchor="bottom"
         className="aui-thread-viewport relative flex flex-1 min-h-0 flex-col overflow-x-hidden overflow-y-auto scroll-smooth px-3 pt-3"
       >
         <AuiIf condition={s => s.thread.isEmpty}>
