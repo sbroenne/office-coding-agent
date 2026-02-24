@@ -67,6 +67,9 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run start:prod-server`      | Start production HTTPS server from `dist/`         |
 | `npm run start:tray`             | Build + run Electron system tray app               |
 | `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop |
+| `npm run start:tray:excel`       | Start tray app (if needed) then sideload Excel desktop |
+| `npm run start:tray:ppt`         | Start tray app (if needed) then sideload PowerPoint desktop |
+| `npm run start:tray:word`        | Start tray app (if needed) then sideload Word desktop |
 | `npm run stop:tray:desktop`      | Stop Excel sideload/debug session and server port 3000 |
 | `npm run build:installer`        | Build desktop installer artifacts via electron-builder |
 | `npm run build:installer:win`    | Build Windows installer (NSIS)                     |
@@ -74,6 +77,9 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run build`                  | Production build to `dist/`                       |
 | `npm run build:dev`              | Development build to `dist/`                      |
 | `npm run start:desktop`          | Sideload into Excel Desktop                       |
+| `npm run start:desktop:excel`    | Sideload into Excel Desktop                       |
+| `npm run start:desktop:ppt`      | Sideload into PowerPoint Desktop                  |
+| `npm run start:desktop:word`     | Sideload into Word Desktop                        |
 | `npm run stop`                   | Stop debugging / unload the add-in                |
 | `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files   |
 | `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows     |

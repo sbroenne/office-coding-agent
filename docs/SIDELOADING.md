@@ -24,7 +24,17 @@ The add-in web app (task pane HTML/JS/CSS) must be hosted at the HTTPS URLs in t
 ## Lane 1: Local Desktop Dev
 
 ```bash
-npm run start:desktop
+npm run start:desktop:excel
+npm run start:desktop:ppt
+npm run start:desktop:word
+```
+
+Or, to run through tray mode first:
+
+```bash
+npm run start:tray:excel
+npm run start:tray:ppt
+npm run start:tray:word
 ```
 
 When done:

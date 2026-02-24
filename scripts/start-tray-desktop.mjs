@@ -2,6 +2,13 @@ import https from 'node:https';
 import { spawn } from 'node:child_process';
 const serverUrl = 'https://localhost:3000/api/ping';
 
+function resolveAppArg() {
+  const arg = process.argv.find(v => v.startsWith('--app='));
+  const value = arg?.split('=')[1]?.toLowerCase() ?? 'excel';
+  if (value === 'excel' || value === 'powerpoint' || value === 'word') return value;
+  return 'excel';
+}
+
 function checkServerReady() {
   return new Promise(resolve => {
     const req = https.get(
@@ -45,6 +52,7 @@ function startTrayDetached() {
 }
 
 async function main() {
+  const app = resolveAppArg();
   const alreadyRunning = await checkServerReady();
 
   if (!alreadyRunning) {
@@ -60,8 +68,11 @@ async function main() {
     console.log('[start:tray:desktop] Server already running on https://localhost:3000.');
   }
 
-  console.log('[start:tray:desktop] Launching Excel sideload...');
-  const sideload = spawn('npm run start:desktop', {
+  console.log(`[start:tray:desktop] Launching ${app} sideload...`);
+  const scriptName =
+    app === 'powerpoint' ? 'start:desktop:ppt' : app === 'word' ? 'start:desktop:word' : 'start:desktop:excel';
+
+  const sideload = spawn(`npm run ${scriptName}`, {
     shell: true,
     stdio: 'inherit',
     windowsHide: false,
