@@ -9,7 +9,9 @@ test.describe('Permissions and session history UI', () => {
     await page.getByRole('button', { name: 'Permissions' }).click();
 
     await expect(page.getByRole('heading', { name: 'Permissions' })).toBeVisible();
-    await expect(page.getByText('Manage auto-approval behavior and saved permission rules.')).toBeVisible();
+    await expect(
+      page.getByText('Manage auto-approval behavior and saved permission rules.')
+    ).toBeVisible();
 
     await page.getByRole('button', { name: /Browse/i }).click();
     await expect(page.getByRole('button', { name: 'Select' })).toBeVisible({ timeout: 10_000 });
@@ -53,9 +55,16 @@ test.describe('Permissions and session history UI', () => {
         },
       };
       localStorage.setItem('office-coding-agent-session-history', JSON.stringify(payload));
-      const runtime = (globalThis as { OfficeRuntime?: { storage?: { setItem?: (k: string, v: string) => Promise<void> } } }).OfficeRuntime;
+      const runtime = (
+        globalThis as {
+          OfficeRuntime?: { storage?: { setItem?: (k: string, v: string) => Promise<void> } };
+        }
+      ).OfficeRuntime;
       if (runtime?.storage?.setItem) {
-        void runtime.storage.setItem('office-coding-agent-session-history', JSON.stringify(payload));
+        void runtime.storage.setItem(
+          'office-coding-agent-session-history',
+          JSON.stringify(payload)
+        );
       }
     });
 

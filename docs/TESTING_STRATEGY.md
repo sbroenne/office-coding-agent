@@ -53,43 +53,43 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 **Runner:** Vitest with jsdom  
 **Real components wired together; real store operations; live Copilot tests require a running dev server.**
 
-| File                                    | Category                            | Requires server? |
-| --------------------------------------- | ----------------------------------- | ---------------- |
-| `agent-manager-dialog.test.tsx`         | Component wiring                    | No               |
-| `agent-picker.test.tsx`                 | Component wiring                    | No               |
-| `agent-service.test.ts`                 | Agent service + frontmatter parsing | No               |
-| `app-error-boundary.test.tsx`           | Component wiring                    | No               |
-| `app-session-error.test.tsx`            | Component wiring                    | No               |
-| `app-state.test.tsx`                    | Component wiring                    | No               |
-| `chat-error-boundary.test.tsx`          | Component wiring                    | No               |
-| `chat-header-settings-flow.test.tsx`    | Component wiring                    | No               |
-| `chat-panel.test.tsx`                   | Component wiring                    | No               |
-| `chat-store.test.ts`                    | Chat message store                  | No               |
-| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes              |
-| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes              |
-| `excel-tools.test.ts`                   | Tool schema + factory (Excel)       | No               |
-| `host-tools-limit.test.ts`             | Host tool count limits              | No               |
-| `humanize-tool-name.test.ts`           | Tool-name → human-readable labels   | No               |
-| `id.test.ts`                            | `generateId` utility                | No               |
-| `management-tools.test.ts`             | Management tool schemas + handlers  | No               |
-| `manifest.test.ts`                      | Office manifest / host assumptions  | No               |
-| `mcp-manager-dialog.test.tsx`           | Component wiring                    | No               |
-| `mcp-service.test.ts`                   | MCP server config parsing           | No               |
-| `model-manager.test.tsx`                | Component wiring                    | No               |
-| `model-picker-interactions.test.tsx`    | Component wiring                    | No               |
-| `office-storage.test.ts`               | `officeStorage` with OfficeRuntime  | No               |
-| `powerpoint-tools.test.ts`             | Tool schema + factory (PPT)         | No               |
-| `settings-dialog.test.tsx`              | Component wiring                    | No               |
-| `settings-store.test.ts`               | Zustand store (model/agent/skills)  | No               |
-| `skill-manager-dialog.test.tsx`         | Component wiring                    | No               |
-| `skill-picker.test.tsx`                 | Component wiring                    | No               |
-| `skill-service.test.ts`                | Skill service + context building    | No               |
-| `stale-state.test.tsx`                  | Store hydration                     | No               |
-| `use-office-chat.test.tsx`             | useOfficeChat hook                  | No               |
-| `use-tool-invocations-patch.test.tsx`  | Tool invocation argument streaming  | No               |
-| `word-tools.test.ts`                    | Tool schema + factory (Word)        | No               |
-| `zip-export-service.test.ts`            | ZIP export service                  | No               |
-| `zip-import-service.test.ts`            | ZIP import service                  | No               |
+| File                                       | Category                            | Requires server? |
+| ------------------------------------------ | ----------------------------------- | ---------------- |
+| `agent-manager-dialog.test.tsx`            | Component wiring                    | No               |
+| `agent-picker.test.tsx`                    | Component wiring                    | No               |
+| `agent-service.test.ts`                    | Agent service + frontmatter parsing | No               |
+| `app-error-boundary.test.tsx`              | Component wiring                    | No               |
+| `app-session-error.test.tsx`               | Component wiring                    | No               |
+| `app-state.test.tsx`                       | Component wiring                    | No               |
+| `chat-error-boundary.test.tsx`             | Component wiring                    | No               |
+| `chat-header-settings-flow.test.tsx`       | Component wiring                    | No               |
+| `chat-panel.test.tsx`                      | Component wiring                    | No               |
+| `chat-store.test.ts`                       | Chat message store                  | No               |
+| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills  | Yes              |
+| `copilot-websocket.integration.test.ts`    | Live Copilot WebSocket E2E          | Yes              |
+| `excel-tools.test.ts`                      | Tool schema + factory (Excel)       | No               |
+| `host-tools-limit.test.ts`                 | Host tool count limits              | No               |
+| `humanize-tool-name.test.ts`               | Tool-name → human-readable labels   | No               |
+| `id.test.ts`                               | `generateId` utility                | No               |
+| `management-tools.test.ts`                 | Management tool schemas + handlers  | No               |
+| `manifest.test.ts`                         | Office manifest / host assumptions  | No               |
+| `mcp-manager-dialog.test.tsx`              | Component wiring                    | No               |
+| `mcp-service.test.ts`                      | MCP server config parsing           | No               |
+| `model-manager.test.tsx`                   | Component wiring                    | No               |
+| `model-picker-interactions.test.tsx`       | Component wiring                    | No               |
+| `office-storage.test.ts`                   | `officeStorage` with OfficeRuntime  | No               |
+| `powerpoint-tools.test.ts`                 | Tool schema + factory (PPT)         | No               |
+| `settings-dialog.test.tsx`                 | Component wiring                    | No               |
+| `settings-store.test.ts`                   | Zustand store (model/agent/skills)  | No               |
+| `skill-manager-dialog.test.tsx`            | Component wiring                    | No               |
+| `skill-picker.test.tsx`                    | Component wiring                    | No               |
+| `skill-service.test.ts`                    | Skill service + context building    | No               |
+| `stale-state.test.tsx`                     | Store hydration                     | No               |
+| `use-office-chat.test.tsx`                 | useOfficeChat hook                  | No               |
+| `use-tool-invocations-patch.test.tsx`      | Tool invocation argument streaming  | No               |
+| `word-tools.test.ts`                       | Tool schema + factory (Word)        | No               |
+| `zip-export-service.test.ts`               | ZIP export service                  | No               |
+| `zip-import-service.test.ts`               | ZIP import service                  | No               |
 
 **Key rules:**
 
@@ -108,26 +108,26 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 ### E2E Tests — Mocha inside real Office hosts
 
-| Host       | Directory            | Tests  |
-| ---------- | -------------------- | ------ |
-| Excel      | `tests-e2e/`         | ~187   |
-| PowerPoint | `tests-e2e-ppt/`     | ~13    |
-| Word       | `tests-e2e-word/`    | ~12    |
+| Host       | Directory         | Tests |
+| ---------- | ----------------- | ----- |
+| Excel      | `tests-e2e/`      | ~187  |
+| PowerPoint | `tests-e2e-ppt/`  | ~13   |
+| Word       | `tests-e2e-word/` | ~12   |
 
 **Real Office.js APIs, real host runtime.**
 
 ## When to Write What
 
-| Scenario                                | Test type        | Location             |
-| --------------------------------------- | ---------------- | -------------------- |
-| New Excel command (`Excel.run`)         | E2E test         | `tests-e2e/`         |
-| New PowerPoint command                  | E2E test         | `tests-e2e-ppt/`     |
-| New Word command                        | E2E test         | `tests-e2e-word/`    |
-| New task pane interaction flow          | UI test          | `tests-ui/`          |
-| New React component or hook behavior   | Integration test | `tests/integration/` |
-| New host routing rule                   | Integration test | `tests/integration/` |
-| New tool definition                     | Integration test | `tests/integration/` |
-| New pure function                       | Integration test | `tests/integration/` |
+| Scenario                             | Test type        | Location             |
+| ------------------------------------ | ---------------- | -------------------- |
+| New Excel command (`Excel.run`)      | E2E test         | `tests-e2e/`         |
+| New PowerPoint command               | E2E test         | `tests-e2e-ppt/`     |
+| New Word command                     | E2E test         | `tests-e2e-word/`    |
+| New task pane interaction flow       | UI test          | `tests-ui/`          |
+| New React component or hook behavior | Integration test | `tests/integration/` |
+| New host routing rule                | Integration test | `tests/integration/` |
+| New tool definition                  | Integration test | `tests/integration/` |
+| New pure function                    | Integration test | `tests/integration/` |
 
 ## Running Tests
 

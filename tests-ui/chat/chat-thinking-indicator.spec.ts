@@ -41,7 +41,9 @@ test.describe('Thinking indicator (live Copilot)', () => {
     });
 
     // Prompt that triggers manage_skills tool (no Excel needed)
-    await composer.fill('Use the manage_skills tool with action "list" and tell me how many skills you have.');
+    await composer.fill(
+      'Use the manage_skills tool with action "list" and tell me how many skills you have.'
+    );
     await composer.press('Enter');
 
     // Wait for the response to complete
@@ -72,7 +74,9 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
     // Use manage_skills — a tool that doesn't need Excel
-    await composer.fill('Use the manage_skills tool with action "list" and tell me how many skills you have.');
+    await composer.fill(
+      'Use the manage_skills tool with action "list" and tell me how many skills you have.'
+    );
     await composer.press('Enter');
 
     // Wait for the response to complete — Cancel button disappears
@@ -102,7 +106,9 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
-    await composer.fill('Use the manage_skills tool with action "list" and tell me how many skills you have.');
+    await composer.fill(
+      'Use the manage_skills tool with action "list" and tell me how many skills you have.'
+    );
     await composer.press('Enter');
 
     // Wait for the thinking indicator to appear
@@ -110,20 +116,18 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(indicator).toBeVisible({ timeout: AI_TIMEOUT });
 
     // The indicator must NOT be a descendant of the viewport footer
-    const isInsideFooter = await indicator.evaluate(el =>
-      !!el.closest('.aui-thread-viewport-footer')
+    const isInsideFooter = await indicator.evaluate(
+      el => !!el.closest('.aui-thread-viewport-footer')
     );
     expect(isInsideFooter).toBe(false);
 
     // The indicator must be a descendant of the scrollable viewport
-    const isInsideViewport = await indicator.evaluate(el =>
-      !!el.closest('.aui-thread-viewport')
-    );
+    const isInsideViewport = await indicator.evaluate(el => !!el.closest('.aui-thread-viewport'));
     expect(isInsideViewport).toBe(true);
 
     // The indicator must be rendered within an assistant message block
-    const isInsideAssistantMessage = await indicator.evaluate(el =>
-      !!el.closest('.aui-assistant-message-root')
+    const isInsideAssistantMessage = await indicator.evaluate(
+      el => !!el.closest('.aui-assistant-message-root')
     );
     expect(isInsideAssistantMessage).toBe(true);
 
