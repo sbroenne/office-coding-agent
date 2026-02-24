@@ -22,10 +22,12 @@ describe('Integration: ChatHeader', () => {
   it('renders skill picker and new conversation button', () => {
     renderWithProviders(
       <ChatHeader
+        host="excel"
         onClearMessages={mockClearMessages}
         sessions={[]}
         activeSessionId={null}
         onRestoreSession={vi.fn()}
+        onDeleteSession={vi.fn()}
       />
     );
 
@@ -36,10 +38,12 @@ describe('Integration: ChatHeader', () => {
   it('calls onClearMessages when New conversation is clicked', async () => {
     renderWithProviders(
       <ChatHeader
+        host="excel"
         onClearMessages={mockClearMessages}
         sessions={[]}
         activeSessionId={null}
         onRestoreSession={vi.fn()}
+        onDeleteSession={vi.fn()}
       />
     );
 

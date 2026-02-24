@@ -60,6 +60,34 @@ async function createServer() {
     res.json({ ok: true });
   });
 
+  apiRouter.get('/env', (_req, res) => {
+    res.json({
+      cwd: process.cwd(),
+      home: os.homedir(),
+      platform: process.platform,
+    });
+  });
+
+  apiRouter.get('/browse', async (req, res) => {
+    try {
+      const requestedPath = typeof req.query.path === 'string' ? req.query.path : process.cwd();
+      const absolutePath = path.resolve(requestedPath);
+      const entries = await fs.promises.readdir(absolutePath, { withFileTypes: true });
+      const dirs = entries
+        .filter(entry => entry.isDirectory())
+        .map(entry => entry.name)
+        .sort((a, b) => a.localeCompare(b));
+      const parent = path.dirname(absolutePath);
+      res.json({
+        path: absolutePath,
+        parent: parent === absolutePath ? null : parent,
+        dirs,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Remote log relay — client errors are printed to the server console
   apiRouter.post('/log', (req, res) => {
     const { level = 'error', tag = 'client', message, detail } = req.body || {};

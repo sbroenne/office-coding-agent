@@ -33,6 +33,15 @@ export interface PermissionRequestPayload {
   requestId: string;
   request: {
     kind: string;
+    intention?: string;
+    fullCommandText?: string;
+    commands?: readonly { identifier: string }[];
+    fileName?: string;
+    diff?: string;
+    path?: string;
+    serverName?: string;
+    toolName?: string;
+    args?: unknown;
     [key: string]: unknown;
   };
 }

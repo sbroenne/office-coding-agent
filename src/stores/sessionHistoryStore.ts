@@ -18,6 +18,8 @@ interface SessionHistoryStoreState {
   createSession: (host: OfficeHostApp) => string;
   setActiveSession: (sessionId: string) => void;
   upsertActiveSession: (input: { host: OfficeHostApp; title: string; messages: unknown[] }) => void;
+  deleteSession: (sessionId: string) => void;
+  clearSessionsForHost: (host: OfficeHostApp) => void;
 }
 
 const MAX_SESSIONS = 50;
@@ -80,6 +82,33 @@ export const useSessionHistoryStore = create<SessionHistoryStoreState>()(
           return {
             sessions: trimSessions([next, ...remaining]),
             activeSessionId: sessionId,
+          };
+        });
+      },
+
+      deleteSession: sessionId => {
+        set(state => {
+          const nextSessions = state.sessions.filter(s => s.id !== sessionId);
+          const nextActiveSessionId =
+            state.activeSessionId === sessionId
+              ? (nextSessions[0]?.id ?? null)
+              : state.activeSessionId;
+          return {
+            sessions: nextSessions,
+            activeSessionId: nextActiveSessionId,
+          };
+        });
+      },
+
+      clearSessionsForHost: host => {
+        set(state => {
+          const nextSessions = state.sessions.filter(s => s.host !== host);
+          const activeStillExists = nextSessions.some(s => s.id === state.activeSessionId);
+          return {
+            sessions: nextSessions,
+            activeSessionId: activeStillExists
+              ? state.activeSessionId
+              : (nextSessions[0]?.id ?? null),
           };
         });
       },

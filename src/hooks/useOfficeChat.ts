@@ -11,6 +11,7 @@ import { resolveActiveAgent } from '@/services/agents';
 import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
+import { usePermissionStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider } from '@/types';
@@ -84,6 +85,10 @@ export function useOfficeChat(host: OfficeHostApp) {
   const createSession = useSessionHistoryStore(s => s.createSession);
   const setActiveSession = useSessionHistoryStore(s => s.setActiveSession);
   const upsertActiveSession = useSessionHistoryStore(s => s.upsertActiveSession);
+  const deleteSessionHistoryItem = useSessionHistoryStore(s => s.deleteSession);
+  const evaluatePermission = usePermissionStore(s => s.evaluate);
+  const addPermissionRule = usePermissionStore(s => s.addRule);
+  const allowAllPermissions = usePermissionStore(s => s.allowAll);
 
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
@@ -244,6 +249,11 @@ export function useOfficeChat(host: OfficeHostApp) {
       console.log('[chat] Session created:', session.sessionId);
 
       session.onPermissionRequest(payload => {
+        const autoDecision = evaluatePermission(payload.request);
+        if (autoDecision === 'approved') {
+          void session.respondPermission(payload.requestId, 'approved');
+          return;
+        }
         activePermissionRequestRef.current = payload.requestId;
         setPendingPermission(payload);
       });
@@ -267,6 +277,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     activeAgentId,
     importedMcpServers,
     activeMcpServerNames,
+    evaluatePermission,
   ]);
 
   useEffect(() => {
@@ -525,6 +536,18 @@ export function useOfficeChat(host: OfficeHostApp) {
     [deserializeMessages, initSession, sessions, setActiveSession]
   );
 
+  const deleteSession = useCallback(
+    (sessionId: string) => {
+      deleteSessionHistoryItem(sessionId);
+      if (activeSessionId === sessionId) {
+        setMessages([]);
+        createSession(host);
+        void initSession();
+      }
+    },
+    [activeSessionId, createSession, deleteSessionHistoryItem, host, initSession]
+  );
+
   const respondPermission = useCallback(async (decision: 'approved' | 'denied') => {
     const session = sessionRef.current;
     const requestId = activePermissionRequestRef.current;
@@ -547,6 +570,24 @@ export function useOfficeChat(host: OfficeHostApp) {
     void respondPermission('denied');
   }, [respondPermission]);
 
+  const allowPermissionAlways = useCallback(() => {
+    const request = pendingPermission?.request;
+    if (!request) return;
+    const pathPrefix =
+      (typeof request.path === 'string' && request.path) ||
+      (typeof request.fileName === 'string' && request.fileName) ||
+      (typeof request.fullCommandText === 'string' && request.fullCommandText) ||
+      null;
+
+    if (pathPrefix) {
+      addPermissionRule({
+        kind: request.kind,
+        pathPrefix,
+      });
+    }
+    void respondPermission('approved');
+  }, [addPermissionRule, pendingPermission, respondPermission]);
+
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     isRunning,
     messages,
@@ -565,11 +606,14 @@ export function useOfficeChat(host: OfficeHostApp) {
     isConnecting,
     clearMessages,
     restoreSession,
+    deleteSession,
     sessions,
     activeSessionId,
     pendingPermission,
+    allowAllPermissions,
     approvePermission,
     denyPermission,
+    allowPermissionAlways,
     thinkingText,
   };
 }

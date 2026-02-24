@@ -80,6 +80,10 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run sideload:share:trust`   | Register local share as trusted Office catalog    |
 | `npm run sideload:share:publish` | Copy staging manifest into local shared folder    |
 | `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup      |
+| `npm run register:win`           | Trust cert and register manifest for Word/PPT/Excel (Windows) |
+| `npm run unregister:win`         | Remove registered manifest entry (Windows)        |
+| `npm run register:mac`           | Trust cert and register manifest for Word/PPT/Excel (macOS) |
+| `npm run unregister:mac`         | Remove manifest from Word/PPT/Excel WEF folders (macOS) |
 | `npm run lint`                   | Run ESLint                                        |
 | `npm run lint:fix`               | Auto-fix ESLint issues                            |
 | `npm run format`                 | Format code with Prettier                         |
