@@ -48,10 +48,10 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 ## Test Tiers
 
-### Integration Tests (`tests/integration/`) — 36 files, 429 tests
+### Integration Tests (`tests/integration/`)
 
 **Runner:** Vitest with jsdom  
-**Real components wired together; real store operations; live Copilot tests auto-skip without a server.**
+**Real components wired together; real store operations; live Copilot tests require a running dev server.**
 
 | File                                    | Category                            | Requires server? |
 | --------------------------------------- | ----------------------------------- | ---------------- |
@@ -65,10 +65,9 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 | `chat-header-settings-flow.test.tsx`    | Component wiring                    | No               |
 | `chat-panel.test.tsx`                   | Component wiring                    | No               |
 | `chat-store.test.ts`                    | Chat message store                  | No               |
-| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes (auto-skip)  |
-| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes (auto-skip)  |
+| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes              |
+| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes              |
 | `excel-tools.test.ts`                   | Tool schema + factory (Excel)       | No               |
-| `general-tools.test.ts`                 | General-purpose tool definitions    | No               |
 | `host-tools-limit.test.ts`             | Host tool count limits              | No               |
 | `humanize-tool-name.test.ts`           | Tool-name → human-readable labels   | No               |
 | `id.test.ts`                            | `generateId` utility                | No               |
@@ -99,7 +98,7 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 - **No child mocks.** Render real components together to test cross-component interactions.
 - **Reset store state** in `beforeEach` via `useSettingsStore.getState().reset()`.
 - **Use table-driven tests** (`it.each`) for functions with many input→output mappings.
-- The live Copilot tests auto-skip when `npm run dev` is not running.
+- Live Copilot tests must run against a live server (`npm run dev`); do not add auto-skip behavior.
 - Both `vitest.config.ts` and `vitest.integration.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`.
 
 ### UI Tests (`tests-ui/`) — Playwright
@@ -133,7 +132,7 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 ## Running Tests
 
 ```bash
-# Integration tests (429 tests, 36 files)
+# Integration tests
 npm run test:integration
 
 # Playwright UI tests

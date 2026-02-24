@@ -9,10 +9,10 @@ An Office add-in that embeds GitHub Copilot as an AI assistant in Excel (and oth
 ## How It Works
 
 ```
-Excel Task Pane (React + assistant-ui)
-        ↓ WebSocket (wss://localhost:3000/api/copilot)
+Office Task Pane (React + assistant-ui)
+      ↓ WebSocket (wss://localhost:3000/api/copilot)
 Node.js proxy server  (src/server.mjs)
-        ↓ @github/copilot-sdk (manages CLI lifecycle internally)
+      ↓ @github/copilot-sdk (manages CLI lifecycle internally)
 GitHub Copilot API
 ```
 
@@ -21,7 +21,7 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 ## Features
 
 - **GitHub Copilot authentication** — sign in once with your GitHub account; no API keys or endpoint config
-- **10 Excel tool groups** — range, table, chart, sheet, workbook, comment, conditional format, data validation, pivot table, range format — covering ~83 actions the AI can perform
+- **Host-routed tools** — Excel, PowerPoint, and Word toolsets selected by current Office host
 - **Agent system** — host-targeted agents with YAML frontmatter (`hosts`, `defaultForHosts`)
 - **Skills system** — bundled skill files inject context into the system prompt, toggleable via SkillPicker
 - **Custom agents & skills** — import local ZIP files for custom agents and skills
@@ -37,7 +37,7 @@ A skill is a folder containing `SKILL.md`. Optional supporting docs live under `
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) >= 20
-- Microsoft Excel (desktop or Microsoft 365 web)
+- Microsoft Office desktop app(s): Excel, PowerPoint, and/or Word
 - An active **GitHub Copilot** subscription (individual, business, or enterprise)
 - The `@github/copilot` CLI authenticated (`gh auth login` or equivalent)
 
@@ -50,8 +50,12 @@ npm install
 # Terminal 1: start the Copilot proxy server
 npm run dev
 
-# Terminal 2: sideload into Excel Desktop
-npm run start:desktop
+# Terminal 2: sideload into a desktop host
+npm run start:desktop:excel
+# or
+npm run start:desktop:ppt
+# or
+npm run start:desktop:word
 ```
 
 The proxy server runs on `https://localhost:3000` and handles both the Vite dev server UI and the WebSocket Copilot proxy.
@@ -60,24 +64,22 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 
 ## Available Scripts
 
-## Available Scripts
-
 | Script                           | Description                                       |
 | -------------------------------- | ------------------------------------------------- |
 | `npm run dev`                    | Start Copilot proxy + Vite dev server (port 3000) |
 | `npm run start:prod-server`      | Start production HTTPS server from `dist/`         |
 | `npm run start:tray`             | Build + run Electron system tray app               |
-| `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop |
+| `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop (legacy alias) |
 | `npm run start:tray:excel`       | Start tray app (if needed) then sideload Excel desktop |
 | `npm run start:tray:ppt`         | Start tray app (if needed) then sideload PowerPoint desktop |
 | `npm run start:tray:word`        | Start tray app (if needed) then sideload Word desktop |
-| `npm run stop:tray:desktop`      | Stop Excel sideload/debug session and server port 3000 |
+| `npm run stop:tray:desktop`      | Stop desktop sideload/debug session and server port 3000 |
 | `npm run build:installer`        | Build desktop installer artifacts via electron-builder |
 | `npm run build:installer:win`    | Build Windows installer (NSIS)                     |
 | `npm run build:installer:dir`    | Build unpacked desktop app directory               |
 | `npm run build`                  | Production build to `dist/`                       |
 | `npm run build:dev`              | Development build to `dist/`                      |
-| `npm run start:desktop`          | Sideload into Excel Desktop                       |
+| `npm run start:desktop`          | Sideload into Excel Desktop (legacy alias)       |
 | `npm run start:desktop:excel`    | Sideload into Excel Desktop                       |
 | `npm run start:desktop:ppt`      | Sideload into PowerPoint Desktop                  |
 | `npm run start:desktop:word`     | Sideload into Word Desktop                        |
@@ -95,22 +97,25 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run lint:fix`               | Auto-fix ESLint issues                            |
 | `npm run format`                 | Format code with Prettier                         |
 | `npm run typecheck`              | Type-check without emitting                       |
-| `npm test`                       | Run all Vitest tests                              |
+| `npm test`                       | Run all Vitest suites                             |
+| `npm run test:integration`       | Run integration test suite                         |
+| `npm run test:ui`                | Run Playwright UI tests                            |
 | `npm run test:watch`             | Run tests in watch mode                           |
 | `npm run test:coverage`          | Run tests with coverage                           |
-| `npm run test:e2e`               | Run E2E tests in Excel Desktop (~187)             |
+| `npm run test:e2e`               | Run E2E tests in Excel Desktop                    |
+| `npm run test:e2e:ppt`           | Run E2E tests in PowerPoint Desktop               |
+| `npm run test:e2e:word`          | Run E2E tests in Word Desktop                     |
 | `npm run validate`               | Validate `manifests/manifest.dev.xml`             |
 
 ## Testing
 
-The project has four layers of tests:
+This project uses three active test layers:
 
-| Layer           | Tool       | Count                | What it covers                                                              |
-| --------------- | ---------- | -------------------- | --------------------------------------------------------------------------- |
-| **Unit**        | Vitest     | 18 files (265 tests) | Pure functions, Zustand store, JSON Schema tool configs, host/agent parsing |
-| **Integration** | Vitest     | 12 files             | Component wiring (no live API needed)                                       |
-| **UI**          | Playwright | ~14 tests            | Browser taskpane flows                                                      |
-| **E2E**         | Mocha      | 234 tests            | Excel commands inside real Excel Desktop (4 require live Copilot)           |
+- **Integration** (`tests/integration/`, Vitest) — component wiring, stores, host/tool routing, and live Copilot websocket flows
+- **UI** (`tests-ui/`, Playwright) — browser taskpane behavior and regression coverage
+- **E2E** (`tests-e2e*`, Mocha) — real Office host validation in Excel, PowerPoint, and Word desktop
+
+Unit tests are intentionally not used for new work in this repository.
 
 ### Running Tests
 
@@ -127,42 +132,14 @@ npm run test:coverage
 # Browser UI tests
 npm run test:ui
 
-# E2E tests (requires Excel Desktop)
+# E2E tests (require Office desktop app)
 npm run test:e2e
+npm run test:e2e:ppt
+npm run test:e2e:word
 
 # Validate the Office add-in manifest
 npm run validate
 ```
-
-### Unit Tests
-
-Unit tests in `tests/unit/` cover pure functions and store logic with **no** `Excel.run()` dependency:
-
-| File                                | What it tests                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------ |
-| `agentService.test.ts`              | Agent frontmatter parsing, getAgents, getAgent, getAgentInstructions     |
-| `buildSkillContext.test.ts`         | `buildSkillContext` and related skill functions with bundled `.md` files |
-| `chatErrorBoundary.test.tsx`        | Error boundary fallback rendering and recovery flow                      |
-| `chatPanel.test.tsx`                | ChatPanel component logic (mocks assistant-ui components for jsdom)      |
-| `humanizeToolName.test.ts`          | Tool-name formatting for user-facing progress labels                     |
-| `id.test.ts`                        | `generateId` unique ID generation utility                                |
-| `manifest.test.ts`                  | Manifest and runtime host assumptions used by tests                      |
-| `officeStorage.test.ts`             | `officeStorage` localStorage fallback (OfficeRuntime undefined in jsdom) |
-| `officeStorageRuntime.test.ts`      | `officeStorage` behavior when OfficeRuntime is present and throws        |
-| `parseFrontmatter.test.ts`          | YAML frontmatter parsing for skill files (delimiters, arrays)            |
-| `settingsStore.test.ts`             | Zustand store: activeModel, agent/skill management                       |
-| `toolSchemas.test.ts`               | JSON Schema validation for all tool definitions                          |
-| `useToolInvocations-patch.test.tsx` | assistant-ui patch for tool invocation argument streaming integrity      |
-
-**Key principle:** unit tests run against the **real** Zustand store with localStorage (jsdom). No mocking.
-
-### Integration Tests
-
-Integration tests in `tests/integration/` exercise **component wiring only** (no live API needed):
-
-- `agent-picker.test.tsx`, `skill-picker.test.tsx`, `chat-panel.test.tsx`, `chat-header-settings-flow.test.tsx`
-- `app-state.test.tsx`, `app-error-boundary.test.tsx`, `model-picker-interactions.test.tsx`
-- `stale-state.test.tsx` — store hydration recovery from stale localStorage
 
 Integration tests run as part of the default `npm test` suite.
 
