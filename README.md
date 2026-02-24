@@ -27,6 +27,7 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 - **Custom agents & skills** — import local ZIP files for custom agents and skills
 - **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
+- **Auto-scroll chat** — thread stays pinned to newest content so follow-up output remains visible
 - **Web fetch tool** — proxied through the local server to avoid CORS restrictions
 
 ## Agent Skills Format

@@ -37,6 +37,10 @@ npm run start:tray:ppt
 npm run start:tray:word
 ```
 
+Note: tray startup includes a reliability fallback — if the tray server does not
+become healthy on `https://localhost:3000` in time, the launcher falls back to
+starting the dev server and then proceeds with host sideload.
+
 When done:
 
 ```bash
