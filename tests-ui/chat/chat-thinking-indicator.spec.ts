@@ -127,6 +127,17 @@ test.describe('Thinking indicator (live Copilot)', () => {
     );
     expect(isInsideAssistantMessage).toBe(true);
 
+    // Geometric guard: indicator must render above the composer area
+    const isAboveComposer = await page.evaluate(() => {
+      const indicatorEl = document.querySelector('.aui-assistant-thinking-indicator');
+      const composerEl = document.querySelector('.aui-composer-root');
+      if (!indicatorEl || !composerEl) return false;
+      const indicatorRect = indicatorEl.getBoundingClientRect();
+      const composerRect = composerEl.getBoundingClientRect();
+      return indicatorRect.bottom <= composerRect.top;
+    });
+    expect(isAboveComposer).toBe(true);
+
     // The indicator must appear BELOW the last message in DOM order
     const isAfterMessages = await page.evaluate(() => {
       const messages = document.querySelector('[data-role="user"]');
