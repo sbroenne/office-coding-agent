@@ -325,9 +325,9 @@ State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill config
 
 The task pane is organized into three areas:
 
-- **ChatHeader** — "AI Chat" title + SkillPicker (icon-only with badge) + New Conversation button + Settings gear
-- **ChatPanel** — CopilotChat messages, Copilot-style progress indicators (cycling dots + phase labels), choice cards, error bar, ChatInput, and an **input toolbar** below the text box with AgentPicker + ModelPicker (GitHub Copilot-style)
-- **App** — root component that owns settings dialog state, detects system theme and Office host
+- **ChatHeader** — SkillPicker, Session History picker, Permissions button, and New Conversation action
+- **ChatPanel** — thread/message stream, inline thinking indicator, composer, and input toolbar with AgentPicker + ModelPicker
+- **App** — root shell that handles Office host detection, theme sync, and connection/session/permission banners
 
 ## Authentication
 
@@ -335,7 +335,7 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 
 ## Tech Stack
 
-- **React 18** — UI framework
+- **React 19** — UI framework
 - **assistant-ui + Radix UI + Tailwind CSS v4** — task pane UI components and styling
 - **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
 - **WebSocket + JSON-RPC** (`vscode-jsonrpc`, `ws`) — browser-to-proxy transport
@@ -343,7 +343,7 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 - **Zustand 5** — lightweight state management with `OfficeRuntime.storage` persistence
 - **Vite 7** — bundling with HMR
 - **TypeScript 5** — type safety
-- **Vitest** — unit, component, and integration testing
+- **Vitest** — integration testing
 - **Playwright** — browser UI testing for task pane flows
 - **Mocha** — E2E testing inside Excel Desktop (~187 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
