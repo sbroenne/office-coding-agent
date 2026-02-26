@@ -3,25 +3,25 @@ import { test, expect } from '../fixtures';
 test.describe('Permissions and session history UI', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('opens permissions dialog and can set working directory via browser', async ({
+  test('opens permissions panel and can set working directory via browser', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Permissions' }).click();
 
     await expect(page.getByRole('heading', { name: 'Permissions' })).toBeVisible();
     await expect(
-      page.getByText('Manage auto-approval behavior and saved permission rules.')
+      page.getByText('Manage auto-approval and saved rules')
     ).toBeVisible();
 
     await page.getByRole('button', { name: /Browse/i }).click();
-    await expect(page.getByRole('button', { name: 'Select' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Select', exact: true })).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('button', { name: 'Select', exact: true }).click();
 
     await expect(page.getByText('Not set')).not.toBeVisible();
   });
 
-  test('opens history manage dialog and deletes a saved session', async ({
+  test('opens history manage panel and deletes a saved session', async ({
     configuredTaskpane: page,
   }) => {
     await page.evaluate(() => {
@@ -75,7 +75,7 @@ test.describe('Permissions and session history UI', () => {
     await expect(page.getByRole('button', { name: 'Manage history…' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Manage history…' }).click();
-    await expect(page.getByRole('heading', { name: 'Session history' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session History' })).toBeVisible();
     await expect(page.getByText('Budget review session')).toBeVisible();
 
     await expect(page.getByText('Word-only session')).not.toBeVisible();
