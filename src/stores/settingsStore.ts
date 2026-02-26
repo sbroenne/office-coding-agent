@@ -51,6 +51,10 @@ interface SettingsState extends UserSettings {
   addNpmSkillPackage: (packageName: string) => void;
   removeNpmSkillPackage: (packageName: string) => void;
 
+  // ─── WorkIQ ───
+  toggleWorkiq: () => void;
+  setWorkiqModel: (modelId: string | null) => void;
+
   // ─── Reset ───
   reset: () => void;
 }
@@ -246,6 +250,15 @@ export const useSettingsStore = create<SettingsState>()(
         }));
       },
 
+      // ─── WorkIQ ───
+      toggleWorkiq: () => {
+        set(state => ({ workiqEnabled: !state.workiqEnabled }));
+      },
+
+      setWorkiqModel: modelId => {
+        set({ workiqModel: modelId });
+      },
+
       // ─── Reset ───
       reset: () => {
         setImportedSkills([]);
@@ -265,6 +278,8 @@ export const useSettingsStore = create<SettingsState>()(
         importedMcpServers: state.importedMcpServers,
         activeMcpServerNames: state.activeMcpServerNames,
         npmSkillPackages: state.npmSkillPackages,
+        workiqEnabled: state.workiqEnabled,
+        workiqModel: state.workiqModel,
         // availableModels is NOT persisted — it's always fetched fresh from the
         // Copilot CLI on connect, so a stale cached list never survives restarts.
       }),

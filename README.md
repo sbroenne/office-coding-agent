@@ -1,6 +1,6 @@
 # Office Coding Agent
 
-An Office add-in that embeds GitHub Copilot as an AI assistant in Excel (and other Office hosts). Built with React, [assistant-ui](https://github.com/assistant-ui/assistant-ui), Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). The Copilot SDK integration architecture is based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
+An Office add-in that embeds GitHub Copilot as an AI assistant in Excel, PowerPoint, Word, and Outlook. Built with React, [assistant-ui](https://github.com/assistant-ui/assistant-ui), Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). The Copilot SDK integration architecture is based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
 
 > **Research Project Disclaimer**
 >
@@ -16,12 +16,16 @@ Node.js proxy server  (src/server.mjs)
 GitHub Copilot API
 ```
 
-The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecycle and bridges it to the browser task pane via WebSocket + JSON-RPC. Tool calls (Excel commands) flow back from the server to the browser.
+The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecycle and bridges it to the browser task pane via WebSocket + JSON-RPC. Tool calls flow back from the server to the browser, where host-specific handlers execute them (e.g., `Excel.run()`, `PowerPoint.run()`, `Word.run()`, or Outlook REST APIs).
 
 ## Features
 
 - **GitHub Copilot authentication** — sign in once with your GitHub account; no API keys or endpoint config
-- **Host-routed tools** — Excel, PowerPoint, and Word toolsets selected by current Office host
+- **Host-routed tools** — Excel, PowerPoint, Word, and Outlook toolsets selected by current Office host
+- **10 Excel tool groups** — range, table, chart, sheet, workbook, comment, conditional format, data validation, pivot table, range format — covering ~83 actions
+- **24 PowerPoint tools** — slides, shapes, text, images, tables, charts, notes, layouts; includes visual QA with `get_slide_image` region cropping for overflow detection
+- **35 Word tools** — documents, paragraphs, tables, images, headers/footers, styles, comments, sections, fields, content controls
+- **22 Outlook tools** — emails, calendar, contacts, folders, attachments, categories, search, flags, drafts
 - **Agent system** — host-targeted agents with YAML frontmatter (`hosts`, `defaultForHosts`)
 - **Skills system** — bundled skill files inject context into the system prompt, toggleable via SkillPicker
 - **Custom agents & skills** — import local ZIP files for custom agents and skills
@@ -29,6 +33,17 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
 - **Auto-scroll chat** — thread stays pinned to newest content so follow-up output remains visible
 - **Web fetch tool** — proxied through the local server to avoid CORS restrictions
+
+## Agent Skills Format
+
+A skill is a folder containing `SKILL.md`. Optional supporting docs live under `references/` inside that skill folder.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) >= 20
+- Microsoft Office (Excel, PowerPoint, Word, or Outlook — desktop or Microsoft 365 web)
+- An active **GitHub Copilot** subscription (individual, business, or enterprise)
+- The `@github/copilot` CLI authenticated (`gh auth login` or equivalent)
 
 ## Getting Started
 
@@ -57,6 +72,8 @@ npm run start:desktop:excel   # or :ppt / :word
 The proxy server runs on `https://localhost:3000` and handles both the Vite dev server UI and the Copilot WebSocket proxy. It must be running whenever you use the add-in.
 
 For local shared-folder sideloading and staging manifest workflows, see [docs/SIDELOADING.md](./docs/SIDELOADING.md).
+
+## Available Scripts
 
 ## Available Scripts
 
@@ -101,7 +118,10 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run test:e2e`               | Run E2E tests in Excel Desktop                                        |
 | `npm run test:e2e:ppt`           | Run E2E tests in PowerPoint Desktop                                   |
 | `npm run test:e2e:word`          | Run E2E tests in Word Desktop                                         |
+| `npm run test:e2e:outlook`       | Run E2E tests in Outlook Desktop                                      |
+| `npm run test:e2e:all`           | Run all four E2E suites in sequence                                   |
 | `npm run validate`               | Validate `manifests/manifest.dev.xml`                                 |
+| `npm run validate:outlook`       | Validate `manifests/manifest.outlook.dev.xml`                         |
 
 ## Testing
 
@@ -109,7 +129,7 @@ This project uses three active test layers:
 
 - **Integration** (`tests/integration/`, Vitest) — component wiring, stores, host/tool routing, and live Copilot websocket flows
 - **UI** (`tests-ui/`, Playwright) — browser taskpane behavior and regression coverage
-- **E2E** (`tests-e2e*`, Mocha) — real Office host validation in Excel, PowerPoint, and Word desktop
+- **E2E** (`tests-e2e*`, Mocha) — real Office host validation in Excel, PowerPoint, Word, and Outlook desktop
 
 Unit tests are intentionally not used for new work in this repository.
 
@@ -132,6 +152,7 @@ npm run test:ui
 npm run test:e2e
 npm run test:e2e:ppt
 npm run test:e2e:word
+npm run test:e2e:outlook
 
 # Validate the Office add-in manifest
 npm run validate
@@ -141,7 +162,7 @@ Integration tests run as part of the default `npm test` suite.
 
 ## E2E Testing
 
-The project includes ~187 end-to-end tests that validate all 83 Excel tools plus settings persistence and AI round-trips inside a real Excel Desktop instance.
+The project includes end-to-end tests across all four Office hosts: ~187 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
 
 ### How It Works
 
@@ -313,7 +334,7 @@ In chat pickers:
 
 - **`useOfficeChat`** — creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, maps `SessionEvent` stream to `ThreadMessage[]` for `useExternalStoreRuntime`
 - **`BrowserCopilotSession.query()`** — async generator yielding `SessionEvent` objects (assistant.message_delta, tool.execution_start, session.idle, etc.)
-- **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host
+- **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host (Excel: ~83 tools, PowerPoint: 24, Word: 35, Outlook: 22)
 
 State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill configuration; chat state is ephemeral.
 
@@ -367,6 +388,7 @@ The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/
 ## Acknowledgments
 
 - **[patniko/github-copilot-office](https://github.com/patniko/github-copilot-office)** — The proxy server architecture, Copilot SDK integration pattern, and WebSocket transport design used in this project were adopted from this repository by [Patrick Nikoletich](https://github.com/patniko) and [Steve Sanderson](https://github.com/SteveSandersonMS). Their work provided the foundation for the Phase 2 migration.
+- **[@trsdn (Torsten)](https://github.com/trsdn)** and **[@urosstojkic](https://github.com/urosstojkic)** — Contributed the Word document orchestrator (planner→worker pattern), 22 Outlook tools, expanded PowerPoint tooling (24 tools), WorkIQ MCP stdio integration, host-specific welcome prompts, improved auto-scroll, and new skills (Outlook email/calendar/drafting, Word formatting/tables/document-builder, PowerPoint content/layout/animation/presentation). Originally submitted as [PR #33](https://github.com/sbroenne/office-coding-agent/pull/33) and merged in [PR #45](https://github.com/sbroenne/office-coding-agent/pull/45).
 - **[assistant-ui](https://github.com/assistant-ui/assistant-ui)** — React chat UI components used for the task pane thread and composer.
 - **[Vercel AI SDK](https://ai-sdk.dev/)** — Original AI runtime used in Phase 1.
 

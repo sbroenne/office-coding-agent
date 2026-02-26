@@ -124,6 +124,15 @@ export default [
     },
   },
 
+  // CommonJS files — must use require(), disable ES-module-only rules
+  {
+    files: ['**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      'no-console': 'off',
+    },
+  },
+
   // Office Add-in specific overrides
   {
     files: ['src/**/*.{ts,tsx,mjs}'],

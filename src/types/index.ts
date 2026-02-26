@@ -1,5 +1,5 @@
 export type { CopilotModel, ModelProvider, UserSettings } from './settings';
-export { DEFAULT_SETTINGS, inferProvider } from './settings';
+export { DEFAULT_SETTINGS, inferProvider, WORKIQ_MCP_SERVER } from './settings';
 export type { ChatMessage, Suggestion, ToolCall } from './chat';
 export type {
   RangeData,
