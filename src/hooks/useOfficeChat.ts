@@ -80,6 +80,7 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
+  const npmSkillPackages = useSettingsStore(s => s.npmSkillPackages);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
   const createSession = useSessionHistoryStore(s => s.createSession);
@@ -229,6 +230,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           skills,
           disabledSkills,
           customAgents,
+          npmSkillPackages: npmSkillPackages.length > 0 ? npmSkillPackages : undefined,
         }),
         60_000,
         'session.create'

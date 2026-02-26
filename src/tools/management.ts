@@ -17,14 +17,14 @@ import type { AgentHost } from '@/types/agent';
 export const manageSkillsTool: Tool = {
   name: 'manage_skills',
   description:
-    'Manage agent skills. Actions: "list" (show all skills and active state), "install" (add a new skill from structured data), "remove" (delete an imported skill by name), "toggle" (enable/disable a skill by name).',
+    'Manage agent skills. Actions: "list" (show all skills and active state), "install" (add a new skill from structured data), "install_from_npm" (register a skillpm skill package from npm — see skillpm.dev — whose SKILL.md files are loaded at session start), "remove" (delete an imported skill by name), "remove_npm_package" (unregister a skillpm package by name), "toggle" (enable/disable a skill by name). Packages must follow the skillpm spec: skills/<name>/SKILL.md inside the package.',
   parameters: {
     type: 'object',
     properties: {
       action: {
         type: 'string',
         description: 'Operation to perform',
-        enum: ['list', 'install', 'remove', 'toggle'],
+        enum: ['list', 'install', 'install_from_npm', 'remove', 'remove_npm_package', 'toggle'],
       },
       // install params
       name: { type: 'string', description: 'Skill name (install, remove, toggle).' },
@@ -45,6 +45,12 @@ export const manageSkillsTool: Tool = {
         type: 'string',
         description: 'Markdown body of the skill — injected into the system prompt (install).',
       },
+      // install_from_npm / remove_npm_package params
+      package: {
+        type: 'string',
+        description:
+          'skillpm package name from npmjs.org (install_from_npm, remove_npm_package), e.g. "skillpm-skill" or "@myorg/my-skills". The package must follow the skillpm spec (skills/<name>/SKILL.md). See skillpm.dev for how to create and publish skill packages.',
+      },
     },
     required: ['action'],
   },
@@ -57,6 +63,7 @@ export const manageSkillsTool: Tool = {
       hosts?: string[];
       tags?: string[];
       content?: string;
+      package?: string;
     };
 
     const store = useSettingsStore.getState();
@@ -73,6 +80,7 @@ export const manageSkillsTool: Tool = {
           tags: s.metadata.tags,
           active: activeNames === null ? true : activeNames.includes(s.metadata.name),
         })),
+        npmSkillPackages: store.npmSkillPackages,
         count: skills.length,
       });
     }
@@ -97,6 +105,31 @@ export const manageSkillsTool: Tool = {
         name: skill.metadata.name,
         message: 'Skill installed. It will be active in the next conversation.',
       });
+    }
+
+    if (action === 'install_from_npm') {
+      const { package: packageName } = args as { package?: string };
+      if (!packageName)
+        return JSON.stringify({ error: 'package is required for install_from_npm' });
+
+      store.addNpmSkillPackage(packageName);
+      return JSON.stringify({
+        registered: true,
+        package: packageName,
+        message:
+          `skillpm package "${packageName}" registered. ` +
+          'The proxy will install it via npm and load all skills/<name>/SKILL.md files at the start of the next conversation. ' +
+          'See skillpm.dev for how to create and publish skill packages.',
+      });
+    }
+
+    if (action === 'remove_npm_package') {
+      const { package: packageName } = args as { package?: string };
+      if (!packageName)
+        return JSON.stringify({ error: 'package is required for remove_npm_package' });
+
+      store.removeNpmSkillPackage(packageName);
+      return JSON.stringify({ removed: true, package: packageName });
     }
 
     if (action === 'remove') {
@@ -276,28 +309,64 @@ export const manageMcpServersTool: Tool = {
       },
       name: { type: 'string', description: 'Server name (install, remove, toggle).' },
       description: { type: 'string', description: 'Server description (install).' },
-      url: { type: 'string', description: 'MCP server endpoint URL (install).' },
       transport: {
         type: 'string',
-        description: 'Transport protocol (install). Default: "http".',
-        enum: ['http', 'sse'],
+        description:
+          'Transport protocol (install). Use "http" or "sse" for remote servers, "stdio" for local subprocess servers (e.g. npx). Default: "http".',
+        enum: ['http', 'sse', 'stdio'],
+      },
+      // http/sse fields
+      url: {
+        type: 'string',
+        description: 'MCP server endpoint URL — required for http/sse transport (install).',
       },
       headers: {
         type: 'object',
         additionalProperties: { type: 'string' },
-        description: 'Optional HTTP headers, e.g. Authorization (install).',
+        description:
+          'Optional HTTP headers, e.g. Authorization — for http/sse transport (install).',
+      },
+      // stdio fields
+      command: {
+        type: 'string',
+        description: 'Executable command — required for stdio transport, e.g. "npx" (install).',
+      },
+      args: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Command arguments — for stdio transport, e.g. ["-y", "@some/mcp-server"] (install).',
+      },
+      env: {
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        description:
+          'Optional environment variables to pass to the subprocess — for stdio transport (install).',
       },
     },
     required: ['action'],
   },
   handler: (args: unknown, _invocation: ToolInvocation): ToolResultObject | string => {
-    const { action, name, description, url, transport, headers } = args as {
+    const {
+      action,
+      name,
+      description,
+      url,
+      transport,
+      headers,
+      command,
+      args: cmdArgs,
+      env,
+    } = args as {
       action: string;
       name?: string;
       description?: string;
       url?: string;
-      transport?: 'http' | 'sse';
+      transport?: 'http' | 'sse' | 'stdio';
       headers?: Record<string, string>;
+      command?: string;
+      args?: string[];
+      env?: Record<string, string>;
     };
 
     const store = useSettingsStore.getState();
@@ -309,8 +378,8 @@ export const manageMcpServersTool: Tool = {
         servers: servers.map(s => ({
           name: s.name,
           description: s.description,
-          url: s.url,
           transport: s.transport,
+          ...(s.transport === 'stdio' ? { command: s.command, args: s.args } : { url: s.url }),
           active: activeNames === null ? true : activeNames.includes(s.name),
         })),
         count: servers.length,
@@ -319,13 +388,36 @@ export const manageMcpServersTool: Tool = {
 
     if (action === 'install') {
       if (!name) return JSON.stringify({ error: 'name is required for install' });
-      if (!url) return JSON.stringify({ error: 'url is required for install' });
+
+      const resolvedTransport = transport ?? 'http';
+
+      if (resolvedTransport === 'stdio') {
+        if (!command) return JSON.stringify({ error: 'command is required for stdio transport' });
+
+        const server = {
+          name,
+          description,
+          transport: 'stdio' as const,
+          command,
+          args: cmdArgs ?? [],
+          env,
+        };
+        store.importMcpServers([server]);
+        return JSON.stringify({
+          installed: true,
+          name: server.name,
+          message: 'MCP server installed. It will be available in the next conversation.',
+        });
+      }
+
+      // http / sse
+      if (!url) return JSON.stringify({ error: 'url is required for http/sse transport' });
 
       const server = {
         name,
         description,
         url,
-        transport: transport ?? 'http',
+        transport: resolvedTransport,
         headers,
       };
       store.importMcpServers([server]);

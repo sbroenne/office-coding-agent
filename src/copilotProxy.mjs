@@ -10,12 +10,20 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+/** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
+const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+/** execFileAsync options for npm: shell:true is required on Windows for .cmd files. */
+const NPM_EXEC_OPTS = process.platform === 'win32' ? { shell: true } : {};
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
 
@@ -26,6 +34,75 @@ function slugify(name) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return slug || 'skill';
+}
+
+/**
+ * Scan a node_modules directory for skillpm-compatible skill directories.
+ * The skillpm spec places skills at: node_modules/<pkg>/skills/<name>/SKILL.md
+ * Returns an array of skill subdirectory paths (the directory containing SKILL.md).
+ *
+ * @param {string} nodeModulesDir - path to node_modules
+ * @returns {Promise<string[]>}
+ */
+async function findSkillDirs(nodeModulesDir) {
+  const skillDirs = [];
+  let pkgEntries;
+  try {
+    pkgEntries = await readdir(nodeModulesDir, { withFileTypes: true });
+  } catch {
+    return skillDirs; // node_modules doesn't exist
+  }
+
+  for (const entry of pkgEntries) {
+    // Handle scoped packages (@org/...)
+    if (entry.isDirectory() && entry.name.startsWith('@')) {
+      const scopeDir = join(nodeModulesDir, entry.name);
+      let scopedEntries;
+      try {
+        scopedEntries = await readdir(scopeDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const scopedEntry of scopedEntries) {
+        if (scopedEntry.isDirectory()) {
+          const pkgDir = join(scopeDir, scopedEntry.name);
+          const dirs = await findSkillDirsInPackage(pkgDir);
+          skillDirs.push(...dirs);
+        }
+      }
+    } else if (entry.isDirectory()) {
+      const pkgDir = join(nodeModulesDir, entry.name);
+      const dirs = await findSkillDirsInPackage(pkgDir);
+      skillDirs.push(...dirs);
+    }
+  }
+  return skillDirs;
+}
+
+/**
+ * Within a single package directory, find all skills/<name>/ subdirs that contain SKILL.md.
+ *
+ * @param {string} pkgDir
+ * @returns {Promise<string[]>}
+ */
+async function findSkillDirsInPackage(pkgDir) {
+  const skillsRoot = join(pkgDir, 'skills');
+  const result = [];
+  let skillSubdirs;
+  try {
+    skillSubdirs = await readdir(skillsRoot, { withFileTypes: true });
+  } catch {
+    return result; // no skills/ directory in this package
+  }
+  for (const sub of skillSubdirs) {
+    if (sub.isDirectory()) {
+      const skillDir = join(skillsRoot, sub.name);
+      if (existsSync(join(skillDir, 'SKILL.md'))) {
+        result.push(skillDir);
+      }
+    }
+  }
+  return result;
 }
 
 /** Root directory for bundled skills; each host has its own subdirectory. */
@@ -107,6 +184,9 @@ async function handleConnection(ws) {
 
   /** @type {Map<string, string>} Temp skill directories keyed by sessionId for cleanup. */
   const sessionTempDirs = new Map();
+
+  /** @type {Map<string, string[]>} All npm temp dirs keyed by sessionId for cleanup. */
+  const sessionNpmTempDirs = new Map();
 
   /** Send a JSON-RPC response back to the browser. */
   function sendResponse(id, result) {
@@ -241,9 +321,9 @@ async function handleConnection(ws) {
 
     switch (method) {
       case 'session.create': {
-        const { host, model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents } = params || {};
+        const { host, model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents, npmSkillPackages } = params || {};
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, npmSkillPackages=${(npmSkillPackages || []).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -281,6 +361,47 @@ async function handleConnection(ws) {
           skillDirectories.push(tempSkillDir);
         }
 
+        // Install skillpm skill packages and add their skill subdirs to skillDirectories.
+        // Uses skillpm (https://skillpm.dev) — the Agent Skills package manager built on npm.
+        // skillpm packages follow the spec: skills live in skills/<name>/SKILL.md inside the package.
+        // We run `npm install` directly (no global skillpm needed) and then scan for skill dirs.
+        const npmTempDirs = [];
+        if (npmSkillPackages && npmSkillPackages.length > 0) {
+          // Regex: allow scoped (@org/name) and plain package names, with optional @version suffix
+          const NPM_PKG_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(@[^\s/]+)?$/i;
+          for (const pkg of npmSkillPackages) {
+            if (typeof pkg !== 'string' || !NPM_PKG_RE.test(pkg.trim())) {
+              console.warn(`[proxy] Skipping invalid skillpm package name: "${pkg}"`);
+              continue;
+            }
+            const installDir = join(tmpdir(), `oca-skillpm-${randomUUID()}`);
+            await mkdir(installDir, { recursive: true });
+            npmTempDirs.push(installDir);
+            try {
+              // Run `npm install --prefix <dir> --no-save <pkg>` asynchronously
+              // so the Node.js event loop is never blocked.
+              await execFileAsync(
+                NPM_CMD,
+                ['install', '--prefix', installDir, '--no-save', pkg.trim()],
+                { ...NPM_EXEC_OPTS, timeout: 60_000 },
+              );
+
+              // Discover skill directories: skillpm packages put skills under
+              // node_modules/<pkgBaseName>/skills/<skillName>/SKILL.md
+              const skillDirs = await findSkillDirs(join(installDir, 'node_modules'));
+              for (const dir of skillDirs) {
+                skillDirectories.push(dir);
+                console.log(`[proxy] Added skillpm skill dir "${dir}" from package "${pkg}"`);
+              }
+              if (skillDirs.length === 0) {
+                console.warn(`[proxy] No skill dirs found in "${pkg}" — ensure it follows skillpm layout (skills/<name>/SKILL.md)`);
+              }
+            } catch (err) {
+              console.warn(`[proxy] Failed to install skillpm package "${pkg}":`, err.message);
+            }
+          }
+        }
+
         let session;
         try {
           await ensureStarted();
@@ -302,9 +423,12 @@ async function handleConnection(ws) {
             },
           });
         } catch (err) {
-          // Clean up temp skill directory on failure
+          // Clean up temp directories on failure
           if (tempSkillDir) {
             void rm(tempSkillDir, { recursive: true, force: true }).catch(() => {});
+          }
+          for (const dir of npmTempDirs) {
+            void rm(dir, { recursive: true, force: true }).catch(() => {});
           }
           console.error('[proxy] session.create failed:', err);
           sendError(id, -32603, err.message || 'Failed to create session');
@@ -314,6 +438,10 @@ async function handleConnection(ws) {
         sessions.set(session.sessionId, session);
         if (tempSkillDir) {
           sessionTempDirs.set(session.sessionId, tempSkillDir);
+        }
+        // Track ALL npm temp dirs for cleanup on session destroy
+        if (npmTempDirs.length > 0) {
+          sessionNpmTempDirs.set(session.sessionId, npmTempDirs);
         }
         markHealthy();
         console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
@@ -357,6 +485,14 @@ async function handleConnection(ws) {
           if (tempDir) {
             sessionTempDirs.delete(sessionId);
             void rm(tempDir, { recursive: true, force: true }).catch(() => {});
+          }
+          // Clean up all npm skill temp directories
+          const npmDirs = sessionNpmTempDirs.get(sessionId);
+          if (npmDirs) {
+            sessionNpmTempDirs.delete(sessionId);
+            for (const dir of npmDirs) {
+              void rm(dir, { recursive: true, force: true }).catch(() => {});
+            }
           }
         }
         sendResponse(id, {});
@@ -443,6 +579,14 @@ async function handleConnection(ws) {
       void rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
     sessionTempDirs.clear();
+
+    // Clean up all npm skill temp directories for this connection
+    for (const npmDirs of sessionNpmTempDirs.values()) {
+      for (const dir of npmDirs) {
+        void rm(dir, { recursive: true, force: true }).catch(() => {});
+      }
+    }
+    sessionNpmTempDirs.clear();
   }
 
   ws.on('close', () => {

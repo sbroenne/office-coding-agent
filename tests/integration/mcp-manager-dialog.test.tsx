@@ -85,7 +85,7 @@ describe('Integration: McpManagerDialog', () => {
     });
   });
 
-  it('shows error when all entries are stdio (no valid HTTP/SSE servers)', async () => {
+  it('imports stdio (npx) entries from mcp.json successfully', async () => {
     renderWithProviders(<OpenDialog />);
 
     const stdioOnly = { mcpServers: { srv: { command: 'node', args: ['server.js'] } } };
@@ -93,8 +93,11 @@ describe('Integration: McpManagerDialog', () => {
     await userEvent.upload(fileInput, makeJsonFile(stdioOnly));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/No valid HTTP\/SSE/i);
+      expect(screen.getByRole('status')).toHaveTextContent('Imported 1 server from mcp.json.');
     });
+    expect(screen.getByText('srv')).toBeInTheDocument();
+    // Shows command + args as fallback description
+    expect(screen.getByText('node server.js')).toBeInTheDocument();
   });
 
   it('servers are active (aria-pressed=true) by default after import', async () => {

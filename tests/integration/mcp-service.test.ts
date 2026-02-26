@@ -55,7 +55,7 @@ describe('parseMcpJsonFile', () => {
     expect(result[0].description).toBe('My server');
   });
 
-  it('skips entries without a url (stdio entries)', async () => {
+  it('includes stdio entries alongside http/sse entries', async () => {
     const file = makeFile({
       mcpServers: {
         stdio: { command: 'node', args: ['server.js'] },
@@ -63,8 +63,39 @@ describe('parseMcpJsonFile', () => {
       },
     });
     const result = await parseMcpJsonFile(file);
+    expect(result).toHaveLength(2);
+    expect(result.find(s => s.name === 'stdio')).toMatchObject({
+      transport: 'stdio',
+      command: 'node',
+      args: ['server.js'],
+    });
+    expect(result.find(s => s.name === 'web')).toMatchObject({ transport: 'http' });
+  });
+
+  it('parses a VS Code-style npx stdio entry', async () => {
+    const file = makeFile({
+      servers: {
+        'mcp-docs-server': { command: 'npx', args: ['-y', '@assistant-ui/mcp-docs-server'] },
+      },
+    });
+    const result = await parseMcpJsonFile(file);
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('web');
+    expect(result[0]).toMatchObject({
+      name: 'mcp-docs-server',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@assistant-ui/mcp-docs-server'],
+    });
+  });
+
+  it('passes env to stdio entries when present', async () => {
+    const file = makeFile({
+      mcpServers: {
+        local: { command: 'node', args: ['srv.js'], env: { API_KEY: 'abc' } },
+      },
+    });
+    const result = await parseMcpJsonFile(file);
+    expect(result[0]).toMatchObject({ transport: 'stdio', env: { API_KEY: 'abc' } });
   });
 
   it('skips unknown transport types', async () => {
@@ -89,13 +120,13 @@ describe('parseMcpJsonFile', () => {
     await expect(parseMcpJsonFile(file)).rejects.toThrow(/mcpServers|servers/);
   });
 
-  it('throws when all entries are skipped (no valid HTTP/SSE servers)', async () => {
+  it('throws when all entries are skipped (neither url nor command)', async () => {
     const file = makeFile({
       mcpServers: {
-        stdio: { command: 'node' },
+        empty: { description: 'no url or command' },
       },
     });
-    await expect(parseMcpJsonFile(file)).rejects.toThrow('No valid HTTP/SSE');
+    await expect(parseMcpJsonFile(file)).rejects.toThrow('No valid MCP servers');
   });
 
   it('throws on non-.json file extension', async () => {
@@ -170,12 +201,43 @@ describe('toSdkMcpServers', () => {
       transport: 'http',
       headers: { Authorization: 'Bearer tok' },
     }]);
-    expect(result['auth-server'].headers).toEqual({ Authorization: 'Bearer tok' });
+    expect(result['auth-server']).toMatchObject({ headers: { Authorization: 'Bearer tok' } });
   });
 
   it('omits headers key when headers is undefined', () => {
     const result = toSdkMcpServers([{ name: 'bare', url: 'https://example.com', transport: 'http' }]);
     expect(Object.keys(result['bare'])).not.toContain('headers');
+  });
+
+  it('converts a stdio server to MCPLocalServerConfig', () => {
+    const result = toSdkMcpServers([{
+      name: 'local-srv',
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', '@some/mcp-server'],
+    }]);
+    expect(result['local-srv']).toMatchObject({
+      type: 'stdio',
+      command: 'npx',
+      args: ['-y', '@some/mcp-server'],
+      tools: ['*'],
+    });
+  });
+
+  it('passes env to stdio server when present', () => {
+    const result = toSdkMcpServers([{
+      name: 'env-srv',
+      transport: 'stdio',
+      command: 'node',
+      args: ['srv.js'],
+      env: { TOKEN: 'secret' },
+    }]);
+    expect(result['env-srv']).toMatchObject({ type: 'stdio', env: { TOKEN: 'secret' } });
+  });
+
+  it('omits env key when env is undefined for stdio server', () => {
+    const result = toSdkMcpServers([{ name: 'bare-stdio', transport: 'stdio', command: 'node', args: [] }]);
+    expect(Object.keys(result['bare-stdio'])).not.toContain('env');
   });
 
   it('returns a record with one key per server', () => {

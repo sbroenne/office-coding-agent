@@ -62,8 +62,8 @@ export const McpManagerDialog: React.FC<McpManagerDialogProps> = ({ open, onOpen
         <DialogHeader>
           <DialogTitle>MCP Servers</DialogTitle>
           <DialogDescription>
-            Import a <code>mcp.json</code> file to connect AI tools from external MCP servers (HTTP
-            or SSE transport).
+            Import a <code>mcp.json</code> file to connect AI tools from external MCP servers (HTTP,
+            SSE, or stdio/npx transport).
           </DialogDescription>
         </DialogHeader>
 
@@ -138,7 +138,10 @@ export const McpManagerDialog: React.FC<McpManagerDialogProps> = ({ open, onOpen
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{server.name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {server.description ?? server.url}
+                        {server.description ??
+                          (server.transport === 'stdio'
+                            ? [server.command, ...(server.args ?? [])].join(' ')
+                            : server.url)}
                       </p>
                     </div>
                   </button>

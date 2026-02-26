@@ -47,6 +47,10 @@ interface SettingsState extends UserSettings {
   removeMcpServer: (serverName: string) => void;
   toggleMcpServer: (serverName: string) => void;
 
+  // ─── npm skill packages ───
+  addNpmSkillPackage: (packageName: string) => void;
+  removeNpmSkillPackage: (packageName: string) => void;
+
   // ─── Reset ───
   reset: () => void;
 }
@@ -228,6 +232,20 @@ export const useSettingsStore = create<SettingsState>()(
         });
       },
 
+      // ─── npm skill packages ───
+      addNpmSkillPackage: packageName => {
+        set(state => {
+          if (state.npmSkillPackages.includes(packageName)) return state;
+          return { npmSkillPackages: [...state.npmSkillPackages, packageName] };
+        });
+      },
+
+      removeNpmSkillPackage: packageName => {
+        set(state => ({
+          npmSkillPackages: state.npmSkillPackages.filter(p => p !== packageName),
+        }));
+      },
+
       // ─── Reset ───
       reset: () => {
         setImportedSkills([]);
@@ -246,6 +264,7 @@ export const useSettingsStore = create<SettingsState>()(
         importedAgents: state.importedAgents,
         importedMcpServers: state.importedMcpServers,
         activeMcpServerNames: state.activeMcpServerNames,
+        npmSkillPackages: state.npmSkillPackages,
         // availableModels is NOT persisted — it's always fetched fresh from the
         // Copilot CLI on connect, so a stale cached list never survives restarts.
       }),

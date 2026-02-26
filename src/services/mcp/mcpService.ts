@@ -1,4 +1,8 @@
-import type { MCPRemoteServerConfig } from '@github/copilot-sdk';
+import type {
+  MCPLocalServerConfig,
+  MCPRemoteServerConfig,
+  MCPServerConfig,
+} from '@github/copilot-sdk';
 import type { McpServerConfig, McpTransportType } from '@/types';
 
 /** Shape accepted from both Claude Desktop and VS Code mcp.json formats */
@@ -8,6 +12,10 @@ interface RawMcpEntry {
   transport?: string;
   headers?: Record<string, string>;
   description?: string;
+  // stdio fields
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
 }
 
 /**
@@ -17,8 +25,9 @@ interface RawMcpEntry {
  *   - Claude Desktop format: `{ mcpServers: { name: { url, type, headers } } }`
  *   - VS Code format:        `{ servers:    { name: { url, type, headers } } }`
  *
- * Only HTTP/SSE entries are included (stdio entries are silently skipped because
- * they require a Node.js child process and do not work in a browser runtime).
+ * Includes both HTTP/SSE remote entries and stdio entries (e.g. npx-based MCP servers).
+ * Stdio servers require a local proxy to spawn the subprocess — they are forwarded to
+ * the Copilot SDK's MCPLocalServerConfig.
  */
 export async function parseMcpJsonFile(file: File): Promise<McpServerConfig[]> {
   if (!file.name.endsWith('.json')) {
@@ -52,15 +61,30 @@ export async function parseMcpJsonFile(file: File): Promise<McpServerConfig[]> {
   for (const [name, entry] of Object.entries(serversMap)) {
     if (typeof entry !== 'object' || entry === null) continue;
 
+    const description = typeof entry.description === 'string' ? entry.description : undefined;
+
+    // Stdio entry: has command but no url
+    if (typeof entry.command === 'string' && entry.command) {
+      configs.push({
+        name,
+        description,
+        transport: 'stdio',
+        command: entry.command,
+        args: Array.isArray(entry.args) ? entry.args : [],
+        env: entry.env,
+      });
+      continue;
+    }
+
     const url = entry.url;
-    if (typeof url !== 'string' || !url) continue; // skip stdio entries (no url)
+    if (typeof url !== 'string' || !url) continue; // skip entries with no url and no command
 
     const rawTransport = (entry.type ?? entry.transport ?? 'http').toLowerCase();
-    if (rawTransport !== 'http' && rawTransport !== 'sse') continue; // skip unknown/stdio
+    if (rawTransport !== 'http' && rawTransport !== 'sse') continue; // skip unknown transport
 
     configs.push({
       name,
-      description: typeof entry.description === 'string' ? entry.description : undefined,
+      description,
       url,
       transport: rawTransport as McpTransportType,
       headers: entry.headers,
@@ -69,8 +93,8 @@ export async function parseMcpJsonFile(file: File): Promise<McpServerConfig[]> {
 
   if (configs.length === 0) {
     throw new Error(
-      'No valid HTTP/SSE MCP servers found in mcp.json. ' +
-        'Make sure each entry has a "url" and an optional "type" of "http" or "sse".'
+      'No valid MCP servers found in mcp.json. ' +
+        'Each entry must have either a "url" (for http/sse) or a "command" (for stdio/npx).'
     );
   }
 
@@ -87,19 +111,30 @@ export function resolveActiveMcpServers(
 }
 
 /**
- * Convert our internal McpServerConfig format to the SDK's MCPRemoteServerConfig record.
+ * Convert our internal McpServerConfig format to the SDK's MCPServerConfig record.
+ * - HTTP/SSE servers become MCPRemoteServerConfig
+ * - stdio servers become MCPLocalServerConfig (proxy spawns the subprocess)
  * All servers get `tools: ['*']` so the model can access every tool each server exports.
  */
-export function toSdkMcpServers(configs: McpServerConfig[]): Record<string, MCPRemoteServerConfig> {
-  return Object.fromEntries(
-    configs.map(c => [
-      c.name,
-      {
-        type: c.transport as 'http' | 'sse',
-        url: c.url,
-        ...(c.headers !== undefined && { headers: c.headers }),
+export function toSdkMcpServers(configs: McpServerConfig[]): Record<string, MCPServerConfig> {
+  const entries: [string, MCPServerConfig][] = configs.map(c => {
+    if (c.transport === 'stdio') {
+      const local: MCPLocalServerConfig = {
+        type: 'stdio',
+        command: c.command ?? '',
+        args: c.args ?? [],
+        ...(c.env !== undefined && { env: c.env }),
         tools: ['*'],
-      } satisfies MCPRemoteServerConfig,
-    ])
-  );
+      };
+      return [c.name, local];
+    }
+    const remote: MCPRemoteServerConfig = {
+      type: c.transport,
+      url: c.url ?? '',
+      ...(c.headers !== undefined && { headers: c.headers }),
+      tools: ['*'],
+    };
+    return [c.name, remote];
+  });
+  return Object.fromEntries(entries);
 }

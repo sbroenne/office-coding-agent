@@ -167,11 +167,20 @@ The task pane is split into three areas:
 4. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
 5. `npm run test:ui` — Playwright UI tests when task pane flows are changed
 
-**Never consider work done until integration and E2E tests pass for the affected host(s).** If E2E tests cannot be run (Office app not open), explicitly flag this as a blocker to the user — do not silently skip them.
+**Never consider work done until integration and E2E tests pass for the affected host(s).** If live Copilot WebSocket tests fail because the dev server is not running, start `npm run dev` as a background process and re-run — do not skip or report as blocked. If E2E tests cannot be run (Office app not open), explicitly flag this as a blocker to the user — do not silently skip them.
 
 > ### ⛔ ZERO FAILURES POLICY
 >
-> **0 test failures is the only acceptable result.** Any failure — including live Copilot WebSocket tests — is a blocker that must be flagged to the user. Never dismiss failures as "expected" or "needs server". If live Copilot tests fail because the dev server isn't running, tell the user: "9 live Copilot tests are failing because `npm run dev` is not running. Start the server or these failures block completion."
+> **0 test failures is the only acceptable result.** Any failure is a blocker — there are no acceptable failures, no "expected" failures, no "needs server" exceptions.
+>
+> **If tests fail because the dev server is not running, START IT — do not just report it.**
+> Run `npm run dev` as a background process, wait for `https://localhost:3000` to be ready, then re-run the failing tests. Only after the server is up and the tests still fail should you escalate to the user.
+>
+> Dev server start sequence:
+> 1. Start `npm run dev` in the background (it binds to `https://localhost:3000`)
+> 2. Poll or wait ~10 s for `Copilot Office Add-in server running on https://localhost:3000`
+> 3. Re-run the affected tests
+> 4. If tests pass → work is complete. If tests still fail → report the actual failure to the user.
 
 > ### ⛔ NO MOCKING IN PLAYWRIGHT TESTS
 >
