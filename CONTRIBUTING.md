@@ -3,6 +3,8 @@
 Thanks for your interest in contributing to Office Coding Agent.
 
 > **⛔ Never push or merge directly to `main`.** All changes must go through a pull request on a feature branch. Branch protection is enforced on GitHub.
+>
+> **Squash merge only.** When merging a PR on GitHub, always use **"Squash and merge"**. Merge commits and rebase merges are disabled.
 
 ## Development Setup
 

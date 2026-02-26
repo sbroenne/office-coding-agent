@@ -18,6 +18,8 @@ All changes must go through a pull request on a feature branch:
 
 Branch protection is enforced on GitHub (ruleset ID `13260767`). Any attempt to push directly to `main` will be rejected by the server.
 
+**PRs must be merged via squash merge only.** Merge commits and rebase merges are disabled in the repository settings. When asking the user to merge a PR, always tell them to use **"Squash and merge"** on GitHub.
+
 ## Project Overview
 
 **office-coding-agent** is a Microsoft Office add-in with a single task pane UI and host-routed AI runtime behavior. The current implementation is **Excel-first**, but tools and prompts are selected by host (`excel`, `powerpoint`, etc.) to support future hosts without changing the UI.
