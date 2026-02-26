@@ -34,7 +34,7 @@ Branch protection is enforced on GitHub (ruleset ID `13260767`). Any attempt to 
 - **Vite 7** — bundling, dev server (HMR via middleware mode in Express)
 - **TypeScript 5** — type safety
 - **Vitest** — unit + integration testing (jsdom env)
-- **Mocha** — E2E tests inside Excel Desktop (current host runtime E2E)
+- **Mocha** — E2E tests inside real Office Desktop hosts (Excel, PowerPoint, Word, Outlook)
 - **Playwright** — browser UI tests for task pane flows
 
 ## Architecture
@@ -114,15 +114,15 @@ Bundled skill files in `src/skills/` provide additional context injected into th
 │  • WebSocket client + session (mocked in unit tests) │
 │  • Agent/skill service parsing                       │
 ├──────────────────────────────────────────────────────┤
-│  Excel.run() boundary (current host implementation)  │
+│  Office.run() boundary (all hosts)                   │
 ├──────────────────────────────────────────────────────┤
-│  E2E only (Mocha + real Excel Desktop)               │
+│  E2E only (Mocha + real Office Desktop)              │
 │  ─────────────────────────────                       │
 │  • rangeCommands, tableCommands, sheetCommands       │
 │  • chartCommands, workbookCommands, commentCommands  │
 │  • conditionalFormatCommands, dataValidationCommands │
 │  • pivotTableCommands                                │
-│  • PowerPoint / Word commands                        │
+│  • PowerPoint / Word / Outlook commands              │
 │  • OfficeRuntime.storage (real runtime)              │
 └──────────────────────────────────────────────────────┘
 ```
@@ -152,10 +152,11 @@ The task pane is split into three areas:
 | --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------------------------------------ |
 | **Integration** | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket |
 | **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows (real Copilot API, NO mocking)                                |
-| **E2E (Excel)** | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                                             |
-| **E2E (PPT)**   | Mocha      | `tests-e2e-ppt/`     | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
-| **E2E (Word)**  | Mocha      | `tests-e2e-word/`    | ~12   | Word commands inside real Word Desktop                                               |
-| ~~Unit~~        | ~~Vitest~~ | ~~`tests/unit/`~~    |       | ~~DO NOT ADD NEW UNIT TESTS~~                                                        |
+| **E2E (Excel)**   | Mocha      | `tests-e2e/`           | ~187  | Excel commands inside real Excel Desktop                                             |
+| **E2E (PPT)**     | Mocha      | `tests-e2e-ppt/`       | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
+| **E2E (Word)**    | Mocha      | `tests-e2e-word/`      | ~12   | Word commands inside real Word Desktop                                               |
+| **E2E (Outlook)** | Mocha      | `tests-e2e-outlook/`   | ~9    | Outlook commands (requires Exchange sideloading approval)                            |
+| ~~Unit~~          | ~~Vitest~~ | ~~`tests/unit/`~~      |       | ~~DO NOT ADD NEW UNIT TESTS~~                                                        |
 
 ### Required Test Execution After Any Code Change
 
@@ -165,7 +166,8 @@ The task pane is split into three areas:
 2. `npm run test:e2e` — E2E tests inside real Excel Desktop (requires `npm run start:desktop` first; **must pass before marking work complete**)
 3. `npm run test:e2e:ppt` — E2E tests inside real PowerPoint Desktop (requires PPT open; **must pass before marking PPT work complete**)
 4. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
-5. `npm run test:ui` — Playwright UI tests when task pane flows are changed
+5. `npm run test:e2e:outlook` — E2E tests inside real Outlook Desktop (requires Exchange sideloading approval; blocked on tenants with policy restrictions — flag as blocker if unavailable)
+6. `npm run test:ui` — Playwright UI tests when task pane flows are changed
 
 **Never consider work done until integration and E2E tests pass for the affected host(s).** If live Copilot WebSocket tests fail because the dev server is not running, start `npm run dev` as a background process and re-run — do not skip or report as blocked. If E2E tests cannot be run (Office app not open), explicitly flag this as a blocker to the user — do not silently skip them.
 
@@ -238,6 +240,7 @@ The task pane is split into three areas:
 - **New Excel command?** → E2E test in `tests-e2e/`
 - **New PowerPoint command?** → E2E test in `tests-e2e-ppt/`
 - **New Word command?** → E2E test in `tests-e2e-word/`
+- **New Outlook command?** → E2E test in `tests-e2e-outlook/`
 - **New task pane interaction flow?** → UI test in `tests-ui/`
 - **New React component or hook behavior?** → Integration test in `tests/integration/`
 - **New host routing rule?** → Integration test in `tests/integration/`

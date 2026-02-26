@@ -118,7 +118,10 @@ For local shared-folder sideloading and staging manifest workflows, see [docs/SI
 | `npm run test:e2e`               | Run E2E tests in Excel Desktop                                        |
 | `npm run test:e2e:ppt`           | Run E2E tests in PowerPoint Desktop                                   |
 | `npm run test:e2e:word`          | Run E2E tests in Word Desktop                                         |
+| `npm run test:e2e:outlook`       | Run E2E tests in Outlook Desktop                                      |
+| `npm run test:e2e:all`           | Run all four E2E suites in sequence                                   |
 | `npm run validate`               | Validate `manifests/manifest.dev.xml`                                 |
+| `npm run validate:outlook`       | Validate `manifests/manifest.outlook.dev.xml`                         |
 
 ## Testing
 
@@ -126,7 +129,7 @@ This project uses three active test layers:
 
 - **Integration** (`tests/integration/`, Vitest) — component wiring, stores, host/tool routing, and live Copilot websocket flows
 - **UI** (`tests-ui/`, Playwright) — browser taskpane behavior and regression coverage
-- **E2E** (`tests-e2e*`, Mocha) — real Office host validation in Excel, PowerPoint, and Word desktop
+- **E2E** (`tests-e2e*`, Mocha) — real Office host validation in Excel, PowerPoint, Word, and Outlook desktop
 
 Unit tests are intentionally not used for new work in this repository.
 
@@ -149,6 +152,7 @@ npm run test:ui
 npm run test:e2e
 npm run test:e2e:ppt
 npm run test:e2e:word
+npm run test:e2e:outlook
 
 # Validate the Office add-in manifest
 npm run validate
@@ -158,7 +162,7 @@ Integration tests run as part of the default `npm test` suite.
 
 ## E2E Testing
 
-The project includes ~187 end-to-end tests that validate all 83 Excel tools plus settings persistence and AI round-trips inside a real Excel Desktop instance. E2E tests for PowerPoint, Word, and Outlook tools are planned.
+The project includes end-to-end tests across all four Office hosts: ~187 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
 
 ### How It Works
 
@@ -384,6 +388,7 @@ The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/
 ## Acknowledgments
 
 - **[patniko/github-copilot-office](https://github.com/patniko/github-copilot-office)** — The proxy server architecture, Copilot SDK integration pattern, and WebSocket transport design used in this project were adopted from this repository by [Patrick Nikoletich](https://github.com/patniko) and [Steve Sanderson](https://github.com/SteveSandersonMS). Their work provided the foundation for the Phase 2 migration.
+- **[@trsdn (Torsten)](https://github.com/trsdn)** and **[@urosstojkic](https://github.com/urosstojkic)** — Contributed the Word document orchestrator (planner→worker pattern), 22 Outlook tools, expanded PowerPoint tooling (24 tools), WorkIQ MCP stdio integration, host-specific welcome prompts, improved auto-scroll, and new skills (Outlook email/calendar/drafting, Word formatting/tables/document-builder, PowerPoint content/layout/animation/presentation). Originally submitted as [PR #33](https://github.com/sbroenne/office-coding-agent/pull/33) and merged in [PR #45](https://github.com/sbroenne/office-coding-agent/pull/45).
 - **[assistant-ui](https://github.com/assistant-ui/assistant-ui)** — React chat UI components used for the task pane thread and composer.
 - **[Vercel AI SDK](https://ai-sdk.dev/)** — Original AI runtime used in Phase 1.
 

@@ -108,11 +108,12 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 ### E2E Tests — Mocha inside real Office hosts
 
-| Host       | Directory         | Tests |
-| ---------- | ----------------- | ----- |
-| Excel      | `tests-e2e/`      | ~187  |
-| PowerPoint | `tests-e2e-ppt/`  | ~13   |
-| Word       | `tests-e2e-word/` | ~12   |
+| Host       | Directory              | Tests |
+| ---------- | ---------------------- | ----- |
+| Excel      | `tests-e2e/`           | ~187  |
+| PowerPoint | `tests-e2e-ppt/`       | ~13   |
+| Word       | `tests-e2e-word/`      | ~12   |
+| Outlook    | `tests-e2e-outlook/`   | ~9    |
 
 **Real Office.js APIs, real host runtime.**
 
@@ -120,9 +121,10 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 | Scenario                             | Test type        | Location             |
 | ------------------------------------ | ---------------- | -------------------- |
-| New Excel command (`Excel.run`)      | E2E test         | `tests-e2e/`         |
-| New PowerPoint command               | E2E test         | `tests-e2e-ppt/`     |
-| New Word command                     | E2E test         | `tests-e2e-word/`    |
+| New Excel command (`Excel.run`)      | E2E test         | `tests-e2e/`           |
+| New PowerPoint command               | E2E test         | `tests-e2e-ppt/`       |
+| New Word command                     | E2E test         | `tests-e2e-word/`      |
+| New Outlook command                  | E2E test         | `tests-e2e-outlook/`   |
 | New task pane interaction flow       | UI test          | `tests-ui/`          |
 | New React component or hook behavior | Integration test | `tests/integration/` |
 | New host routing rule                | Integration test | `tests/integration/` |
@@ -142,6 +144,8 @@ npm run test:ui
 npm run test:e2e          # Excel Desktop (~187 tests)
 npm run test:e2e:ppt      # PowerPoint Desktop (~13 tests)
 npm run test:e2e:word     # Word Desktop (~12 tests)
+npm run test:e2e:outlook  # Outlook Desktop (~9 tests; requires Exchange sideloading approval)
+npm run test:e2e:all      # All four suites in sequence
 
 # Validate manifest
 npm run validate
