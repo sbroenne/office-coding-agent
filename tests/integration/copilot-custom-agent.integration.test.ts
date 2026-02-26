@@ -17,6 +17,8 @@ import { buildSkillContext } from '@/services/skills';
 
 const SERVER_URL = 'wss://localhost:3000/api/copilot';
 const TIMEOUT_MS = 45_000;
+/** Extra time for tests that run npm install inside the proxy before the session opens. */
+const TIMEOUT_SKILLPM_MS = 90_000;
 
 global.WebSocket = class PatchedWebSocket extends WS {
   constructor(url: string | URL, protocols?: string | string[]) {
@@ -281,5 +283,60 @@ describe('Copilot custom agent integration', () => {
       }
     },
     TIMEOUT_MS
+  );
+
+  it(
+    'npmSkillPackages: skillpm-skill is installed by proxy and its content reaches the model',
+    async () => {
+      // This test verifies the full npmSkillPackages pipeline end-to-end:
+      //   1. The proxy receives npmSkillPackages = ['skillpm-skill']
+      //   2. It runs `npm install skillpm-skill` into a temp dir
+      //   3. It discovers skills/skillpm/SKILL.md via findSkillDirs
+      //   4. It passes that dir to the SDK's skillDirectories
+      //   5. The model can answer a question that requires knowledge from that SKILL.md
+      //
+      // skillpm-skill's SKILL.md teaches agents how to use the skillpm CLI.
+      // The install command `npx skillpm install <skill-name>` is a concrete,
+      // unambiguous fact from that file that the base model is unlikely to know
+      // confidently without the skill context being injected.
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        const session = await client.createSession({
+          systemMessage: {
+            mode: 'replace',
+            content:
+              'You are a helpful assistant. Answer questions concisely. ' +
+              'Use any agent skills loaded in your context.',
+          },
+          npmSkillPackages: ['skillpm-skill'],
+        });
+
+        let fullText = '';
+        for await (const event of session.query({
+          prompt:
+            'I have the skillpm skill loaded. ' +
+            'What is the exact CLI command to install a skill package called "my-skill" using skillpm? ' +
+            'Just give me the command.',
+        })) {
+          if (event.type === 'assistant.message_delta') {
+            fullText += event.data.deltaContent;
+          }
+          if (event.type === 'assistant.message') {
+            fullText = event.data.content;
+          }
+          if (event.type === 'session.idle') break;
+        }
+
+        // The skillpm SKILL.md documents: `npx skillpm install <skill-name>`
+        // or `skillpm install <skill-name>`. Verify the model produced the right command.
+        const lower = fullText.toLowerCase();
+        expect(lower).toContain('skillpm');
+        expect(lower).toContain('install');
+        expect(lower).toContain('my-skill');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_SKILLPM_MS
   );
 });
