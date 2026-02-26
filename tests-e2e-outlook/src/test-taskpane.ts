@@ -143,7 +143,9 @@ async function callTool(
 ): Promise<unknown> {
   const tool = tools.find(t => t.name === name);
   if (!tool) throw new Error(`Outlook tool not found: ${name}`);
-  return await tool.handler(args);
+  // Provide a minimal dummy invocation — Outlook handlers don't use it
+  const invocation = { sessionId: 'e2e', toolCallId: 'e2e', toolName: name, arguments: args };
+  return await tool.handler(args, invocation);
 }
 
 async function runTool(
