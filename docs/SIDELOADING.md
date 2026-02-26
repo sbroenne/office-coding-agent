@@ -1,5 +1,9 @@
 # Sideloading Guide
 
+> **First time?** See [GETTING_STARTED.md](../GETTING_STARTED.md) for the full setup walkthrough including authentication, proxy server startup, and add-in registration.
+>
+> The proxy server (`npm run dev`) must be running on `https://localhost:3000` before any of the sideload commands below will work.
+
 This project supports three sideloading lanes:
 
 1. **Local desktop dev (fastest)** via `localhost`
@@ -12,7 +16,7 @@ Main environment manifests are stored in `manifests/`:
 - `manifests/manifest.staging.xml`
 - `manifests/manifest.prod.xml`
 
-## Important Model
+## Important Note
 
 A shared folder catalog distributes the **manifest only**.
 

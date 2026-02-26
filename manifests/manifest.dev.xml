@@ -17,8 +17,7 @@
   <SupportUrl DefaultValue="https://github.com/sbroenne/office-coding-agent" />
 
   <AppDomains>
-    <AppDomain>https://login.microsoftonline.com</AppDomain>
-    <AppDomain>https://login.microsoft.com</AppDomain>
+    <AppDomain>https://localhost:3000</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -170,7 +169,7 @@
         <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://go.microsoft.com/fwlink/?LinkId=276812" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/sbroenne/office-coding-agent/blob/main/GETTING_STARTED.md" />
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
