@@ -2,15 +2,13 @@ import React, { useMemo, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { History, ChevronDown, Trash2 } from 'lucide-react';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
-import type { OfficeHostApp } from '@/services/office/host';
-import { SessionHistoryDialog } from './SessionHistoryDialog';
 
 interface SessionHistoryPickerProps {
-  host: OfficeHostApp;
   sessions: SessionHistoryItem[];
   activeSessionId: string | null;
   onRestoreSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
+  onOpenPanel?: (panel: string) => void;
 }
 
 function formatRelativeTime(updatedAt: number): string {
@@ -25,14 +23,13 @@ function formatRelativeTime(updatedAt: number): string {
 }
 
 export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
-  host,
   sessions,
   activeSessionId,
   onRestoreSession,
   onDeleteSession,
+  onOpenPanel,
 }) => {
   const [open, setOpen] = useState(false);
-  const [manageOpen, setManageOpen] = useState(false);
 
   const ordered = useMemo(
     () => [...sessions].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -113,7 +110,7 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    setManageOpen(true);
+                    onOpenPanel?.('history');
                   }}
                   className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
@@ -125,16 +122,6 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-
-      <SessionHistoryDialog
-        open={manageOpen}
-        onOpenChange={setManageOpen}
-        host={host}
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onRestoreSession={onRestoreSession}
-        onDeleteSession={onDeleteSession}
-      />
     </>
   );
 };

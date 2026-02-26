@@ -1,8 +1,8 @@
 /**
- * Integration test: ChatHeader — SkillPicker and New Conversation button.
+ * Integration test: ChatHeader — SkillPicker, New Conversation, panel buttons.
  *
- * ChatHeader now contains only: SkillPicker and New Conversation button.
- * SettingsDialog and McpManagerDialog have been removed.
+ * ChatHeader contains: SkillPicker, SessionHistoryPicker, Permissions, MCP, New Conversation.
+ * All settings panels are opened via onOpenPanel callback.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
@@ -12,11 +12,13 @@ import { ChatHeader } from '@/components/ChatHeader';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 const mockClearMessages = vi.fn();
+const mockOpenPanel = vi.fn();
 
 describe('Integration: ChatHeader', () => {
   beforeEach(() => {
     useSettingsStore.getState().reset();
     mockClearMessages.mockClear();
+    mockOpenPanel.mockClear();
   });
 
   it('renders skill picker and new conversation button', () => {
@@ -28,6 +30,7 @@ describe('Integration: ChatHeader', () => {
         activeSessionId={null}
         onRestoreSession={vi.fn()}
         onDeleteSession={vi.fn()}
+        onOpenPanel={mockOpenPanel}
       />
     );
 
@@ -44,10 +47,45 @@ describe('Integration: ChatHeader', () => {
         activeSessionId={null}
         onRestoreSession={vi.fn()}
         onDeleteSession={vi.fn()}
+        onOpenPanel={mockOpenPanel}
       />
     );
 
     await userEvent.click(screen.getByLabelText('New conversation'));
     expect(mockClearMessages).toHaveBeenCalledOnce();
+  });
+
+  it('MCP Servers button calls onOpenPanel with "mcp"', async () => {
+    renderWithProviders(
+      <ChatHeader
+        host="excel"
+        onClearMessages={mockClearMessages}
+        sessions={[]}
+        activeSessionId={null}
+        onRestoreSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onOpenPanel={mockOpenPanel}
+      />
+    );
+
+    await userEvent.click(screen.getByLabelText('MCP Servers'));
+    expect(mockOpenPanel).toHaveBeenCalledWith('mcp');
+  });
+
+  it('Permissions button calls onOpenPanel with "permissions"', async () => {
+    renderWithProviders(
+      <ChatHeader
+        host="excel"
+        onClearMessages={mockClearMessages}
+        sessions={[]}
+        activeSessionId={null}
+        onRestoreSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        onOpenPanel={mockOpenPanel}
+      />
+    );
+
+    await userEvent.click(screen.getByLabelText('Permissions'));
+    expect(mockOpenPanel).toHaveBeenCalledWith('permissions');
   });
 });

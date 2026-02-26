@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
 import { getBundledSkills, getImportedSkills, getSkills } from '@/services/skills';
 import { detectOfficeHost } from '@/services/office/host';
-import { SkillManagerDialog } from './SkillManagerDialog';
 
-export const SkillPicker: React.FC = () => {
+interface SkillPickerProps {
+  onOpenPanel?: (panel: string) => void;
+}
+
+export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
   const [open, setOpen] = useState(false);
-  const [managerOpen, setManagerOpen] = useState(false);
   const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
 
@@ -122,7 +124,7 @@ export const SkillPicker: React.FC = () => {
               <button
                 onClick={() => {
                   setOpen(false);
-                  setManagerOpen(true);
+                  onOpenPanel?.('skills');
                 }}
                 className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
@@ -133,8 +135,6 @@ export const SkillPicker: React.FC = () => {
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-
-      <SkillManagerDialog open={managerOpen} onOpenChange={setManagerOpen} />
     </>
   );
 };
