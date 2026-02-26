@@ -1,5 +1,25 @@
 # Copilot Instructions for office-coding-agent
 
+## ⛔ NEVER PUSH OR MERGE DIRECTLY TO MAIN
+
+**Direct commits, merges, or pushes to `main` are strictly forbidden — no exceptions.**
+
+All changes must go through a pull request on a feature branch:
+
+1. `git checkout -b <branch-name>` — create a feature branch
+2. Make and commit changes on that branch
+3. `git push -u origin <branch-name>` — push the branch
+4. Ask the user to review and merge the PR on GitHub
+
+**Never run:**
+- `git push origin main`
+- `git merge <branch> ` while on `main`
+- `git commit --no-verify` to bypass hooks and then push to `main`
+
+Branch protection is enforced on GitHub (ruleset ID `13260767`). Any attempt to push directly to `main` will be rejected by the server.
+
+**PRs must be merged via squash merge only.** Merge commits and rebase merges are disabled in the repository settings. When asking the user to merge a PR, always tell them to use **"Squash and merge"** on GitHub.
+
 ## Project Overview
 
 **office-coding-agent** is a Microsoft Office add-in with a single task pane UI and host-routed AI runtime behavior. The current implementation is **Excel-first**, but tools and prompts are selected by host (`excel`, `powerpoint`, etc.) to support future hosts without changing the UI.
