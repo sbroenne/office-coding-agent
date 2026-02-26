@@ -40,12 +40,14 @@ beforeEach(() => {
 });
 
 describe('Integration: McpManagerDialog', () => {
-  it('renders empty state with import button', () => {
+  it('renders with bundled servers and import button', () => {
     renderWithProviders(<OpenDialog />);
 
     expect(screen.getByRole('dialog', { name: 'MCP Servers' })).toBeInTheDocument();
-    expect(screen.getByText(/No MCP servers configured/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Import mcp\.json/i })).toBeInTheDocument();
+    // Bundled WorkIQ server should always be visible
+    expect(screen.getByText('workiq')).toBeInTheDocument();
+    expect(screen.getByText('Built-in')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Import/i })).toBeInTheDocument();
   });
 
   it('imports servers from a valid mcp.json file', async () => {
@@ -100,52 +102,17 @@ describe('Integration: McpManagerDialog', () => {
     expect(screen.getByText('node server.js')).toBeInTheDocument();
   });
 
-  it('servers are active (aria-pressed=true) by default after import', async () => {
-    renderWithProviders(<OpenDialog />);
-
-    const fileInput = screen.getByLabelText('Import mcp.json file');
-    await userEvent.upload(fileInput, makeJsonFile(validMcpJson));
-
-    await waitFor(() => {
-      expect(screen.getByText('my-server')).toBeInTheDocument();
-    });
-
-    // Toggle button name includes description text — use regex
-    const toggleButton = screen.getByRole('button', { name: /my-server/ });
-    expect(toggleButton).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('clicking a server button toggles it off', async () => {
-    renderWithProviders(<OpenDialog />);
-
-    const fileInput = screen.getByLabelText('Import mcp.json file');
-    await userEvent.upload(fileInput, makeJsonFile(validMcpJson));
-
-    await waitFor(() => {
-      expect(screen.getByText('my-server')).toBeInTheDocument();
-    });
-
-    const toggleButton = screen.getByRole('button', { name: /my-server/ });
-    await userEvent.click(toggleButton);
-
-    expect(toggleButton).toHaveAttribute('aria-pressed', 'false');
-    expect(useSettingsStore.getState().activeMcpServerNames).toEqual(['another-server']);
-  });
-
-  it('clicking a disabled server toggles it back on', async () => {
+  it('imported servers show Remove button while bundled servers do not', async () => {
     useSettingsStore.getState().importMcpServers([
-      { name: 'srv', url: 'https://example.com/mcp', transport: 'http' },
+      { name: 'to-remove', url: 'https://example.com/mcp', transport: 'http' },
+      { name: 'keep', url: 'https://example.com/keep', transport: 'http' },
     ]);
-    useSettingsStore.setState({ activeMcpServerNames: [] });
 
     renderWithProviders(<OpenDialog />);
 
-    // Toggle button name includes URL — use regex
-    const toggleButton = screen.getByRole('button', { name: /^srv/ });
-    expect(toggleButton).toHaveAttribute('aria-pressed', 'false');
-
-    await userEvent.click(toggleButton);
-    expect(toggleButton).toHaveAttribute('aria-pressed', 'true');
+    // Should have Remove buttons for imported servers only
+    const removeButtons = screen.getAllByTitle('Remove');
+    expect(removeButtons.length).toBe(2); // to-remove + keep (not bundled workiq)
   });
 
   it('Remove button removes a server from the list and store', async () => {
@@ -158,7 +125,7 @@ describe('Integration: McpManagerDialog', () => {
 
     expect(screen.getByText('to-remove')).toBeInTheDocument();
 
-    const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
+    const removeButtons = screen.getAllByTitle('Remove');
     await userEvent.click(removeButtons[0]);
 
     await waitFor(() => {
@@ -166,5 +133,22 @@ describe('Integration: McpManagerDialog', () => {
     });
     expect(screen.getByText('keep')).toBeInTheDocument();
     expect(useSettingsStore.getState().importedMcpServers).toHaveLength(1);
+  });
+
+  it('shows Add button that opens add server form', async () => {
+    renderWithProviders(<OpenDialog />);
+
+    const addButton = screen.getByRole('button', { name: /Add/i });
+    await userEvent.click(addButton);
+
+    expect(screen.getByText('Add Server', { selector: 'h4' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('my-server')).toBeInTheDocument();
+  });
+
+  it('bundled servers show Built-in badge', () => {
+    renderWithProviders(<OpenDialog />);
+
+    expect(screen.getByText('Built-in')).toBeInTheDocument();
+    expect(screen.getByText('workiq')).toBeInTheDocument();
   });
 });

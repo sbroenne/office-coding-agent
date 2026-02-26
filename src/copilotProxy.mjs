@@ -188,6 +188,9 @@ async function handleConnection(ws) {
   /** @type {Map<string, string[]>} All npm temp dirs keyed by sessionId for cleanup. */
   const sessionNpmTempDirs = new Map();
 
+  /** @type {Map<string, string[]>} MCP server names keyed by sessionId for stop notifications. */
+  const sessionMcpServerNames = new Map();
+
   /** Send a JSON-RPC response back to the browser. */
   function sendResponse(id, result) {
     if (ws.readyState === ws.OPEN) {
@@ -321,7 +324,19 @@ async function handleConnection(ws) {
 
     switch (method) {
       case 'session.create': {
-        const { host, model, sessionId, systemMessage, tools: toolDefs, mcpServers, availableTools, skills, disabledSkills, customAgents, npmSkillPackages } = params || {};
+        const {
+          host,
+          model,
+          sessionId,
+          systemMessage,
+          tools: toolDefs,
+          mcpServers,
+          availableTools,
+          skills,
+          disabledSkills,
+          customAgents,
+          npmSkillPackages,
+        } = params || {};
         console.log(
           `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, npmSkillPackages=${(npmSkillPackages || []).length}, customAgents=${(customAgents || []).length})`
         );
@@ -383,7 +398,7 @@ async function handleConnection(ws) {
               await execFileAsync(
                 NPM_CMD,
                 ['install', '--prefix', installDir, '--no-save', pkg.trim()],
-                { ...NPM_EXEC_OPTS, timeout: 60_000 },
+                { ...NPM_EXEC_OPTS, timeout: 60_000 }
               );
 
               // Discover skill directories: skillpm packages put skills under
@@ -394,12 +409,26 @@ async function handleConnection(ws) {
                 console.log(`[proxy] Added skillpm skill dir "${dir}" from package "${pkg}"`);
               }
               if (skillDirs.length === 0) {
-                console.warn(`[proxy] No skill dirs found in "${pkg}" — ensure it follows skillpm layout (skills/<name>/SKILL.md)`);
+                console.warn(
+                  `[proxy] No skill dirs found in "${pkg}" — ensure it follows skillpm layout (skills/<name>/SKILL.md)`
+                );
               }
             } catch (err) {
               console.warn(`[proxy] Failed to install skillpm package "${pkg}":`, err.message);
             }
           }
+        }
+
+        // Emit 'starting' status for each configured MCP server
+        const mcpServerNames = Object.keys(mcpServers || {});
+        for (const name of mcpServerNames) {
+          sendNotification('mcp.status', { server: name, status: 'starting' });
+          sendNotification('mcp.log', {
+            server: name,
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            message: `Connecting to MCP server '${name}'...`,
+          });
         }
 
         let session;
@@ -430,12 +459,36 @@ async function handleConnection(ws) {
           for (const dir of npmTempDirs) {
             void rm(dir, { recursive: true, force: true }).catch(() => {});
           }
+          // Emit error status for all MCP servers
+          for (const name of mcpServerNames) {
+            sendNotification('mcp.status', { server: name, status: 'error', error: err.message || 'Session creation failed' });
+            sendNotification('mcp.log', {
+              server: name,
+              timestamp: new Date().toISOString(),
+              level: 'error',
+              message: `Failed to connect: ${err.message || 'unknown error'}`,
+            });
+          }
           console.error('[proxy] session.create failed:', err);
           sendError(id, -32603, err.message || 'Failed to create session');
           break;
         }
 
+        // Emit 'connected' status for each MCP server on success
+        for (const name of mcpServerNames) {
+          sendNotification('mcp.status', { server: name, status: 'connected' });
+          sendNotification('mcp.log', {
+            server: name,
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            message: `Server '${name}' connected successfully`,
+          });
+        }
+
         sessions.set(session.sessionId, session);
+        if (mcpServerNames.length > 0) {
+          sessionMcpServerNames.set(session.sessionId, mcpServerNames);
+        }
         if (tempSkillDir) {
           sessionTempDirs.set(session.sessionId, tempSkillDir);
         }
@@ -480,6 +533,20 @@ async function handleConnection(ws) {
           eventUnsubs.delete(sessionId);
           await session.destroy();
           sessions.delete(sessionId);
+          // Emit 'stopped' status for MCP servers in this session
+          const mcpNames = sessionMcpServerNames.get(sessionId);
+          if (mcpNames) {
+            for (const name of mcpNames) {
+              sendNotification('mcp.status', { server: name, status: 'stopped' });
+              sendNotification('mcp.log', {
+                server: name,
+                timestamp: new Date().toISOString(),
+                level: 'info',
+                message: `Server '${name}' stopped`,
+              });
+            }
+            sessionMcpServerNames.delete(sessionId);
+          }
           // Clean up temp skill directory
           const tempDir = sessionTempDirs.get(sessionId);
           if (tempDir) {
@@ -525,7 +592,11 @@ async function handleConnection(ws) {
           return;
         }
         if (pending.sessionId !== sessionId) {
-          sendError(id, -32602, `Permission request '${requestId}' does not belong to session '${sessionId}'`);
+          sendError(
+            id,
+            -32602,
+            `Permission request '${requestId}' does not belong to session '${sessionId}'`
+          );
           return;
         }
         const normalizedDecision = decision === 'approved' ? 'approved' : 'denied';
@@ -587,6 +658,9 @@ async function handleConnection(ws) {
       }
     }
     sessionNpmTempDirs.clear();
+
+    // Clear MCP server tracking
+    sessionMcpServerNames.clear();
   }
 
   ws.on('close', () => {

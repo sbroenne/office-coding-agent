@@ -207,6 +207,27 @@ export class BrowserCopilotSession {
   }
 }
 
+/** MCP status notification payload */
+export interface McpStatusPayload {
+  server: string;
+  status: 'stopped' | 'starting' | 'connected' | 'error';
+  error?: string;
+}
+
+/** MCP log notification payload */
+export interface McpLogPayload {
+  server: string;
+  timestamp: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
+/** MCP tools notification payload */
+export interface McpToolsPayload {
+  server: string;
+  tools: { name: string; description: string }[];
+}
+
 /**
  * Browser-compatible Copilot client connected via WebSocket proxy.
  */
@@ -214,6 +235,9 @@ export class WebSocketCopilotClient {
   private connection: MessageConnection | null = null;
   private wsSocket: WebSocket | null = null;
   private sessions = new Map<string, BrowserCopilotSession>();
+  private mcpStatusHandlers = new Set<(payload: McpStatusPayload) => void>();
+  private mcpLogHandlers = new Set<(payload: McpLogPayload) => void>();
+  private mcpToolsHandlers = new Set<(payload: McpToolsPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -283,6 +307,27 @@ export class WebSocketCopilotClient {
     return result.models;
   }
 
+  onMcpStatus(handler: (payload: McpStatusPayload) => void): () => void {
+    this.mcpStatusHandlers.add(handler);
+    return () => {
+      this.mcpStatusHandlers.delete(handler);
+    };
+  }
+
+  onMcpLog(handler: (payload: McpLogPayload) => void): () => void {
+    this.mcpLogHandlers.add(handler);
+    return () => {
+      this.mcpLogHandlers.delete(handler);
+    };
+  }
+
+  onMcpTools(handler: (payload: McpToolsPayload) => void): () => void {
+    this.mcpToolsHandlers.add(handler);
+    return () => {
+      this.mcpToolsHandlers.delete(handler);
+    };
+  }
+
   async stop(): Promise<void> {
     for (const session of this.sessions.values()) {
       try {
@@ -318,6 +363,39 @@ export class WebSocketCopilotClient {
       const payload = notification as PermissionRequestPayload;
       if (!payload?.sessionId || !payload?.requestId) return;
       this.sessions.get(payload.sessionId)?._dispatchPermissionRequest(payload);
+    });
+
+    this.connection.onNotification('mcp.status', (notification: unknown) => {
+      const payload = notification as McpStatusPayload;
+      for (const handler of this.mcpStatusHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('mcp.log', (notification: unknown) => {
+      const payload = notification as McpLogPayload;
+      for (const handler of this.mcpLogHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('mcp.tools', (notification: unknown) => {
+      const payload = notification as McpToolsPayload;
+      for (const handler of this.mcpToolsHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
     });
 
     this.connection.onRequest(
