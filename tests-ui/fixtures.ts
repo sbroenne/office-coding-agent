@@ -5,6 +5,22 @@ import { test as base, type Page } from '@playwright/test';
  * Must run before the app code so Zustand persist can hydrate.
  */
 function officeRuntimePolyfill() {
+  const officeHost = 'excel';
+  (globalThis as Record<string, unknown>).Office = {
+    HostType: {
+      Excel: 'excel',
+      PowerPoint: 'powerpoint',
+      Word: 'word',
+    },
+    context: {
+      host: officeHost,
+    },
+    onReady: (callback?: () => void) => {
+      if (typeof callback === 'function') callback();
+      return Promise.resolve({ host: officeHost });
+    },
+  };
+
   (globalThis as Record<string, unknown>).OfficeRuntime = {
     storage: {
       getItem: (key: string) => Promise.resolve(localStorage.getItem(key)),

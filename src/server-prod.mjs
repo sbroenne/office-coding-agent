@@ -1,15 +1,3 @@
-/**
- * server.mjs — Express HTTPS server with Copilot WebSocket proxy + Vite dev middleware.
- *
- * Dev workflow:
- *   npm run dev          → starts this server (port 3000, HTTPS)
- *
- * The server:
- *  1. Serves the frontend via Vite (dev) or static dist (production)
- *  2. Proxies /api/copilot WebSocket to the @github/copilot-sdk
- *  3. Handles /api/upload-image for image attachments
- */
-
 import express from 'express';
 import cors from 'cors';
 import https from 'node:https';
@@ -18,13 +6,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
-const isDev = process.env.NODE_ENV !== 'production';
 
-/** Check that the port is available, exit early if it's in use. */
 async function checkPort(port) {
   return new Promise((resolve, reject) => {
     const tester = net
@@ -41,14 +28,12 @@ async function checkPort(port) {
   });
 }
 
-async function createServer() {
-  console.log('\n  [server] Starting Copilot Office Add-in server...');
+export async function createServer() {
   await checkPort(PORT);
 
   const app = express();
   app.use(cors({ origin: '*' }));
 
-  // ─── API Routes ──────────────────────────────────────────────────────────────
   const apiRouter = express.Router();
   apiRouter.use(express.json({ limit: '50mb' }));
 
@@ -88,7 +73,6 @@ async function createServer() {
     }
   });
 
-  // Remote log relay — client errors are printed to the server console
   apiRouter.post('/log', (req, res) => {
     const { level = 'error', tag = 'client', message, detail } = req.body || {};
     const prefix = `[${String(tag)}]`;
@@ -100,13 +84,11 @@ async function createServer() {
     res.sendStatus(204);
   });
 
-  // Copilot health check — reports whether any active session is connected
   apiRouter.get('/copilot-health', (_req, res) => {
     const health = checkCopilotHealth();
     res.json(health);
   });
 
-  // Image upload for multimodal prompts
   apiRouter.post('/upload-image', (req, res) => {
     try {
       const { dataUrl, name } = req.body;
@@ -124,7 +106,6 @@ async function createServer() {
       const buffer = Buffer.from(base64Data, 'base64');
       const tempDir = path.join(os.tmpdir(), 'copilot-office-images');
       if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-      // path.basename prevents path traversal (e.g. name='../../etc/passwd')
       const filename = path.basename(name || `image-${Date.now()}.${extension}`);
       const filepath = path.join(tempDir, filename);
       fs.writeFileSync(filepath, buffer);
@@ -137,58 +118,36 @@ async function createServer() {
   app.use('/api', apiRouter);
   app.get('/ping', (_req, res) => res.json({ ok: true }));
 
-  // ─── HTTPS server ───────────────────────────────────────────────────────────
   const devCerts = await import('office-addin-dev-certs');
   const httpsOptions = await devCerts.getHttpsServerOptions();
   const httpsServer = https.createServer(httpsOptions, app);
 
-  // ─── Copilot WebSocket Proxy (registered BEFORE Vite HMR) ────────────────────
-  // Must come before createViteServer so the Copilot upgrade handler is the
-  // first to receive WS upgrade events on /api/copilot — Vite's HMR handler
-  // is registered afterwards and only consumes its own path.
   setupCopilotProxy(httpsServer);
 
-  // ─── Frontend ────────────────────────────────────────────────────────────────
-  if (isDev) {
-    // Vite dev server in middleware mode.
-    // Pass httpsServer via hmr.server so Vite attaches its HMR WebSocket to
-    // our HTTPS server — without this, the Vite client can't upgrade to WS
-    // and throws "WebSocket closed without opened."
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: { server: httpsServer } },
-      appType: 'custom',
-    });
-    app.use(vite.middlewares);
-
-    // appType:'custom' disables Vite's HTML middleware — serve HTML manually
-    // through Vite's transform pipeline so HMR client injection works
-    const projectRoot = path.resolve(__dirname, '..');
-    app.use(async (req, res, next) => {
-      const isHtmlReq =
-        req.url.endsWith('.html') || req.url === '/' || req.headers.accept?.includes('text/html');
-      if (!isHtmlReq) return next();
-      try {
-        const htmlPath = path.join(projectRoot, 'taskpane.html');
-        let html = fs.readFileSync(htmlPath, 'utf-8');
-        html = await vite.transformIndexHtml(req.originalUrl, html);
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
-      } catch (e) {
-        next(e);
-      }
-    });
-  } else {
-    // Serve static dist in production
-    app.use(express.static(path.join(__dirname, '../dist')));
-  }
-
-  httpsServer.listen(PORT, () => {
-    console.log(`\n  Copilot Office Add-in server running on https://localhost:${PORT}`);
-    console.log(`  API: https://localhost:${PORT}/api\n`);
+  const distDir = path.resolve(__dirname, '..', 'dist');
+  app.use(express.static(distDir));
+  app.get('*path', (_req, res) => {
+    res.sendFile(path.join(distDir, 'taskpane.html'));
   });
+
+  await new Promise(resolve => {
+    httpsServer.listen(PORT, () => {
+      console.log(
+        `\n  Copilot Office Add-in production server running on https://localhost:${PORT}`
+      );
+      console.log(`  API: https://localhost:${PORT}/api\n`);
+      resolve(undefined);
+    });
+  });
+
+  return httpsServer;
 }
 
-createServer().catch(err => {
-  console.error('Server startup error:', err);
-  process.exit(1);
-});
+const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+
+if (isMainModule) {
+  createServer().catch(err => {
+    console.error('Server startup error:', err);
+    process.exit(1);
+  });
+}

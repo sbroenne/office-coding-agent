@@ -3,12 +3,15 @@ import { flushSync } from 'react-dom';
 import { useExternalStoreRuntime } from '@assistant-ui/react';
 import type { ThreadMessageLike, AppendMessage } from '@assistant-ui/react';
 import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
+import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { getSkills, getImportedSkills, skillToMarkdown } from '@/services/skills';
 import { resolveActiveAgent } from '@/services/agents';
 import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
+import { useSessionHistoryStore } from '@/stores';
+import { usePermissionStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider } from '@/types';
@@ -78,18 +81,65 @@ export function useOfficeChat(host: OfficeHostApp) {
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
   const npmSkillPackages = useSettingsStore(s => s.npmSkillPackages);
+  const sessions = useSessionHistoryStore(s => s.sessions);
+  const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
+  const createSession = useSessionHistoryStore(s => s.createSession);
+  const setActiveSession = useSessionHistoryStore(s => s.setActiveSession);
+  const upsertActiveSession = useSessionHistoryStore(s => s.upsertActiveSession);
+  const deleteSessionHistoryItem = useSessionHistoryStore(s => s.deleteSession);
+  const evaluatePermission = usePermissionStore(s => s.evaluate);
+  const addPermissionRule = usePermissionStore(s => s.addRule);
+  const allowAllPermissions = usePermissionStore(s => s.allowAll);
 
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
   const cancelRef = useRef(false);
   // Guard against concurrent/stale initSession calls (React StrictMode double-mount)
   const initCounterRef = useRef(0);
+  const restoredInitialSessionRef = useRef(false);
 
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [thinkingText, setThinkingText] = useState<string | null>(null);
+  const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
+  const activePermissionRequestRef = useRef<string | null>(null);
+
+  const deserializeMessages = useCallback((rawMessages: unknown[]): ThreadMessageLike[] => {
+    return rawMessages
+      .filter((msg): msg is Record<string, unknown> => typeof msg === 'object' && msg !== null)
+      .map(msg => {
+        const createdAtRaw = msg.createdAt;
+        const createdAt =
+          typeof createdAtRaw === 'string' || typeof createdAtRaw === 'number'
+            ? new Date(createdAtRaw)
+            : new Date();
+        return {
+          ...(msg as ThreadMessageLike),
+          createdAt,
+        };
+      });
+  }, []);
+
+  const deriveSessionTitle = useCallback((nextMessages: ThreadMessageLike[]): string => {
+    const firstUser = nextMessages.find(m => m.role === 'user');
+    const contentParts: unknown[] = Array.isArray(firstUser?.content) ? firstUser.content : [];
+    const textPart = contentParts.find(
+      (part): part is { type: 'text'; text?: string } =>
+        typeof part === 'object' &&
+        part !== null &&
+        'type' in part &&
+        (part as { type?: unknown }).type === 'text'
+    );
+    const text = textPart ? String(textPart.text ?? '') : '';
+    const trimmed = text.trim();
+    if (!trimmed) return 'New conversation';
+    return trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
+  }, []);
+
+  // Stable ref so onNew can call the latest initSession without adding it to deps
+  const initSessionRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   const initSession = useCallback(async () => {
     // Increment counter — any in-flight init with a stale counter will be discarded
@@ -196,7 +246,19 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       sessionRef.current = session;
       setSessionError(null);
+      setPendingPermission(null);
+      activePermissionRequestRef.current = null;
       console.log('[chat] Session created:', session.sessionId);
+
+      session.onPermissionRequest(payload => {
+        const autoDecision = evaluatePermission(payload.request);
+        if (autoDecision === 'approved') {
+          void session.respondPermission(payload.requestId, 'approved');
+          return;
+        }
+        activePermissionRequestRef.current = payload.requestId;
+        setPendingPermission(payload);
+      });
 
       // Fetch available models (non-blocking, with timeout)
       void loadAvailableModels(client);
@@ -217,7 +279,39 @@ export function useOfficeChat(host: OfficeHostApp) {
     activeAgentId,
     importedMcpServers,
     activeMcpServerNames,
+    evaluatePermission,
   ]);
+
+  useEffect(() => {
+    initSessionRef.current = initSession;
+  }, [initSession]);
+
+  useEffect(() => {
+    if (restoredInitialSessionRef.current) return;
+
+    if (!activeSessionId) {
+      createSession(host);
+      restoredInitialSessionRef.current = true;
+      return;
+    }
+
+    const active = sessions.find(s => s.id === activeSessionId);
+    if (active && active.messages.length > 0) {
+      setMessages(deserializeMessages(active.messages));
+    }
+
+    restoredInitialSessionRef.current = true;
+  }, [activeSessionId, createSession, deserializeMessages, host, sessions]);
+
+  useEffect(() => {
+    if (!restoredInitialSessionRef.current) return;
+    const title = deriveSessionTitle(messages);
+    upsertActiveSession({
+      host,
+      title,
+      messages,
+    });
+  }, [deriveSessionTitle, host, messages, upsertActiveSession]);
 
   useEffect(() => {
     void initSession();
@@ -389,13 +483,34 @@ export function useOfficeChat(host: OfficeHostApp) {
       if (staleTimer) clearTimeout(staleTimer);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === assistantId
-            ? { ...m, status: { type: 'incomplete', reason: 'error', error: errMsg } }
-            : m
-        )
-      );
+      // Auto-reconnect if the Copilot session was lost (e.g. proxy restart, laptop sleep)
+      const isSessionLost =
+        errMsg.includes('Session') ||
+        errMsg.includes('not connected') ||
+        errMsg.includes('disconnected') ||
+        errMsg.includes('WebSocket closed');
+      if (isSessionLost) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: [{ type: 'text', text: '🔄 Session lost — reconnecting…' }],
+                  status: { type: 'complete', reason: 'stop' },
+                }
+              : m
+          )
+        );
+        void initSessionRef.current();
+      } else {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? { ...m, status: { type: 'incomplete', reason: 'error', error: errMsg } }
+              : m
+          )
+        );
+      }
     } finally {
       setThinkingText(null);
       setIsRunning(false);
@@ -404,8 +519,76 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setPendingPermission(null);
+    activePermissionRequestRef.current = null;
+    createSession(host);
     void initSession();
-  }, [initSession]);
+  }, [createSession, host, initSession]);
+
+  const restoreSession = useCallback(
+    (sessionId: string) => {
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session) return;
+      setActiveSession(sessionId);
+      setMessages(deserializeMessages(session.messages));
+      setPendingPermission(null);
+      activePermissionRequestRef.current = null;
+      void initSession();
+    },
+    [deserializeMessages, initSession, sessions, setActiveSession]
+  );
+
+  const deleteSession = useCallback(
+    (sessionId: string) => {
+      deleteSessionHistoryItem(sessionId);
+      if (activeSessionId === sessionId) {
+        setMessages([]);
+        createSession(host);
+        void initSession();
+      }
+    },
+    [activeSessionId, createSession, deleteSessionHistoryItem, host, initSession]
+  );
+
+  const respondPermission = useCallback(async (decision: 'approved' | 'denied') => {
+    const session = sessionRef.current;
+    const requestId = activePermissionRequestRef.current;
+    if (!session || !requestId) return;
+    try {
+      await session.respondPermission(requestId, decision);
+    } finally {
+      if (activePermissionRequestRef.current === requestId) {
+        activePermissionRequestRef.current = null;
+        setPendingPermission(null);
+      }
+    }
+  }, []);
+
+  const approvePermission = useCallback(() => {
+    void respondPermission('approved');
+  }, [respondPermission]);
+
+  const denyPermission = useCallback(() => {
+    void respondPermission('denied');
+  }, [respondPermission]);
+
+  const allowPermissionAlways = useCallback(() => {
+    const request = pendingPermission?.request;
+    if (!request) return;
+    const pathPrefix =
+      (typeof request.path === 'string' && request.path) ||
+      (typeof request.fileName === 'string' && request.fileName) ||
+      (typeof request.fullCommandText === 'string' && request.fullCommandText) ||
+      null;
+
+    if (pathPrefix) {
+      addPermissionRule({
+        kind: request.kind,
+        pathPrefix,
+      });
+    }
+    void respondPermission('approved');
+  }, [addPermissionRule, pendingPermission, respondPermission]);
 
   const runtime = useExternalStoreRuntime<ThreadMessageLike>({
     isRunning,
@@ -419,5 +602,20 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
-  return { runtime, sessionError, isConnecting, clearMessages, thinkingText };
+  return {
+    runtime,
+    sessionError,
+    isConnecting,
+    clearMessages,
+    restoreSession,
+    deleteSession,
+    sessions,
+    activeSessionId,
+    pendingPermission,
+    allowAllPermissions,
+    approvePermission,
+    denyPermission,
+    allowPermissionAlways,
+    thinkingText,
+  };
 }

@@ -2,14 +2,28 @@
   "name": "office-coding-agent",
   "version": "0.2.1",
   "private": true,
+  "main": "src/tray/main.cjs",
   "description": "Office coding agent add-in with host-routed AI chat",
   "license": "MIT",
   "scripts": {
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "dev": "node scripts/kill-port.mjs && node src/server.mjs",
+    "start:prod-server": "node src/server-prod.mjs",
+    "start:tray": "npm run build && electron .",
+    "start:tray:desktop": "node scripts/start-tray-desktop.mjs",
+    "stop:tray:desktop": "node scripts/stop-tray-desktop.mjs",
+    "build:installer": "npm run build && electron-builder",
+    "build:installer:win": "npm run build && electron-builder --win",
+    "build:installer:dir": "npm run build && electron-builder --dir",
     "start": "office-addin-debugging start manifests/manifest.dev.xml",
     "start:desktop": "office-addin-debugging start manifests/manifest.dev.xml desktop --app excel",
+    "start:desktop:excel": "office-addin-debugging start manifests/manifest.dev.xml desktop --app excel",
+    "start:desktop:ppt": "office-addin-debugging start manifests/manifest.dev.xml desktop --app powerpoint",
+    "start:desktop:word": "office-addin-debugging start manifests/manifest.dev.xml desktop --app word",
+    "start:tray:excel": "node scripts/start-tray-desktop.mjs --app excel",
+    "start:tray:ppt": "node scripts/start-tray-desktop.mjs --app powerpoint",
+    "start:tray:word": "node scripts/start-tray-desktop.mjs --app word",
     "stop": "office-addin-debugging stop manifests/manifest.dev.xml && node scripts/kill-port.mjs",
     "dev:start": "node scripts/start-dev-server.mjs",
     "dev:stop": "node scripts/kill-port.mjs",
@@ -18,6 +32,10 @@
     "sideload:share:trust": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/trust-local-share.ps1",
     "sideload:share:publish": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/publish-manifest.ps1",
     "sideload:share:cleanup": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/remove-local-share.ps1",
+    "register:win": "powershell -ExecutionPolicy Bypass -File ./scripts/register.ps1",
+    "unregister:win": "powershell -ExecutionPolicy Bypass -File ./scripts/unregister.ps1",
+    "register:mac": "bash ./scripts/register.sh",
+    "unregister:mac": "bash ./scripts/unregister.sh",
     "validate": "office-addin-manifest validate manifests/manifest.dev.xml",
     "validate:staging": "office-addin-manifest validate manifests/manifest.staging.xml",
     "validate:prod": "office-addin-manifest validate manifests/manifest.prod.xml",
@@ -90,6 +108,8 @@
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/coverage-v8": "^4.0.18",
     "dotenv": "^17.3.1",
+    "electron": "^36.9.0",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vitest": "^0.5.4",
@@ -120,6 +140,32 @@
   "overrides": {
     "tmp": "0.2.4",
     "@noble/hashes": "2.0.1"
+  },
+  "build": {
+    "appId": "com.officecodingagent.tray",
+    "productName": "Office Coding Agent",
+    "directories": {
+      "output": "build/electron"
+    },
+    "files": [
+      "dist/**/*",
+      "src/tray/**/*",
+      "src/server-prod.mjs",
+      "src/copilotProxy.mjs",
+      "src/skills/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [

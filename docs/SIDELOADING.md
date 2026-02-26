@@ -1,5 +1,9 @@
 # Sideloading Guide
 
+> **First time?** See [GETTING_STARTED.md](../GETTING_STARTED.md) for the full setup walkthrough including authentication, proxy server startup, and add-in registration.
+>
+> The proxy server (`npm run dev`) must be running on `https://localhost:3000` before any of the sideload commands below will work.
+
 This project supports three sideloading lanes:
 
 1. **Local desktop dev (fastest)** via `localhost`
@@ -12,7 +16,7 @@ Main environment manifests are stored in `manifests/`:
 - `manifests/manifest.staging.xml`
 - `manifests/manifest.prod.xml`
 
-## Important Model
+## Important Note
 
 A shared folder catalog distributes the **manifest only**.
 
@@ -24,8 +28,22 @@ The add-in web app (task pane HTML/JS/CSS) must be hosted at the HTTPS URLs in t
 ## Lane 1: Local Desktop Dev
 
 ```bash
-npm run start:desktop
+npm run start:desktop:excel
+npm run start:desktop:ppt
+npm run start:desktop:word
 ```
+
+Or, to run through tray mode first:
+
+```bash
+npm run start:tray:excel
+npm run start:tray:ppt
+npm run start:tray:word
+```
+
+Note: tray startup includes a reliability fallback — if the tray server does not
+become healthy on `https://localhost:3000` in time, the launcher falls back to
+starting the dev server and then proceeds with host sideload.
 
 When done:
 

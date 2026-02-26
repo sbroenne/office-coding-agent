@@ -26,7 +26,7 @@ export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root className="aui-root aui-thread-root flex flex-1 min-h-0 flex-col bg-background">
       <ThreadPrimitive.Viewport
-        turnAnchor="top"
+        turnAnchor="bottom"
         className="aui-thread-viewport relative flex flex-1 min-h-0 flex-col overflow-x-hidden overflow-y-auto scroll-smooth px-3 pt-3"
       >
         <AuiIf condition={s => s.thread.isEmpty}>
@@ -42,7 +42,6 @@ export const Thread: FC = () => {
 
         <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-3 overflow-visible rounded-t-2xl bg-background pb-3">
           <ThreadScrollToBottom />
-          <ThinkingIndicator />
           <Composer />
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
@@ -163,14 +162,16 @@ const MessageError: FC = () => {
   );
 };
 
-const ThinkingIndicator: FC = () => {
+const AssistantThinkingIndicator: FC = () => {
   const thinkingText = useThinkingText();
   if (thinkingText === null) return null;
   return (
-    <div className="aui-thinking-indicator fade-in animate-in duration-150 flex items-center gap-2 px-2 py-1 text-muted-foreground text-sm">
-      <LoaderIcon className="size-3.5 animate-spin" />
-      <span className="animate-pulse">{thinkingText}</span>
-    </div>
+    <AuiIf condition={s => s.message.status?.type === 'running'}>
+      <div className="aui-assistant-thinking-indicator fade-in animate-in duration-150 mt-1 flex items-center gap-2 px-1 text-muted-foreground text-sm">
+        <LoaderIcon className="size-3.5 animate-spin" />
+        <span className="animate-pulse">{thinkingText}</span>
+      </div>
+    </AuiIf>
   );
 };
 
@@ -187,6 +188,7 @@ const AssistantMessage: FC = () => {
             tools: { Fallback: ToolFallback },
           }}
         />
+        <AssistantThinkingIndicator />
         <MessageError />
       </div>
 

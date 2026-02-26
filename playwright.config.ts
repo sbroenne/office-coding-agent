@@ -17,11 +17,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'node src/server.mjs',
+    command: 'npm run dev',
     url: 'https://localhost:3000/api/ping',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     ignoreHTTPSErrors: true,
-    timeout: 60_000,
+    timeout: 120_000,
   },
   expect: {
     timeout: 5_000,

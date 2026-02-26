@@ -217,6 +217,9 @@ async function handleConnection(ws) {
   /** @type {Map<number, { resolve: Function, reject: Function }>} */
   const pendingRequests = new Map();
 
+  /** @type {Map<string, { sessionId: string, resolve: (decision: 'approved'|'denied') => void, timer: NodeJS.Timeout }>} */
+  const pendingPermissionResponses = new Map();
+
   function sendRequest(method, params) {
     return new Promise((resolve, reject) => {
       const id = nextRequestId++;
@@ -227,6 +230,30 @@ async function handleConnection(ws) {
         pendingRequests.delete(id);
         reject(new Error('WebSocket closed'));
       }
+    });
+  }
+
+  /** Request explicit permission decision from the browser UI. */
+  function requestPermissionDecision(sessionId, request) {
+    const requestId = randomUUID();
+    sendNotification('permission.request', {
+      sessionId,
+      requestId,
+      request,
+    });
+
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        pendingPermissionResponses.delete(requestId);
+        console.warn(`[proxy] permission.request timed out (${requestId}) — default deny`);
+        resolve('denied');
+      }, 60_000);
+
+      pendingPermissionResponses.set(requestId, {
+        sessionId,
+        resolve,
+        timer,
+      });
     });
   }
 
@@ -388,6 +415,12 @@ async function handleConnection(ws) {
             skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
             customAgents: customAgents?.length > 0 ? customAgents : undefined,
+            onPermissionRequest: async request => {
+              console.log(`[proxy] permission.request received: ${request.kind}`);
+              const decision = await requestPermissionDecision(session.sessionId, request);
+              console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision}`);
+              return { kind: decision };
+            },
           });
         } catch (err) {
           // Clean up temp directories on failure
@@ -484,6 +517,25 @@ async function handleConnection(ws) {
         break;
       }
 
+      case 'permission.respond': {
+        const { sessionId, requestId, decision } = params || {};
+        const pending = pendingPermissionResponses.get(requestId);
+        if (!pending) {
+          sendError(id, -32602, `Permission request '${requestId}' not found`);
+          return;
+        }
+        if (pending.sessionId !== sessionId) {
+          sendError(id, -32602, `Permission request '${requestId}' does not belong to session '${sessionId}'`);
+          return;
+        }
+        const normalizedDecision = decision === 'approved' ? 'approved' : 'denied';
+        clearTimeout(pending.timer);
+        pendingPermissionResponses.delete(requestId);
+        pending.resolve(normalizedDecision);
+        sendResponse(id, {});
+        break;
+      }
+
       default:
         sendError(id, -32601, `Method '${method}' not supported`);
     }
@@ -504,6 +556,12 @@ async function handleConnection(ws) {
       pending.reject(new Error('WebSocket disconnected'));
     }
     pendingRequests.clear();
+
+    for (const pending of pendingPermissionResponses.values()) {
+      clearTimeout(pending.timer);
+      pending.resolve('denied');
+    }
+    pendingPermissionResponses.clear();
 
     // Destroy server-side sessions so the shared CopilotClient doesn't
     // accumulate open sessions across reconnects.
