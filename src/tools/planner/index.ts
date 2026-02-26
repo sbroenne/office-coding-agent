@@ -63,7 +63,7 @@ export const submitPlanTool: Tool = {
     },
     required: ['slides'],
   },
-  handler: async (args: unknown) => {
+  handler: (args: unknown) => {
     const plan = args as DeckPlan;
     // Capture the plan so the orchestrator can read it
     if (Array.isArray(plan.slides) && plan.slides.length > 0) {
@@ -77,7 +77,7 @@ export const submitPlanTool: Tool = {
  * Extract plan from tool call events.
  */
 export function extractPlanFromEvents(
-  events: Array<{ type: string; data: Record<string, unknown> }>,
+  events: { type: string; data: Record<string, unknown> }[]
 ): DeckPlan | null {
   for (const event of events) {
     if (event.type === 'tool.execution_start') {
