@@ -1,6 +1,6 @@
 # Office Coding Agent
 
-An Office add-in that embeds GitHub Copilot as an AI assistant in Excel (and other Office hosts). Built with React, [assistant-ui](https://github.com/assistant-ui/assistant-ui), Tailwind CSS, and the [GitHub Copilot SDK](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
+An Office add-in that embeds GitHub Copilot as an AI assistant in Excel (and other Office hosts). Built with React, [assistant-ui](https://github.com/assistant-ui/assistant-ui), Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). The Copilot SDK integration architecture is based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
 
 > **Research Project Disclaimer**
 >
@@ -30,82 +30,78 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 - **Auto-scroll chat** — thread stays pinned to newest content so follow-up output remains visible
 - **Web fetch tool** — proxied through the local server to avoid CORS restrictions
 
-## Agent Skills Format
-
-A skill is a folder containing `SKILL.md`. Optional supporting docs live under `references/` inside that skill folder.
-
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) >= 20
-- Microsoft Office desktop app(s): Excel, PowerPoint, and/or Word
-- An active **GitHub Copilot** subscription (individual, business, or enterprise)
-- The `@github/copilot` CLI authenticated (`gh auth login` or equivalent)
-
 ## Getting Started
 
+**👉 See [GETTING_STARTED.md](./GETTING_STARTED.md) for full setup instructions** — including authentication, starting the proxy server, registering the add-in, and sideloading into Office.
+
+**Quick start** (requires [Node.js 20+](https://nodejs.org/), [GitHub CLI](https://cli.github.com/), and an active [GitHub Copilot](https://github.com/features/copilot) subscription):
+
 ```bash
-# Install dependencies
+# 1. Install dependencies
 npm install
 
-# Terminal 1: start the Copilot proxy server
+# 2. Authenticate with GitHub Copilot (once)
+gh auth login
+
+# 3. Register the add-in manifest + trust the SSL cert
+npm run register:win    # Windows
+npm run register:mac    # macOS
+
+# 4. Terminal 1 — start the proxy server (keep this running)
 npm run dev
 
-# Terminal 2: sideload into a desktop host
-npm run start:desktop:excel
-# or
-npm run start:desktop:ppt
-# or
-npm run start:desktop:word
+# 5. Terminal 2 — sideload into Office
+npm run start:desktop:excel   # or :ppt / :word
 ```
 
-The proxy server runs on `https://localhost:3000` and handles both the Vite dev server UI and the WebSocket Copilot proxy.
+The proxy server runs on `https://localhost:3000` and handles both the Vite dev server UI and the Copilot WebSocket proxy. It must be running whenever you use the add-in.
 
 For local shared-folder sideloading and staging manifest workflows, see [docs/SIDELOADING.md](./docs/SIDELOADING.md).
 
 ## Available Scripts
 
-| Script                           | Description                                       |
-| -------------------------------- | ------------------------------------------------- |
-| `npm run dev`                    | Start Copilot proxy + Vite dev server (port 3000) |
-| `npm run start:prod-server`      | Start production HTTPS server from `dist/`         |
-| `npm run start:tray`             | Build + run Electron system tray app               |
+| Script                           | Description                                                           |
+| -------------------------------- | --------------------------------------------------------------------- |
+| `npm run dev`                    | Start Copilot proxy + Vite dev server (port 3000)                     |
+| `npm run start:prod-server`      | Start production HTTPS server from `dist/`                            |
+| `npm run start:tray`             | Build + run Electron system tray app                                  |
 | `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop (legacy alias) |
-| `npm run start:tray:excel`       | Start tray app (if needed) then sideload Excel desktop |
-| `npm run start:tray:ppt`         | Start tray app (if needed) then sideload PowerPoint desktop |
-| `npm run start:tray:word`        | Start tray app (if needed) then sideload Word desktop |
-| `npm run stop:tray:desktop`      | Stop desktop sideload/debug session and server port 3000 |
-| `npm run build:installer`        | Build desktop installer artifacts via electron-builder |
-| `npm run build:installer:win`    | Build Windows installer (NSIS)                     |
-| `npm run build:installer:dir`    | Build unpacked desktop app directory               |
-| `npm run build`                  | Production build to `dist/`                       |
-| `npm run build:dev`              | Development build to `dist/`                      |
-| `npm run start:desktop`          | Sideload into Excel Desktop (legacy alias)       |
-| `npm run start:desktop:excel`    | Sideload into Excel Desktop                       |
-| `npm run start:desktop:ppt`      | Sideload into PowerPoint Desktop                  |
-| `npm run start:desktop:word`     | Sideload into Word Desktop                        |
-| `npm run stop`                   | Stop debugging / unload the add-in                |
-| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files   |
-| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows     |
-| `npm run sideload:share:trust`   | Register local share as trusted Office catalog    |
-| `npm run sideload:share:publish` | Copy staging manifest into local shared folder    |
-| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup      |
-| `npm run register:win`           | Trust cert and register manifest for Word/PPT/Excel (Windows) |
-| `npm run unregister:win`         | Remove registered manifest entry (Windows)        |
-| `npm run register:mac`           | Trust cert and register manifest for Word/PPT/Excel (macOS) |
-| `npm run unregister:mac`         | Remove manifest from Word/PPT/Excel WEF folders (macOS) |
-| `npm run lint`                   | Run ESLint                                        |
-| `npm run lint:fix`               | Auto-fix ESLint issues                            |
-| `npm run format`                 | Format code with Prettier                         |
-| `npm run typecheck`              | Type-check without emitting                       |
-| `npm test`                       | Run all Vitest suites                             |
-| `npm run test:integration`       | Run integration test suite                         |
-| `npm run test:ui`                | Run Playwright UI tests                            |
-| `npm run test:watch`             | Run tests in watch mode                           |
-| `npm run test:coverage`          | Run tests with coverage                           |
-| `npm run test:e2e`               | Run E2E tests in Excel Desktop                    |
-| `npm run test:e2e:ppt`           | Run E2E tests in PowerPoint Desktop               |
-| `npm run test:e2e:word`          | Run E2E tests in Word Desktop                     |
-| `npm run validate`               | Validate `manifests/manifest.dev.xml`             |
+| `npm run start:tray:excel`       | Start tray app (if needed) then sideload Excel desktop                |
+| `npm run start:tray:ppt`         | Start tray app (if needed) then sideload PowerPoint desktop           |
+| `npm run start:tray:word`        | Start tray app (if needed) then sideload Word desktop                 |
+| `npm run stop:tray:desktop`      | Stop desktop sideload/debug session and server port 3000              |
+| `npm run build:installer`        | Build desktop installer artifacts via electron-builder                |
+| `npm run build:installer:win`    | Build Windows installer (NSIS)                                        |
+| `npm run build:installer:dir`    | Build unpacked desktop app directory                                  |
+| `npm run build`                  | Production build to `dist/`                                           |
+| `npm run build:dev`              | Development build to `dist/`                                          |
+| `npm run start:desktop`          | Sideload into Excel Desktop (legacy alias)                            |
+| `npm run start:desktop:excel`    | Sideload into Excel Desktop                                           |
+| `npm run start:desktop:ppt`      | Sideload into PowerPoint Desktop                                      |
+| `npm run start:desktop:word`     | Sideload into Word Desktop                                            |
+| `npm run stop`                   | Stop debugging / unload the add-in                                    |
+| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files                       |
+| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows                         |
+| `npm run sideload:share:trust`   | Register local share as trusted Office catalog                        |
+| `npm run sideload:share:publish` | Copy staging manifest into local shared folder                        |
+| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup                          |
+| `npm run register:win`           | Trust cert and register manifest for Word/PPT/Excel (Windows)         |
+| `npm run unregister:win`         | Remove registered manifest entry (Windows)                            |
+| `npm run register:mac`           | Trust cert and register manifest for Word/PPT/Excel (macOS)           |
+| `npm run unregister:mac`         | Remove manifest from Word/PPT/Excel WEF folders (macOS)               |
+| `npm run lint`                   | Run ESLint                                                            |
+| `npm run lint:fix`               | Auto-fix ESLint issues                                                |
+| `npm run format`                 | Format code with Prettier                                             |
+| `npm run typecheck`              | Type-check without emitting                                           |
+| `npm test`                       | Run all Vitest suites                                                 |
+| `npm run test:integration`       | Run integration test suite                                            |
+| `npm run test:ui`                | Run Playwright UI tests                                               |
+| `npm run test:watch`             | Run tests in watch mode                                               |
+| `npm run test:coverage`          | Run tests with coverage                                               |
+| `npm run test:e2e`               | Run E2E tests in Excel Desktop                                        |
+| `npm run test:e2e:ppt`           | Run E2E tests in PowerPoint Desktop                                   |
+| `npm run test:e2e:word`          | Run E2E tests in Word Desktop                                         |
+| `npm run validate`               | Validate `manifests/manifest.dev.xml`                                 |
 
 ## Testing
 
@@ -348,6 +344,31 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 - **Mocha** — E2E testing inside Excel Desktop (~187 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
 - **ESLint + Prettier** — code quality
+
+## Project History
+
+This project has gone through two major architectural phases:
+
+### Phase 1 — Vercel AI SDK + Azure AI Foundry (Feb 16 2026)
+
+The initial version of Office Coding Agent was built on the [Vercel AI SDK](https://ai-sdk.dev/) with [Azure AI Foundry](https://ai.azure.com/) as the model backend. It used `@ai-sdk/azure` and `@ai-sdk/react` along with `@assistant-ui/react-ai-sdk` for the chat UI. Users had to configure API endpoints, keys, and model deployments manually through a setup wizard.
+
+### Phase 2 — GitHub Copilot SDK (Feb 20 2026 – present)
+
+Inspired by [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office) — a project by [Patrick Nikoletich](https://github.com/patniko), [Steve Sanderson](https://github.com/SteveSandersonMS), and [contributors](https://github.com/patniko/github-copilot-office/graphs/contributors) — the entire AI backend was replaced with the `@github/copilot-sdk` in [PR #25](https://github.com/sbroenne/office-coding-agent/pull/25). This migration:
+
+- Replaced the Vercel AI SDK and Azure AI Foundry backend with the GitHub Copilot SDK
+- Added a Node.js WebSocket proxy server (bridging the browser task pane to the Copilot CLI)
+- Removed the setup wizard, API key configuration, and multi-provider endpoint management
+- Simplified authentication to a single GitHub account sign-in via `gh auth login`
+
+The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/copilot-sdk`) and WebSocket-based browser transport were directly adopted from the patterns established in [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office).
+
+## Acknowledgments
+
+- **[patniko/github-copilot-office](https://github.com/patniko/github-copilot-office)** — The proxy server architecture, Copilot SDK integration pattern, and WebSocket transport design used in this project were adopted from this repository by [Patrick Nikoletich](https://github.com/patniko) and [Steve Sanderson](https://github.com/SteveSandersonMS). Their work provided the foundation for the Phase 2 migration.
+- **[assistant-ui](https://github.com/assistant-ui/assistant-ui)** — React chat UI components used for the task pane thread and composer.
+- **[Vercel AI SDK](https://ai-sdk.dev/)** — Original AI runtime used in Phase 1.
 
 ## Community & Security
 
