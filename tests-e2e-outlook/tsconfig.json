@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": false,
+    "lib": ["ES2022", "DOM"],
+    "types": ["mocha", "node", "office-js"],
+    "jsx": "react-jsx",
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node"
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

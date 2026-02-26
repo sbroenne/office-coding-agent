@@ -14,12 +14,14 @@ export const SkillPicker: React.FC = () => {
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
 
   const host = detectOfficeHost();
-  const allSkills = getSkills(host);
+  const allSkills = getSkills().filter(
+    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
+  );
   const bundledSkills = getBundledSkills().filter(
-    s => !s.metadata.hosts || s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host)
+    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
   );
   const importedSkills = getImportedSkills().filter(
-    s => !s.metadata.hosts || s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host)
+    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
   );
 
   // null = all on, explicit array = only those
