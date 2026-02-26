@@ -297,7 +297,8 @@ export const McpManagerPanel: React.FC = () => {
                       <button
                         onClick={() => {
                           toggleMcpServer(server.name);
-                          setTimeout(() => toggleMcpServer(server.name), 100);
+                          // Brief delay to allow the server to stop before restarting
+                          setTimeout(() => toggleMcpServer(server.name), 150);
                         }}
                         className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         title="Restart"

@@ -76,7 +76,10 @@ export const PermissionManagerPanel: React.FC = () => {
 
       <div className="rounded-md border border-border p-3">
         <div className="mb-1 font-medium">Working directory</div>
-        <div className="text-xs text-muted-foreground break-all">
+        <div
+          className="text-xs text-muted-foreground truncate"
+          title={workingDirectory ?? undefined}
+        >
           {workingDirectory ?? 'Not set'}
         </div>
         <div className="mt-2 flex items-center gap-2">

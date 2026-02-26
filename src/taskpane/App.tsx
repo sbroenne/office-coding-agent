@@ -122,9 +122,11 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
         <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
           {/* Main chat view */}
           <div
-            className={`flex h-full flex-col transition-transform duration-300 ease-in-out ${
+            className={`flex h-full flex-col will-change-transform transition-transform duration-300 ease-in-out ${
               activePanel ? '-translate-x-full' : 'translate-x-0'
             }`}
+            aria-hidden={!!activePanel}
+            inert={activePanel ? ('' as unknown as boolean) : undefined}
           >
             <ChatHeader
               host={host}
