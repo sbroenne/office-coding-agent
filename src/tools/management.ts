@@ -17,7 +17,7 @@ import type { AgentHost } from '@/types/agent';
 export const manageSkillsTool: Tool = {
   name: 'manage_skills',
   description:
-    'Manage agent skills. Actions: "list" (show all skills and active state), "install" (add a new skill from structured data), "install_from_npm" (register an npm package whose SKILL.md files are loaded at session start), "remove" (delete an imported skill by name), "remove_npm_package" (unregister an npm skill package by name), "toggle" (enable/disable a skill by name).',
+    'Manage agent skills. Actions: "list" (show all skills and active state), "install" (add a new skill from structured data), "install_from_npm" (register a skillpm skill package from npm — see skillpm.dev — whose SKILL.md files are loaded at session start), "remove" (delete an imported skill by name), "remove_npm_package" (unregister a skillpm package by name), "toggle" (enable/disable a skill by name). Packages must follow the skillpm spec: skills/<name>/SKILL.md inside the package.',
   parameters: {
     type: 'object',
     properties: {
@@ -49,7 +49,7 @@ export const manageSkillsTool: Tool = {
       package: {
         type: 'string',
         description:
-          'npm package name, e.g. "@myorg/my-skills" (install_from_npm, remove_npm_package). The proxy installs the package at session start and loads any SKILL.md files found inside it.',
+          'skillpm package name from npmjs.org (install_from_npm, remove_npm_package), e.g. "skillpm-skill" or "@myorg/my-skills". The package must follow the skillpm spec (skills/<name>/SKILL.md). See skillpm.dev for how to create and publish skill packages.',
       },
     },
     required: ['action'],
@@ -117,8 +117,9 @@ export const manageSkillsTool: Tool = {
         registered: true,
         package: packageName,
         message:
-          `npm skill package "${packageName}" registered. ` +
-          'The proxy will install it and load its SKILL.md files at the start of the next conversation.',
+          `skillpm package "${packageName}" registered. ` +
+          'The proxy will install it via npm and load all skills/<name>/SKILL.md files at the start of the next conversation. ' +
+          'See skillpm.dev for how to create and publish skill packages.',
       });
     }
 

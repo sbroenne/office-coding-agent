@@ -10,13 +10,20 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+/** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
+const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+/** execFileAsync options for npm: shell:true is required on Windows for .cmd files. */
+const NPM_EXEC_OPTS = process.platform === 'win32' ? { shell: true } : {};
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
 
@@ -27,6 +34,75 @@ function slugify(name) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return slug || 'skill';
+}
+
+/**
+ * Scan a node_modules directory for skillpm-compatible skill directories.
+ * The skillpm spec places skills at: node_modules/<pkg>/skills/<name>/SKILL.md
+ * Returns an array of skill subdirectory paths (the directory containing SKILL.md).
+ *
+ * @param {string} nodeModulesDir - path to node_modules
+ * @returns {Promise<string[]>}
+ */
+async function findSkillDirs(nodeModulesDir) {
+  const skillDirs = [];
+  let pkgEntries;
+  try {
+    pkgEntries = await readdir(nodeModulesDir, { withFileTypes: true });
+  } catch {
+    return skillDirs; // node_modules doesn't exist
+  }
+
+  for (const entry of pkgEntries) {
+    // Handle scoped packages (@org/...)
+    if (entry.isDirectory() && entry.name.startsWith('@')) {
+      const scopeDir = join(nodeModulesDir, entry.name);
+      let scopedEntries;
+      try {
+        scopedEntries = await readdir(scopeDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const scopedEntry of scopedEntries) {
+        if (scopedEntry.isDirectory()) {
+          const pkgDir = join(scopeDir, scopedEntry.name);
+          const dirs = await findSkillDirsInPackage(pkgDir);
+          skillDirs.push(...dirs);
+        }
+      }
+    } else if (entry.isDirectory()) {
+      const pkgDir = join(nodeModulesDir, entry.name);
+      const dirs = await findSkillDirsInPackage(pkgDir);
+      skillDirs.push(...dirs);
+    }
+  }
+  return skillDirs;
+}
+
+/**
+ * Within a single package directory, find all skills/<name>/ subdirs that contain SKILL.md.
+ *
+ * @param {string} pkgDir
+ * @returns {Promise<string[]>}
+ */
+async function findSkillDirsInPackage(pkgDir) {
+  const skillsRoot = join(pkgDir, 'skills');
+  const result = [];
+  let skillSubdirs;
+  try {
+    skillSubdirs = await readdir(skillsRoot, { withFileTypes: true });
+  } catch {
+    return result; // no skills/ directory in this package
+  }
+  for (const sub of skillSubdirs) {
+    if (sub.isDirectory()) {
+      const skillDir = join(skillsRoot, sub.name);
+      if (existsSync(join(skillDir, 'SKILL.md'))) {
+        result.push(skillDir);
+      }
+    }
+  }
+  return result;
 }
 
 /** Root directory for bundled skills; each host has its own subdirectory. */
@@ -258,49 +334,43 @@ async function handleConnection(ws) {
           skillDirectories.push(tempSkillDir);
         }
 
-        // Install npm skill packages and add their directories to skillDirectories
-        // Uses the SDK's own skillDirectories mechanism — no custom HTTP endpoint needed.
+        // Install skillpm skill packages and add their skill subdirs to skillDirectories.
+        // Uses skillpm (https://skillpm.dev) — the Agent Skills package manager built on npm.
+        // skillpm packages follow the spec: skills live in skills/<name>/SKILL.md inside the package.
+        // We run `npm install` directly (no global skillpm needed) and then scan for skill dirs.
         const npmTempDirs = [];
         if (npmSkillPackages && npmSkillPackages.length > 0) {
           // Regex: allow scoped (@org/name) and plain package names, with optional @version suffix
           const NPM_PKG_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(@[^\s/]+)?$/i;
           for (const pkg of npmSkillPackages) {
             if (typeof pkg !== 'string' || !NPM_PKG_RE.test(pkg.trim())) {
-              console.warn(`[proxy] Skipping invalid npm skill package name: "${pkg}"`);
+              console.warn(`[proxy] Skipping invalid skillpm package name: "${pkg}"`);
               continue;
             }
-            const installDir = join(tmpdir(), `oca-npm-skill-${randomUUID()}`);
+            const installDir = join(tmpdir(), `oca-skillpm-${randomUUID()}`);
             await mkdir(installDir, { recursive: true });
             npmTempDirs.push(installDir);
             try {
-              const result = spawnSync('npm', ['install', '--prefix', installDir, '--no-save', pkg.trim()], {
-                encoding: 'utf8',
-                timeout: 60_000,
-              });
-              if (result.status !== 0) {
-                console.warn(`[proxy] npm install failed for "${pkg}":`, result.stderr?.trim() || result.stdout?.trim());
-                continue;
+              // Run `npm install --prefix <dir> --no-save <pkg>` asynchronously
+              // so the Node.js event loop is never blocked.
+              await execFileAsync(
+                NPM_CMD,
+                ['install', '--prefix', installDir, '--no-save', pkg.trim()],
+                { ...NPM_EXEC_OPTS, timeout: 60_000 },
+              );
+
+              // Discover skill directories: skillpm packages put skills under
+              // node_modules/<pkgBaseName>/skills/<skillName>/SKILL.md
+              const skillDirs = await findSkillDirs(join(installDir, 'node_modules'));
+              for (const dir of skillDirs) {
+                skillDirectories.push(dir);
+                console.log(`[proxy] Added skillpm skill dir "${dir}" from package "${pkg}"`);
               }
-              // Extract base package name (strip optional @version suffix from the end)
-              // Scoped: @org/name[@version] → @org/name
-              // Plain:  name[@version]      → name
-              const pkgTrimmed = pkg.trim();
-              let pkgBaseName;
-              if (pkgTrimmed.startsWith('@')) {
-                const slashIdx = pkgTrimmed.indexOf('/');
-                const afterSlash = pkgTrimmed.slice(slashIdx + 1);
-                const nameOnly = afterSlash.split('@')[0];
-                pkgBaseName = `${pkgTrimmed.slice(0, slashIdx + 1)}${nameOnly}`;
-              } else {
-                pkgBaseName = pkgTrimmed.split('@')[0];
-              }
-              const pkgDir = join(installDir, 'node_modules', pkgBaseName);
-              if (existsSync(pkgDir)) {
-                skillDirectories.push(pkgDir);
-                console.log(`[proxy] Added npm skill package "${pkg}" from ${pkgDir}`);
+              if (skillDirs.length === 0) {
+                console.warn(`[proxy] No skill dirs found in "${pkg}" — ensure it follows skillpm layout (skills/<name>/SKILL.md)`);
               }
             } catch (err) {
-              console.warn(`[proxy] Failed to install npm skill package "${pkg}":`, err.message);
+              console.warn(`[proxy] Failed to install skillpm package "${pkg}":`, err.message);
             }
           }
         }
