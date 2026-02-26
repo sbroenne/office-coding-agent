@@ -48,6 +48,10 @@ export interface UserSettings {
    * its directory to the SDK's skillDirectories parameter.
    */
   npmSkillPackages: string[];
+  /** Whether the built-in WorkIQ integration is enabled. */
+  workiqEnabled: boolean;
+  /** Optional separate model for WorkIQ sessions. null = use activeModel. */
+  workiqModel: string | null;
 }
 
 /** Default settings applied on first run */
@@ -59,5 +63,16 @@ export const DEFAULT_SETTINGS: UserSettings = {
   importedAgents: [],
   importedMcpServers: [],
   activeMcpServerNames: null,
-  npmSkillPackages: [],
+npmSkillPackages: [],
+  workiqEnabled: false,
+  workiqModel: null,
+};
+
+/** Built-in WorkIQ MCP server config */
+export const WORKIQ_MCP_SERVER: McpServerConfig = {
+  name: 'workiq',
+  description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams',
+  transport: 'stdio',
+  command: 'npx',
+  args: ['-y', '@microsoft/workiq', 'mcp'],
 };

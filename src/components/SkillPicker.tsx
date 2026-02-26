@@ -4,6 +4,7 @@ import { BrainCircuit, Check, Square, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
 import { getBundledSkills, getImportedSkills, getSkills } from '@/services/skills';
+import { detectOfficeHost } from '@/services/office/host';
 import { SkillManagerDialog } from './SkillManagerDialog';
 
 export const SkillPicker: React.FC = () => {
@@ -12,9 +13,14 @@ export const SkillPicker: React.FC = () => {
   const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
 
-  const allSkills = getSkills();
-  const bundledSkills = getBundledSkills();
-  const importedSkills = getImportedSkills();
+  const host = detectOfficeHost();
+  const allSkills = getSkills(host);
+  const bundledSkills = getBundledSkills().filter(
+    s => !s.metadata.hosts || s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host)
+  );
+  const importedSkills = getImportedSkills().filter(
+    s => !s.metadata.hosts || s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host)
+  );
 
   // null = all on, explicit array = only those
   const allNames = allSkills.map(s => s.metadata.name);

@@ -14,7 +14,7 @@ import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { humanizeToolName } from '@/utils/humanizeToolName';
-import { inferProvider } from '@/types';
+import { inferProvider, WORKIQ_MCP_SERVER } from '@/types';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
@@ -81,6 +81,8 @@ export function useOfficeChat(host: OfficeHostApp) {
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
   const npmSkillPackages = useSettingsStore(s => s.npmSkillPackages);
+  const workiqEnabled = useSettingsStore(s => s.workiqEnabled);
+  const workiqModel = useSettingsStore(s => s.workiqModel);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
   const createSession = useSessionHistoryStore(s => s.createSession);
@@ -214,14 +216,22 @@ export function useOfficeChat(host: OfficeHostApp) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
         activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
       }
+      // WorkIQ: exclude legacy 'workiq' entry, then re-add if enabled
+      activeServers = activeServers.filter(s => s.name !== 'workiq');
+      if (workiqEnabled) {
+        activeServers.push(WORKIQ_MCP_SERVER);
+      }
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
 
       // Per-agent tool restriction (omit = all tools available)
       const availableTools = resolvedAgent?.metadata.tools;
 
+      // Use dedicated WorkIQ model if enabled and set, otherwise use active model
+      const sessionModel = workiqEnabled && workiqModel ? workiqModel : activeModel;
+
       const session = await withTimeout(
         client.createSession({
-          model: activeModel,
+          model: sessionModel,
           systemMessage: { mode: 'replace', content: systemContent },
           tools: getToolsForHost(host),
           mcpServers,
@@ -280,6 +290,8 @@ export function useOfficeChat(host: OfficeHostApp) {
     importedMcpServers,
     activeMcpServerNames,
     evaluatePermission,
+    workiqEnabled,
+    workiqModel,
   ]);
 
   useEffect(() => {
@@ -335,7 +347,8 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     if (!userText.trim()) return;
 
-    if (!sessionRef.current) {
+    const client = clientRef.current;
+    if (!sessionRef.current || !client) {
       const errorMsg: ThreadMessageLike = {
         id: generateId(),
         role: 'assistant',
@@ -358,6 +371,196 @@ export function useOfficeChat(host: OfficeHostApp) {
         },
         errorMsg,
       ]);
+      return;
+    }
+
+    // Detect multi-slide PowerPoint requests → use orchestrator
+    const isMultiSlideRequest =
+      host === 'powerpoint' &&
+      /\b(\d+)\s*(slides?|folien?|seiten?)\b/i.test(userText) &&
+      !userText.toLowerCase().includes('this slide');
+
+    // Detect deep-mode Word document requests → use document orchestrator
+    // Triggers on: deep keywords OR multi-section requests (like "write a report with 5 sections")
+    const isDeepWordRequest =
+      host === 'word' &&
+      (/\b(deep|gründlich|ausführlich|thoroughly|think|go\s*deep|detail(liert)?|qualit)/i.test(
+        userText
+      ) ||
+        /\b(\d+)\s*(sections?|abschnitt(e|en)?|kapitel|teil(e|en)?|chapters?)\b/i.test(userText) ||
+        /\b(erstell|schreib|create|write|build|generate|verfass)\w*\b.{0,30}\b(report|bericht|dokument|document|paper|aufsatz|memo|proposal|angebot|zusammenfassung)\b/i.test(
+          userText
+        ));
+
+    if (isDeepWordRequest) {
+      const assistantId = generateId();
+      cancelRef.current = false;
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: generateId(),
+          role: 'user',
+          content: [{ type: 'text', text: userText }],
+          createdAt: new Date(),
+        },
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: [{ type: 'text', text: '' }],
+          status: { type: 'running' },
+          createdAt: new Date(),
+        },
+      ]);
+      setIsRunning(true);
+
+      let streamText = '';
+      const updateText = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? { ...m, content: [{ type: 'text', text: streamText }], ...extra }
+              : m
+          )
+        );
+      };
+
+      const abortController = new AbortController();
+      const origCancel = cancelRef.current;
+      const cancelCheck = setInterval(() => {
+        if (cancelRef.current && !origCancel) abortController.abort();
+      }, 500);
+
+      try {
+        const { orchestrateDocument } = await import('@/hooks/useDocumentOrchestrator');
+        const docMode =
+          /\b(deep|gründlich|ausführlich|thoroughly|think|go\s*deep|detail(liert)?|qualit)/i.test(
+            userText
+          )
+            ? ('deep' as const)
+            : ('fast' as const);
+        await orchestrateDocument(
+          client,
+          activeModel,
+          userText,
+          {
+            onPlan: () => {
+              /* plan received */
+            },
+            onSectionProgress: () => {
+              /* section status changed */
+            },
+            onText: (text: string) => {
+              streamText += text;
+              updateText();
+            },
+            onWorkerEvent: () => {
+              /* worker tool events */
+            },
+            onComplete: () => {
+              updateText({ status: { type: 'complete', reason: 'stop' } });
+            },
+            onError: (error: string) => {
+              streamText += `\n\n❌ Error: ${error}`;
+              updateText({ status: { type: 'incomplete', reason: 'error', error } });
+            },
+          },
+          abortController.signal,
+          docMode
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        streamText += `\n\n❌ ${errMsg}`;
+        updateText({ status: { type: 'incomplete', reason: 'error', error: errMsg } });
+      } finally {
+        clearInterval(cancelCheck);
+        setIsRunning(false);
+      }
+      return;
+    }
+
+    if (isMultiSlideRequest) {
+      const assistantId = generateId();
+      cancelRef.current = false;
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: generateId(),
+          role: 'user',
+          content: [{ type: 'text', text: userText }],
+          createdAt: new Date(),
+        },
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: [{ type: 'text', text: '' }],
+          status: { type: 'running' },
+          createdAt: new Date(),
+        },
+      ]);
+      setIsRunning(true);
+
+      let streamText = '';
+      const updateText = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? { ...m, content: [{ type: 'text', text: streamText }], ...extra }
+              : m
+          )
+        );
+      };
+
+      const abortController = new AbortController();
+      const origCancel = cancelRef.current;
+      // Check cancel periodically
+      const cancelCheck = setInterval(() => {
+        if (cancelRef.current && !origCancel) abortController.abort();
+      }, 500);
+
+      try {
+        const { orchestrateDeck } = await import('@/hooks/useDeckOrchestrator');
+        const deckMode = /\b(deep|detail|qualit)/i.test(userText)
+          ? ('deep' as const)
+          : ('fast' as const);
+        await orchestrateDeck(
+          client,
+          activeModel,
+          userText,
+          {
+            onPlan: () => {
+              /* plan received */
+            },
+            onSlideProgress: () => {
+              /* slide status changed */
+            },
+            onText: (text: string) => {
+              streamText += text;
+              updateText();
+            },
+            onWorkerEvent: () => {
+              /* worker tool events */
+            },
+            onComplete: () => {
+              updateText({ status: { type: 'complete', reason: 'stop' } });
+            },
+            onError: (error: string) => {
+              streamText += `\n\n❌ Error: ${error}`;
+              updateText({ status: { type: 'incomplete', reason: 'error', error } });
+            },
+          },
+          abortController.signal,
+          deckMode
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        streamText += `\n\n❌ ${errMsg}`;
+        updateText({ status: { type: 'incomplete', reason: 'error', error: errMsg } });
+      } finally {
+        clearInterval(cancelCheck);
+        setIsRunning(false);
+      }
       return;
     }
 

@@ -5,6 +5,7 @@ import type { OfficeHostApp } from '@/services/office/host';
 import excelAgentRaw from '@/agents/excel/AGENT.md';
 import powerpointAgentRaw from '@/agents/powerpoint/AGENT.md';
 import wordAgentRaw from '@/agents/word/AGENT.md';
+import outlookAgentRaw from '@/agents/outlook/AGENT.md';
 
 /**
  * Parse YAML frontmatter from an agent markdown file.
@@ -145,7 +146,7 @@ function parseInlineArray(value: string): string[] {
   return [trimmed];
 }
 
-const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint', 'word'];
+const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint', 'word', 'outlook'];
 
 function isAgentHost(value: string): value is AgentHost {
   return SUPPORTED_AGENT_HOSTS.includes(value as AgentHost);
@@ -176,6 +177,7 @@ const bundledAgents: AgentConfig[] = [
   parseAgentFrontmatter(excelAgentRaw),
   parseAgentFrontmatter(powerpointAgentRaw),
   parseAgentFrontmatter(wordAgentRaw),
+  parseAgentFrontmatter(outlookAgentRaw),
 ];
 let importedAgents: AgentConfig[] = [];
 
@@ -192,7 +194,8 @@ export function setImportedAgents(agents: AgentConfig[]): void {
 }
 
 function toAgentHost(host: OfficeHostApp): AgentHost | undefined {
-  if (host === 'excel' || host === 'powerpoint' || host === 'word') return host;
+  if (host === 'excel' || host === 'powerpoint' || host === 'word' || host === 'outlook')
+    return host;
   return undefined;
 }
 

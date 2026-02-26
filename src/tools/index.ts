@@ -16,6 +16,7 @@ import type { Tool } from '@github/copilot-sdk';
 import type { OfficeHostApp } from '@/services/office/host';
 import { powerPointTools, powerPointConfigs } from './powerpoint';
 import { wordTools, wordConfigs } from './word';
+import { outlookTools } from './outlook';
 import { managementTools } from './management';
 
 export { managementTools } from './management';
@@ -48,6 +49,7 @@ export const excelTools: Tool[] = allConfigs.flatMap(configs => createTools(conf
 
 export { powerPointTools, powerPointConfigs } from './powerpoint';
 export { wordTools, wordConfigs } from './word';
+export { outlookTools } from './outlook';
 
 /** General-purpose tools included for all hosts */
 const generalTools: Tool[] = [...managementTools];
@@ -63,6 +65,9 @@ export function getToolsForHost(host: OfficeHostApp): Tool[] {
       break;
     case 'word':
       hostTools = wordTools;
+      break;
+    case 'outlook':
+      hostTools = outlookTools;
       break;
     default:
       return [];
