@@ -2,6 +2,8 @@
 
 Thanks for your interest in contributing to Office Coding Agent.
 
+> **⛔ Never push or merge directly to `main`.** All changes must go through a pull request on a feature branch. Branch protection is enforced on GitHub.
+
 ## Development Setup
 
 - Install dependencies: `npm install`
