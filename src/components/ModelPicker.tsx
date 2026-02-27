@@ -34,12 +34,12 @@ export const ModelPicker: React.FC = () => {
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-2 pr-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           aria-label="Select model"
           title="Select model"
         >
-          <span className="max-w-[120px] truncate">{displayLabel}</span>
-          <ChevronDown className="size-3 opacity-60" />
+          <span className="max-w-[110px] truncate">{displayLabel}</span>
+          <ChevronDown className="size-3 shrink-0 opacity-50" />
         </button>
       </Popover.Trigger>
 

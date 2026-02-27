@@ -8,6 +8,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { humanizeToolName } from '@/utils/humanizeToolName';
+import { toolResultSummary } from '@/utils/toolResultSummary';
 
 const ANIMATION_DURATION = 200;
 
@@ -82,11 +83,13 @@ const statusIconMap: Record<ToolStatus, React.ElementType> = {
 function ToolFallbackTrigger({
   toolName,
   status,
+  result,
   className,
   ...props
 }: React.ComponentProps<typeof CollapsibleTrigger> & {
   toolName: string;
   status?: ToolCallMessagePartStatus;
+  result?: unknown;
 }) {
   const statusType = status?.type ?? 'complete';
   const isRunning = statusType === 'running';
@@ -94,7 +97,7 @@ function ToolFallbackTrigger({
 
   const Icon = statusIconMap[statusType];
   const friendlyName = humanizeToolName(toolName);
-  const label = isCancelled ? 'Cancelled' : isRunning ? 'Running' : 'Used';
+  const summary = !isRunning && result !== undefined ? toolResultSummary(result) : null;
 
   return (
     <CollapsibleTrigger
@@ -116,12 +119,12 @@ function ToolFallbackTrigger({
       <span
         data-slot="tool-fallback-trigger-label"
         className={cn(
-          'aui-tool-fallback-trigger-label-wrapper relative inline-block grow text-left leading-none',
+          'aui-tool-fallback-trigger-label-wrapper relative inline-block text-left leading-none',
           isCancelled && 'text-muted-foreground line-through'
         )}
       >
         <span>
-          {label}: <b>{friendlyName}</b>
+          <b>{friendlyName}</b>
         </span>
         {isRunning && (
           <span
@@ -129,14 +132,19 @@ function ToolFallbackTrigger({
             data-slot="tool-fallback-trigger-shimmer"
             className="aui-tool-fallback-trigger-shimmer shimmer pointer-events-none absolute inset-0 motion-reduce:animate-none"
           >
-            {label}: <b>{friendlyName}</b>
+            <b>{friendlyName}</b>
           </span>
         )}
       </span>
+      {summary && (
+        <span className="ml-1 min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {summary}
+        </span>
+      )}
       <ChevronDownIcon
         data-slot="tool-fallback-trigger-chevron"
         className={cn(
-          'aui-tool-fallback-trigger-chevron size-4 shrink-0',
+          'aui-tool-fallback-trigger-chevron ml-auto size-4 shrink-0',
           'transition-transform duration-200 ease-out',
           'group-data-[state=closed]/trigger:-rotate-90',
           'group-data-[state=open]/trigger:rotate-0'
@@ -181,6 +189,7 @@ function ToolFallbackArgs({
       className={cn('aui-tool-fallback-args px-4', className)}
       {...props}
     >
+      <p className="mb-1 text-xs font-semibold text-muted-foreground">Input</p>
       <pre className="aui-tool-fallback-args-value whitespace-pre-wrap text-xs">{argsText}</pre>
     </div>
   );
@@ -201,7 +210,9 @@ function ToolFallbackResult({
       className={cn('aui-tool-fallback-result border-t border-dashed px-4 pt-2', className)}
       {...props}
     >
-      <p className="aui-tool-fallback-result-header font-semibold">Result:</p>
+      <p className="aui-tool-fallback-result-header mb-1 text-xs font-semibold text-muted-foreground">
+        Output
+      </p>
       <pre className="aui-tool-fallback-result-content whitespace-pre-wrap text-xs">
         {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
       </pre>
@@ -245,7 +256,7 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
 
   return (
     <ToolFallbackRoot className={cn(isCancelled && 'border-muted-foreground/30 bg-muted/30')}>
-      <ToolFallbackTrigger toolName={toolName} status={status} />
+      <ToolFallbackTrigger toolName={toolName} status={status} result={result as unknown} />
       <ToolFallbackContent>
         <ToolFallbackError status={status} />
         <ToolFallbackArgs argsText={argsText} className={cn(isCancelled && 'opacity-60')} />

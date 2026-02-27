@@ -250,6 +250,27 @@ describe('settingsStore — MCP servers', () => {
     expect(useSettingsStore.getState().importedMcpServers).toEqual([]);
     expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
   });
+
+  it('updateMcpServer updates an existing imported server', () => {
+    useSettingsStore.getState().importMcpServers([server1]);
+    useSettingsStore.getState().updateMcpServer('srv1', { url: 'https://updated.com/mcp' });
+    expect(useSettingsStore.getState().importedMcpServers[0].url).toBe('https://updated.com/mcp');
+    expect(useSettingsStore.getState().importedMcpServers[0].name).toBe('srv1');
+  });
+
+  it('updateMcpServer preserves name even if config tries to change it', () => {
+    useSettingsStore.getState().importMcpServers([server1]);
+    useSettingsStore.getState().updateMcpServer('srv1', { name: 'hacked', transport: 'sse' } as Partial<McpServerConfig>);
+    expect(useSettingsStore.getState().importedMcpServers[0].name).toBe('srv1');
+    expect(useSettingsStore.getState().importedMcpServers[0].transport).toBe('sse');
+  });
+
+  it('updateMcpServer is no-op for unknown server name', () => {
+    useSettingsStore.getState().importMcpServers([server1]);
+    useSettingsStore.getState().updateMcpServer('nonexistent', { url: 'https://x.com' });
+    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(1);
+    expect(useSettingsStore.getState().importedMcpServers[0].url).toBe('https://s1.com/mcp');
+  });
 });
 
 // ─── Deduplication / name collision ───

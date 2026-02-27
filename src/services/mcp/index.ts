@@ -1,1 +1,6 @@
-export { parseMcpJsonFile, resolveActiveMcpServers, toSdkMcpServers } from './mcpService';
+export {
+  parseMcpJsonFile,
+  resolveActiveMcpServers,
+  toSdkMcpServers,
+  getAllMcpServers,
+} from './mcpService';

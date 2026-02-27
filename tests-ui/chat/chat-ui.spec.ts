@@ -49,7 +49,7 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('agent manager dialog supports keyboard open/close', async ({
+  test('agent manager panel opens from manage button and closes with back', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Select agent' }).click();
@@ -59,11 +59,11 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Enter');
 
     await expect(page.getByRole('heading', { name: 'Manage Agents' })).toBeVisible();
-    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByRole('heading', { name: 'Manage Agents' })).not.toBeVisible();
   });
 
-  test('skill manager dialog supports keyboard open/close', async ({
+  test('skill manager panel opens from manage button and closes with back', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Agent skills' }).click();
@@ -73,7 +73,7 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Enter');
 
     await expect(page.getByRole('heading', { name: 'Manage Skills' })).toBeVisible();
-    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByRole('heading', { name: 'Manage Skills' })).not.toBeVisible();
   });
 

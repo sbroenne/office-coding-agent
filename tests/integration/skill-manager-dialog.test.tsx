@@ -1,16 +1,15 @@
 /**
- * Integration tests for SkillManagerDialog.
+ * Integration tests for SkillManagerPanel.
  *
- * Renders the real SkillManagerDialog with the real Zustand store.
+ * Renders the real SkillManagerPanel with the real Zustand store.
  * Tests ZIP import, .md single-file import, remove, and UI state flows.
  */
-import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JSZip from 'jszip';
 import { renderWithProviders } from '../test-utils';
-import { SkillManagerDialog } from '@/components/SkillManagerDialog';
+import { SkillManagerPanel } from '@/components/SkillManagerDialog';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { AgentSkill } from '@/types';
 
@@ -37,26 +36,21 @@ function makeSkill(name: string): AgentSkill {
   };
 }
 
-const OpenDialog: React.FC = () => {
-  const [open, setOpen] = React.useState(true);
-  return <SkillManagerDialog open={open} onOpenChange={setOpen} />;
-};
-
 beforeEach(() => {
   useSettingsStore.getState().reset();
 });
 
-describe('Integration: SkillManagerDialog', () => {
-  it('renders the dialog with title and both import buttons', () => {
-    renderWithProviders(<OpenDialog />);
+describe('Integration: SkillManagerPanel', () => {
+  it('renders the panel with import buttons', () => {
+    renderWithProviders(<SkillManagerPanel />);
 
-    expect(screen.getByRole('dialog', { name: 'Manage Skills' })).toBeInTheDocument();
+    expect(screen.getByText('Custom Skills')).toBeInTheDocument();
     expect(screen.getByLabelText('Import skills ZIP file')).toBeInTheDocument();
     expect(screen.getByLabelText('Import skill Markdown file')).toBeInTheDocument();
   });
 
   it('shows bundled skills in the read-only section', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     expect(screen.getByText(/Bundled \(read-only\)/i)).toBeInTheDocument();
     // The bundled 'excel' skill must appear
@@ -64,13 +58,13 @@ describe('Integration: SkillManagerDialog', () => {
   });
 
   it('shows "No imported skills." when nothing has been imported', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     expect(screen.getByText('No imported skills.')).toBeInTheDocument();
   });
 
   it('imports skills from a valid ZIP file and shows success status', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     const zipFile = await createSkillsZipFile({
       'skills/my-skill.md': validSkillMarkdown,
@@ -87,7 +81,7 @@ describe('Integration: SkillManagerDialog', () => {
   });
 
   it('imports multiple skills from a ZIP with multiple files', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     const skillB = `---
 name: Skill B
@@ -112,7 +106,7 @@ Skill B content.`;
   });
 
   it('shows error alert when ZIP contains no skills/ markdown files', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     const zip = new JSZip();
     zip.file('notes/readme.txt', 'not a skill');
@@ -127,7 +121,7 @@ Skill B content.`;
   });
 
   it('imports a single skill from a .md file and shows success status', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     const mdFile = new File([validSkillMarkdown], 'skill.md', { type: 'text/markdown' });
     await userEvent.upload(screen.getByLabelText('Import skill Markdown file'), mdFile);
@@ -143,7 +137,7 @@ Skill B content.`;
   });
 
   it('shows error alert when .md file has no name', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     const badMd = `---
 description: no name here
@@ -160,7 +154,7 @@ Content`;
   });
 
   it('bundled skills each have a "Download as template" button', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     // 'excel' is a known bundled skill
     expect(
@@ -169,7 +163,7 @@ Content`;
   });
 
   it('"Download all" button is not shown when no imported skills exist', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     expect(screen.queryByText('Download all')).not.toBeInTheDocument();
   });
@@ -177,7 +171,7 @@ Content`;
   it('"Download all" button appears once imported skills exist', () => {
     useSettingsStore.getState().importSkills([makeSkill('My Skill')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     expect(screen.getByText('Download all')).toBeInTheDocument();
   });
@@ -185,7 +179,7 @@ Content`;
   it('imported skill shows individual Download and Remove buttons', () => {
     useSettingsStore.getState().importSkills([makeSkill('My Import')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     expect(screen.getByRole('button', { name: 'Download My Import' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove My Import' })).toBeInTheDocument();
@@ -194,7 +188,7 @@ Content`;
   it('Remove button removes the skill from the list and store', async () => {
     useSettingsStore.getState().importSkills([makeSkill('To Remove')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     expect(screen.getByText('To Remove')).toBeInTheDocument();
 
@@ -211,7 +205,7 @@ Content`;
   it('removing one of many imported skills only removes the target', async () => {
     useSettingsStore.getState().importSkills([makeSkill('Keep Me'), makeSkill('Remove Me')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Remove Me' }));
 
@@ -224,7 +218,7 @@ Content`;
   });
 
   it('clears error when a new import is attempted', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<SkillManagerPanel />);
 
     // First: trigger an error
     const badMd = `---

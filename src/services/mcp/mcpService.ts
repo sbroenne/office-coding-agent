@@ -101,6 +101,18 @@ export async function parseMcpJsonFile(file: File): Promise<McpServerConfig[]> {
   return configs;
 }
 
+/**
+ * Merge bundled and imported MCP servers into a single list.
+ * Bundled servers appear first; imported servers with the same name as a bundled server are skipped.
+ */
+export function getAllMcpServers(
+  bundled: McpServerConfig[],
+  imported: McpServerConfig[]
+): McpServerConfig[] {
+  const bundledNames = new Set(bundled.map(s => s.name));
+  return [...bundled, ...imported.filter(s => !bundledNames.has(s.name))];
+}
+
 /** Return only the servers that are currently active (null = all active). */
 export function resolveActiveMcpServers(
   servers: McpServerConfig[],

@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
 import { getBundledSkills, getImportedSkills, getSkills } from '@/services/skills';
 import { detectOfficeHost } from '@/services/office/host';
-import { SkillManagerDialog } from './SkillManagerDialog';
 
-export const SkillPicker: React.FC = () => {
+interface SkillPickerProps {
+  onOpenPanel?: (panel: string) => void;
+}
+
+export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
   const [open, setOpen] = useState(false);
-  const [managerOpen, setManagerOpen] = useState(false);
   const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
 
@@ -67,17 +69,18 @@ export const SkillPicker: React.FC = () => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-1.5 pr-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Agent skills"
             title="Agent skills"
           >
-            <BrainCircuit className="size-4" />
-            {activeCount > 0 && (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+            <BrainCircuit className="size-3 shrink-0" />
+            <span>Skills</span>
+            {activeCount > 0 && activeSkillNames !== null && (
+              <span className="min-w-[14px] rounded-full bg-muted px-1 text-center text-[10px] tabular-nums text-muted-foreground">
                 {activeCount}
               </span>
             )}
-            <ChevronDown className="size-3 opacity-60" />
+            <ChevronDown className="size-3 shrink-0 opacity-50" />
           </button>
         </Popover.Trigger>
 
@@ -122,7 +125,7 @@ export const SkillPicker: React.FC = () => {
               <button
                 onClick={() => {
                   setOpen(false);
-                  setManagerOpen(true);
+                  onOpenPanel?.('skills');
                 }}
                 className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
@@ -133,8 +136,6 @@ export const SkillPicker: React.FC = () => {
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-
-      <SkillManagerDialog open={managerOpen} onOpenChange={setManagerOpen} />
     </>
   );
 };

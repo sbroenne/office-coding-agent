@@ -49,6 +49,9 @@ function makeFakeClient(
     createSession: vi.fn().mockResolvedValue(session),
     listModels: vi.fn().mockResolvedValue(models),
     stop: vi.fn().mockResolvedValue(undefined),
+    onMcpStatus: vi.fn(() => () => undefined),
+    onMcpLog: vi.fn(() => () => undefined),
+    onMcpTools: vi.fn(() => () => undefined),
   };
 }
 

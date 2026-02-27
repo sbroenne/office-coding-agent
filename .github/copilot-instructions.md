@@ -162,7 +162,7 @@ The task pane is split into three areas:
 
 **ALWAYS run integration and E2E tests after making code changes — these are the only tests that matter:**
 
-1. `npm run test:integration` — integration tests (**ALL must pass — 0 failures is the only acceptable result**)
+2. `npm run test:integration` — integration tests via `--project integration` (**ALL must pass — 0 failures is the only acceptable result**)
 2. `npm run test:e2e` — E2E tests inside real Excel Desktop (requires `npm run start:desktop` first; **must pass before marking work complete**)
 3. `npm run test:e2e:ppt` — E2E tests inside real PowerPoint Desktop (requires PPT open; **must pass before marking PPT work complete**)
 4. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
@@ -282,7 +282,7 @@ The task pane is split into three areas:
 
 - `officeStorage.ts` throws if `OfficeRuntime.storage` is unavailable (no localStorage fallback)
 - Unit and integration tests rely on the `OfficeRuntime` mock in `tests/setup.ts`
-- **Both** `vitest.config.ts` and `vitest.integration.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`
+- Both the `unit` and `integration` projects in `vitest.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`
 
 ## Build & Run
 
@@ -332,5 +332,5 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
 - `taskpane.html` — Vite HTML entry point (root level, references `src/taskpane/index.tsx`)
 - `vitest.config.ts` — unit test config (jsdom, `@/` alias, setup file, globals)
-- `vitest.integration.config.ts` — integration test config (jsdom, setup file, globals, 60s timeout)
+- `vitest.config.ts` — unified vitest config with two named projects: `unit` (30s) and `integration` (60s, live Copilot tests)
 - `tests/setup.ts` — `OfficeRuntime.storage` mock + polyfills (ResizeObserver, matchMedia, etc.)
