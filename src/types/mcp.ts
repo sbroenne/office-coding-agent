@@ -1,6 +1,24 @@
 /** Transport type for an MCP server */
 export type McpTransportType = 'http' | 'sse' | 'stdio';
 
+/** Lifecycle status of an MCP server */
+export type McpServerStatus = 'stopped' | 'starting' | 'connected' | 'error';
+
+/** A single log entry from an MCP server */
+export interface McpLogEntry {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
+/** Runtime state tracked per MCP server (ephemeral, not persisted) */
+export interface McpServerState {
+  status: McpServerStatus;
+  error?: string;
+  tools: { name: string; description: string }[];
+  logs: McpLogEntry[];
+}
+
 /** A configured MCP server imported from a mcp.json file */
 export interface McpServerConfig {
   /** Display name (used as identifier) */

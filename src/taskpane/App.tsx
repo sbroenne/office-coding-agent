@@ -1,9 +1,15 @@
-import React, { useEffect, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
+import { SlidePanel } from '@/components/SlidePanel';
+import { McpManagerPanel } from '@/components/McpManagerDialog';
+import { AgentManagerPanel } from '@/components/AgentManagerDialog';
+import { SkillManagerPanel } from '@/components/SkillManagerDialog';
+import { SessionHistoryPanel } from '@/components/SessionHistoryDialog';
+import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
 import { useSettingsStore } from '@/stores';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { ThinkingContext } from '@/contexts/ThinkingContext';
@@ -74,6 +80,14 @@ const PermissionBanner: React.FC<{
   </div>
 );
 
+const PANEL_TITLES: Record<string, { title: string; description?: string }> = {
+  mcp: { title: 'MCP Servers', description: 'Manage servers that provide additional AI tools' },
+  agents: { title: 'Manage Agents', description: 'Import and manage custom agents' },
+  skills: { title: 'Manage Skills', description: 'Import and manage custom skills' },
+  history: { title: 'Session History' },
+  permissions: { title: 'Permissions', description: 'Manage auto-approval and saved rules' },
+};
+
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
   const {
     runtime,
@@ -91,6 +105,9 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     thinkingText,
   } = useOfficeChat(host);
 
+  const [activePanel, setActivePanel] = useState<string | null>(null);
+  const closePanel = useCallback(() => setActivePanel(null), []);
+
   const permissionDetail = pendingPermission
     ? (pendingPermission.request.path ??
       pendingPermission.request.fileName ??
@@ -102,29 +119,64 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ThinkingContext.Provider value={thinkingText}>
-        <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-          <ChatHeader
-            host={host}
-            onClearMessages={clearMessages}
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onRestoreSession={restoreSession}
-            onDeleteSession={deleteSession}
-          />
-          {isConnecting && !sessionError && <ConnectingBanner />}
-          {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
-          {pendingPermission && (
-            <PermissionBanner
-              kind={pendingPermission.request.kind}
-              detail={permissionDetail}
-              onApprove={approvePermission}
-              onDeny={denyPermission}
-              onAlwaysAllow={allowPermissionAlways}
+        <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+          {/* Main chat view */}
+          <div
+            className={`flex h-full flex-col will-change-transform transition-transform duration-300 ease-in-out ${
+              activePanel ? '-translate-x-full' : 'translate-x-0'
+            }`}
+            aria-hidden={!!activePanel}
+            inert={activePanel ? ('' as unknown as boolean) : undefined}
+          >
+            <ChatHeader
+              host={host}
+              onClearMessages={clearMessages}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onRestoreSession={restoreSession}
+              onDeleteSession={deleteSession}
+              onOpenPanel={setActivePanel}
             />
-          )}
-          <ChatErrorBoundary>
-            <ChatPanel />
-          </ChatErrorBoundary>
+            {isConnecting && !sessionError && <ConnectingBanner />}
+            {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
+            {pendingPermission && (
+              <PermissionBanner
+                kind={pendingPermission.request.kind}
+                detail={permissionDetail}
+                onApprove={approvePermission}
+                onDeny={denyPermission}
+                onAlwaysAllow={allowPermissionAlways}
+              />
+            )}
+            <ChatErrorBoundary>
+              <ChatPanel onOpenPanel={setActivePanel} />
+            </ChatErrorBoundary>
+          </div>
+
+          {/* Slide panels */}
+          {Object.entries(PANEL_TITLES).map(([key, { title, description }]) => (
+            <SlidePanel
+              key={key}
+              open={activePanel === key}
+              onClose={closePanel}
+              title={title}
+              description={description}
+            >
+              {key === 'mcp' && <McpManagerPanel />}
+              {key === 'agents' && <AgentManagerPanel />}
+              {key === 'skills' && <SkillManagerPanel />}
+              {key === 'history' && (
+                <SessionHistoryPanel
+                  host={host}
+                  sessions={sessions}
+                  activeSessionId={activeSessionId}
+                  onRestoreSession={restoreSession}
+                  onDeleteSession={deleteSession}
+                />
+              )}
+              {key === 'permissions' && <PermissionManagerPanel />}
+            </SlidePanel>
+          ))}
         </div>
       </ThinkingContext.Provider>
     </AssistantRuntimeProvider>

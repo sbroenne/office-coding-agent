@@ -1,16 +1,15 @@
 /**
- * Integration tests for AgentManagerDialog.
+ * Integration tests for AgentManagerPanel.
  *
- * Renders the real AgentManagerDialog with the real Zustand store.
+ * Renders the real AgentManagerPanel with the real Zustand store.
  * Tests ZIP import, .md single-file import, remove, and UI state flows.
  */
-import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JSZip from 'jszip';
 import { renderWithProviders } from '../test-utils';
-import { AgentManagerDialog } from '@/components/AgentManagerDialog';
+import { AgentManagerPanel } from '@/components/AgentManagerDialog';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { AgentConfig } from '@/types';
 
@@ -45,26 +44,21 @@ function makeAgent(name: string): AgentConfig {
   };
 }
 
-const OpenDialog: React.FC = () => {
-  const [open, setOpen] = React.useState(true);
-  return <AgentManagerDialog open={open} onOpenChange={setOpen} />;
-};
-
 beforeEach(() => {
   useSettingsStore.getState().reset();
 });
 
-describe('Integration: AgentManagerDialog', () => {
-  it('renders the dialog with title and both import buttons', () => {
-    renderWithProviders(<OpenDialog />);
+describe('Integration: AgentManagerPanel', () => {
+  it('renders the panel with import buttons', () => {
+    renderWithProviders(<AgentManagerPanel />);
 
-    expect(screen.getByRole('dialog', { name: 'Manage Agents' })).toBeInTheDocument();
+    expect(screen.getByText('Custom Agents')).toBeInTheDocument();
     expect(screen.getByLabelText('Import agents ZIP file')).toBeInTheDocument();
     expect(screen.getByLabelText('Import agent Markdown file')).toBeInTheDocument();
   });
 
   it('shows bundled agents in the read-only section', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     expect(screen.getByText(/Bundled \(read-only\)/i)).toBeInTheDocument();
     // The Excel bundled agent must appear
@@ -72,13 +66,13 @@ describe('Integration: AgentManagerDialog', () => {
   });
 
   it('shows "No imported agents." when no custom agents have been imported', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     expect(screen.getByText('No imported agents.')).toBeInTheDocument();
   });
 
   it('imports agents from a valid ZIP file and shows success status', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     const zipFile = await createAgentsZipFile({
       'agents/my-agent.md': validAgentMarkdown,
@@ -95,7 +89,7 @@ describe('Integration: AgentManagerDialog', () => {
   });
 
   it('imports multiple agents from a ZIP with multiple files', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     const agentB = `---
 name: Agent B
@@ -122,7 +116,7 @@ Agent B instructions.`;
   });
 
   it('shows error alert when ZIP contains no agents/ markdown files', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     const zip = new JSZip();
     zip.file('notes/readme.txt', 'not an agent');
@@ -137,7 +131,7 @@ Agent B instructions.`;
   });
 
   it('shows error alert when ZIP agent has no valid hosts', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     const noHostsMd = `---
 name: No Hosts Agent
@@ -158,7 +152,7 @@ Instructions`;
   });
 
   it('imports a single agent from a .md file and shows success status', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     const mdFile = new File([validAgentMarkdown], 'agent.md', { type: 'text/markdown' });
     await userEvent.upload(screen.getByLabelText('Import agent Markdown file'), mdFile);
@@ -174,7 +168,7 @@ Instructions`;
   });
 
   it('shows error alert when .md file has no valid hosts', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     const badMd = `---
 name: No Hosts Agent
@@ -192,7 +186,7 @@ Instructions`;
   });
 
   it('bundled agents each have a "Download as template" button', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     // Excel is a known bundled agent
     expect(
@@ -201,7 +195,7 @@ Instructions`;
   });
 
   it('"Download all" button is not shown when no imported agents exist', () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     expect(screen.queryByText('Download all')).not.toBeInTheDocument();
   });
@@ -209,7 +203,7 @@ Instructions`;
   it('"Download all" button appears once imported agents exist', () => {
     useSettingsStore.getState().importAgents([makeAgent('Custom Agent')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     expect(screen.getByText('Download all')).toBeInTheDocument();
   });
@@ -217,7 +211,7 @@ Instructions`;
   it('imported agent shows individual Download and Remove buttons', () => {
     useSettingsStore.getState().importAgents([makeAgent('My Import')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     expect(screen.getByRole('button', { name: 'Download My Import' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove My Import' })).toBeInTheDocument();
@@ -226,7 +220,7 @@ Instructions`;
   it('Remove button removes the agent from the list and store', async () => {
     useSettingsStore.getState().importAgents([makeAgent('To Remove')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     expect(screen.getByText('To Remove')).toBeInTheDocument();
 
@@ -243,7 +237,7 @@ Instructions`;
   it('removing one of many imported agents only removes the target', async () => {
     useSettingsStore.getState().importAgents([makeAgent('Keep Me'), makeAgent('Remove Me')]);
 
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Remove Me' }));
 
@@ -256,7 +250,7 @@ Instructions`;
   });
 
   it('clears error when a new import is attempted', async () => {
-    renderWithProviders(<OpenDialog />);
+    renderWithProviders(<AgentManagerPanel />);
 
     // First: trigger an error
     const badMd = `---

@@ -46,14 +46,11 @@ interface SettingsState extends UserSettings {
   importMcpServers: (servers: McpServerConfig[]) => void;
   removeMcpServer: (serverName: string) => void;
   toggleMcpServer: (serverName: string) => void;
+  updateMcpServer: (serverName: string, config: Partial<McpServerConfig>) => void;
 
   // ─── npm skill packages ───
   addNpmSkillPackage: (packageName: string) => void;
   removeNpmSkillPackage: (packageName: string) => void;
-
-  // ─── WorkIQ ───
-  toggleWorkiq: () => void;
-  setWorkiqModel: (modelId: string | null) => void;
 
   // ─── Reset ───
   reset: () => void;
@@ -236,6 +233,15 @@ export const useSettingsStore = create<SettingsState>()(
         });
       },
 
+      updateMcpServer: (serverName, config) => {
+        set(state => {
+          const nextImported = state.importedMcpServers.map(s =>
+            s.name === serverName ? { ...s, ...config, name: serverName } : s
+          );
+          return { importedMcpServers: nextImported };
+        });
+      },
+
       // ─── npm skill packages ───
       addNpmSkillPackage: packageName => {
         set(state => {
@@ -248,15 +254,6 @@ export const useSettingsStore = create<SettingsState>()(
         set(state => ({
           npmSkillPackages: state.npmSkillPackages.filter(p => p !== packageName),
         }));
-      },
-
-      // ─── WorkIQ ───
-      toggleWorkiq: () => {
-        set(state => ({ workiqEnabled: !state.workiqEnabled }));
-      },
-
-      setWorkiqModel: modelId => {
-        set({ workiqModel: modelId });
       },
 
       // ─── Reset ───
@@ -278,14 +275,28 @@ export const useSettingsStore = create<SettingsState>()(
         importedMcpServers: state.importedMcpServers,
         activeMcpServerNames: state.activeMcpServerNames,
         npmSkillPackages: state.npmSkillPackages,
-        workiqEnabled: state.workiqEnabled,
-        workiqModel: state.workiqModel,
         // availableModels is NOT persisted — it's always fetched fresh from the
         // Copilot CLI on connect, so a stale cached list never survives restarts.
       }),
       onRehydrateStorage: () => state => {
         setImportedSkills(state?.importedSkills ?? []);
         setImportedAgents(state?.importedAgents ?? []);
+
+        // Migration: convert legacy workiqEnabled flag to activeMcpServerNames entry
+        const raw = state as Record<string, unknown> | undefined;
+        if (raw && typeof raw.workiqEnabled === 'boolean') {
+          const wasEnabled = raw.workiqEnabled;
+          if (wasEnabled) {
+            const currentActive = state?.activeMcpServerNames ?? null;
+            if (!currentActive?.includes('workiq')) {
+              const next = currentActive === null ? ['workiq'] : [...currentActive, 'workiq'];
+              useSettingsStore.setState({ activeMcpServerNames: next });
+            }
+          }
+          // Clean up legacy fields from persisted state
+          delete raw.workiqEnabled;
+          delete raw.workiqModel;
+        }
       },
     }
   )

@@ -5,15 +5,18 @@
  * bundled skills (loaded via rawMarkdownPlugin). Verifies toggling
  * skills on/off updates the store and shows the badge count.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
 import { SkillPicker } from '@/components/SkillPicker';
 import { useSettingsStore } from '@/stores/settingsStore';
 
+const mockOpenPanel = vi.fn();
+
 beforeEach(() => {
   useSettingsStore.getState().reset();
+  mockOpenPanel.mockClear();
 });
 
 describe('Integration: SkillPicker', () => {
@@ -27,13 +30,12 @@ describe('Integration: SkillPicker', () => {
 
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
-    expect(screen.getByText('Skills')).toBeInTheDocument();
     expect(screen.getByText('Bundled')).toBeInTheDocument();
     expect(screen.getByText('Manage skills…')).toBeInTheDocument();
   });
 
-  it('opens manager dialog from keyboard and closes with Escape', async () => {
-    renderWithProviders(<SkillPicker />);
+  it('calls onOpenPanel when manage skills button is clicked', async () => {
+    renderWithProviders(<SkillPicker onOpenPanel={mockOpenPanel} />);
 
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
@@ -41,9 +43,6 @@ describe('Integration: SkillPicker', () => {
     manageButton.focus();
     await userEvent.keyboard('{Enter}');
 
-    expect(screen.getByRole('dialog', { name: 'Manage Skills' })).toBeInTheDocument();
-
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog', { name: 'Manage Skills' })).not.toBeInTheDocument();
+    expect(mockOpenPanel).toHaveBeenCalledWith('skills');
   });
 });

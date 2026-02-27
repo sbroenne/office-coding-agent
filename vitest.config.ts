@@ -19,47 +19,74 @@ function rawMarkdownPlugin(): Plugin {
   };
 }
 
-/**
- * Vitest Configuration for Excel AI Add-in
- *
- * Test configuration for the Office Excel AI Assistant Add-in project.
- */
-export default defineConfig({
+const sharedViteConfig = {
   plugins: [rawMarkdownPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
   },
-  define: {
-    // Override build-time env vars so SetupWizard starts with blank defaults
-    'process.env.AZURE_OPENAI_ENDPOINT': JSON.stringify(''),
-    'process.env.AZURE_OPENAI_API_KEY': JSON.stringify(''),
-  },
+};
+
+/**
+ * Vitest Configuration for Excel AI Add-in
+ *
+ * Uses Vitest projects to consolidate unit and integration configs into a single
+ * file, preventing the VS Code Vitest extension from exceeding its 5-project limit.
+ *
+ * Projects:
+ *   unit        — jsdom, 30s timeout, all tests except tests/integration/ and *.integration.test.ts
+ *   integration — jsdom, 60s timeout, tests/integration/ (including live Copilot WebSocket tests)
+ *
+ * Run all:         vitest run
+ * Run integration: vitest run --project integration
+ * Watch:           vitest
+ */
+export default defineConfig({
   test: {
-    // jsdom for all tests — needed by React component tests;
-    // pure .ts unit tests work fine in jsdom as well
-    environment: 'jsdom',
-
-    // Match unit and component test files (integration tests use vitest.integration.config.ts)
-    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
-    // Exclude API-calling integration tests (they use vitest.integration.config.ts with node env + 60s timeout)
-    exclude: [...defaultExclude, 'tests/**/*.integration.test.ts'],
-
-    // Setup file for testing-library matchers
-    setupFiles: ['tests/setup.ts'],
-
-    // Test timeout (30 seconds for API calls)
-    testTimeout: 30000,
-
-    // Code coverage configuration
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['src/**/*.d.ts'],
     },
-
-    // Use globals (describe, it, expect) without imports
-    globals: true,
+    projects: [
+      {
+        ...sharedViteConfig,
+        define: {
+          // Override build-time env vars so tests start with blank defaults
+          'process.env.AZURE_OPENAI_ENDPOINT': JSON.stringify(''),
+          'process.env.AZURE_OPENAI_API_KEY': JSON.stringify(''),
+        },
+        test: {
+          name: 'unit',
+          // jsdom for all tests — needed by React component tests
+          environment: 'jsdom',
+          // All tests except server-dependent live Copilot WebSocket tests
+          include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
+          exclude: [
+            ...defaultExclude,
+            // Skip live-server-dependent integration tests
+            'tests/**/*.integration.test.ts',
+          ],
+          setupFiles: ['tests/setup.ts'],
+          testTimeout: 30000,
+          globals: true,
+        },
+      },
+      {
+        ...sharedViteConfig,
+        test: {
+          name: 'integration',
+          // jsdom — React component integration tests need DOM
+          environment: 'jsdom',
+          // All tests in tests/integration/ including live Copilot WebSocket tests
+          include: ['tests/integration/**/*.test.ts', 'tests/integration/**/*.test.tsx'],
+          // 60s — live Copilot calls can be slow
+          testTimeout: 60000,
+          setupFiles: ['tests/setup.ts'],
+          globals: true,
+        },
+      },
+    ],
   },
 });

@@ -19,7 +19,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'https://localhost:3000/api/ping',
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     ignoreHTTPSErrors: true,
     timeout: 120_000,
   },

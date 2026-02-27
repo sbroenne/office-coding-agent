@@ -99,7 +99,7 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 - **Reset store state** in `beforeEach` via `useSettingsStore.getState().reset()`.
 - **Use table-driven tests** (`it.each`) for functions with many input→output mappings.
 - Live Copilot tests must run against a live server (`npm run dev`); do not add auto-skip behavior.
-- Both `vitest.config.ts` and `vitest.integration.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`.
+- Both the `unit` and `integration` projects in `vitest.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`.
 
 ### UI Tests (`tests-ui/`) — Playwright
 
@@ -108,12 +108,12 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 ### E2E Tests — Mocha inside real Office hosts
 
-| Host       | Directory              | Tests |
-| ---------- | ---------------------- | ----- |
-| Excel      | `tests-e2e/`           | ~187  |
-| PowerPoint | `tests-e2e-ppt/`       | ~13   |
-| Word       | `tests-e2e-word/`      | ~12   |
-| Outlook    | `tests-e2e-outlook/`   | ~9    |
+| Host       | Directory            | Tests |
+| ---------- | -------------------- | ----- |
+| Excel      | `tests-e2e/`         | ~187  |
+| PowerPoint | `tests-e2e-ppt/`     | ~13   |
+| Word       | `tests-e2e-word/`    | ~12   |
+| Outlook    | `tests-e2e-outlook/` | ~9    |
 
 **Real Office.js APIs, real host runtime.**
 
@@ -121,10 +121,10 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 | Scenario                             | Test type        | Location             |
 | ------------------------------------ | ---------------- | -------------------- |
-| New Excel command (`Excel.run`)      | E2E test         | `tests-e2e/`           |
-| New PowerPoint command               | E2E test         | `tests-e2e-ppt/`       |
-| New Word command                     | E2E test         | `tests-e2e-word/`      |
-| New Outlook command                  | E2E test         | `tests-e2e-outlook/`   |
+| New Excel command (`Excel.run`)      | E2E test         | `tests-e2e/`         |
+| New PowerPoint command               | E2E test         | `tests-e2e-ppt/`     |
+| New Word command                     | E2E test         | `tests-e2e-word/`    |
+| New Outlook command                  | E2E test         | `tests-e2e-outlook/` |
 | New task pane interaction flow       | UI test          | `tests-ui/`          |
 | New React component or hook behavior | Integration test | `tests/integration/` |
 | New host routing rule                | Integration test | `tests/integration/` |

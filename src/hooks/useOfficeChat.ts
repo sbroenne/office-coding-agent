@@ -8,13 +8,14 @@ import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { getSkills, getImportedSkills, skillToMarkdown } from '@/services/skills';
 import { resolveActiveAgent } from '@/services/agents';
-import { resolveActiveMcpServers, toSdkMcpServers } from '@/services/mcp';
+import { toSdkMcpServers, getAllMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
+import { useMcpStatusStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { humanizeToolName } from '@/utils/humanizeToolName';
-import { inferProvider, WORKIQ_MCP_SERVER } from '@/types';
+import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
@@ -81,8 +82,6 @@ export function useOfficeChat(host: OfficeHostApp) {
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
   const npmSkillPackages = useSettingsStore(s => s.npmSkillPackages);
-  const workiqEnabled = useSettingsStore(s => s.workiqEnabled);
-  const workiqModel = useSettingsStore(s => s.workiqModel);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
   const createSession = useSessionHistoryStore(s => s.createSession);
@@ -176,6 +175,23 @@ export function useOfficeChat(host: OfficeHostApp) {
       clientRef.current = client;
       console.log('[chat] WebSocket connected');
 
+      // Register MCP event handlers to forward to the status store
+      const mcpStore = useMcpStatusStore.getState();
+      mcpStore.clearAll();
+      client.onMcpStatus(payload => {
+        useMcpStatusStore.getState().setStatus(payload.server, payload.status, payload.error);
+      });
+      client.onMcpLog(payload => {
+        useMcpStatusStore.getState().addLog(payload.server, {
+          timestamp: payload.timestamp,
+          level: payload.level,
+          message: payload.message,
+        });
+      });
+      client.onMcpTools(payload => {
+        useMcpStatusStore.getState().setTools(payload.server, payload.tools);
+      });
+
       const resolvedAgent = resolveActiveAgent(activeAgentId, host);
 
       // System prompt: only base + app prompt (no agent/skill concatenation)
@@ -210,28 +226,29 @@ export function useOfficeChat(host: OfficeHostApp) {
           ]
         : undefined;
 
-      // Resolve active MCP servers, intersect with agent allowlist if specified
-      let activeServers = resolveActiveMcpServers(importedMcpServers, activeMcpServerNames);
+      // Resolve active MCP servers (bundled + imported), intersect with agent allowlist if specified
+      // Bundled servers require explicit opt-in (name must be in activeMcpServerNames).
+      // When activeMcpServerNames is null (all active), only imported servers are included.
+      const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServers);
+      let activeServers: typeof allServers;
+      if (activeMcpServerNames === null) {
+        // null = all imported active, bundled NOT active (require explicit opt-in)
+        activeServers = allServers.filter(s => !BUNDLED_MCP_SERVERS.some(b => b.name === s.name));
+      } else {
+        activeServers = allServers.filter(s => activeMcpServerNames.includes(s.name));
+      }
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
         activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
-      }
-      // WorkIQ: exclude legacy 'workiq' entry, then re-add if enabled
-      activeServers = activeServers.filter(s => s.name !== 'workiq');
-      if (workiqEnabled) {
-        activeServers.push(WORKIQ_MCP_SERVER);
       }
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
 
       // Per-agent tool restriction (omit = all tools available)
       const availableTools = resolvedAgent?.metadata.tools;
 
-      // Use dedicated WorkIQ model if enabled and set, otherwise use active model
-      const sessionModel = workiqEnabled && workiqModel ? workiqModel : activeModel;
-
       const session = await withTimeout(
         client.createSession({
-          model: sessionModel,
+          model: activeModel,
           systemMessage: { mode: 'replace', content: systemContent },
           tools: getToolsForHost(host),
           mcpServers,
@@ -290,8 +307,6 @@ export function useOfficeChat(host: OfficeHostApp) {
     importedMcpServers,
     activeMcpServerNames,
     evaluatePermission,
-    workiqEnabled,
-    workiqModel,
   ]);
 
   useEffect(() => {
