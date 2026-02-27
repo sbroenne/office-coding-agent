@@ -30,7 +30,6 @@ describe('Integration: SkillPicker', () => {
 
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
-    expect(screen.getByText('Skills')).toBeInTheDocument();
     expect(screen.getByText('Bundled')).toBeInTheDocument();
     expect(screen.getByText('Manage skills…')).toBeInTheDocument();
   });

@@ -2,27 +2,20 @@ import { MarkdownText } from '@/components/assistant-ui/markdown-text';
 import { ToolFallback } from '@/components/assistant-ui/tool-fallback';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 import {
-  ActionBarPrimitive,
   AuiIf,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
 } from '@assistant-ui/react';
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CheckIcon,
-  CopyIcon,
-  LoaderIcon,
-  RefreshCwIcon,
-  SparklesIcon,
-  SquareIcon,
-} from 'lucide-react';
-import type { FC } from 'react';
+import { ArrowDownIcon, ArrowUpIcon, CircleStop, LoaderIcon, SparklesIcon } from 'lucide-react';
+import type { FC, ReactNode } from 'react';
 import { useThinkingText } from '@/contexts/ThinkingContext';
 
-export const Thread: FC = () => {
+export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
+  leftToolbar,
+  rightToolbar,
+}) => {
   return (
     <ThreadPrimitive.Root className="aui-root aui-thread-root flex flex-1 min-h-0 flex-col bg-background">
       <ThreadPrimitive.Viewport
@@ -42,7 +35,7 @@ export const Thread: FC = () => {
 
         <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-3 overflow-visible rounded-t-2xl bg-background pb-3">
           <ThreadScrollToBottom />
-          <Composer />
+          <Composer leftToolbar={leftToolbar} rightToolbar={rightToolbar} />
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
@@ -108,47 +101,49 @@ const ThreadWelcome: FC = () => {
   );
 };
 
-const Composer: FC = () => {
+const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
+  leftToolbar,
+  rightToolbar,
+}) => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col rounded-2xl border border-input bg-background px-1 pt-2 outline-none transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20">
       <ComposerPrimitive.Input
         placeholder="Send a message..."
-        className="aui-composer-input mb-1 max-h-32 min-h-10 w-full resize-none bg-transparent px-3 pt-1 pb-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+        className="aui-composer-input max-h-32 min-h-10 w-full resize-none bg-transparent px-3 pt-1 pb-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
         rows={1}
         autoFocus
         aria-label="Message input"
       />
-      <ComposerAction />
+      {/* VS Code-style bottom bar: pickers left, model+send right */}
+      <div className="aui-composer-action mx-1 mb-1.5 flex items-center justify-between border-t border-border/40 pt-1">
+        <div className="flex items-center gap-0.5 pl-1">{leftToolbar}</div>
+        <div className="flex items-center gap-0.5 pr-0.5">
+          {rightToolbar}
+          <AuiIf condition={s => !s.thread.isRunning}>
+            <ComposerPrimitive.Send asChild>
+              <TooltipIconButton
+                tooltip="Send"
+                variant="default"
+                className="aui-composer-send size-8 rounded-full p-2 transition-opacity"
+              >
+                <ArrowUpIcon />
+              </TooltipIconButton>
+            </ComposerPrimitive.Send>
+          </AuiIf>
+          <AuiIf condition={s => s.thread.isRunning}>
+            <ComposerPrimitive.Cancel asChild>
+              <TooltipIconButton
+                tooltip="Stop"
+                variant="default"
+                className="aui-composer-cancel size-8 rounded-full p-2 transition-opacity"
+              >
+                <CircleStop className="size-4" />
+              </TooltipIconButton>
+            </ComposerPrimitive.Cancel>
+          </AuiIf>
+        </div>
+      </div>
     </ComposerPrimitive.Root>
-  );
-};
-
-const ComposerAction: FC = () => {
-  return (
-    <div className="aui-composer-action mx-2 mb-2 flex items-center justify-end">
-      <AuiIf condition={s => !s.thread.isRunning}>
-        <ComposerPrimitive.Send asChild>
-          <TooltipIconButton
-            tooltip="Send"
-            variant="default"
-            className="aui-composer-send size-8 rounded-full p-2 transition-opacity"
-          >
-            <ArrowUpIcon />
-          </TooltipIconButton>
-        </ComposerPrimitive.Send>
-      </AuiIf>
-      <AuiIf condition={s => s.thread.isRunning}>
-        <ComposerPrimitive.Cancel asChild>
-          <TooltipIconButton
-            tooltip="Cancel"
-            variant="default"
-            className="aui-composer-cancel size-8 rounded-full p-2 transition-opacity"
-          >
-            <SquareIcon className="size-4" />
-          </TooltipIconButton>
-        </ComposerPrimitive.Cancel>
-      </AuiIf>
-    </div>
   );
 };
 
@@ -191,38 +186,7 @@ const AssistantMessage: FC = () => {
         <AssistantThinkingIndicator />
         <MessageError />
       </div>
-
-      <div className="aui-assistant-message-footer mt-1 ml-1 flex">
-        <AssistantActionBar />
-      </div>
     </MessagePrimitive.Root>
-  );
-};
-
-const AssistantActionBar: FC = () => {
-  return (
-    <ActionBarPrimitive.Root
-      hideWhenRunning
-      autohide="not-last"
-      autohideFloat="single-branch"
-      className="aui-assistant-action-bar-root -ml-1 flex gap-1 text-muted-foreground data-floating:absolute data-floating:rounded-md data-floating:border data-floating:bg-background data-floating:p-1 data-floating:shadow-sm"
-    >
-      <ActionBarPrimitive.Copy asChild>
-        <TooltipIconButton tooltip="Copy">
-          <AuiIf condition={s => s.message.isCopied}>
-            <CheckIcon />
-          </AuiIf>
-          <AuiIf condition={s => !s.message.isCopied}>
-            <CopyIcon />
-          </AuiIf>
-        </TooltipIconButton>
-      </ActionBarPrimitive.Copy>
-      <ActionBarPrimitive.Reload asChild>
-        <TooltipIconButton tooltip="Regenerate">
-          <RefreshCwIcon />
-        </TooltipIconButton>
-      </ActionBarPrimitive.Reload>
-    </ActionBarPrimitive.Root>
   );
 };
 

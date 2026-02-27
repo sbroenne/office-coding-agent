@@ -1,6 +1,5 @@
 import React from 'react';
-import { RotateCcw, ServerIcon, Shield } from 'lucide-react';
-import { SkillPicker } from './SkillPicker';
+import { RotateCcw, Shield } from 'lucide-react';
 import { SessionHistoryPicker } from './SessionHistoryPicker';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 import type { OfficeHostApp } from '@/services/office/host';
@@ -27,7 +26,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   return (
     <div className="flex items-center justify-between border-b border-border bg-background px-3 py-1.5">
       <div className="flex items-center gap-2 min-w-0">
-        <SkillPicker onOpenPanel={onOpenPanel} />
         <SessionHistoryPicker
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -45,14 +43,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           title="Permissions"
         >
           <Shield className="size-4" />
-        </button>
-        <button
-          onClick={() => onOpenPanel?.('mcp')}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-          aria-label="MCP Servers"
-          title="MCP Servers"
-        >
-          <ServerIcon className="size-4" />
         </button>
         <button
           onClick={onClearMessages}

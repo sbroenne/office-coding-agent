@@ -66,13 +66,13 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-1.5 pr-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Select agent"
             title="Select agent"
           >
-            <Bot className="size-3.5" />
-            <span className="max-w-[100px] truncate">{displayName}</span>
-            <ChevronDown className="size-3 opacity-60" />
+            <Bot className="size-3 shrink-0" />
+            <span className="max-w-[80px] truncate">{displayName}</span>
+            <ChevronDown className="size-3 shrink-0 opacity-50" />
           </button>
         </Popover.Trigger>
 
