@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Bot, Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
 import {
@@ -21,7 +22,10 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
   const setActiveAgent = useSettingsStore(s => s.setActiveAgent);
 
   const host = detectOfficeHost();
-  const targetHost = host === 'excel' || host === 'powerpoint' ? host : undefined;
+  const targetHost =
+    host === 'excel' || host === 'powerpoint' || host === 'word' || host === 'outlook'
+      ? host
+      : undefined;
   const allAgents = getAgents(host);
   const bundledAgents = targetHost
     ? getBundledAgents().filter(agent => agent.metadata.hosts.includes(targetHost))
@@ -35,8 +39,10 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
   const activeAgent = resolveActiveAgent(activeAgentId, host);
   const displayName = activeAgent?.metadata.name ?? allAgents[0].metadata.name;
 
+  const resolvedName = activeAgent?.metadata.name ?? null;
+
   const renderAgentOption = (agentName: string, agentDescription: string) => {
-    const isActive = agentName === activeAgentId;
+    const isActive = agentName === resolvedName;
 
     return (
       <button
@@ -66,13 +72,11 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-1.5 pr-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Select agent"
-            title="Select agent"
+            title={`Agent: ${displayName}`}
           >
-            <Bot className="size-3 shrink-0" />
-            <span className="max-w-[80px] truncate">{displayName}</span>
-            <ChevronDown className="size-3 shrink-0 opacity-50" />
+            <Codicon name="robot" className="text-base" />
           </button>
         </Popover.Trigger>
 

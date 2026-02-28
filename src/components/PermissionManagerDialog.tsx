@@ -39,6 +39,9 @@ export const PermissionManagerPanel: React.FC = () => {
       setBrowsePath(data.path);
       setBrowseParent(data.parent);
       setBrowseDirs(data.dirs ?? []);
+    } catch {
+      // Network error — clear stale directories so the UI doesn't show old data
+      setBrowseDirs([]);
     } finally {
       setBrowseLoading(false);
     }
@@ -50,9 +53,14 @@ export const PermissionManagerPanel: React.FC = () => {
       return;
     }
     void (async () => {
-      const response = await fetch('/api/env');
-      const data = (await response.json()) as { cwd?: string; home?: string };
-      void loadDir(data.cwd ?? data.home);
+      try {
+        const response = await fetch('/api/env');
+        const data = (await response.json()) as { cwd?: string; home?: string };
+        void loadDir(data.cwd ?? data.home);
+      } catch {
+        // Server unavailable — load root or leave empty
+        void loadDir();
+      }
     })();
   }, [workingDirectory]);
 

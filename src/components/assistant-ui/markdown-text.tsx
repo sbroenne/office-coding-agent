@@ -213,13 +213,12 @@ const defaultComponents = memoizeMarkdownComponents({
     <hr className={cn('aui-md-hr my-2 border-muted-foreground/20', className)} {...props} />
   ),
   table: ({ className, ...props }) => (
-    <table
-      className={cn(
-        'aui-md-table my-2 w-full border-separate border-spacing-0 overflow-y-auto',
-        className
-      )}
-      {...props}
-    />
+    <div className="my-2 overflow-x-auto">
+      <table
+        className={cn('aui-md-table w-full border-separate border-spacing-0', className)}
+        {...props}
+      />
+    </div>
   ),
   th: ({ className, ...props }) => (
     <th

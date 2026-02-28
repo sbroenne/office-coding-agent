@@ -1,6 +1,7 @@
 import React from 'react';
-import { RotateCcw, Shield } from 'lucide-react';
 import { SessionHistoryPicker } from './SessionHistoryPicker';
+import { SkillPicker } from './SkillPicker';
+import { Codicon } from '@/components/Codicon';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 import type { OfficeHostApp } from '@/services/office/host';
 
@@ -36,13 +37,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-0.5">
+        <SkillPicker onOpenPanel={onOpenPanel} />
         <button
           onClick={() => onOpenPanel?.('permissions')}
           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           aria-label="Permissions"
           title="Permissions"
         >
-          <Shield className="size-4" />
+          <Codicon name="shield" className="text-base" />
         </button>
         <button
           onClick={onClearMessages}
@@ -50,7 +52,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           aria-label="New conversation"
           title="New conversation"
         >
-          <RotateCcw className="size-4" />
+          <Codicon name="comment-add" className="text-base" />
         </button>
       </div>
     </div>

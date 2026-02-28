@@ -12,6 +12,7 @@ All changes must go through a pull request on a feature branch:
 4. Ask the user to review and merge the PR on GitHub
 
 **Never run:**
+
 - `git push origin main`
 - `git merge <branch> ` while on `main`
 - `git commit --no-verify` to bypass hooks and then push to `main`
@@ -148,26 +149,26 @@ The task pane is split into three areas:
 
 ### Test Tiers
 
-| Tier            | Runner     | Directory            | Count | What it tests                                                                        |
-| --------------- | ---------- | -------------------- | ----- | ------------------------------------------------------------------------------------ |
-| **Integration** | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket |
-| **UI**          | Playwright | `tests-ui/`          |       | Browser task pane flows (real Copilot API, NO mocking)                                |
-| **E2E (Excel)**   | Mocha      | `tests-e2e/`           | ~187  | Excel commands inside real Excel Desktop                                             |
-| **E2E (PPT)**     | Mocha      | `tests-e2e-ppt/`       | ~13   | PowerPoint commands inside real PowerPoint Desktop                                   |
-| **E2E (Word)**    | Mocha      | `tests-e2e-word/`      | ~12   | Word commands inside real Word Desktop                                               |
-| **E2E (Outlook)** | Mocha      | `tests-e2e-outlook/`   | ~9    | Outlook commands (requires Exchange sideloading approval)                            |
-| ~~Unit~~          | ~~Vitest~~ | ~~`tests/unit/`~~      |       | ~~DO NOT ADD NEW UNIT TESTS~~                                                        |
+| Tier              | Runner     | Directory            | Count | What it tests                                                         |
+| ----------------- | ---------- | -------------------- | ----- | --------------------------------------------------------------------- |
+| **Integration**   | Vitest     | `tests/integration/` | 36    | Component wiring; tool schemas; stores; hooks; live Copilot WebSocket |
+| **UI**            | Playwright | `tests-ui/`          |       | Browser task pane flows (real Copilot API, NO mocking)                |
+| **E2E (Excel)**   | Mocha      | `tests-e2e/`         | ~187  | Excel commands inside real Excel Desktop                              |
+| **E2E (PPT)**     | Mocha      | `tests-e2e-ppt/`     | ~13   | PowerPoint commands inside real PowerPoint Desktop                    |
+| **E2E (Word)**    | Mocha      | `tests-e2e-word/`    | ~12   | Word commands inside real Word Desktop                                |
+| **E2E (Outlook)** | Mocha      | `tests-e2e-outlook/` | ~9    | Outlook commands (requires Exchange sideloading approval)             |
+| ~~Unit~~          | ~~Vitest~~ | ~~`tests/unit/`~~    |       | ~~DO NOT ADD NEW UNIT TESTS~~                                         |
 
 ### Required Test Execution After Any Code Change
 
 **ALWAYS run integration and E2E tests after making code changes — these are the only tests that matter:**
 
 2. `npm run test:integration` — integration tests via `--project integration` (**ALL must pass — 0 failures is the only acceptable result**)
-2. `npm run test:e2e` — E2E tests inside real Excel Desktop (requires `npm run start:desktop` first; **must pass before marking work complete**)
-3. `npm run test:e2e:ppt` — E2E tests inside real PowerPoint Desktop (requires PPT open; **must pass before marking PPT work complete**)
-4. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
-5. `npm run test:e2e:outlook` — E2E tests inside real Outlook Desktop (requires Exchange sideloading approval; blocked on tenants with policy restrictions — flag as blocker if unavailable)
-6. `npm run test:ui` — Playwright UI tests when task pane flows are changed
+3. `npm run test:e2e` — E2E tests inside real Excel Desktop (requires `npm run start:desktop` first; **must pass before marking work complete**)
+4. `npm run test:e2e:ppt` — E2E tests inside real PowerPoint Desktop (requires PPT open; **must pass before marking PPT work complete**)
+5. `npm run test:e2e:word` — E2E tests inside real Word Desktop (requires Word open; **must pass before marking Word work complete**)
+6. `npm run test:e2e:outlook` — E2E tests inside real Outlook Desktop (requires Exchange sideloading approval; blocked on tenants with policy restrictions — flag as blocker if unavailable)
+7. `npm run test:ui` — Playwright UI tests when task pane flows are changed
 
 **Never consider work done until integration and E2E tests pass for the affected host(s).** If live Copilot WebSocket tests fail because the dev server is not running, start `npm run dev` as a background process and re-run — do not skip or report as blocked. If E2E tests cannot be run (Office app not open), explicitly flag this as a blocker to the user — do not silently skip them.
 
@@ -179,6 +180,7 @@ The task pane is split into three areas:
 > Run `npm run dev` as a background process, wait for `https://localhost:3000` to be ready, then re-run the failing tests. Only after the server is up and the tests still fail should you escalate to the user.
 >
 > Dev server start sequence:
+>
 > 1. Start `npm run dev` in the background (it binds to `https://localhost:3000`)
 > 2. Poll or wait ~10 s for `Copilot Office Add-in server running on https://localhost:3000`
 > 3. Re-run the affected tests
@@ -190,45 +192,46 @@ The task pane is split into three areas:
 
 > `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
-### Current Integration Test Files (35)
+### Current Integration Test Files (40)
 
-| File                                    | Category                            | Requires server? |
-| --------------------------------------- | ----------------------------------- | ---------------- |
-| `agent-manager-dialog.test.tsx`         | Component wiring                    | No               |
-| `agent-picker.test.tsx`                 | Component wiring                    | No               |
-| `agent-service.test.ts`                 | Agent service + frontmatter parsing | No               |
-| `app-error-boundary.test.tsx`           | Component wiring                    | No               |
-| `app-session-error.test.tsx`            | Component wiring                    | No               |
-| `app-state.test.tsx`                    | Component wiring                    | No               |
-| `chat-error-boundary.test.tsx`          | Component wiring                    | No               |
-| `chat-header-settings-flow.test.tsx`    | Component wiring                    | No               |
-| `chat-panel.test.tsx`                   | Component wiring                    | No               |
-| `chat-store.test.ts`                    | Chat message store                  | No               |
-| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills | Yes (fails without server) |
-| `copilot-websocket.integration.test.ts` | Live Copilot WebSocket E2E          | Yes (fails without server) |
-| `excel-tools.test.ts`                   | Tool schema + factory (Excel)       | No               |
-| `host-tools-limit.test.ts`              | Host tool count limits              | No               |
-| `humanize-tool-name.test.ts`            | Tool-name → human-readable labels   | No               |
-| `id.test.ts`                            | `generateId` utility                | No               |
-| `management-tools.test.ts`              | Management tool schemas + handlers  | No               |
-| `manifest.test.ts`                      | Office manifest / host assumptions  | No               |
-| `mcp-manager-dialog.test.tsx`           | Component wiring                    | No               |
-| `mcp-service.test.ts`                   | MCP server config parsing           | No               |
-| `model-manager.test.tsx`                | Component wiring                    | No               |
-| `model-picker-interactions.test.tsx`    | Component wiring                    | No               |
-| `office-storage.test.ts`                | `officeStorage` with OfficeRuntime  | No               |
-| `powerpoint-tools.test.ts`              | Tool schema + factory (PPT)         | No               |
-| `settings-dialog.test.tsx`              | Component wiring                    | No               |
-| `settings-store.test.ts`                | Zustand store (model/agent/skills)  | No               |
-| `skill-manager-dialog.test.tsx`         | Component wiring                    | No               |
-| `skill-picker.test.tsx`                 | Component wiring                    | No               |
-| `skill-service.test.ts`                 | Skill service + context building    | No               |
-| `stale-state.test.tsx`                  | Store hydration                     | No               |
-| `use-office-chat.test.tsx`              | useOfficeChat hook                  | No               |
-| `use-tool-invocations-patch.test.tsx`   | Tool invocation argument streaming  | No               |
-| `word-tools.test.ts`                    | Tool schema + factory (Word)        | No               |
-| `zip-export-service.test.ts`            | ZIP export service                  | No               |
-| `zip-import-service.test.ts`            | ZIP import service                  | No               |
+| File                                       | Category                            | Requires server?           |
+| ------------------------------------------ | ----------------------------------- | -------------------------- |
+| `agent-manager-dialog.test.tsx`            | Component wiring                    | No                         |
+| `agent-picker.test.tsx`                    | Component wiring                    | No                         |
+| `agent-service.test.ts`                    | Agent service + frontmatter parsing | No                         |
+| `app-error-boundary.test.tsx`              | Component wiring                    | No                         |
+| `app-session-error.test.tsx`               | Component wiring                    | No                         |
+| `app-state.test.tsx`                       | Component wiring                    | No                         |
+| `chat-error-boundary.test.tsx`             | Component wiring                    | No                         |
+| `chat-header-settings-flow.test.tsx`       | Component wiring                    | No                         |
+| `chat-panel.test.tsx`                      | Component wiring                    | No                         |
+| `chat-store.test.ts`                       | Chat message store                  | No                         |
+| `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills  | Yes (fails without server) |
+| `copilot-websocket.integration.test.ts`    | Live Copilot WebSocket E2E          | Yes (fails without server) |
+| `excel-tools.test.ts`                      | Tool schema + factory (Excel)       | No                         |
+| `host-tools-limit.test.ts`                 | Host tool count limits              | No                         |
+| `humanize-tool-name.test.ts`               | Tool-name → human-readable labels   | No                         |
+| `id.test.ts`                               | `generateId` utility                | No                         |
+| `management-tools.test.ts`                 | Management tool schemas + handlers  | No                         |
+| `manifest.test.ts`                         | Office manifest / host assumptions  | No                         |
+| `mcp-manager-dialog.test.tsx`              | Component wiring                    | No                         |
+| `mcp-service.test.ts`                      | MCP server config parsing           | No                         |
+| `model-manager.test.tsx`                   | Component wiring                    | No                         |
+| `model-picker-interactions.test.tsx`       | Component wiring                    | No                         |
+| `office-storage.test.ts`                   | `officeStorage` with OfficeRuntime  | No                         |
+| `powerpoint-tools.test.ts`                 | Tool schema + factory (PPT)         | No                         |
+| `settings-dialog.test.tsx`                 | Component wiring                    | No                         |
+| `settings-store.test.ts`                   | Zustand store (model/agent/skills)  | No                         |
+| `skill-manager-dialog.test.tsx`            | Component wiring                    | No                         |
+| `skill-picker.test.tsx`                    | Component wiring                    | No                         |
+| `skill-service.test.ts`                    | Skill service + context building    | No                         |
+| `stale-state.test.tsx`                     | Store hydration                     | No                         |
+| `thread-message-rendering.test.tsx`        | Component wiring                    | No                         |
+| `use-office-chat.test.tsx`                 | useOfficeChat hook                  | No                         |
+| `use-tool-invocations-patch.test.tsx`      | Tool invocation argument streaming  | No                         |
+| `word-tools.test.ts`                       | Tool schema + factory (Word)        | No                         |
+| `zip-export-service.test.ts`               | ZIP export service                  | No                         |
+| `zip-import-service.test.ts`               | ZIP import service                  | No                         |
 
 ### Integration Test Categories
 

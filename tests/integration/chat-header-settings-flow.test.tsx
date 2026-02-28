@@ -1,8 +1,8 @@
 /**
  * Integration test: ChatHeader — New Conversation, panel buttons.
  *
- * ChatHeader contains: SessionHistoryPicker, Permissions, New Conversation.
- * SkillPicker and MCP pill live in the Composer toolbar (ChatPanel).
+ * ChatHeader contains: SessionHistoryPicker, SkillPicker, Permissions, New Conversation.
+ * MCP pill lives in the Composer toolbar (ChatPanel).
  * All settings panels are opened via onOpenPanel callback.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';

@@ -50,7 +50,15 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
       if (currentKey === 'tags') {
         metadata.tags.push(itemValue);
       } else {
-        metadata.hosts.push(itemValue as AgentHost);
+        const lower = itemValue.toLowerCase();
+        if (
+          lower === 'excel' ||
+          lower === 'powerpoint' ||
+          lower === 'word' ||
+          lower === 'outlook'
+        ) {
+          metadata.hosts.push(lower as AgentHost);
+        }
       }
       continue;
     }
@@ -83,7 +91,11 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
       // Could be start of array (tags: / hosts:) — handled by "- " check above
       continue;
     } else if (currentKey === 'hosts') {
-      metadata.hosts = parseInlineArray(value) as AgentHost[];
+      metadata.hosts = parseInlineArray(value)
+        .map(h => h.toLowerCase())
+        .filter(
+          h => h === 'excel' || h === 'powerpoint' || h === 'word' || h === 'outlook'
+        ) as AgentHost[];
     } else {
       setMetadataField(metadata, currentKey, value);
     }
