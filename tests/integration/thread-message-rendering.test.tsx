@@ -1,0 +1,581 @@
+/**
+ * Integration tests for Thread / AssistantMessage rendering behaviour.
+ *
+ * Specifically covers:
+ *  1. Action bar (copy / thumbsup / thumbsdown) is present in the DOM after
+ *     a completed assistant text response.
+ *  2. The "MessagePartText can only be used inside text or reasoning message
+ *     parts" crash does NOT occur when the assistant response ends with a
+ *     tool-call part (i.e. no trailing text part).
+ *
+ * Uses the same fake session/client pattern as use-office-chat.test.tsx.
+ * No real WebSocket or Copilot API is required.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
+import { AssistantRuntimeProvider } from '@assistant-ui/react';
+import type { AppendMessage } from '@assistant-ui/react';
+import type { SessionEvent } from '@github/copilot-sdk';
+import { Thread } from '@/components/assistant-ui/thread';
+import { useOfficeChat } from '@/hooks/useOfficeChat';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
+import { ThinkingContext } from '@/contexts/ThinkingContext';
+
+// ─── Fake session / client ────────────────────────────────────────────────────
+
+type EventEmitter = (event: SessionEvent) => void;
+
+function makeFakeSession(events: SessionEvent[]) {
+  return {
+    sessionId: 'test-session-id',
+    async *query() {
+      for (const event of events) {
+        yield event;
+        if (event.type === 'session.idle') return;
+      }
+    },
+    on: vi.fn(),
+    onPermissionRequest: vi.fn(() => () => undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
+    send: vi.fn().mockResolvedValue('msg-id'),
+    registerTools: vi.fn(),
+    getToolHandler: vi.fn(),
+    respondPermission: vi.fn().mockResolvedValue(undefined),
+    _dispatchEvent: vi.fn() as EventEmitter,
+  };
+}
+
+function makeFakeClient(session: ReturnType<typeof makeFakeSession>) {
+  return {
+    start: vi.fn().mockResolvedValue(undefined),
+    createSession: vi.fn().mockResolvedValue(session),
+    listModels: vi.fn().mockResolvedValue([]),
+    stop: vi.fn().mockResolvedValue(undefined),
+    onMcpStatus: vi.fn(() => () => undefined),
+    onMcpLog: vi.fn(() => () => undefined),
+    onMcpTools: vi.fn(() => () => undefined),
+  };
+}
+
+function makeEvent<T extends SessionEvent['type']>(
+  type: T,
+  data: Extract<SessionEvent, { type: T }>['data']
+): SessionEvent {
+  return {
+    id: 'e1',
+    timestamp: new Date().toISOString(),
+    parentId: null,
+    type,
+    data,
+  } as SessionEvent;
+}
+
+const IDLE_EVENT = makeEvent('session.idle', {});
+
+const APPEND_MSG = (): AppendMessage => ({
+  parentId: null,
+  sourceId: null,
+  runConfig: undefined,
+  role: 'user',
+  content: [{ type: 'text', text: 'test' }],
+  attachments: [],
+  metadata: { custom: {} },
+  createdAt: new Date(),
+});
+
+vi.mock('@/lib/websocket-client', () => ({
+  createWebSocketClient: vi.fn(),
+}));
+
+import { createWebSocketClient } from '@/lib/websocket-client';
+const mockCreate = vi.mocked(createWebSocketClient);
+
+// ─── Shared test wrapper ──────────────────────────────────────────────────────
+
+/**
+ * Renders the Thread with a real (faked) useOfficeChat runtime and returns
+ * the hook result so tests can drive messages through `runtime.thread.append`.
+ */
+function renderThreadWithHook(host: 'excel' = 'excel') {
+  let hookRef: ReturnType<typeof useOfficeChat> | undefined;
+
+  function TestComponent() {
+    const chat = useOfficeChat(host);
+    hookRef = chat;
+    return (
+      <AssistantRuntimeProvider runtime={chat.runtime}>
+        <ThinkingContext.Provider value={chat.thinkingText}>
+          <Thread />
+        </ThinkingContext.Provider>
+      </AssistantRuntimeProvider>
+    );
+  }
+
+  render(<TestComponent />);
+  return { getHook: () => hookRef! };
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+describe('Thread – AssistantMessage rendering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('renders the action bar (copy + thumbsup + thumbsdown) in a completed text response', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Hello!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Wait for the assistant message bubble to appear
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // Action bar must exist in the DOM (opacity-0 when not hovered, but present)
+    const actionBar = document.querySelector('.aui-assistant-action-bar');
+    expect(actionBar).toBeInTheDocument();
+
+    // All three buttons must be present.
+    // TooltipIconButton renders the tooltip text as an sr-only span inside the button,
+    // making it the accessible name — so getByRole('button', { name }) is the right query.
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Good response' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bad response' })).toBeInTheDocument();
+
+    // Initially hidden (no hover) — CSS opacity-0 class is applied
+    expect(actionBar).toHaveClass('opacity-0');
+  });
+
+  it('action bar is positioned inside the assistant message container', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    const msg = document.querySelector('[data-role="assistant"]');
+    const actionBar = msg?.querySelector('.aui-assistant-action-bar');
+    expect(actionBar).toBeTruthy();
+  });
+
+  it('does NOT crash when the assistant response contains only tool-call parts (no text)', async () => {
+    // This is the regression test for "MessagePartText can only be used inside
+    // text or reasoning message parts".
+    //
+    // When a response ends with a tool-call part and has no text part,
+    // @assistant-ui's EmptyPartFallback was previously rendered, which called
+    // useMessagePartText() in the wrong context and threw.
+    // The fix: Empty: () => null + unstable_showEmptyOnNonTextEnd={false}.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'manage_skills',
+        arguments: { action: 'list' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[]' },
+      }),
+      // ⚠️  No assistant.message event — response ends at the tool call
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // The critical assertion: no error boundary and no crash text
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+
+    // The tool card should render normally
+    expect(document.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+  });
+
+  it('renders the message text content alongside the action bar', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'All good here!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('All good here!')).toBeInTheDocument();
+    });
+
+    // Action bar is still present alongside the text
+    expect(document.querySelector('.aui-assistant-action-bar')).toBeInTheDocument();
+  });
+
+  it('thinking indicator appears with "Thinking…" during streaming', async () => {
+    // Use a session that yields a tool start + complete + text so the stream
+    // takes some time, then idle.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1:C3' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1,2],[3,4]]' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Here is the data.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // After the stream completes, the thinking indicator should be gone
+    await waitFor(() => {
+      expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+    });
+  });
+
+  it('thinking indicator is rendered at the thread level, not inside individual messages', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // The thinking indicator should NOT be inside any assistant message
+    const assistantMsg = document.querySelector('[data-role="assistant"]');
+    const indicatorInsideMsg = assistantMsg?.querySelector('.aui-assistant-thinking-indicator');
+    expect(indicatorInsideMsg).toBeNull();
+  });
+
+  it('does NOT crash when message has only tool-call parts with empty streamText', async () => {
+    // Regression: updateAssistant() used to always include { type: 'text', text: '' }
+    // which fromThreadMessageLike() would strip, producing 0-part or non-text-ending
+    // messages that crashed MarkdownTextPrimitive.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'set_range_values',
+        arguments: { address: 'A1', values: [[1]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1:B2' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: '[[1,2]]' },
+      }),
+      // assistant.message with text arrives only AFTER all tool calls
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    // Must not crash
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+
+    // Final text should render
+    await waitFor(() => {
+      expect(screen.getByText('Done!')).toBeInTheDocument();
+    });
+  });
+
+  it('does NOT crash when Thread renders mid-stream with tool parts and empty streamText', async () => {
+    // KEY REGRESSION TEST: The crash only happened when React rendered the
+    // Thread while the assistant message was in-progress with tool-call parts
+    // and streamText = ''.  Fast-session tests miss this because by the time
+    // React paints, the stream is already done.  This test pauses mid-stream
+    // so the Thread renders the intermediate state.
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'set_range_values',
+          arguments: { address: 'A1', values: [[42]] },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: 'OK' },
+        });
+        // ── PAUSE ── React will render the in-progress message here.
+        // At this point: toolParts has tc1, streamText is '' (no text yet).
+        await streamGate;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'All set.' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // Start the stream — it will pause after the tool completes
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    // The Thread has now rendered the in-progress assistant message with
+    // only a tool-call part and no text.  This is where the old code crashed
+    // because updateAssistant() sent { text: '' } which got stripped by
+    // fromThreadMessageLike(), leaving only the tool-call part.
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+
+    // The tool card should be visible
+    expect(document.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+
+    // Release the stream and let it finish
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Final text should render
+    await waitFor(() => {
+      expect(screen.getByText('All set.')).toBeInTheDocument();
+    });
+  });
+
+  it('thinking indicator shows humanized tool name in the rendered DOM during streaming', async () => {
+    // Regression test: thinking indicator was stuck on "Thinking…" because the
+    // AuiIf wrapper depended on the AUI store's deferred useEffect sync.
+    // After the fix, the indicator reads directly from ThinkingContext
+    // (set via flushSync) so it updates immediately.
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'A1:C3' },
+        });
+        // ── PAUSE ── thinking text should now say "Get range values…"
+        await streamGate;
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1]]' },
+        });
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Got it.' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // Start the stream — it will pause after tool.execution_start
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    // The thinking indicator should be visible with the humanized tool name
+    const indicator = document.querySelector('.aui-assistant-thinking-indicator');
+    expect(indicator).toBeInTheDocument();
+    expect(indicator!.textContent).toContain('Get range values…');
+
+    // Release and finish
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Indicator should be gone after completion
+    expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+  });
+
+  it('thinking indicator shows report_intent text in the rendered DOM', async () => {
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'ri1',
+          toolName: 'report_intent',
+          arguments: { intent: 'Analyzing your data' },
+        });
+        // ── PAUSE ── thinking text should now say "Analyzing your data"
+        await streamGate;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Analysis done.' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    // The thinking indicator should show the intent text, not "Thinking…"
+    const indicator = document.querySelector('.aui-assistant-thinking-indicator');
+    expect(indicator).toBeInTheDocument();
+    expect(indicator!.textContent).toContain('Analyzing your data');
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+  });
+});

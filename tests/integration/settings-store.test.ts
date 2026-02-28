@@ -244,6 +244,20 @@ describe('settingsStore — MCP servers', () => {
     expect(useSettingsStore.getState().activeMcpServerNames).toContain('srv1');
   });
 
+  // Bug regression: toggling a bundled server from default state (null) should enable it
+  it('toggleMcpServer adds bundled server when activeMcpServerNames is null', () => {
+    // Default state: activeMcpServerNames === null (all imported ON, bundled OFF)
+    useSettingsStore.getState().importMcpServers([server1]);
+    expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
+    // Toggle a bundled server (e.g. 'workiq') that is NOT in importedMcpServers
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    const active = useSettingsStore.getState().activeMcpServerNames;
+    // Before fix: 'workiq' was silently dropped because allNames only contained imported servers
+    expect(active).toContain('workiq');
+    // Imported servers should also be present
+    expect(active).toContain('srv1');
+  });
+
   it('reset clears imported MCP servers', () => {
     useSettingsStore.getState().importMcpServers([server1]);
     useSettingsStore.getState().reset();
@@ -260,7 +274,9 @@ describe('settingsStore — MCP servers', () => {
 
   it('updateMcpServer preserves name even if config tries to change it', () => {
     useSettingsStore.getState().importMcpServers([server1]);
-    useSettingsStore.getState().updateMcpServer('srv1', { name: 'hacked', transport: 'sse' } as Partial<McpServerConfig>);
+    useSettingsStore
+      .getState()
+      .updateMcpServer('srv1', { name: 'hacked', transport: 'sse' } as Partial<McpServerConfig>);
     expect(useSettingsStore.getState().importedMcpServers[0].name).toBe('srv1');
     expect(useSettingsStore.getState().importedMcpServers[0].transport).toBe('sse');
   });
@@ -298,7 +314,13 @@ describe('settingsStore — name deduplication', () => {
 
   it('importAgents renames second import of same name with incrementing suffix', () => {
     const makeAgent = (name: string): AgentConfig => ({
-      metadata: { name, description: 'desc', version: '1.0.0', hosts: ['excel'], defaultForHosts: [] },
+      metadata: {
+        name,
+        description: 'desc',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
       instructions: '',
     });
 
@@ -311,15 +333,19 @@ describe('settingsStore — name deduplication', () => {
 
   it('importAgents applies incrementing index beyond "(imported)"', () => {
     const makeAgent = (name: string): AgentConfig => ({
-      metadata: { name, description: 'desc', version: '1.0.0', hosts: ['excel'], defaultForHosts: [] },
+      metadata: {
+        name,
+        description: 'desc',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
       instructions: '',
     });
 
-    useSettingsStore.getState().importAgents([
-      makeAgent('Dupe'),
-      makeAgent('Dupe'),
-      makeAgent('Dupe'),
-    ]);
+    useSettingsStore
+      .getState()
+      .importAgents([makeAgent('Dupe'), makeAgent('Dupe'), makeAgent('Dupe')]);
 
     const names = useSettingsStore.getState().importedAgents.map(a => a.metadata.name);
     expect(names[0]).toBe('Dupe');

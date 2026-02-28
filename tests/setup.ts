@@ -71,6 +71,15 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     }) as MediaQueryList;
 }
 
+// @assistant-ui/react's useThreadViewportAutoScroll calls element.scrollTo()
+// which jsdom (used by Vitest) does not implement. Polyfill as a no-op so
+// ThreadPrimitive.Viewport renders without crashing in integration tests.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = function (
+    ..._args: unknown[]
+  ) {} as typeof Element.prototype.scrollTo;
+}
+
 // ─── Clear build-time environment defaults ───
 // SetupWizard reads ENV_ENDPOINT / ENV_API_KEY from process.env at import time.
 // In tests we want blank defaults so component tests start from a clean state.

@@ -461,7 +461,11 @@ async function handleConnection(ws) {
           }
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
-            sendNotification('mcp.status', { server: name, status: 'error', error: err.message || 'Session creation failed' });
+            sendNotification('mcp.status', {
+              server: name,
+              status: 'error',
+              error: err.message || 'Session creation failed',
+            });
             sendNotification('mcp.log', {
               server: name,
               timestamp: new Date().toISOString(),
@@ -614,7 +618,10 @@ async function handleConnection(ws) {
 
   // ── Cleanup ─────────────────────────────────────────────────────────────
 
+  let _cleaned = false;
   async function cleanup() {
+    if (_cleaned) return;
+    _cleaned = true;
     _activeConnections--;
     for (const unsub of eventUnsubs.values()) {
       unsub();

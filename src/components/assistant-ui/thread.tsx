@@ -2,13 +2,15 @@ import { MarkdownText } from '@/components/assistant-ui/markdown-text';
 import { ToolFallback } from '@/components/assistant-ui/tool-fallback';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 import {
+  ActionBarPrimitive,
   AuiIf,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
 } from '@assistant-ui/react';
-import { ArrowDownIcon, ArrowUpIcon, CircleStop, LoaderIcon, SparklesIcon } from 'lucide-react';
+import { ArrowDownIcon, CircleStop, LoaderIcon, SparklesIcon } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import type { FC, ReactNode } from 'react';
 import { useThinkingText } from '@/contexts/ThinkingContext';
 
@@ -32,6 +34,8 @@ export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> =
             AssistantMessage,
           }}
         />
+
+        <ThreadLevelThinkingIndicator />
 
         <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-3 overflow-visible rounded-t-2xl bg-background pb-3">
           <ThreadScrollToBottom />
@@ -123,10 +127,10 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
             <ComposerPrimitive.Send asChild>
               <TooltipIconButton
                 tooltip="Send"
-                variant="default"
-                className="aui-composer-send size-8 rounded-full p-2 transition-opacity"
+                variant="ghost"
+                className="aui-composer-send h-7 w-7 rounded-md transition-opacity"
               >
-                <ArrowUpIcon />
+                <Codicon name="send" className="text-base" />
               </TooltipIconButton>
             </ComposerPrimitive.Send>
           </AuiIf>
@@ -134,8 +138,8 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
             <ComposerPrimitive.Cancel asChild>
               <TooltipIconButton
                 tooltip="Stop"
-                variant="default"
-                className="aui-composer-cancel size-8 rounded-full p-2 transition-opacity"
+                variant="ghost"
+                className="aui-composer-cancel h-7 w-7 rounded-md transition-opacity"
               >
                 <CircleStop className="size-4" />
               </TooltipIconButton>
@@ -157,23 +161,66 @@ const MessageError: FC = () => {
   );
 };
 
-const AssistantThinkingIndicator: FC = () => {
+/**
+ * Thread-level thinking indicator.  Rendered once after ThreadPrimitive.Messages
+ * so it always appears below the last message.  It reads directly from
+ * ThinkingContext — no dependency on the per-message AUI store, which avoids
+ * the timing gap between flushSync renders and the deferred useEffect adapter
+ * sync in useExternalStoreRuntime.
+ */
+const ThreadLevelThinkingIndicator: FC = () => {
   const thinkingText = useThinkingText();
   if (thinkingText === null) return null;
   return (
-    <AuiIf condition={s => s.message.status?.type === 'running'}>
-      <div className="aui-assistant-thinking-indicator fade-in animate-in duration-150 mt-1 flex items-center gap-2 px-1 text-muted-foreground text-sm">
-        <LoaderIcon className="size-3.5 animate-spin" />
-        <span className="animate-pulse">{thinkingText}</span>
-      </div>
-    </AuiIf>
+    <div className="aui-assistant-thinking-indicator fade-in animate-in duration-150 mt-1 flex items-center gap-2 px-4 py-2 text-muted-foreground text-sm">
+      <LoaderIcon className="size-3.5 animate-spin" />
+      <span className="animate-pulse">{thinkingText}</span>
+    </div>
+  );
+};
+
+const AssistantActionBar: FC = () => {
+  return (
+    <ActionBarPrimitive.Root
+      hideWhenRunning
+      autohide="not-last"
+      className="aui-assistant-action-bar flex items-center gap-0.5 mt-1 opacity-0 transition-opacity duration-150 group-hover/message:opacity-100 data-[floating]:absolute data-[floating]:-bottom-2 data-[floating]:right-0"
+    >
+      <ActionBarPrimitive.Copy asChild>
+        <TooltipIconButton
+          tooltip="Copy"
+          variant="ghost"
+          className="h-6 w-6 rounded text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <Codicon name="copy" className="text-sm" />
+        </TooltipIconButton>
+      </ActionBarPrimitive.Copy>
+      <ActionBarPrimitive.FeedbackPositive asChild>
+        <TooltipIconButton
+          tooltip="Good response"
+          variant="ghost"
+          className="h-6 w-6 rounded text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <Codicon name="thumbsup" className="text-sm" />
+        </TooltipIconButton>
+      </ActionBarPrimitive.FeedbackPositive>
+      <ActionBarPrimitive.FeedbackNegative asChild>
+        <TooltipIconButton
+          tooltip="Bad response"
+          variant="ghost"
+          className="h-6 w-6 rounded text-muted-foreground/60 hover:text-muted-foreground"
+        >
+          <Codicon name="thumbsdown" className="text-sm" />
+        </TooltipIconButton>
+      </ActionBarPrimitive.FeedbackNegative>
+    </ActionBarPrimitive.Root>
   );
 };
 
 const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-assistant-message-root fade-in slide-in-from-bottom-1 relative w-full animate-in py-3 duration-150"
+      className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-3 duration-150"
       data-role="assistant"
     >
       <div className="aui-assistant-message-content wrap-break-word px-1 text-foreground text-sm leading-relaxed">
@@ -181,9 +228,15 @@ const AssistantMessage: FC = () => {
           components={{
             Text: MarkdownText,
             tools: { Fallback: ToolFallback },
+            // Prevent EmptyPartFallback from rendering MarkdownText outside a valid
+            // part context — this avoids the "MessagePartText can only be used inside
+            // text or reasoning message parts" crash when the message has 0 parts or
+            // ends in a tool-call / source part.
+            Empty: () => null,
           }}
+          unstable_showEmptyOnNonTextEnd={false}
         />
-        <AssistantThinkingIndicator />
+        <AssistantActionBar />
         <MessageError />
       </div>
     </MessagePrimitive.Root>

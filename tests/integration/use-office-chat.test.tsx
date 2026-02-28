@@ -458,9 +458,9 @@ describe('useOfficeChat', () => {
   // ─── MCP wiring ────────────────────────────────────────────────────────────
 
   it('passes mcpServers to createSession when servers are active in the store', async () => {
-    useSettingsStore.getState().importMcpServers([
-      { name: 'my-server', url: 'https://example.com/mcp', transport: 'http' },
-    ]);
+    useSettingsStore
+      .getState()
+      .importMcpServers([{ name: 'my-server', url: 'https://example.com/mcp', transport: 'http' }]);
     // activeMcpServerNames null = all enabled
 
     const session = makeFakeSession([IDLE_EVENT]);
@@ -498,9 +498,9 @@ describe('useOfficeChat', () => {
   });
 
   it('does not pass mcpServers when all servers are toggled off', async () => {
-    useSettingsStore.getState().importMcpServers([
-      { name: 'srv', url: 'https://example.com/mcp', transport: 'http' },
-    ]);
+    useSettingsStore
+      .getState()
+      .importMcpServers([{ name: 'srv', url: 'https://example.com/mcp', transport: 'http' }]);
     useSettingsStore.setState({ activeMcpServerNames: [] });
 
     const session = makeFakeSession([IDLE_EVENT]);
@@ -518,9 +518,9 @@ describe('useOfficeChat', () => {
   });
 
   it('SSE server is mapped with type:sse in mcpServers config', async () => {
-    useSettingsStore.getState().importMcpServers([
-      { name: 'sse-srv', url: 'https://sse.example.com', transport: 'sse' },
-    ]);
+    useSettingsStore
+      .getState()
+      .importMcpServers([{ name: 'sse-srv', url: 'https://sse.example.com', transport: 'sse' }]);
 
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
@@ -621,9 +621,9 @@ describe('useOfficeChat', () => {
   });
 
   it('agent with empty mcpServers allowlist blocks all MCP servers', async () => {
-    useSettingsStore.getState().importMcpServers([
-      { name: 'srv', url: 'https://srv.com/mcp', transport: 'http' },
-    ]);
+    useSettingsStore
+      .getState()
+      .importMcpServers([{ name: 'srv', url: 'https://srv.com/mcp', transport: 'http' }]);
     useSettingsStore.getState().importAgents([
       {
         metadata: {
@@ -742,5 +742,146 @@ describe('useOfficeChat', () => {
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
     const disabled = config.disabledSkills as string[];
     expect(disabled).toContain('excel');
+  });
+
+  it('does not include empty text parts in intermediate message content', async () => {
+    // KEY REGRESSION TEST: updateAssistant() used to always append
+    // { type: 'text', text: '' } even when streamText was empty.
+    // fromThreadMessageLike() silently strips empty text parts, which
+    // caused the "MessagePartText can only be used inside text or
+    // reasoning message parts" crash.  This test verifies the fix by
+    // pausing mid-stream (after tool events, before any text) and
+    // inspecting that no empty text part is present.
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { range: 'A1' },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1]]' },
+        });
+        // Pause — the message now has tool parts but no text
+        await streamGate;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Got it.' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(pausingSession);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // Start the stream — pauses after tool.execution_complete
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Read'));
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // Inspect intermediate message content
+    const messages = result.current.runtime.thread.getState().messages;
+    const assistant = messages.find(m => m.role === 'assistant');
+    expect(assistant).toBeDefined();
+
+    // Must have at least one tool-call part
+    const toolParts = assistant!.content.filter(c => c.type === 'tool-call');
+    expect(toolParts.length).toBeGreaterThanOrEqual(1);
+
+    // Must NOT have an empty text part — this is what caused the crash
+    const textParts = assistant!.content.filter(c => c.type === 'text');
+    for (const tp of textParts) {
+      expect((tp as { text: string }).text.trim().length).toBeGreaterThan(0);
+    }
+
+    // Release the stream
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // After completion, text should be present
+    const finalMessages = result.current.runtime.thread.getState().messages;
+    const finalAssistant = finalMessages.find(m => m.role === 'assistant');
+    const finalTextParts = finalAssistant!.content.filter(c => c.type === 'text');
+    expect(finalTextParts.length).toBe(1);
+    expect((finalTextParts[0] as { text: string }).text).toBe('Got it.');
+  });
+
+  it('initial assistant message has no empty text part (content starts as [])', async () => {
+    // Regression: initial assistant message had content: [{ type: 'text', text: '' }]
+    // which fromThreadMessageLike() would strip, causing crashes on first render.
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        // Pause immediately — the initial assistant message is in state before
+        // any events arrive
+        await streamGate;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Hi' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(pausingSession);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Hi'));
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // The assistant message exists in running state
+    const messages = result.current.runtime.thread.getState().messages;
+    const assistant = messages.find(m => m.role === 'assistant');
+    expect(assistant).toBeDefined();
+
+    // No empty text part should be in the content
+    const textParts = assistant!.content.filter(c => c.type === 'text');
+    for (const tp of textParts) {
+      expect((tp as { text: string }).text.trim().length).toBeGreaterThan(0);
+    }
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 100));
+    });
   });
 });
