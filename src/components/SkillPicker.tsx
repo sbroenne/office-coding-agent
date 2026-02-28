@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { BrainCircuit, Check, Square, ChevronDown } from 'lucide-react';
+import { Check, Square } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
 import { getBundledSkills, getImportedSkills, getSkills } from '@/services/skills';
@@ -69,18 +70,16 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-1.5 pr-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Agent skills"
             title="Agent skills"
           >
-            <BrainCircuit className="size-3 shrink-0" />
-            <span>Skills</span>
+            <Codicon name="lightbulb-sparkle" className="text-base" />
             {activeCount > 0 && activeSkillNames !== null && (
-              <span className="min-w-[14px] rounded-full bg-muted px-1 text-center text-[10px] tabular-nums text-muted-foreground">
+              <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-medium tabular-nums text-primary-foreground">
                 {activeCount}
               </span>
             )}
-            <ChevronDown className="size-3 shrink-0 opacity-50" />
           </button>
         </Popover.Trigger>
 

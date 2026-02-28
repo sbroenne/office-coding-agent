@@ -81,6 +81,17 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
     }
   }, []);
 
+  // Sync the `inert` attribute imperatively — React 18 strips unknown HTML attrs
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    if (!open) {
+      el.setAttribute('inert', '');
+    } else {
+      el.removeAttribute('inert');
+    }
+  }, [open]);
+
   return (
     <div
       ref={panelRef}

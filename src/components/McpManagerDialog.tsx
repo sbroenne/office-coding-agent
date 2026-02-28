@@ -49,6 +49,7 @@ export const McpManagerPanel: React.FC = () => {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [logServer, setLogServer] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const restartTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
@@ -296,9 +297,13 @@ export const McpManagerPanel: React.FC = () => {
                     {isServerActive(server.name) && (
                       <button
                         onClick={() => {
+                          // Guard against double-click: skip if a restart is already pending
+                          if (restartTimerRef.current[server.name]) return;
                           toggleMcpServer(server.name);
-                          // Brief delay to allow the server to stop before restarting
-                          setTimeout(() => toggleMcpServer(server.name), 150);
+                          restartTimerRef.current[server.name] = setTimeout(() => {
+                            toggleMcpServer(server.name);
+                            delete restartTimerRef.current[server.name];
+                          }, 200);
                         }}
                         className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         title="Restart"

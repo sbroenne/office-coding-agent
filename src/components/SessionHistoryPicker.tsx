@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { History, ChevronDown, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 
 interface SessionHistoryPickerProps {
@@ -80,7 +81,10 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
                         onRestoreSession(session.id);
                         setOpen(false);
                       }}
-                      className={isActive ? 'font-medium text-foreground' : 'text-foreground'}
+                      className={cn(
+                        'w-full truncate text-left',
+                        isActive ? 'font-medium text-foreground' : 'text-foreground'
+                      )}
                     >
                       {session.title}
                     </button>

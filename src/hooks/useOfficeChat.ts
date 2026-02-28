@@ -307,6 +307,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     importedMcpServers,
     activeMcpServerNames,
     evaluatePermission,
+    npmSkillPackages,
   ]);
 
   useEffect(() => {
@@ -454,9 +455,10 @@ export function useOfficeChat(host: OfficeHostApp) {
           )
             ? ('deep' as const)
             : ('fast' as const);
+        const currentModelForDoc = useSettingsStore.getState().activeModel;
         await orchestrateDocument(
           client,
-          activeModel,
+          currentModelForDoc,
           userText,
           {
             onPlan: () => {
@@ -539,9 +541,10 @@ export function useOfficeChat(host: OfficeHostApp) {
         const deckMode = /\b(deep|detail|qualit)/i.test(userText)
           ? ('deep' as const)
           : ('fast' as const);
+        const currentModelForDeck = useSettingsStore.getState().activeModel;
         await orchestrateDeck(
           client,
-          activeModel,
+          currentModelForDeck,
           userText,
           {
             onPlan: () => {
@@ -592,7 +595,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     const assistantMsg: ThreadMessageLike = {
       id: assistantId,
       role: 'assistant',
-      content: [{ type: 'text', text: '' }],
+      content: [],
       status: { type: 'running' },
       createdAt: new Date(),
     };
@@ -619,18 +622,26 @@ export function useOfficeChat(host: OfficeHostApp) {
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
       const content: ThreadMessageLike['content'] = [
         ...Array.from(toolParts.values()),
-        { type: 'text', text: streamText },
+        // Only append a text part when there is actual text — the
+        // external-store adapter's fromThreadMessageLike() silently strips
+        // empty text parts (text.trim().length === 0 → null → filtered).
+        // Sending an empty text part causes a 0-part message or a message
+        // that ends on a tool-call part, which can trigger the
+        // "MessagePartText can only be used inside text or reasoning
+        // message parts" crash in @assistant-ui/react-markdown.
+        ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
     };
 
+    // Stale-response watchdog: if no event arrives within 30s, warn the user.
+    // Reset on every event; cleared when the stream ends.
+    // Declared outside `try` so the `finally` block can clear it.
+    const STALE_TIMEOUT = 30_000;
+    let staleTimer: ReturnType<typeof setTimeout> | null = null;
+
     try {
       const session = sessionRef.current;
-
-      // Stale-response watchdog: if no event arrives within 30s, warn the user.
-      // Reset on every event; cleared when the stream ends.
-      const STALE_TIMEOUT = 30_000;
-      let staleTimer: ReturnType<typeof setTimeout> | null = null;
       const resetStaleTimer = () => {
         if (staleTimer) clearTimeout(staleTimer);
         staleTimer = setTimeout(() => {
@@ -698,7 +709,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           break;
         }
       }
-      if (staleTimer) clearTimeout(staleTimer);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       // Auto-reconnect if the Copilot session was lost (e.g. proxy restart, laptop sleep)
@@ -730,6 +740,7 @@ export function useOfficeChat(host: OfficeHostApp) {
         );
       }
     } finally {
+      if (staleTimer) clearTimeout(staleTimer);
       setThinkingText(null);
       setIsRunning(false);
     }
@@ -814,7 +825,9 @@ export function useOfficeChat(host: OfficeHostApp) {
     onNew,
     onCancel: () => {
       cancelRef.current = true;
-      setIsRunning(false);
+      // Do not set isRunning=false here — the streaming loop's `finally` block
+      // handles it after the current iteration actually finishes. Setting it
+      // prematurely causes the UI to show "idle" while events are still processing.
       return Promise.resolve();
     },
     convertMessage: (msg: ThreadMessageLike) => msg,

@@ -223,8 +223,12 @@ export const useSettingsStore = create<SettingsState>()(
         set(state => {
           const current = state.activeMcpServerNames;
           if (current === null) {
-            const allNames = state.importedMcpServers.map(s => s.name);
-            return { activeMcpServerNames: allNames.filter(n => n !== serverName) };
+            const allImported = state.importedMcpServers.map(s => s.name);
+            // If toggling a bundled server (not in imported list), add it to the active list
+            if (!allImported.includes(serverName)) {
+              return { activeMcpServerNames: [...allImported, serverName] };
+            }
+            return { activeMcpServerNames: allImported.filter(n => n !== serverName) };
           }
           const next = current.includes(serverName)
             ? current.filter(n => n !== serverName)

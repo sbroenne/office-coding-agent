@@ -168,4 +168,44 @@ Content`;
     const { metadata } = parseFrontmatter(raw);
     expect(metadata.hosts).toEqual(['excel', 'word']);
   });
+
+  // Bug regression: hosts should be normalized to lowercase
+  it('normalizes capitalized host names to lowercase in inline array', () => {
+    const raw = `---
+name: caps-host-skill
+description: Test
+version: 1.0.0
+hosts: [Excel, PowerPoint]
+---
+Content`;
+    const { metadata } = parseFrontmatter(raw);
+    // Before fix: stored as 'Excel' which never matched lowercase 'excel' in filtering
+    expect(metadata.hosts).toEqual(['excel', 'powerpoint']);
+  });
+
+  it('normalizes capitalized host names to lowercase in list format', () => {
+    const raw = `---
+name: caps-host-skill
+description: Test
+version: 1.0.0
+hosts:
+  - Excel
+  - Word
+---
+Content`;
+    const { metadata } = parseFrontmatter(raw);
+    expect(metadata.hosts).toEqual(['excel', 'word']);
+  });
+
+  it('filters out invalid host values during parsing', () => {
+    const raw = `---
+name: bad-host-skill
+description: Test
+version: 1.0.0
+hosts: [excel, invalidhost, word]
+---
+Content`;
+    const { metadata } = parseFrontmatter(raw);
+    expect(metadata.hosts).toEqual(['excel', 'word']);
+  });
 });

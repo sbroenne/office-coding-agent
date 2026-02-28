@@ -6,7 +6,12 @@
 export function toolResultSummary(result: unknown): string {
   if (result === undefined || result === null) return '';
 
-  const str = typeof result === 'string' ? result : JSON.stringify(result);
+  let str: string;
+  try {
+    str = typeof result === 'string' ? result : JSON.stringify(result);
+  } catch {
+    return '';
+  }
   if (!str) return '';
 
   // Try to parse as JSON for structured inspection
