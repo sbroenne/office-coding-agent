@@ -356,11 +356,26 @@ async function handleConnection(ws) {
           },
         }));
 
-        // Point to the host-specific bundled skills directory if it exists
+        // Discover all bundled skill directories for the current host.
+        // Skill dirs use the naming convention: <host>/ and <host>-<specialization>/
+        // e.g. for host "powerpoint": powerpoint/, powerpoint-deck-builder/, powerpoint-formatting/
         const skillDirectories = [];
-        const hostSkillDir = host ? join(BUNDLED_SKILLS_ROOT, slugify(host)) : null;
-        if (hostSkillDir && existsSync(hostSkillDir)) {
-          skillDirectories.push(hostSkillDir);
+        if (host && existsSync(BUNDLED_SKILLS_ROOT)) {
+          const hostSlug = slugify(host);
+          try {
+            const entries = await readdir(BUNDLED_SKILLS_ROOT, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.isDirectory() && (entry.name === hostSlug || entry.name.startsWith(hostSlug + '-'))) {
+                skillDirectories.push(join(BUNDLED_SKILLS_ROOT, entry.name));
+              }
+            }
+          } catch {
+            // Fall back to single-directory approach if readdir fails
+            const hostSkillDir = join(BUNDLED_SKILLS_ROOT, hostSlug);
+            if (existsSync(hostSkillDir)) {
+              skillDirectories.push(hostSkillDir);
+            }
+          }
         }
 
         // Write imported skills to a temp directory so the SDK can load them

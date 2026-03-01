@@ -1,7 +1,21 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
+
+// Bundled skill imports — one per host-specific skill directory
 import excelSkillRaw from '@/skills/excel/SKILL.md';
+import powerpointSkillRaw from '@/skills/powerpoint/SKILL.md';
+import powerpointDeckBuilderSkillRaw from '@/skills/powerpoint-deck-builder/SKILL.md';
+import powerpointFormattingSkillRaw from '@/skills/powerpoint-formatting/SKILL.md';
+import powerpointRedesignSkillRaw from '@/skills/powerpoint-redesign/SKILL.md';
+import wordSkillRaw from '@/skills/word/SKILL.md';
+import wordDocumentBuilderSkillRaw from '@/skills/word-document-builder/SKILL.md';
+import wordFormattingSkillRaw from '@/skills/word-formatting/SKILL.md';
+import wordTablesSkillRaw from '@/skills/word-tables/SKILL.md';
+import outlookSkillRaw from '@/skills/outlook/SKILL.md';
+import outlookCalendarSkillRaw from '@/skills/outlook-calendar/SKILL.md';
+import outlookDraftingSkillRaw from '@/skills/outlook-drafting/SKILL.md';
+import outlookEmailAnalysisSkillRaw from '@/skills/outlook-email-analysis/SKILL.md';
 
 /**
  * Parse YAML frontmatter from a skill markdown file.
@@ -145,7 +159,21 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
 }
 
 function loadBundledSkills(): AgentSkill[] {
-  const bundledRawSkills = [excelSkillRaw];
+  const bundledRawSkills = [
+    excelSkillRaw,
+    powerpointSkillRaw,
+    powerpointDeckBuilderSkillRaw,
+    powerpointFormattingSkillRaw,
+    powerpointRedesignSkillRaw,
+    wordSkillRaw,
+    wordDocumentBuilderSkillRaw,
+    wordFormattingSkillRaw,
+    wordTablesSkillRaw,
+    outlookSkillRaw,
+    outlookCalendarSkillRaw,
+    outlookDraftingSkillRaw,
+    outlookEmailAnalysisSkillRaw,
+  ];
 
   const loaded = bundledRawSkills.map(raw => {
     const parsed = parseFrontmatter(raw);
