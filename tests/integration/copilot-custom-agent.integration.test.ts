@@ -460,4 +460,103 @@ function handleRequest(req) {
     },
     TIMEOUT_MS
   );
+
+  // ── Bundled skill loading via skillDirectories ──────────────────────────
+
+  it(
+    'bundled Excel skill is loaded by the SDK when host=excel is passed',
+    async () => {
+      // Create a session with host='excel' — the proxy should discover
+      // src/skills/excel/ and pass it as a skillDirectory to the SDK.
+      // We do NOT inject skills via systemMessage; we rely on the SDK
+      // loading them from disk via skillDirectories.
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        const session = await client.createSession({
+          host: 'excel',
+          // Minimal system message — no skill content injected manually.
+          systemMessage: {
+            mode: 'replace',
+            content:
+              'You are a helpful assistant. Answer questions concisely. ' +
+              'If you have been given an Excel skill with an "Operating Loop", ' +
+              'list its five steps as a numbered list. ' +
+              'If you have no such skill, reply with exactly: NO_SKILL_FOUND',
+          },
+        });
+
+        // The SDK may request file-read permissions (e.g. to read skill files).
+        // Auto-approve so the session doesn't hang waiting for a response.
+        session.onPermissionRequest(async payload => {
+          await session.respondPermission(payload.requestId, 'approved');
+        });
+
+        let fullText = '';
+        for await (const event of session.query({
+          prompt: 'What are the five steps of the Excel Operating Loop from the Excel skill?',
+        })) {
+          if (event.type === 'assistant.message_delta') {
+            fullText += event.data.deltaContent;
+          }
+          if (event.type === 'assistant.message') {
+            fullText = event.data.content;
+          }
+          if (event.type === 'session.idle') break;
+        }
+
+        // The Excel skill defines: Discover, Read, Execute, Verify, Summarize
+        expect(fullText).not.toContain('NO_SKILL_FOUND');
+        expect(fullText.toLowerCase()).toContain('discover');
+        expect(fullText.toLowerCase()).toContain('verify');
+        expect(fullText.toLowerCase()).toContain('summarize');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    'disabledSkills is accepted by the SDK and session still works',
+    async () => {
+      // Pass host='excel' so the proxy discovers the bundled Excel skill,
+      // but also disable it via disabledSkills. Verify the session still
+      // creates and responds (disabledSkills doesn't break the SDK).
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        const session = await client.createSession({
+          host: 'excel',
+          disabledSkills: ['excel'],
+          systemMessage: {
+            mode: 'replace',
+            content: 'You are a helpful assistant. Reply with exactly one word: PONG',
+          },
+        });
+
+        // Auto-approve any permission requests to prevent 60s proxy timeout.
+        session.onPermissionRequest(async payload => {
+          await session.respondPermission(payload.requestId, 'approved');
+        });
+
+        let fullText = '';
+        for await (const event of session.query({
+          prompt: 'Ping',
+        })) {
+          if (event.type === 'assistant.message_delta') {
+            fullText += event.data.deltaContent;
+          }
+          if (event.type === 'assistant.message') {
+            fullText = event.data.content;
+          }
+          if (event.type === 'session.idle') break;
+        }
+
+        // The session should work and the model should respond
+        expect(fullText.toLowerCase()).toContain('pong');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
 });
