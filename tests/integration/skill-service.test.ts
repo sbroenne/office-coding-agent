@@ -11,6 +11,7 @@ import {
   buildSkillContext,
   getSkills,
   getSkill,
+  getBundledSkills,
   parseFrontmatter,
   setImportedSkills,
 } from '@/services/skills/skillService';
@@ -73,10 +74,13 @@ describe('buildSkillContext', () => {
 });
 
 describe('getSkills', () => {
-  it('returns bundled skills', () => {
+  it('returns all 13 bundled skills', () => {
     const skills = getSkills();
-    expect(skills.length).toBeGreaterThan(0);
-    expect(skills.some(skill => skill.metadata.name === 'excel')).toBe(true);
+    expect(skills.length).toBe(13);
+  });
+
+  it('includes the excel skill', () => {
+    expect(getSkills().some(skill => skill.metadata.name === 'excel')).toBe(true);
   });
 
   it('each skill has metadata with a name', () => {
@@ -102,6 +106,82 @@ describe('getSkill', () => {
     expect(skill).toBeDefined();
     expect(skill?.metadata.name).toBe('excel');
     expect(skill?.metadata.hosts).toEqual(['excel']);
+  });
+});
+
+// Regression: all 13 bundled skills must be loaded (not just excel)
+describe('bundled skill loading', () => {
+  const expectedSkills = [
+    { name: 'excel', host: 'excel' },
+    { name: 'powerpoint', host: 'powerpoint' },
+    { name: 'powerpoint-deck-builder', host: 'powerpoint' },
+    { name: 'powerpoint-formatting', host: 'powerpoint' },
+    { name: 'powerpoint-redesign', host: 'powerpoint' },
+    { name: 'Word Document Editing', host: 'word' },
+    { name: 'word-document-builder', host: 'word' },
+    { name: 'word-formatting', host: 'word' },
+    { name: 'word-tables', host: 'word' },
+    { name: 'outlook', host: 'outlook' },
+    { name: 'outlook-calendar', host: 'outlook' },
+    { name: 'outlook-drafting', host: 'outlook' },
+    { name: 'outlook-email-analysis', host: 'outlook' },
+  ];
+
+  it('loads exactly 13 bundled skills', () => {
+    expect(getBundledSkills()).toHaveLength(13);
+  });
+
+  it.each(expectedSkills)('loads $name skill targeting $host', ({ name, host }) => {
+    const skill = getSkill(name);
+    expect(skill).toBeDefined();
+    expect(skill!.metadata.hosts).toContain(host);
+    expect(skill!.content.length).toBeGreaterThan(0);
+  });
+
+  it('includes 1 excel skill', () => {
+    const excelSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('excel'));
+    expect(excelSkills).toHaveLength(1);
+  });
+
+  it('includes 4 powerpoint skills', () => {
+    const pptSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('powerpoint'));
+    expect(pptSkills).toHaveLength(4);
+  });
+
+  it('includes 4 word skills', () => {
+    const wordSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('word'));
+    expect(wordSkills).toHaveLength(4);
+  });
+
+  it('includes 4 outlook skills', () => {
+    const outlookSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('outlook'));
+    expect(outlookSkills).toHaveLength(4);
+  });
+
+  it('buildSkillContext returns skills for powerpoint host', () => {
+    const ctx = buildSkillContext(undefined, 'powerpoint');
+    expect(ctx).toContain('Agent Skill: powerpoint');
+    expect(ctx).toContain('Agent Skill: powerpoint-deck-builder');
+  });
+
+  it('buildSkillContext returns skills for word host', () => {
+    const ctx = buildSkillContext(undefined, 'word');
+    expect(ctx).toContain('Agent Skill: Word Document Editing');
+    expect(ctx).toContain('Agent Skill: word-tables');
+  });
+
+  it('buildSkillContext returns skills for outlook host', () => {
+    const ctx = buildSkillContext(undefined, 'outlook');
+    expect(ctx).toContain('Agent Skill: outlook');
+    expect(ctx).toContain('Agent Skill: outlook-calendar');
+  });
+
+  it('buildSkillContext filters out non-matching host skills', () => {
+    const ctx = buildSkillContext(undefined, 'excel');
+    expect(ctx).toContain('Agent Skill: excel');
+    expect(ctx).not.toContain('Agent Skill: powerpoint');
+    expect(ctx).not.toContain('Agent Skill: word');
+    expect(ctx).not.toContain('Agent Skill: outlook');
   });
 });
 
