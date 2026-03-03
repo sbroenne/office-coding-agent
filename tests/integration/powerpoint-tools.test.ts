@@ -120,6 +120,16 @@ describe('Integration: slide-index tool schemas', () => {
     expect(validate(schema, { slideIndex: 0, width: 1024 })).toBe(true);
   });
 
+  it('get_slide_image accepts optional region (enum)', () => {
+    const schema = toolsByName.get_slide_image.parameters;
+    expect(validate(schema, { slideIndex: 0, region: 'full' })).toBe(true);
+    expect(validate(schema, { slideIndex: 0, region: 'bottom-left' })).toBe(true);
+    expect(validate(schema, { slideIndex: 0, region: 'bottom-right' })).toBe(true);
+    expect(validate(schema, { slideIndex: 0, region: 'top-left' })).toBe(true);
+    expect(validate(schema, { slideIndex: 0, region: 'top-right' })).toBe(true);
+    expect(validate(schema, { slideIndex: 0, region: 'invalid' })).toBe(false);
+  });
+
   it('clear_slide requires slideIndex', () => {
     const schema = toolsByName.clear_slide.parameters;
     expect(validate(schema, { slideIndex: 2 })).toBe(true);
