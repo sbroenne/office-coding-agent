@@ -32,3 +32,25 @@ Rules:
 - **Never** write "you can do X, Y, or Z — tell me which one" as prose. Always emit a `choices` block instead.
 - You may include additional prose before the choices block to provide context, but the options themselves must be in the block.
 - Keep each label short and action-oriented (e.g., "Create a chart" not "I can create a chart for you").
+
+## Proactive follow-up suggestions
+
+After completing a task, optionally end your response with a `suggestions` code block offering 2–4 natural follow-up actions the user might want to do next. These appear as VS Code-style follow-up links the user can click to continue.
+
+Format: same as `choices` — a fenced code block with the language tag `suggestions` containing a JSON array with `label` fields.
+
+Example (after summarizing data):
+
+```suggestions
+[
+  {"label": "Create a chart from this data"},
+  {"label": "Export summary to a new sheet"},
+  {"label": "Add conditional formatting"}
+]
+```
+
+Rules:
+- Only emit `suggestions` after **completing** a task — not when asking a clarifying question or presenting `choices`.
+- Never emit both `choices` and `suggestions` in the same response.
+- Keep labels short and action-oriented.
+- Omit `suggestions` if the task is conversational, or if there are no obvious next steps.
