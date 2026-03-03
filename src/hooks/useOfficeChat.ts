@@ -620,6 +620,15 @@ export function useOfficeChat(host: OfficeHostApp) {
     let streamText = '';
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
+      // When the message is complete and has text, drop tool-call parts so they no
+      // longer render below the final response. Tool calls are already surfaced as
+      // progress indicators during streaming — keeping them in the completed content
+      // makes past actions visible at the bottom of every response, cluttering the
+      // thread. If the message has no text (tool-only result) we keep tool parts so
+      // the message is not empty.
+      const isComplete = extra?.status?.type === 'complete';
+      const includeToolParts = !isComplete || !streamText;
+
       const content: ThreadMessageLike['content'] = [
         // Text part comes FIRST so its array index stays stable even as tool-call
         // parts are appended. Prepending tool-calls would shift the text part's
@@ -629,7 +638,7 @@ export function useOfficeChat(host: OfficeHostApp) {
         // old index — triggering "MessagePartText can only be used inside text or
         // reasoning message parts".
         ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
-        ...Array.from(toolParts.values()),
+        ...(includeToolParts ? Array.from(toolParts.values()) : []),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
     };
