@@ -1,0 +1,106 @@
+# Release Pipeline
+#
+# Triggered by a version tag push (e.g. git tag v1.2.3 && git push origin v1.2.3).
+# Builds unsigned installers for Windows (NSIS .exe) and macOS (DMG) in parallel,
+# then publishes them as a GitHub Release with auto-generated release notes.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ─── Windows Installer ──────────────────────────────────────
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build
+
+      - name: Build Windows installer
+        run: npx electron-builder --win --publish never
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows
+          path: build/electron/*.exe
+          retention-days: 7
+
+  # ─── macOS Installer ────────────────────────────────────────
+  build-macos:
+    name: Build macOS Installer
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production)
+        run: npm run build
+
+      - name: Build macOS installer
+        run: npx electron-builder --mac --publish never
+        env:
+          # Skip ad-hoc/notarization signing (unsigned build)
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos
+          path: build/electron/*.dmg
+          retention-days: 7
+
+  # ─── GitHub Release ─────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-windows
+          path: installers/
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-macos
+          path: installers/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installers/**
+          generate_release_notes: true

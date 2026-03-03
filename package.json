@@ -15,6 +15,7 @@
     "stop:tray:desktop": "node scripts/stop-tray-desktop.mjs",
     "build:installer": "npm run build && electron-builder",
     "build:installer:win": "npm run build && electron-builder --win",
+    "build:installer:mac": "npm run build && electron-builder --mac",
     "build:installer:dir": "npm run build && electron-builder --dir",
     "start": "office-addin-debugging start manifests/manifest.dev.xml",
     "start:desktop": "office-addin-debugging start manifests/manifest.dev.xml desktop --app excel",
@@ -36,6 +37,7 @@
     "sideload:share:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/setup-local-share.ps1",
     "sideload:share:trust": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/trust-local-share.ps1",
     "sideload:share:publish": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/publish-manifest.ps1",
+    "sideload:share:publish:outlook": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/publish-manifest.ps1 -ManifestPath manifests/manifest.outlook.staging.xml",
     "sideload:share:cleanup": "powershell -ExecutionPolicy Bypass -File ./scripts/sideload/remove-local-share.ps1",
     "register:win": "powershell -ExecutionPolicy Bypass -File ./scripts/register.ps1",
     "unregister:win": "powershell -ExecutionPolicy Bypass -File ./scripts/unregister.ps1",
@@ -44,6 +46,7 @@
     "validate": "office-addin-manifest validate manifests/manifest.dev.xml",
     "validate:outlook": "office-addin-manifest validate manifests/manifest.outlook.dev.xml",
     "validate:staging": "office-addin-manifest validate manifests/manifest.staging.xml",
+    "validate:outlook:staging": "office-addin-manifest validate manifests/manifest.outlook.staging.xml",
     "validate:prod": "office-addin-manifest validate manifests/manifest.prod.xml",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
@@ -167,6 +170,11 @@
     "win": {
       "target": [
         "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
       ]
     },
     "nsis": {
