@@ -178,8 +178,10 @@ const ThreadLevelThinkingIndicator: FC = () => {
   const thinkingText = useThinkingText();
   if (thinkingText === null) return null;
   return (
-    <div className="aui-assistant-thinking-indicator fade-in animate-in duration-150 mt-1 flex items-center gap-2 px-4 py-2 text-sm">
-      <span className="chat-thinking-shimmer-text">{thinkingText}</span>
+    <div className="aui-assistant-message-root" data-role="assistant">
+      <div className="aui-assistant-thinking-indicator fade-in animate-in duration-150 mt-1 flex items-center gap-2 px-4 py-2 text-sm">
+        <span className="chat-thinking-shimmer-text">{thinkingText}</span>
+      </div>
     </div>
   );
 };

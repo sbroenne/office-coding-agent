@@ -711,6 +711,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {
           const { toolCallId, result } = event.data;
+          setThinkingText(null);
           const existing = toolParts.get(toolCallId);
           if (existing) {
             const resultText = result
