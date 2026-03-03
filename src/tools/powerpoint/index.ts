@@ -175,7 +175,9 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
   {
     name: 'get_slide_image',
     description:
-      'Capture a slide as a PNG image to see its visual design, layout, colors, and styling. Requires PowerPoint on Windows (16.0.17628+), Mac (16.85+), or PowerPoint on the web.',
+      'Capture a slide as a PNG image to see its visual design, layout, colors, and styling. ' +
+      'Use region="full" for an overview, or "bottom-left"/"bottom-right" for 2× zoom into the bottom corners to check text overflow. ' +
+      'Requires PowerPoint on Windows (16.0.17628+), Mac (16.85+), or PowerPoint on the web.',
     params: {
       slideIndex: { type: 'number', description: '0-based slide index.' },
       width: {
@@ -183,9 +185,27 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
         required: false,
         description: 'Image width in pixels. Aspect ratio is preserved. Default: 800.',
       },
+      region: {
+        type: 'string',
+        required: false,
+        description:
+          'Which part of the slide to return. "full" (default) = entire slide. ' +
+          '"top-left", "top-right", "bottom-left", "bottom-right" = that quadrant zoomed 2×. ' +
+          'Use bottom quadrants to inspect text overflow at the bottom of slides.',
+        enum: ['full', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+        default: 'full',
+      },
     },
     execute: async (context, args) => {
-      const { slideIndex, width = 800 } = args as { slideIndex: number; width?: number };
+      const {
+        slideIndex,
+        width = 800,
+        region = 'full',
+      } = args as {
+        slideIndex: number;
+        width?: number;
+        region?: 'full' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+      };
 
       const slides = context.presentation.slides;
       slides.load('items');
@@ -203,10 +223,73 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
       interface SlideWithImage {
         getImageAsBase64(width: number): { value: string };
       }
-      const imageResult = (slide as unknown as SlideWithImage).getImageAsBase64(width);
-      await context.sync();
 
-      return `data:image/png;base64,${imageResult.value}`;
+      let imageResult: { value: string };
+      try {
+        imageResult = (slide as unknown as SlideWithImage).getImageAsBase64(width);
+        await context.sync();
+      } catch {
+        return (
+          'Slide image capture is not available in this version of PowerPoint. ' +
+          'Image capture requires PowerPoint on Windows (16.0.17628+), Mac (16.85+), or PowerPoint on the web. ' +
+          'Use get_slide_shapes and get_presentation_content to inspect the slide via text instead.'
+        );
+      }
+
+      const fullDataUrl = `data:image/png;base64,${imageResult.value}`;
+
+      if (region === 'full') {
+        return fullDataUrl;
+      }
+
+      // Crop to the requested quadrant and scale up 2× using an offscreen canvas.
+      // This gives the model a zoomed view to check for text overflow / layout issues.
+      return new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const halfW = Math.floor(img.width / 2);
+          const halfH = Math.floor(img.height / 2);
+
+          let sx: number;
+          let sy: number;
+          switch (region) {
+            case 'top-left':
+              sx = 0;
+              sy = 0;
+              break;
+            case 'top-right':
+              sx = halfW;
+              sy = 0;
+              break;
+            case 'bottom-left':
+              sx = 0;
+              sy = halfH;
+              break;
+            case 'bottom-right':
+              sx = halfW;
+              sy = halfH;
+              break;
+            default:
+              sx = 0;
+              sy = 0;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width; // output is full-size — the quadrant is stretched 2×
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(fullDataUrl); // canvas not available — fall back to full image
+            return;
+          }
+          ctx.drawImage(img, sx, sy, halfW, halfH, 0, 0, img.width, img.height);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => {
+          reject(new Error('Failed to load slide image for region crop'));
+        };
+        img.src = fullDataUrl;
+      });
     },
   },
 
