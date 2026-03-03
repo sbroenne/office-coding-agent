@@ -621,15 +621,15 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
       const content: ThreadMessageLike['content'] = [
-        ...Array.from(toolParts.values()),
-        // Only append a text part when there is actual text — the
-        // external-store adapter's fromThreadMessageLike() silently strips
-        // empty text parts (text.trim().length === 0 → null → filtered).
-        // Sending an empty text part causes a 0-part message or a message
-        // that ends on a tool-call part, which can trigger the
-        // "MessagePartText can only be used inside text or reasoning
-        // message parts" crash in @assistant-ui/react-markdown.
+        // Text part comes FIRST so its array index stays stable even as tool-call
+        // parts are appended. Prepending tool-calls would shift the text part's
+        // index on every new tool invocation, causing React's useSyncExternalStore
+        // tearing-detection in MarkdownTextPrimitive (useMessagePartText) to see
+        // s.part.type === "tool-call" while MarkdownText is still mounted at the
+        // old index — triggering "MessagePartText can only be used inside text or
+        // reasoning message parts".
         ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
+        ...Array.from(toolParts.values()),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
     };
