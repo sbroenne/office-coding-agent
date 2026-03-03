@@ -181,7 +181,9 @@ describe('useOfficeChat', () => {
     expect((textPart as { type: 'text'; text: string }).text).toBe('Hello!');
   });
 
-  it('includes tool-call parts when tool events fire', async () => {
+  it('drops tool-call parts from completed message when text is present', async () => {
+    // Tool-call parts are shown during streaming but stripped from the final content
+    // once the message is complete with text, so they do not clutter the thread.
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
@@ -212,9 +214,49 @@ describe('useOfficeChat', () => {
 
     const messages = result.current.runtime.thread.getState().messages;
     const assistantContent = messages[1].content;
+    // Text part must be present
+    const textPart = assistantContent.find(c => c.type === 'text');
+    expect(textPart).toBeDefined();
+    expect((textPart as { type: 'text'; text: string }).text).toBe('Done!');
+    // Tool-call parts must be absent in the completed message (dropped to avoid cluttering thread)
+    const toolPart = assistantContent.find(c => c.type === 'tool-call');
+    expect(toolPart).toBeUndefined();
+  });
+
+  it('keeps tool-call parts in completed message when there is no text', async () => {
+    // If the AI response is tool-only (no text), tool parts must be kept so the
+    // message is not empty.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'get_range_values',
+        arguments: { range: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: '42' },
+      }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Get A1'));
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const messages = result.current.runtime.thread.getState().messages;
+    const assistantContent = messages[1].content;
     const toolPart = assistantContent.find(c => c.type === 'tool-call');
     expect(toolPart).toBeDefined();
-    expect(toolPart!.type).toBe('tool-call');
     expect((toolPart as { type: 'tool-call'; toolName: string }).toolName).toBe('get_range_values');
   });
 
