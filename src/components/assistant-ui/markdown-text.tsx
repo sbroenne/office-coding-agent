@@ -7,7 +7,7 @@ import {
 import { useThreadRuntime } from '@assistant-ui/react';
 import remarkGfm from 'remark-gfm';
 import { type FC, memo, useState, useCallback } from 'react';
-import { CheckIcon, CopyIcon } from 'lucide-react';
+import { CheckIcon, CopyIcon, SparklesIcon } from 'lucide-react';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +48,11 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   // choices blocks: render cards instead of code header + code block
   if (language === 'choices') {
     return <ChoiceCards code={code} />;
+  }
+
+  // suggestions blocks: render VS Code-style follow-up links
+  if (language === 'suggestions') {
+    return <SuggestionLinks code={code} />;
   }
 
   return (
@@ -141,6 +146,43 @@ const ChoiceCards: FC<{ code: string }> = ({ code }) => {
           }}
         />
       </div>
+    </div>
+  );
+};
+
+// ─── Suggestion Links ───
+// Parses ```suggestions JSON blocks into VS Code-style follow-up links.
+// Same JSON format as choices: [{"label": "..."}]
+// Rendered as plain text-link buttons with a sparkle icon (no border, no freeform).
+
+const SuggestionLinks: FC<{ code: string }> = ({ code }) => {
+  const threadRuntime = useThreadRuntime();
+  const suggestions = parseChoices(code); // reuse same parser
+
+  const handleClick = useCallback(
+    (label: string) => {
+      threadRuntime.append({
+        role: 'user',
+        content: [{ type: 'text', text: label }],
+      });
+    },
+    [threadRuntime]
+  );
+
+  if (!suggestions || suggestions.length === 0) return null;
+
+  return (
+    <div className="aui-suggestions-wrapper mt-3 flex flex-col items-start gap-1.5">
+      {suggestions.map(suggestion => (
+        <button
+          key={suggestion.label}
+          onClick={() => handleClick(suggestion.label)}
+          className="flex items-center gap-1.5 border-none bg-transparent p-0 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <SparklesIcon className="size-3 shrink-0" />
+          {suggestion.label}
+        </button>
+      ))}
     </div>
   );
 };
