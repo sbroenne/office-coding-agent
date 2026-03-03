@@ -242,9 +242,21 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
 
       const results: string[] = [];
       for (let i = startIdx; i < endIdx; i++) {
-        results.push(
-          `Slide ${i + 1}: (Speaker notes require PowerPoint desktop — API limitation in web add-ins)`
-        );
+        const slide = slides.items[i];
+        let notesText = '(no notes)';
+        try {
+          /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
+          const notesObj = (slide as any).notes;
+          if (notesObj?.body) {
+            notesObj.body.load('text');
+            await context.sync();
+            notesText = (notesObj.body.text as string) || '(no notes)';
+          }
+          /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment */
+        } catch {
+          notesText = '(notes unavailable in this environment)';
+        }
+        results.push(`Slide ${i + 1}: ${notesText}`);
       }
 
       return slideIndex !== undefined
@@ -490,8 +502,19 @@ PptxGenJS API reference:
         );
       }
 
-      const preview = notes.length > 100 ? `${notes.substring(0, 100)}...` : notes;
-      return `Note: Direct speaker notes editing has limited API support in web add-ins. For slide ${String(slideIndex + 1)}, please use the Notes pane in PowerPoint to add: "${preview}"`;
+      const slide = slides.items[slideIndex];
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+        const notesObj = (slide as any).notes;
+        if (!notesObj?.body) throw new Error('Notes API not available');
+        notesObj.body.text = notes;
+        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+        await context.sync();
+        return `Set speaker notes for slide ${String(slideIndex + 1)}.`;
+      } catch {
+        const preview = notes.length > 100 ? `${notes.substring(0, 100)}...` : notes;
+        return `Notes API unavailable in this environment. For slide ${String(slideIndex + 1)}, please use the Notes pane in PowerPoint to add: "${preview}"`;
+      }
     },
   },
 
@@ -551,6 +574,747 @@ PptxGenJS API reference:
       await context.sync();
 
       return `Duplicated slide ${String(sourceIndex + 1)} (text content only).`;
+    },
+  },
+
+  {
+    name: 'get_selected_slides',
+    description:
+      'Get the currently selected slide(s). Call this first to know which slide the user is working on.',
+    params: {},
+    execute: async context => {
+      const allSlides = context.presentation.slides;
+      allSlides.load('items');
+      await context.sync();
+      for (const s of allSlides.items) {
+        s.load('id');
+      }
+      await context.sync();
+
+      const selected = context.presentation.getSelectedSlides();
+      selected.load('items');
+      await context.sync();
+      for (const s of selected.items) {
+        s.load('id');
+      }
+      await context.sync();
+
+      const selectedIds = new Set(selected.items.map(s => s.id));
+      const matches = allSlides.items
+        .map((s, i) => ({ index: i, id: s.id }))
+        .filter(s => selectedIds.has(s.id));
+
+      if (matches.length === 0) return 'No slides currently selected.';
+      return `Selected slide(s): ${matches.map(r => `Slide ${r.index + 1} (index ${r.index})`).join(', ')}`;
+    },
+  },
+
+  {
+    name: 'get_slide_shapes',
+    description:
+      'List all shapes on a slide with their index, name, type, position (inches), size (inches), and text. Use this before modifying, moving, or deleting individual shapes.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex } = args as { slideIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      if (slide.shapes.items.length === 0) {
+        return `Slide ${String(slideIndex + 1)} has no shapes.`;
+      }
+
+      for (const shape of slide.shapes.items) {
+        shape.load('name,id,left,top,width,height,type');
+        try {
+          shape.textFrame.textRange.load('text');
+        } catch {
+          // shape may not have a textFrame
+        }
+      }
+      await context.sync();
+
+      const PTS_PER_INCH = 72;
+      const lines = slide.shapes.items.map((shape, i) => {
+        const x = (shape.left / PTS_PER_INCH).toFixed(2);
+        const y = (shape.top / PTS_PER_INCH).toFixed(2);
+        const w = (shape.width / PTS_PER_INCH).toFixed(2);
+        const h = (shape.height / PTS_PER_INCH).toFixed(2);
+        let text = '';
+        try {
+          text = shape.textFrame.textRange.text?.trim() ?? '';
+        } catch {
+          /* no text frame */
+        }
+        const textPart = text
+          ? ` | text: "${text.length > 60 ? `${text.substring(0, 60)}\u2026` : text}"`
+          : '';
+        return `[${i}] "${shape.name}" type:${String(shape.type)} — x:${x}" y:${y}" w:${w}" h:${h}"${textPart}`;
+      });
+
+      return `Slide ${String(slideIndex + 1)} — ${String(slide.shapes.items.length)} shape(s):\n${lines.join('\n')}`;
+    },
+  },
+
+  {
+    name: 'get_slide_layouts',
+    description:
+      'List all available slide layouts from the first slide master. Use before apply_slide_layout.',
+    params: {},
+    execute: async context => {
+      const masters = context.presentation.slideMasters;
+      masters.load('items');
+      await context.sync();
+
+      if (masters.items.length === 0) return 'No slide masters found.';
+
+      const master = masters.items[0];
+      master.layouts.load('items');
+      await context.sync();
+
+      for (const l of master.layouts.items) {
+        l.load('name');
+      }
+      await context.sync();
+
+      if (master.layouts.items.length === 0) return 'No slide layouts found.';
+      const lines = master.layouts.items.map((l, i) => `[${i}] ${l.name}`);
+      return `Available layouts (${String(master.layouts.items.length)}):\n${lines.join('\n')}`;
+    },
+  },
+
+  {
+    name: 'delete_slide',
+    description: 'Delete a slide from the presentation by its 0-based index.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based index of the slide to delete.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex } = args as { slideIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideCount === 0) throw new Error('Presentation has no slides.');
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      slides.items[slideIndex].delete();
+      await context.sync();
+
+      return `Deleted slide ${String(slideIndex + 1)}.`;
+    },
+  },
+
+  {
+    name: 'move_slide',
+    description:
+      'Reorder a slide by moving it to a new position. Requires PowerPoint 16.0.14326+ (requirement set 1.8).',
+    params: {
+      fromIndex: { type: 'number', description: '0-based index of the slide to move.' },
+      toIndex: {
+        type: 'number',
+        description: '0-based destination index the slide should occupy after the move.',
+      },
+    },
+    execute: async (context, args) => {
+      const { fromIndex, toIndex } = args as { fromIndex: number; toIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (fromIndex < 0 || fromIndex >= slideCount) {
+        throw new Error(
+          `Invalid fromIndex ${String(fromIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+      if (toIndex < 0 || toIndex >= slideCount) {
+        throw new Error(`Invalid toIndex ${String(toIndex)}. Must be 0-${String(slideCount - 1)}.`);
+      }
+      if (fromIndex === toIndex)
+        return `Slide ${String(fromIndex + 1)} is already at that position.`;
+
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+        (slides.items[fromIndex] as any).moveTo(toIndex);
+        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+        await context.sync();
+        return `Moved slide ${String(fromIndex + 1)} to position ${String(toIndex + 1)}.`;
+      } catch {
+        throw new Error(
+          'move_slide requires PowerPoint 16.0.14326+ (requirement set 1.8). Alternatively use delete_slide + add_slide_from_code to recreate the slide at the desired position.'
+        );
+      }
+    },
+  },
+
+  {
+    name: 'delete_shape',
+    description: 'Delete a specific shape from a slide by its index. Use get_slide_shapes first.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: { type: 'number', description: '0-based shape index (from get_slide_shapes).' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex } = args as { slideIndex: number; shapeIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      if (shapeIndex < 0 || shapeIndex >= shapeCount) {
+        throw new Error(
+          `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+        );
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      shape.load('name');
+      await context.sync();
+      const shapeName = shape.name;
+      shape.delete();
+      await context.sync();
+
+      return `Deleted shape [${String(shapeIndex)}] "${shapeName}" from slide ${String(slideIndex + 1)}.`;
+    },
+  },
+
+  {
+    name: 'set_shape_text',
+    description:
+      'Set the text content of a shape by name (preferred) or by index. Use get_slide_shapes first to identify names and indices.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      text: { type: 'string', description: 'New text content for the shape.' },
+      shapeName: {
+        type: 'string',
+        required: false,
+        description: 'Name of the shape to update (preferred over shapeIndex).',
+      },
+      shapeIndex: {
+        type: 'number',
+        required: false,
+        description: '0-based shape index. Used when shapeName is not provided.',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, text, shapeName, shapeIndex } = args as {
+        slideIndex: number;
+        text: string;
+        shapeName?: string;
+        shapeIndex?: number;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+      for (const s of slide.shapes.items) {
+        s.load('name');
+      }
+      await context.sync();
+
+      let targetIndex = -1;
+      if (shapeName) {
+        targetIndex = slide.shapes.items.findIndex(
+          s => s.name.toLowerCase() === shapeName.toLowerCase()
+        );
+        if (targetIndex === -1) {
+          const available = slide.shapes.items.map(s => `"${s.name}"`).join(', ');
+          throw new Error(
+            `Shape named "${shapeName}" not found on slide ${String(slideIndex + 1)}. Available: ${available}`
+          );
+        }
+      } else if (shapeIndex !== undefined) {
+        if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
+          throw new Error(
+            `Invalid shapeIndex ${String(shapeIndex)}. Slide has ${String(slide.shapes.items.length)} shape(s).`
+          );
+        }
+        targetIndex = shapeIndex;
+      } else {
+        throw new Error('Provide either shapeName or shapeIndex.');
+      }
+
+      const shape = slide.shapes.items[targetIndex];
+      shape.textFrame.textRange.text = text;
+      await context.sync();
+
+      return `Updated text of shape "${shape.name}" on slide ${String(slideIndex + 1)}.`;
+    },
+  },
+
+  {
+    name: 'move_resize_shape',
+    description:
+      'Move and/or resize a shape on a slide. All values are in inches (matching add_slide_from_code). Omit any property to leave it unchanged.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: { type: 'number', description: '0-based shape index (from get_slide_shapes).' },
+      left: {
+        type: 'number',
+        required: false,
+        description: 'New left position in inches from the left edge of the slide.',
+      },
+      top: {
+        type: 'number',
+        required: false,
+        description: 'New top position in inches from the top edge of the slide.',
+      },
+      width: { type: 'number', required: false, description: 'New width in inches.' },
+      height: { type: 'number', required: false, description: 'New height in inches.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex, left, top, width, height } = args as {
+        slideIndex: number;
+        shapeIndex: number;
+        left?: number;
+        top?: number;
+        width?: number;
+        height?: number;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      if (shapeIndex < 0 || shapeIndex >= shapeCount) {
+        throw new Error(
+          `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+        );
+      }
+
+      const PTS_PER_INCH = 72;
+      const shape = slide.shapes.items[shapeIndex];
+      if (left !== undefined) shape.left = left * PTS_PER_INCH;
+      if (top !== undefined) shape.top = top * PTS_PER_INCH;
+      if (width !== undefined) shape.width = width * PTS_PER_INCH;
+      if (height !== undefined) shape.height = height * PTS_PER_INCH;
+      await context.sync();
+
+      const changes: string[] = [];
+      if (left !== undefined) changes.push(`left:${String(left)}"`);
+      if (top !== undefined) changes.push(`top:${String(top)}"`);
+      if (width !== undefined) changes.push(`width:${String(width)}"`);
+      if (height !== undefined) changes.push(`height:${String(height)}"`);
+      return `Updated shape [${String(shapeIndex)}] on slide ${String(slideIndex + 1)}: ${changes.join(', ')}.`;
+    },
+  },
+
+  {
+    name: 'update_shape_style',
+    description:
+      'Update the visual style of a shape: fill color, font color, font size, bold. Use get_slide_shapes to get the shapeIndex first.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: { type: 'number', description: '0-based shape index (from get_slide_shapes).' },
+      fillColor: {
+        type: 'string',
+        required: false,
+        description: '6-digit hex fill color without # (e.g. "4472C4"). Use "none" to remove fill.',
+      },
+      fontColor: {
+        type: 'string',
+        required: false,
+        description: '6-digit hex font color without # (e.g. "FFFFFF").',
+      },
+      fontSize: { type: 'number', required: false, description: 'Font size in points.' },
+      bold: { type: 'boolean', required: false, description: 'Set text bold (true/false).' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex, fillColor, fontColor, fontSize, bold } = args as {
+        slideIndex: number;
+        shapeIndex: number;
+        fillColor?: string;
+        fontColor?: string;
+        fontSize?: number;
+        bold?: boolean;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      if (shapeIndex < 0 || shapeIndex >= shapeCount) {
+        throw new Error(
+          `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+        );
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      const applied: string[] = [];
+
+      if (fillColor !== undefined) {
+        const hex = fillColor.startsWith('#') ? fillColor.slice(1) : fillColor;
+        if (hex.toLowerCase() === 'none') {
+          shape.fill.clear();
+        } else {
+          shape.fill.setSolidColor(hex);
+        }
+        applied.push(`fill:${hex.toLowerCase() === 'none' ? 'none' : `#${hex}`}`);
+      }
+
+      if (fontColor !== undefined || fontSize !== undefined || bold !== undefined) {
+        const font = shape.textFrame.textRange.font;
+        if (fontColor !== undefined) {
+          const hex = fontColor.startsWith('#') ? fontColor.slice(1) : fontColor;
+          font.color = hex;
+          applied.push(`fontColor:#${hex}`);
+        }
+        if (fontSize !== undefined) {
+          font.size = fontSize;
+          applied.push(`fontSize:${String(fontSize)}pt`);
+        }
+        if (bold !== undefined) {
+          font.bold = bold;
+          applied.push(`bold:${String(bold)}`);
+        }
+      }
+
+      if (applied.length === 0) throw new Error('Provide at least one style property to update.');
+
+      await context.sync();
+      return `Updated style of shape [${String(shapeIndex)}] on slide ${String(slideIndex + 1)}: ${applied.join(', ')}.`;
+    },
+  },
+
+  {
+    name: 'set_slide_background',
+    description: 'Set the solid background color of a slide.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      color: {
+        type: 'string',
+        description:
+          '6-digit hex color without # (e.g. "1F2937" for dark charcoal). Use "none" to reset to theme default.',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, color } = args as { slideIndex: number; color: string };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      const hex = color.startsWith('#') ? color.slice(1) : color;
+      if (hex.toLowerCase() === 'none') {
+        slide.background.reset();
+      } else {
+        slide.background.fill.setSolidFill({ color: hex });
+      }
+      await context.sync();
+
+      return `Set background of slide ${String(slideIndex + 1)} to ${hex.toLowerCase() === 'none' ? 'theme default' : `#${hex}`}.`;
+    },
+  },
+
+  {
+    name: 'apply_slide_layout',
+    description:
+      'Apply a slide layout to a slide by name or index. Use get_slide_layouts to see available layouts first.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      layoutName: {
+        type: 'string',
+        required: false,
+        description: 'Name of the layout to apply (from get_slide_layouts). Preferred.',
+      },
+      layoutIndex: {
+        type: 'number',
+        required: false,
+        description: '0-based layout index. Used when layoutName is not provided.',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, layoutName, layoutIndex } = args as {
+        slideIndex: number;
+        layoutName?: string;
+        layoutIndex?: number;
+      };
+
+      if (layoutName === undefined && layoutIndex === undefined) {
+        throw new Error('Provide either layoutName or layoutIndex.');
+      }
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const masters = context.presentation.slideMasters;
+      masters.load('items');
+      await context.sync();
+      if (masters.items.length === 0) throw new Error('No slide masters found.');
+
+      const master = masters.items[0];
+      master.layouts.load('items');
+      await context.sync();
+      for (const l of master.layouts.items) {
+        l.load('name');
+      }
+      await context.sync();
+
+      let targetLayout: PowerPoint.SlideLayout | undefined;
+      if (layoutName) {
+        targetLayout = master.layouts.items.find(
+          l => l.name.toLowerCase() === layoutName.toLowerCase()
+        );
+      } else if (layoutIndex !== undefined) {
+        targetLayout = master.layouts.items[layoutIndex];
+      }
+
+      if (!targetLayout) {
+        const available = master.layouts.items.map((l, i) => `[${i}] ${l.name}`).join(', ');
+        throw new Error(`Layout not found. Available: ${available}`);
+      }
+
+      const layoutFoundName = targetLayout.name;
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+        (slides.items[slideIndex] as any).layout = targetLayout;
+        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+        await context.sync();
+        return `Applied layout "${layoutFoundName}" to slide ${String(slideIndex + 1)}.`;
+      } catch {
+        throw new Error(
+          `Failed to apply layout "${layoutFoundName}". This API may require a newer PowerPoint version.`
+        );
+      }
+    },
+  },
+
+  {
+    name: 'add_geometric_shape',
+    description:
+      'Add a geometric shape to a slide. Position and size are in inches, consistent with add_slide_from_code.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeType: {
+        type: 'string',
+        description:
+          'Shape type — e.g. "rectangle", "roundedRectangle", "ellipse", "triangle", "rightTriangle", "diamond", "pentagon", "hexagon", "star5", "heart", "cloud", "arrowRight", "arrowLeft". See PowerPoint.GeometricShapeType for full list.',
+      },
+      left: { type: 'number', description: 'Left position in inches.' },
+      top: { type: 'number', description: 'Top position in inches.' },
+      width: { type: 'number', description: 'Width in inches.' },
+      height: { type: 'number', description: 'Height in inches.' },
+      fillColor: {
+        type: 'string',
+        required: false,
+        description: '6-digit hex fill color without # (e.g. "4472C4"). Optional.',
+      },
+      name: { type: 'string', required: false, description: 'Optional name for the shape.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeType, left, top, width, height, fillColor, name } = args as {
+        slideIndex: number;
+        shapeType: string;
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+        fillColor?: string;
+        name?: string;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      const PTS_PER_INCH = 72;
+
+      const options: PowerPoint.ShapeAddOptions = {
+        left: left * PTS_PER_INCH,
+        top: top * PTS_PER_INCH,
+        width: width * PTS_PER_INCH,
+        height: height * PTS_PER_INCH,
+      };
+
+      const shape = slide.shapes.addGeometricShape(
+        shapeType as PowerPoint.GeometricShapeType,
+        options
+      );
+
+      if (name) shape.name = name;
+
+      if (fillColor) {
+        const hex = fillColor.startsWith('#') ? fillColor.slice(1) : fillColor;
+        shape.fill.setSolidColor(hex);
+      }
+
+      await context.sync();
+      return `Added ${shapeType} shape${name ? ` "${name}"` : ''} to slide ${String(slideIndex + 1)} at (${String(left)}", ${String(top)}") ${String(width)}"\u00d7${String(height)}".`;
+    },
+  },
+
+  {
+    name: 'add_line',
+    description:
+      'Add a straight line (connector) to a slide. Coordinates are in inches, consistent with add_slide_from_code.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      startX: { type: 'number', description: 'Start X position in inches.' },
+      startY: { type: 'number', description: 'Start Y position in inches.' },
+      endX: { type: 'number', description: 'End X position in inches.' },
+      endY: { type: 'number', description: 'End Y position in inches.' },
+      connectorType: {
+        type: 'string',
+        required: false,
+        description: 'Connector type: "straight" (default), "elbow", or "curve".',
+        enum: ['straight', 'elbow', 'curve'],
+        default: 'straight',
+      },
+      color: {
+        type: 'string',
+        required: false,
+        description: '6-digit hex line color without # (e.g. "363636"). Optional.',
+      },
+    },
+    execute: async (context, args) => {
+      const {
+        slideIndex,
+        startX,
+        startY,
+        endX,
+        endY,
+        connectorType = 'straight',
+        color,
+      } = args as {
+        slideIndex: number;
+        startX: number;
+        startY: number;
+        endX: number;
+        endY: number;
+        connectorType?: string;
+        color?: string;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      const PTS_PER_INCH = 72;
+
+      // Bounding box derived from start/end points
+      const options: PowerPoint.ShapeAddOptions = {
+        left: Math.min(startX, endX) * PTS_PER_INCH,
+        top: Math.min(startY, endY) * PTS_PER_INCH,
+        width: Math.abs(endX - startX) * PTS_PER_INCH,
+        height: Math.abs(endY - startY) * PTS_PER_INCH,
+      };
+
+      const shape = slide.shapes.addLine(connectorType as PowerPoint.ConnectorType, options);
+
+      if (color) {
+        try {
+          const hex = color.startsWith('#') ? color.slice(1) : color;
+          /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+          (shape as any).lineFormat.color = `#${hex}`;
+          /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access */
+        } catch {
+          // lineFormat not available in this environment — continue
+        }
+      }
+
+      await context.sync();
+      return `Added ${connectorType} line from (${String(startX)}", ${String(startY)}") to (${String(endX)}", ${String(endY)}") on slide ${String(slideIndex + 1)}.`;
     },
   },
 ];

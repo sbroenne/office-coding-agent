@@ -1,7 +1,37 @@
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const { app, Tray, Menu, shell, nativeImage } = require('electron');
+
+/**
+ * Find a real Node.js executable on PATH, skipping the Electron binary.
+ * Returns the found path, or null if not found.
+ */
+function findRealNode() {
+  // Already explicitly provided and valid
+  const configured = process.env.ORIGINAL_NODE_EXE;
+  if (configured && fs.existsSync(configured)) return configured;
+
+  try {
+    const cmd = process.platform === 'win32' ? 'where' : 'which';
+    const result = execFileSync(cmd, ['node'], { encoding: 'utf8', timeout: 3000 });
+    const candidates = result
+      .trim()
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    for (const candidate of candidates) {
+      // Skip Electron's bundled Node impersonation
+      if (!candidate.toLowerCase().includes('electron')) {
+        return candidate;
+      }
+    }
+  } catch {
+    // PATH search failed — fall through
+  }
+  return null;
+}
 
 let tray = null;
 let serverProcess = null;
@@ -149,6 +179,20 @@ function updateMenu() {
 }
 
 app.whenReady().then(() => {
+  // Ensure the Copilot SDK spawns the CLI with real Node, not Electron.
+  // The SDK uses process.execPath (= Electron exe in tray mode) to run the
+  // bundled CLI JS file, which causes Electron to inject extra argv entries
+  // that the CLI rejects as "too many arguments". Setting ORIGINAL_NODE_EXE
+  // causes startServer() to use real Node as the server runtime, making
+  // process.execPath correct for any child process the SDK spawns.
+  const realNode = findRealNode();
+  if (realNode) {
+    process.env.ORIGINAL_NODE_EXE = realNode;
+    console.log('[tray] Using real Node for server:', realNode);
+  } else {
+    console.warn('[tray] Could not find real Node on PATH; Copilot CLI may fail to start.');
+  }
+
   const icon = nativeImage.createFromPath(getIconPath());
   tray = new Tray(icon);
   startServer();

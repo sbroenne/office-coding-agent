@@ -34,6 +34,19 @@ const EXPECTED_TOOL_NAMES = [
   'update_slide_shape',
   'set_slide_notes',
   'duplicate_slide',
+  'get_selected_slides',
+  'get_slide_shapes',
+  'get_slide_layouts',
+  'delete_slide',
+  'move_slide',
+  'delete_shape',
+  'set_shape_text',
+  'move_resize_shape',
+  'update_shape_style',
+  'set_slide_background',
+  'apply_slide_layout',
+  'add_geometric_shape',
+  'add_line',
 ] as const;
 
 // ─── Structural ───────────────────────────────────────────────────────────────
