@@ -101,9 +101,11 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   // Stable refs for settings that should NOT trigger session re-init when they change.
   // initSession reads from these refs so the useCallback only re-creates when host
-  // or activeModel change — not on every skill/agent/MCP toggle mid-conversation.
-  // Without this, any store update (e.g. WorkIQ connecting) would tear down and
-  // restart the Copilot session, losing all conversation context.
+  // changes — not on every skill/agent/MCP/model toggle mid-conversation.
+  // Without this, any store update (e.g. WorkIQ connecting, switching model) would
+  // tear down and restart the Copilot session, losing all conversation context.
+  // Model changes take effect on the next new conversation (same as VS Code Copilot).
+  const activeModelRef = useRef(activeModel);
   const activeSkillNamesRef = useRef(activeSkillNames);
   const activeAgentIdRef = useRef(activeAgentId);
   const importedMcpServersRef = useRef(importedMcpServers);
@@ -111,6 +113,7 @@ export function useOfficeChat(host: OfficeHostApp) {
   const npmSkillPackagesRef = useRef(npmSkillPackages);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
+  activeModelRef.current = activeModel;
   activeSkillNamesRef.current = activeSkillNames;
   activeAgentIdRef.current = activeAgentId;
   importedMcpServersRef.current = importedMcpServers;
@@ -267,7 +270,7 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       const session = await withTimeout(
         client.createSession({
-          model: activeModel,
+          model: activeModelRef.current,
           systemMessage: { mode: 'replace', content: systemContent },
           tools: getToolsForHost(host),
           mcpServers,
@@ -320,10 +323,10 @@ export function useOfficeChat(host: OfficeHostApp) {
       }
     }
   }, [
-    // Only re-init the session when host or model change — these require a genuinely
-    // new connection. All other settings (skills, agents, MCP servers) are read via
-    // refs above so mid-conversation store updates never tear down an active session.
-    activeModel,
+    // Only re-init the session when host changes — that requires a genuinely new
+    // connection. All other settings (model, skills, agents, MCP servers) are read
+    // via refs above so mid-conversation store updates never tear down an active
+    // session. The new values take effect on the next fresh conversation.
     host,
   ]);
 
