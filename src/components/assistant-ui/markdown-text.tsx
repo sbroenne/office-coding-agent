@@ -7,7 +7,7 @@ import {
 import { useThreadRuntime } from '@assistant-ui/react';
 import remarkGfm from 'remark-gfm';
 import { type FC, memo, useState, useCallback } from 'react';
-import { CheckIcon, CopyIcon, SparklesIcon } from 'lucide-react';
+import { CheckIcon, CopyIcon } from 'lucide-react';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 import { cn } from '@/lib/utils';
 
@@ -84,8 +84,9 @@ function parseChoices(code: string): ChoiceItem[] | null {
 const ChoiceCards: FC<{ code: string }> = ({ code }) => {
   const threadRuntime = useThreadRuntime();
   const choices = parseChoices(code);
+  const [freeformText, setFreeformText] = useState('');
 
-  const handleClick = useCallback(
+  const handleChoice = useCallback(
     (label: string) => {
       threadRuntime.append({
         role: 'user',
@@ -95,25 +96,51 @@ const ChoiceCards: FC<{ code: string }> = ({ code }) => {
     [threadRuntime]
   );
 
+  const handleFreeform = useCallback(() => {
+    const trimmed = freeformText.trim();
+    if (!trimmed) return;
+    threadRuntime.append({
+      role: 'user',
+      content: [{ type: 'text', text: trimmed }],
+    });
+    setFreeformText('');
+  }, [threadRuntime, freeformText]);
+
   if (!choices || choices.length === 0) return null;
 
   return (
-    <div className="aui-choices-wrapper my-2 flex flex-col gap-1.5">
-      {choices.map(choice => (
+    <div className="aui-choices-wrapper mt-2 flex flex-col">
+      {choices.map((choice, i) => (
         <button
           key={choice.label}
-          onClick={() => handleClick(choice.label)}
-          className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-left text-sm text-foreground shadow-sm transition-all hover:bg-accent hover:shadow-md active:scale-[0.98]"
+          onClick={() => handleChoice(choice.label)}
+          title={choice.description}
+          className="flex items-baseline gap-3 rounded px-2 py-1 text-left text-sm transition-colors hover:bg-accent"
         >
-          <SparklesIcon className="size-3.5 shrink-0 text-primary" />
-          <div className="min-w-0">
-            <div className="font-medium">{choice.label}</div>
-            {choice.description && (
-              <div className="text-xs text-muted-foreground">{choice.description}</div>
-            )}
-          </div>
+          <span className="w-4 shrink-0 text-right text-xs text-muted-foreground select-none">
+            {i + 1}
+          </span>
+          <span className="text-foreground">{choice.label}</span>
         </button>
       ))}
+      <div className="flex items-baseline gap-3 px-2 py-1">
+        <span className="w-4 shrink-0 text-right text-xs text-muted-foreground select-none">
+          {choices.length + 1}
+        </span>
+        <textarea
+          className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-b border-border focus:border-foreground transition-colors"
+          placeholder="Enter custom answer"
+          rows={1}
+          value={freeformText}
+          onChange={e => setFreeformText(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleFreeform();
+            }
+          }}
+        />
+      </div>
     </div>
   );
 };
