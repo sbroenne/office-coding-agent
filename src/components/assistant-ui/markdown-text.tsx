@@ -6,7 +6,7 @@ import {
 } from '@assistant-ui/react-markdown';
 import { useThreadRuntime } from '@assistant-ui/react';
 import remarkGfm from 'remark-gfm';
-import { type FC, memo, useState, useCallback } from 'react';
+import { type FC, Children, isValidElement, memo, useState, useCallback } from 'react';
 import { CheckIcon, CopyIcon, SparklesIcon } from 'lucide-react';
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button';
 import { cn } from '@/lib/utils';
@@ -322,15 +322,27 @@ const defaultComponents = memoizeMarkdownComponents({
   sup: ({ className, ...props }) => (
     <sup className={cn('aui-md-sup [&>a]:text-xs [&>a]:no-underline', className)} {...props} />
   ),
-  pre: ({ className, ...props }) => (
-    <pre
-      className={cn(
-        'aui-md-pre overflow-x-auto rounded-t-none rounded-b-lg border border-border/50 border-t-0 bg-muted/30 p-3 text-xs leading-relaxed',
-        className
-      )}
-      {...props}
-    />
-  ),
+  pre: ({ className, children, ...props }) => {
+    // Hide the raw pre/code wrapper for custom-rendered blocks (choices, suggestions)
+    const isCustomBlock = Children.toArray(children).some(
+      kid =>
+        isValidElement<{ className?: string }>(kid) &&
+        (kid.props.className?.includes('language-choices') === true ||
+          kid.props.className?.includes('language-suggestions') === true)
+    );
+    if (isCustomBlock) return null;
+    return (
+      <pre
+        className={cn(
+          'aui-md-pre overflow-x-auto rounded-t-none rounded-b-lg border border-border/50 border-t-0 bg-muted/30 p-3 text-xs leading-relaxed',
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </pre>
+    );
+  },
   code: function Code({ className, ...props }) {
     const isCodeBlock = useIsMarkdownCodeBlock();
     return (
