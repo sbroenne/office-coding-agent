@@ -95,7 +95,11 @@
 }
 
 /* ── VS Code Focus Ring ── */
-:focus-visible {
+/* Applied selectively — components with their own focus styles
+   (buttons, inputs, composer) use Tailwind focus-visible utilities instead. */
+a:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible:not([data-slot]) {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
 }
