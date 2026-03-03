@@ -99,6 +99,25 @@ export function useOfficeChat(host: OfficeHostApp) {
   const initCounterRef = useRef(0);
   const restoredInitialSessionRef = useRef(false);
 
+  // Stable refs for settings that should NOT trigger session re-init when they change.
+  // initSession reads from these refs so the useCallback only re-creates when host
+  // or activeModel change — not on every skill/agent/MCP toggle mid-conversation.
+  // Without this, any store update (e.g. WorkIQ connecting) would tear down and
+  // restart the Copilot session, losing all conversation context.
+  const activeSkillNamesRef = useRef(activeSkillNames);
+  const activeAgentIdRef = useRef(activeAgentId);
+  const importedMcpServersRef = useRef(importedMcpServers);
+  const activeMcpServerNamesRef = useRef(activeMcpServerNames);
+  const npmSkillPackagesRef = useRef(npmSkillPackages);
+  const evaluatePermissionRef = useRef(evaluatePermission);
+  // Keep refs in sync on every render (runs synchronously, before any effects)
+  activeSkillNamesRef.current = activeSkillNames;
+  activeAgentIdRef.current = activeAgentId;
+  importedMcpServersRef.current = importedMcpServers;
+  activeMcpServerNamesRef.current = activeMcpServerNames;
+  npmSkillPackagesRef.current = npmSkillPackages;
+  evaluatePermissionRef.current = evaluatePermission;
+
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
@@ -192,7 +211,7 @@ export function useOfficeChat(host: OfficeHostApp) {
         useMcpStatusStore.getState().setTools(payload.server, payload.tools);
       });
 
-      const resolvedAgent = resolveActiveAgent(activeAgentId, host);
+      const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
 
       // System prompt: only base + app prompt (no agent/skill concatenation)
       const systemContent = buildSystemPrompt(host);
@@ -211,8 +230,8 @@ export function useOfficeChat(host: OfficeHostApp) {
         .filter(s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost))
         .map(s => s.metadata.name);
       const disabledSkills =
-        activeSkillNames !== null
-          ? allHostSkillNames.filter(name => !activeSkillNames.includes(name))
+        activeSkillNamesRef.current !== null
+          ? allHostSkillNames.filter(name => !activeSkillNamesRef.current!.includes(name))
           : [];
 
       // Build custom agent config for the SDK
@@ -229,13 +248,13 @@ export function useOfficeChat(host: OfficeHostApp) {
       // Resolve active MCP servers (bundled + imported), intersect with agent allowlist if specified
       // Bundled servers require explicit opt-in (name must be in activeMcpServerNames).
       // When activeMcpServerNames is null (all active), only imported servers are included.
-      const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServers);
+      const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServersRef.current);
       let activeServers: typeof allServers;
-      if (activeMcpServerNames === null) {
+      if (activeMcpServerNamesRef.current === null) {
         // null = all imported active, bundled NOT active (require explicit opt-in)
         activeServers = allServers.filter(s => !BUNDLED_MCP_SERVERS.some(b => b.name === s.name));
       } else {
-        activeServers = allServers.filter(s => activeMcpServerNames.includes(s.name));
+        activeServers = allServers.filter(s => activeMcpServerNamesRef.current!.includes(s.name));
       }
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
@@ -257,7 +276,8 @@ export function useOfficeChat(host: OfficeHostApp) {
           skills,
           disabledSkills,
           customAgents,
-          npmSkillPackages: npmSkillPackages.length > 0 ? npmSkillPackages : undefined,
+          npmSkillPackages:
+            npmSkillPackagesRef.current.length > 0 ? npmSkillPackagesRef.current : undefined,
         }),
         60_000,
         'session.create'
@@ -278,7 +298,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       console.log('[chat] Session created:', session.sessionId);
 
       session.onPermissionRequest(payload => {
-        const autoDecision = evaluatePermission(payload.request);
+        const autoDecision = evaluatePermissionRef.current(payload.request);
         if (autoDecision === 'approved') {
           void session.respondPermission(payload.requestId, 'approved');
           return;
@@ -300,14 +320,11 @@ export function useOfficeChat(host: OfficeHostApp) {
       }
     }
   }, [
+    // Only re-init the session when host or model change — these require a genuinely
+    // new connection. All other settings (skills, agents, MCP servers) are read via
+    // refs above so mid-conversation store updates never tear down an active session.
     activeModel,
     host,
-    activeSkillNames,
-    activeAgentId,
-    importedMcpServers,
-    activeMcpServerNames,
-    evaluatePermission,
-    npmSkillPackages,
   ]);
 
   useEffect(() => {
