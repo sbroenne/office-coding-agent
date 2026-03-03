@@ -153,7 +153,7 @@ test.describe('Action bar (live Copilot)', () => {
       await assistantMsg.hover();
       // Action bar should NOT be visible during streaming (hideWhenRunning)
       const actionBar = assistantMsg.locator('.aui-assistant-action-bar');
-      if (await actionBar.isAttached()) {
+      if ((await actionBar.count()) > 0) {
         // If attached, it must be hidden (data-state or display), not visible buttons
         await expect(page.getByRole('button', { name: 'Copy' })).not.toBeVisible();
       }
