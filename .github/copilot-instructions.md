@@ -27,7 +27,7 @@ Branch protection is enforced on GitHub (ruleset ID `13260767`). Any attempt to 
 
 ## Key Technologies
 
-- **React 18** + **assistant-ui** + **Radix UI** + **Tailwind CSS v4** — task pane UI (Thread, ToolFallback, Popovers)
+- **React 18** + **assistant-ui** + **Radix UI** + **Tailwind CSS v4** — task pane UI (Thread, ToolFallback, Popovers); **VS Code design system** via `vscode-theme.css` (`--vscode-*` CSS custom properties) and **codicons** (`@vscode/codicons`) for all icons
 - **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
 - **WebSocket + JSON-RPC** — browser-to-proxy transport (`src/lib/websocket-client.ts`, `src/lib/websocket-transport.ts`)
 - **Express + HTTPS** — local proxy server (`src/server.mjs`) that bridges WebSocket to the Copilot CLI
@@ -276,10 +276,17 @@ The task pane is split into three areas:
 ### UX Patterns
 
 - **Dynamic thinking indicator** — `ThinkingIndicator` in `thread.tsx` displays dynamic text during tool execution. Text sources: (1) `report_intent` SDK events set the raw intent string (e.g. "Reading the spreadsheet"); (2) every `tool.execution_start` sets the humanized tool name via `humanizeToolName()` (e.g. "Get range values…"). When no text is set, falls back to "Thinking…". Text is provided via `ThinkingContext` (`src/contexts/ThinkingContext.ts`), populated by `useOfficeChat`, and cleared on stream completion.
-- **Copilot-style progress indicators** — cycling dot animation + phase labels (auto-derived via `humanizeToolName()`)
+- **Copilot-style progress indicators** — VS Code shimmer effect (`chat-thinking-shimmer` CSS animation using `background-clip: text` gradient animation matching VS Code Copilot Chat) + phase labels (auto-derived via `humanizeToolName()`)
 - **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners
 - **Input toolbar** — AgentPicker + ModelPicker below Composer (GitHub Copilot-style)
+
+### Styling
+
+- Colors use VS Code design tokens via `--vscode-*` CSS custom properties defined in `vscode-theme.css`
+- Layout uses Tailwind utility classes; colors reference VS Code tokens
+- Focus styles: 1px outline with `--vscode-focusBorder`, no box-shadow rings
+- Font: VS Code font stack (Segoe UI, system fonts), 13px base size
 
 ### OfficeRuntime in Tests
 
@@ -333,6 +340,7 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
 - `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
+- `src/styles/vscode-theme.css` — VS Code design tokens (`--vscode-*` CSS custom properties for dark/light themes)
 - `taskpane.html` — Vite HTML entry point (root level, references `src/taskpane/index.tsx`)
 - `vitest.config.ts` — unit test config (jsdom, `@/` alias, setup file, globals)
 - `vitest.config.ts` — unified vitest config with two named projects: `unit` (30s) and `integration` (60s, live Copilot tests)

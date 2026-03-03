@@ -141,7 +141,8 @@ summary:focus-visible,
   height: 0;
 }
 
-/* Hide the raw code block that follows rendered choice cards */
-.aui-choices-wrapper + .aui-md-pre {
+/* Hide the raw code block that follows rendered choice/suggestion cards */
+.aui-choices-wrapper + .aui-md-pre,
+.aui-suggestions-wrapper + .aui-md-pre {
   display: none;
 }
