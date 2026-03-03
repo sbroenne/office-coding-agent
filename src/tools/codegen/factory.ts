@@ -11,6 +11,14 @@
 
 import type { Tool, ToolInvocation, ToolResultObject } from '@github/copilot-sdk';
 import type { ToolConfig, ParamType } from './types';
+
+/** Mirror of ToolBinaryResult from @github/copilot-sdk (not re-exported from the package index). */
+interface ToolBinaryResult {
+  data: string;
+  mimeType: string;
+  type: string;
+  description?: string;
+}
 import { getSheet } from '@/services/excel/helpers';
 
 // Re-export getSheet so Excel configs can use it without extra imports
@@ -60,6 +68,76 @@ function buildJsonSchema(params: ToolConfig['params']): Record<string, unknown> 
 }
 
 /**
+ * Extracts image data from a tool's execute() result so it can be forwarded
+ * as vision content via binaryResultsForLlm instead of as raw base64 text.
+ *
+ * Handles two cases from PPT tools:
+ *   1. A bare data-URL string  (get_slide_image)
+ *   2. An object with a slides array containing per-slide images  (get_presentation_overview)
+ */
+function extractImages(data: unknown): {
+  textContent: string;
+  binaryResults: ToolBinaryResult[];
+} {
+  // Case 1: bare data-URL string (e.g. "data:image/png;base64,...")
+  if (typeof data === 'string' && data.startsWith('data:image/')) {
+    const match = /^data:(image\/[a-z+]+);base64,(.+)$/s.exec(data);
+    if (match) {
+      return {
+        textContent: JSON.stringify({
+          success: true,
+          data: '[image captured and provided as vision content]',
+        }),
+        binaryResults: [{ type: 'image', mimeType: match[1], data: match[2] }],
+      };
+    }
+  }
+
+  // Case 2: get_presentation_overview result { text: string, slides: [{ slideNumber, image }] }
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'slides' in data &&
+    Array.isArray((data as Record<string, unknown>).slides)
+  ) {
+    const obj = data as { text?: string; slides: { slideNumber?: number; image?: string }[] };
+    const binaryResults: ToolBinaryResult[] = [];
+
+    for (const slide of obj.slides) {
+      if (typeof slide.image === 'string' && slide.image.startsWith('data:image/')) {
+        const match = /^data:(image\/[a-z+]+);base64,(.+)$/s.exec(slide.image);
+        if (match) {
+          binaryResults.push({
+            type: 'image',
+            mimeType: match[1],
+            data: match[2],
+            description: slide.slideNumber != null ? `Slide ${slide.slideNumber}` : undefined,
+          });
+        }
+      }
+    }
+
+    if (binaryResults.length > 0) {
+      // Keep the text summary, strip out the embedded image data
+      const stripped = {
+        ...obj,
+        slides: obj.slides.map(s => ({ ...s, image: '[see vision content]' })),
+      };
+      return {
+        textContent: JSON.stringify({ success: true, data: stripped }),
+        binaryResults,
+      };
+    }
+  }
+
+  // Default: no images — fall through to normal JSON encoding
+  return {
+    textContent: JSON.stringify({ success: true, data }),
+    binaryResults: [],
+  };
+}
+
+/**
  * Internal generic factory. Creates Tool[] from configs, wrapping each execute()
  * inside runFn (the host-specific Office.run equivalent).
  */
@@ -75,9 +153,10 @@ function createToolsFor<TContext>(
       const args = invocation.arguments as Record<string, unknown>;
       try {
         const data = await runFn(context => config.execute(context, args));
-        const result = { success: true, data };
+        const { textContent, binaryResults } = extractImages(data);
         return {
-          textResultForLlm: JSON.stringify(result),
+          textResultForLlm: textContent,
+          ...(binaryResults.length > 0 ? { binaryResultsForLlm: binaryResults } : {}),
           resultType: 'success',
           toolTelemetry: {},
         };
