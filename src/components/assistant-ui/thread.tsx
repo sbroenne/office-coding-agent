@@ -22,7 +22,7 @@ export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> =
     <ThreadPrimitive.Root className="aui-root aui-thread-root flex flex-1 min-h-0 flex-col bg-background">
       <ThreadPrimitive.Viewport
         turnAnchor="bottom"
-        className="aui-thread-viewport relative flex flex-1 min-h-0 flex-col overflow-x-hidden overflow-y-auto scroll-smooth px-3 pt-3"
+        className="aui-thread-viewport relative flex flex-1 min-h-0 flex-col overflow-x-hidden overflow-y-auto scroll-smooth pt-2"
       >
         <AuiIf condition={s => s.thread.isEmpty}>
           <ThreadWelcome />
@@ -38,7 +38,7 @@ export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> =
 
         <ThreadLevelThinkingIndicator />
 
-        <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-3 overflow-visible bg-background pb-3">
+        <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-2 overflow-visible bg-background px-3 pb-3">
           <ThreadScrollToBottom />
           <Composer leftToolbar={leftToolbar} rightToolbar={rightToolbar} />
         </ThreadPrimitive.ViewportFooter>
@@ -77,34 +77,37 @@ const SUGGESTIONS: SuggestionItem[] = [
 
 const ThreadWelcome: FC = () => {
   return (
-    <div className="aui-thread-welcome-root my-auto flex w-full grow flex-col">
+    <div className="aui-thread-welcome-root my-auto flex w-full grow flex-col px-4">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
-        <div className="aui-thread-welcome-message flex w-full flex-col items-center justify-center px-2">
+        <div className="aui-thread-welcome-message flex w-full flex-col items-center justify-center">
           <div
-            className="mb-3 flex items-center justify-center rounded-full"
+            className="mb-2 flex items-center justify-center rounded-full"
             style={{
-              width: 32,
-              height: 32,
+              width: 28,
+              height: 28,
               background: 'var(--vscode-chat-avatarBackground)',
               color: 'var(--vscode-chat-avatarForeground)',
             }}
           >
-            <Codicon name="copilot" className="text-base" />
+            <Codicon name="copilot" className="text-sm" />
           </div>
-          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-xl duration-200">
+          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-base duration-200">
             How can I help?
           </h1>
         </div>
 
-        <div className="mt-6 flex w-full flex-col gap-1 px-2">
+        <div className="mt-4 flex w-full flex-col">
           {SUGGESTIONS.map((suggestion, idx) => (
             <ThreadPrimitive.Suggestion
               key={suggestion.prompt}
               {...suggestion}
-              className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-center gap-2 rounded-[var(--vscode-cornerRadius-medium)] px-3 py-2 text-left text-sm text-foreground transition-colors duration-150 hover:bg-[var(--vscode-list-hoverBackground)]"
-              style={{ animationDelay: `${100 + idx * 50}ms` }}
+              className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-center gap-2 rounded-[var(--vscode-cornerRadius-medium)] px-2 py-1.5 text-left text-[12px] transition-colors duration-150 hover:bg-[var(--vscode-list-hoverBackground)]"
+              style={{
+                animationDelay: `${100 + idx * 50}ms`,
+                color: 'var(--vscode-textLink-foreground)',
+              }}
             >
-              <Codicon name="sparkle" className="shrink-0 text-xs text-muted-foreground" />
+              <Codicon name="sparkle" className="shrink-0 text-[11px]" />
               {suggestion.prompt}
             </ThreadPrimitive.Suggestion>
           ))}
@@ -119,17 +122,17 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
   rightToolbar,
 }) => {
   return (
-    <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col rounded-[var(--vscode-cornerRadius-large)] border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1 pt-2 outline-none transition-colors has-[textarea:focus-visible]:border-[var(--vscode-focusBorder)]">
+    <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col rounded-[var(--vscode-cornerRadius-large)] border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] overflow-hidden outline-none transition-colors has-[textarea:focus-visible]:border-[var(--vscode-focusBorder)]">
       <ComposerPrimitive.Input
         placeholder="Send a message..."
-        className="aui-composer-input max-h-32 min-h-10 w-full resize-none bg-transparent px-3 pt-1 pb-2 text-sm outline-none placeholder:text-[var(--vscode-input-placeholderForeground)] focus-visible:outline-none focus-visible:ring-0"
+        className="aui-composer-input max-h-32 min-h-[34px] w-full resize-none bg-transparent px-3 py-2 text-[13px] outline-none placeholder:text-[var(--vscode-input-placeholderForeground)] focus-visible:outline-none focus-visible:ring-0"
         rows={1}
         autoFocus
         aria-label="Message input"
       />
-      <div className="aui-composer-action mx-1 mb-1.5 flex items-center justify-between border-t border-border/40 pt-1">
-        <div className="flex items-center gap-0.5 pl-1">{leftToolbar}</div>
-        <div className="flex items-center gap-0.5 pr-0.5">
+      <div className="aui-composer-action flex items-center justify-between px-1.5 pb-1">
+        <div className="flex items-center gap-0.5">{leftToolbar}</div>
+        <div className="flex items-center gap-0.5">
           {rightToolbar}
           <AuiIf condition={s => !s.thread.isRunning}>
             <ComposerPrimitive.Send asChild>
@@ -179,7 +182,10 @@ const ThreadLevelThinkingIndicator: FC = () => {
   if (thinkingText === null) return null;
   return (
     <div className="aui-assistant-message-root" data-role="assistant">
-      <div className="aui-assistant-thinking-indicator fade-in animate-in duration-150 mt-1 flex items-center gap-2 px-4 py-2 text-sm">
+      <div
+        className="aui-assistant-thinking-indicator fade-in animate-in duration-150 flex items-center gap-2 px-4 py-1.5"
+        style={{ fontSize: 13 }}
+      >
         <span className="chat-thinking-shimmer-text">{thinkingText}</span>
       </div>
     </div>
@@ -261,25 +267,27 @@ const AssistantActionBar: FC = () => {
 const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-3 duration-150"
+      className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-2 duration-150"
       data-role="assistant"
     >
       {/* Copilot avatar header */}
-      <div className="mb-2 flex items-center gap-2 px-1">
+      <div className="mb-1.5 flex items-center gap-2 px-4">
         <div
           className="flex items-center justify-center rounded-full"
           style={{
-            width: 24,
-            height: 24,
+            width: 22,
+            height: 22,
             background: 'var(--vscode-chat-avatarBackground)',
             color: 'var(--vscode-chat-avatarForeground)',
           }}
         >
-          <Codicon name="copilot" className="text-xs" />
+          <Codicon name="copilot" className="text-[12px]" />
         </div>
-        <span className="text-xs font-semibold text-foreground">Copilot</span>
+        <span style={{ fontSize: 13, fontWeight: 600 }} className="text-foreground">
+          Copilot
+        </span>
       </div>
-      <div className="aui-assistant-message-content wrap-break-word px-4 py-3 text-foreground text-sm leading-relaxed">
+      <div className="aui-assistant-message-content wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
@@ -345,10 +353,10 @@ const UserEditComposer: FC = () => {
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-user-message-root fade-in slide-in-from-bottom-1 group/message relative flex w-full animate-in py-3 duration-150"
+      className="aui-user-message-root fade-in slide-in-from-bottom-1 group/message relative flex w-full animate-in px-4 py-2 duration-150"
       data-role="user"
     >
-      <div className="aui-user-message-content wrap-break-word w-full rounded-[var(--vscode-cornerRadius-medium)] border border-[var(--vscode-chat-requestBorder)] bg-[var(--vscode-chat-requestBubbleBackground)] px-4 py-3 text-foreground text-sm">
+      <div className="aui-user-message-content wrap-break-word w-full text-foreground text-[13px] leading-[1.5em]">
         <MessagePrimitive.Content />
       </div>
       <UserActionBar />
