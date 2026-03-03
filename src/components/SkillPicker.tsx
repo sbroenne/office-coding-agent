@@ -70,7 +70,7 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Agent skills"
             title="Agent skills"
           >
@@ -85,7 +85,7 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
 
         <Popover.Portal>
           <Popover.Content
-            className="z-50 w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+            className="z-50 w-64 max-h-80 overflow-y-auto rounded-[var(--vscode-cornerRadius-medium)] border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
             sideOffset={4}
             align="start"
           >

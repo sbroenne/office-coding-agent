@@ -42,7 +42,7 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Session history"
             title="Session history"
           >
@@ -53,7 +53,7 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
 
         <Popover.Portal>
           <Popover.Content
-            className="z-50 w-72 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md outline-none"
+            className="z-50 w-72 max-h-80 overflow-y-auto rounded-[var(--vscode-cornerRadius-medium)] border border-border bg-popover p-1 shadow-md outline-none"
             sideOffset={4}
             align="start"
           >

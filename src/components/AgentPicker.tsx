@@ -72,7 +72,7 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Select agent"
             title={`Agent: ${displayName}`}
           >
@@ -82,7 +82,7 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
 
         <Popover.Portal>
           <Popover.Content
-            className="z-50 w-56 rounded-lg border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+            className="z-50 w-56 rounded-[var(--vscode-cornerRadius-medium)] border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
             sideOffset={4}
             align="start"
           >

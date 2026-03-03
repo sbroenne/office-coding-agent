@@ -25,7 +25,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onOpenPanel,
 }) => {
   return (
-    <div className="flex items-center justify-between border-b border-border bg-background px-3 py-1.5">
+    <div className="flex h-[35px] items-center justify-between border-b border-border bg-background px-3">
       <div className="flex items-center gap-2 min-w-0">
         <SessionHistoryPicker
           sessions={sessions}
@@ -40,7 +40,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         <SkillPicker onOpenPanel={onOpenPanel} />
         <button
           onClick={() => onOpenPanel?.('permissions')}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           aria-label="Permissions"
           title="Permissions"
         >
@@ -48,7 +48,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </button>
         <button
           onClick={onClearMessages}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           aria-label="New conversation"
           title="New conversation"
         >

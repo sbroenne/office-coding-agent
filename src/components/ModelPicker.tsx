@@ -34,7 +34,7 @@ export const ModelPicker: React.FC = () => {
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-2 pr-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          className="inline-flex items-center gap-1.5 rounded-[var(--vscode-cornerRadius-medium)] border border-border/60 py-0.5 pl-2 pr-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           aria-label="Select model"
           title="Select model"
         >
@@ -45,7 +45,7 @@ export const ModelPicker: React.FC = () => {
 
       <Popover.Portal>
         <Popover.Content
-          className="z-50 w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+          className="z-50 w-64 max-h-80 overflow-y-auto rounded-[var(--vscode-cornerRadius-medium)] border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
           sideOffset={4}
           align="start"
         >

@@ -105,10 +105,10 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
       onKeyDown={handleFocusTrap}
     >
       {/* Panel header */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 shrink-0">
+      <div className="flex h-[35px] items-center gap-2 border-b border-border px-3 shrink-0">
         <button
           onClick={onClose}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           aria-label="Back"
           title="Back"
         >
