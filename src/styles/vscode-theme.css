@@ -1,0 +1,153 @@
+/*---------------------------------------------------------------------------------------------
+ *  VS Code Design Tokens for Office Coding Agent
+ *  
+ *  Defines --vscode-* CSS custom properties for dark and light themes,
+ *  sourced from VS Code's Default Dark Modern / Default Light Modern.
+ *  Since this runs in an Office add-in webview (not a VS Code extension),
+ *  we must define these ourselves.
+ *---------------------------------------------------------------------------------------------*/
+
+:root {
+  /* ── Editor ── */
+  --vscode-editor-background: #ffffff;
+  --vscode-editor-foreground: #3b3b3b;
+  --vscode-sideBar-background: #f8f8f8;
+
+  /* ── Input ── */
+  --vscode-input-background: #ffffff;
+  --vscode-input-foreground: #3b3b3b;
+  --vscode-input-border: #cecece;
+  --vscode-input-placeholderForeground: #767676;
+  --vscode-focusBorder: #0078d4;
+
+  /* ── Buttons ── */
+  --vscode-button-background: #0078d4;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-hoverBackground: #026ec1;
+  --vscode-button-secondaryBackground: #e5e5e5;
+  --vscode-button-secondaryForeground: #3b3b3b;
+  --vscode-button-secondaryHoverBackground: #cccccc;
+
+  /* ── Text & links ── */
+  --vscode-descriptionForeground: #717171;
+  --vscode-errorForeground: #e51400;
+  --vscode-textLink-foreground: #006ab1;
+  --vscode-textLink-activeForeground: #006ab1;
+  --vscode-foreground: #3b3b3b;
+
+  /* ── Code / preformatted ── */
+  --vscode-textPreformat-foreground: #3b3b3b;
+  --vscode-textPreformat-background: #e4e6f1;
+  --vscode-textPreformat-border: #c8c8c8;
+
+  /* ── Widgets ── */
+  --vscode-widget-border: #d4d4d4;
+  --vscode-editorWidget-background: #f3f3f3;
+  --vscode-toolbar-hoverBackground: #e8e8e8;
+
+  /* ── List ── */
+  --vscode-list-hoverBackground: #e8e8e8;
+  --vscode-list-activeSelectionBackground: #0078d4;
+  --vscode-list-activeSelectionForeground: #ffffff;
+  --vscode-list-focusBackground: #d6ebff;
+
+  /* ── Chat-specific ── */
+  --vscode-chat-requestBorder: #e0e0e0;
+  --vscode-chat-requestBubbleBackground: #f4f4f480;
+  --vscode-interactive-session-foreground: #3b3b3b;
+  --vscode-chat-list-background: #ffffff;
+  --vscode-chat-avatarBackground: #e5e5e5;
+  --vscode-chat-avatarForeground: #3b3b3b;
+  --vscode-chat-thinkingShimmer: #0078d4;
+
+  /* ── Blockquote ── */
+  --vscode-textBlockQuote-background: #f2f2f2;
+  --vscode-textBlockQuote-border: #0078d4;
+
+  /* ── Scrollbar ── */
+  --vscode-scrollbarSlider-background: rgba(100, 100, 100, 0.4);
+  --vscode-scrollbarSlider-hoverBackground: rgba(100, 100, 100, 0.7);
+  --vscode-scrollbarSlider-activeBackground: rgba(0, 0, 0, 0.6);
+
+  /* ── Corner radius ── */
+  --vscode-cornerRadius-small: 2px;
+  --vscode-cornerRadius-medium: 4px;
+  --vscode-cornerRadius-large: 8px;
+
+  /* ── Chat typography (relative to 13px base) ── */
+  --vscode-chat-font-size-body-xs: 0.846em;
+  --vscode-chat-font-size-body-s: 0.923em;
+  --vscode-chat-font-size-body-m: 1em;
+  --vscode-chat-font-size-body-l: 1.077em;
+  --vscode-chat-font-size-body-xl: 1.231em;
+  --vscode-chat-font-size-body-xxl: 1.538em;
+
+  /* ── Font stack (VS Code) ── */
+  --vscode-font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, Ubuntu, 'Droid Sans',
+    sans-serif;
+  --vscode-monospace-font: 'Cascadia Code', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
+}
+
+.dark {
+  /* ── Editor ── */
+  --vscode-editor-background: #1f1f1f;
+  --vscode-editor-foreground: #cccccc;
+  --vscode-sideBar-background: #181818;
+
+  /* ── Input ── */
+  --vscode-input-background: #313131;
+  --vscode-input-foreground: #cccccc;
+  --vscode-input-border: #3c3c3c;
+  --vscode-input-placeholderForeground: #989898;
+  --vscode-focusBorder: #0078d4;
+
+  /* ── Buttons ── */
+  --vscode-button-background: #0078d4;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-hoverBackground: #026ec1;
+  --vscode-button-secondaryBackground: #313131;
+  --vscode-button-secondaryForeground: #cccccc;
+  --vscode-button-secondaryHoverBackground: #3c3c3c;
+
+  /* ── Text & links ── */
+  --vscode-descriptionForeground: #989898;
+  --vscode-errorForeground: #f14c4c;
+  --vscode-textLink-foreground: #4daafc;
+  --vscode-textLink-activeForeground: #4daafc;
+  --vscode-foreground: #cccccc;
+
+  /* ── Code / preformatted ── */
+  --vscode-textPreformat-foreground: #d4d4d4;
+  --vscode-textPreformat-background: #3c3c3c;
+  --vscode-textPreformat-border: #454545;
+
+  /* ── Widgets ── */
+  --vscode-widget-border: #454545;
+  --vscode-editorWidget-background: #252526;
+  --vscode-toolbar-hoverBackground: #2a2d2e;
+
+  /* ── List ── */
+  --vscode-list-hoverBackground: #2a2d2e;
+  --vscode-list-activeSelectionBackground: #04395e;
+  --vscode-list-activeSelectionForeground: #ffffff;
+  --vscode-list-focusBackground: #04395e;
+
+  /* ── Chat-specific ── */
+  --vscode-chat-requestBorder: #383838;
+  --vscode-chat-requestBubbleBackground: #2c2c2c80;
+  --vscode-interactive-session-foreground: #cccccc;
+  --vscode-chat-list-background: #1f1f1f;
+  --vscode-chat-avatarBackground: #313131;
+  --vscode-chat-avatarForeground: #cccccc;
+  --vscode-chat-thinkingShimmer: #4daafc;
+
+  /* ── Blockquote ── */
+  --vscode-textBlockQuote-background: #2b2b2b;
+  --vscode-textBlockQuote-border: #0078d4;
+
+  /* ── Scrollbar ── */
+  --vscode-scrollbarSlider-background: rgba(121, 121, 121, 0.4);
+  --vscode-scrollbarSlider-hoverBackground: rgba(100, 100, 100, 0.7);
+  --vscode-scrollbarSlider-activeBackground: rgba(191, 191, 191, 0.4);
+}
