@@ -7,7 +7,7 @@ import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { getSkills, getImportedSkills, skillToMarkdown } from '@/services/skills';
-import { resolveActiveAgent } from '@/services/agents';
+import { resolveActiveAgent, getAgents } from '@/services/agents';
 import { toSdkMcpServers, getAllMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
@@ -20,6 +20,7 @@ import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
 
 const MODEL_FETCH_TIMEOUT_MS = 10_000;
+const DEFAULT_THINKING_TEXT = 'Thinking…';
 
 /** Race a promise against a timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -246,19 +247,24 @@ export function useOfficeChat(host: OfficeHostApp) {
           ? allHostSkillNames.filter(name => !activeSkillNamesRef.current!.includes(name))
           : [];
 
-      // Build custom agent config for the SDK
-      const customAgents = resolvedAgent
-        ? [
-            {
-              name: resolvedAgent.metadata.name,
-              description: resolvedAgent.metadata.description,
-              prompt: resolvedAgent.instructions,
-            },
-          ]
-        : undefined;
+      // Build custom agent configs for ALL agents in this host — this enables sub-agent
+      // delegation where the active agent can invoke other agents as sub-agents.
+      // Each agent carries its own tool allowlist so per-agent restrictions are enforced
+      // by the SDK rather than at the session level.
+      const allHostAgents = getAgents(host);
+      const customAgents =
+        allHostAgents.length > 0
+          ? allHostAgents.map(agent => ({
+              name: agent.metadata.name,
+              description: agent.metadata.description,
+              prompt: agent.instructions,
+              // null = all tools; undefined means the same but we use null for explicitness
+              tools: agent.metadata.tools ?? null,
+            }))
+          : undefined;
 
-      // Resolve active MCP servers (bundled + imported), intersect with agent allowlist if specified
-      // Bundled servers require explicit opt-in (name must be in activeMcpServerNames).
+      // Resolve active MCP servers (bundled + imported), intersect with active agent allowlist
+      // if specified. Bundled servers require explicit opt-in (name must be in activeMcpServerNames).
       // When activeMcpServerNames is null (all active), only imported servers are included.
       const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServersRef.current);
       let activeServers: typeof allServers;
@@ -274,16 +280,12 @@ export function useOfficeChat(host: OfficeHostApp) {
       }
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
 
-      // Per-agent tool restriction (omit = all tools available)
-      const availableTools = resolvedAgent?.metadata.tools;
-
       const session = await withTimeout(
         client.createSession({
           model: activeModelRef.current,
           systemMessage: { mode: 'replace', content: systemContent },
           tools: getToolsForHost(host),
           mcpServers,
-          availableTools,
           host,
           skills,
           disabledSkills,
@@ -634,7 +636,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     // Set explicit default text so the standalone ThinkingIndicator renders
     // immediately via React context — no dependency on the runtime's deferred
     // useEffect adapter sync.
-    setThinkingText('Thinking…');
+    setThinkingText(DEFAULT_THINKING_TEXT);
 
     const toolParts = new Map<
       string,
@@ -740,6 +742,14 @@ export function useOfficeChat(host: OfficeHostApp) {
             status: { type: 'incomplete', reason: 'error', error: event.data.message },
           });
           break;
+        } else if (event.type === 'subagent.started') {
+          // A sub-agent has been invoked — show which agent is being asked
+          flushSync(() =>
+            setThinkingText(`Asking ${event.data.agentDisplayName || event.data.agentName}…`)
+          );
+        } else if (event.type === 'subagent.completed' || event.type === 'subagent.failed') {
+          // Sub-agent finished — return to generic thinking indicator
+          setThinkingText(DEFAULT_THINKING_TEXT);
         }
       }
     } catch (err) {
