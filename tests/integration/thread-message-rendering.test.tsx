@@ -580,6 +580,442 @@ describe('Thread – AssistantMessage rendering', () => {
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// Tool-call visual ordering & tearing prevention
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('tool cards are wrapped in a ToolGroup div with order: -1', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1]]' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Got it.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Got it.')).toBeInTheDocument();
+    });
+
+    // Tool card must be inside a .aui-tool-group wrapper
+    const toolGroup = document.querySelector('.aui-tool-group');
+    expect(toolGroup).toBeInTheDocument();
+    expect(toolGroup!.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+
+    // The ToolGroup wrapper must have order: -1 for CSS visual reordering
+    expect((toolGroup as HTMLElement).style.order).toBe('-1');
+  });
+
+  it('message content area uses flex column layout', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Hi' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-assistant-message-content')).toBeInTheDocument();
+    });
+
+    const content = document.querySelector('.aui-assistant-message-content');
+    expect(content!.classList.contains('flex')).toBe(true);
+    expect(content!.classList.contains('flex-col')).toBe(true);
+  });
+
+  it('ToolGroup has order:-1 so tools render visually above text', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'set_range_values',
+        arguments: { address: 'B1', values: [[99]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Updated B1.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Updated B1.')).toBeInTheDocument();
+    });
+
+    // Verify both text and ToolGroup exist inside message content
+    const content = document.querySelector('.aui-assistant-message-content');
+    const toolGroup = content!.querySelector('.aui-tool-group');
+    const toolCard = toolGroup!.querySelector('[data-slot="tool-fallback-root"]');
+    expect(toolGroup).toBeInTheDocument();
+    expect(toolCard).toBeInTheDocument();
+
+    // ToolGroup has order: -1 → visually above text (order: 0 default)
+    expect((toolGroup as HTMLElement).style.order).toBe('-1');
+  });
+
+  it('multiple tool cards are all inside the same ToolGroup wrapper', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1]]' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'set_range_values',
+        arguments: { address: 'B1', values: [[2]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Both done.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Both done.')).toBeInTheDocument();
+    });
+
+    const toolGroups = document.querySelectorAll('.aui-tool-group');
+    expect(toolGroups).toHaveLength(1);
+
+    const toolCards = toolGroups[0]!.querySelectorAll('[data-slot="tool-fallback-root"]');
+    expect(toolCards).toHaveLength(2);
+  });
+
+  it('no crash when tools arrive before text (tools-first event sequence)', async () => {
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'A1:C3' },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1,2,3]]' },
+        });
+        // ── PAUSE ── React renders: text part (empty) + tool card
+        await streamGate;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Here is A1:C3.' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    // Mid-stream: tool card visible, no crash
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Here is A1:C3.')).toBeInTheDocument();
+    });
+  });
+
+  it('no crash when text streams first then a tool call arrives (text-first tearing scenario)', async () => {
+    // THIS IS THE EXACT TEARING SCENARIO from #56:
+    // Text starts streaming at index 0, then a tool call arrives.
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('assistant.message_delta', {
+          deltaContent: 'Let me check ',
+        } as never);
+        // ── PAUSE ── React renders: text part at index 0 ("Let me check ")
+        await streamGate;
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'Sheet1!A1' },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[42]]' },
+        });
+        yield makeEvent('assistant.message_delta', {
+          deltaContent: 'your data.',
+        } as never);
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 150));
+    });
+
+    // Mid-stream: text is visible, no crash
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    // After completion: both text and tool card visible, no crash
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+  });
+
+  it('no crash with interleaved text → tool → text sequence', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message_delta', { deltaContent: 'Checking...' } as never),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[5]]' },
+      }),
+      makeEvent('assistant.message_delta', { deltaContent: ' Value is 5.' } as never),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    // No crash
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+
+    // Tool card visible
+    expect(document.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+  });
+
+  it('no crash with multiple tool calls and no text at all', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'manage_skills',
+        arguments: { action: 'list' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '["skill1"]' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'manage_agents',
+        arguments: { action: 'list' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: '["agent1"]' },
+      }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // No crash
+    expect(screen.queryByText(/MessagePartText can only/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+
+    // Both tool cards rendered
+    const toolCards = document.querySelectorAll('[data-slot="tool-fallback-root"]');
+    expect(toolCards.length).toBe(2);
+  });
+
+  it('after completion, tool cards remain visible inside ToolGroup above text', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1:A5' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1],[2],[3],[4],[5]]' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Here are rows 1-5.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Here are rows 1-5.')).toBeInTheDocument();
+    });
+
+    // Tool cards must still be visible after completion
+    const toolGroup = document.querySelector('.aui-tool-group');
+    expect(toolGroup).toBeInTheDocument();
+
+    const toolCard = toolGroup!.querySelector('[data-slot="tool-fallback-root"]');
+    expect(toolCard).toBeInTheDocument();
+
+    // The completed tool card should show the checkmark icon (not spinner)
+    const checkIcon = toolCard!.querySelector('.codicon-check');
+    expect(checkIcon).toBeInTheDocument();
+
+    // Thinking indicator must be gone
+    expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // ChoiceCards rendering & interaction
 // ────────────────────────────────────────────────────────────────────────────
 

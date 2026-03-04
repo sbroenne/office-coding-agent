@@ -142,8 +142,10 @@ summary:focus-visible,
 }
 
 /* ── VS Code Chain-of-Thought Timeline ── */
-/* The assistant message content area acts as the timeline container.
-   Tool cards and thinking indicators inside it get the vertical line. */
+/* The assistant message content area is a flex column so the ToolGroup
+   wrapper (order: -1) renders visually above the text part (order: 0),
+   matching VS Code Copilot Chat's layout: tools above → text below.
+   The DOM order stays text-first to prevent React 18 tearing. */
 .aui-assistant-message-content {
   position: relative;
 }
@@ -170,8 +172,8 @@ summary:focus-visible,
   background-color: var(--vscode-chat-requestBorder);
 }
 
-/* Single tool card: short line just beside the icon */
-[data-slot='tool-fallback-root']:only-of-type::before {
+/* Single tool card: hide vertical line (no chain to connect) */
+[data-slot='tool-fallback-root']:only-child::before {
   display: none;
 }
 
