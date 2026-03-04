@@ -651,14 +651,13 @@ export function useOfficeChat(host: OfficeHostApp) {
     let streamText = '';
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
-      // Text part MUST come before tool-call parts to prevent index-shift
-      // tearing: when text is streaming at index 0 and a tool-call arrives,
-      // prepending the tool-call would shift the text to index 1, causing
-      // React 18's useSyncExternalStore to see a tool-call where it expects
-      // text → "MessagePartText can only be used inside text or reasoning
-      // message parts." Keeping text at index 0 avoids the shift entirely.
+      // Text part is ALWAYS at index 0 — even when empty — to prevent
+      // React 18 useSyncExternalStore tearing. Without a stable text part,
+      // adding text later would prepend it, shifting tool-call indices and
+      // causing MarkdownText to read a tool-call part → crash. Tool cards
+      // appear visually above text via CSS order (ToolGroup has order: -1).
       const content: ThreadMessageLike['content'] = [
-        ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
+        { type: 'text' as const, text: streamText },
         ...Array.from(toolParts.values()),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));

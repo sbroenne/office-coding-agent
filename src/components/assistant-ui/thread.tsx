@@ -264,6 +264,20 @@ const AssistantActionBar: FC = () => {
   );
 };
 
+/**
+ * ToolGroup wrapper — rendered by assistant-ui around consecutive tool-call
+ * parts. Uses CSS `order: -1` so tool cards appear visually ABOVE the text
+ * response (matching VS Code Copilot Chat) while keeping text at DOM index 0
+ * to prevent React 18 useSyncExternalStore tearing.
+ */
+const ToolGroup: FC<{ startIndex: number; endIndex: number; children?: ReactNode }> = ({
+  children,
+}) => (
+  <div className="aui-tool-group" style={{ order: -1 }}>
+    {children}
+  </div>
+);
+
 const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root
@@ -287,10 +301,11 @@ const AssistantMessage: FC = () => {
           Copilot
         </span>
       </div>
-      <div className="aui-assistant-message-content wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
+      <div className="aui-assistant-message-content flex flex-col wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
+            ToolGroup,
             tools: { Fallback: ToolFallback },
             Empty: () => null,
           }}
