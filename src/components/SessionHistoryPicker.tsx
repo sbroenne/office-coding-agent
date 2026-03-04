@@ -42,12 +42,13 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="inline-flex items-center gap-1 rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 transition-colors hover:bg-accent"
+            style={{ height: 22, color: 'var(--vscode-icon-foreground)', fontSize: 12 }}
             aria-label="Session history"
             title="Session history"
           >
-            <Codicon name="history" className="text-base" />
-            <Codicon name="chevron-down" className="text-xs opacity-60" />
+            <Codicon name="history" className="text-[14px]" />
+            <Codicon name="chevron-down" className="text-[10px] opacity-60" />
           </button>
         </Popover.Trigger>
 

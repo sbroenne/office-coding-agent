@@ -34,12 +34,13 @@ export const ModelPicker: React.FC = () => {
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
-          className="inline-flex items-center gap-1.5 rounded-[var(--vscode-cornerRadius-medium)] border border-border/60 py-0.5 pl-2 pr-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          className="inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 text-[12px] transition-colors hover:bg-accent"
+          style={{ height: 22, color: 'var(--vscode-icon-foreground)' }}
           aria-label="Select model"
           title="Select model"
         >
           <span className="max-w-[110px] truncate">{displayLabel}</span>
-          <Codicon name="chevron-down" className="text-xs shrink-0 opacity-50" />
+          <Codicon name="chevron-down" className="text-[12px] shrink-0 opacity-60" />
         </button>
       </Popover.Trigger>
 

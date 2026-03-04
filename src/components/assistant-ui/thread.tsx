@@ -53,9 +53,10 @@ const ThreadScrollToBottom: FC = () => {
       <TooltipIconButton
         tooltip="Scroll to bottom"
         variant="ghost"
-        className="aui-thread-scroll-to-bottom absolute -top-10 z-10 self-center rounded-full bg-transparent p-3 disabled:invisible hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+        className="aui-thread-scroll-to-bottom absolute -top-8 z-10 self-center rounded-[var(--vscode-cornerRadius-small)] bg-[var(--vscode-editorWidget-background)] border border-border disabled:invisible"
+        style={{ width: 26, height: 26, color: 'var(--vscode-icon-foreground)' }}
       >
-        <Codicon name="chevron-down" className="text-base" />
+        <Codicon name="chevron-down" className="text-[14px]" />
       </TooltipIconButton>
     </ThreadPrimitive.ScrollToBottom>
   );
@@ -89,7 +90,7 @@ const ThreadWelcome: FC = () => {
               color: 'var(--vscode-chat-avatarForeground)',
             }}
           >
-            <Codicon name="copilot" className="text-sm" />
+            <Codicon name="copilot" className="text-[12px]" />
           </div>
           <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-base duration-200">
             How can I help?
@@ -130,18 +131,19 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
         autoFocus
         aria-label="Message input"
       />
-      <div className="aui-composer-action flex items-center justify-between px-1.5 pb-1">
-        <div className="flex items-center gap-0.5">{leftToolbar}</div>
-        <div className="flex items-center gap-0.5">
+      <div className="aui-composer-action flex items-center justify-between px-1 pb-1">
+        <div className="flex items-center gap-1">{leftToolbar}</div>
+        <div className="flex items-center gap-1">
           {rightToolbar}
           <AuiIf condition={s => !s.thread.isRunning}>
             <ComposerPrimitive.Send asChild>
               <TooltipIconButton
                 tooltip="Send"
                 variant="ghost"
-                className="aui-composer-send h-7 w-7 rounded-md transition-opacity"
+                className="aui-composer-send rounded-[var(--vscode-cornerRadius-small)] transition-opacity"
+                style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
               >
-                <Codicon name="send" className="text-base" />
+                <Codicon name="send" className="text-[14px]" />
               </TooltipIconButton>
             </ComposerPrimitive.Send>
           </AuiIf>
@@ -150,9 +152,10 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
               <TooltipIconButton
                 tooltip="Stop"
                 variant="ghost"
-                className="aui-composer-cancel h-7 w-7 rounded-md transition-opacity"
+                className="aui-composer-cancel rounded-[var(--vscode-cornerRadius-small)] transition-opacity"
+                style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
               >
-                <Codicon name="debug-stop" className="text-base" />
+                <Codicon name="debug-stop" className="text-[14px]" />
               </TooltipIconButton>
             </ComposerPrimitive.Cancel>
           </AuiIf>
@@ -203,36 +206,40 @@ const AssistantActionBar: FC = () => {
         <TooltipIconButton
           tooltip="Copy"
           variant="ghost"
-          className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+          className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+          style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
         >
-          <Codicon name="copy" className="text-sm" />
+          <Codicon name="copy" className="text-[12px]" />
         </TooltipIconButton>
       </ActionBarPrimitive.Copy>
       <ActionBarPrimitive.Reload asChild>
         <TooltipIconButton
           tooltip="Regenerate response"
           variant="ghost"
-          className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+          className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+          style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
         >
-          <Codicon name="refresh" className="text-sm" />
+          <Codicon name="refresh" className="text-[12px]" />
         </TooltipIconButton>
       </ActionBarPrimitive.Reload>
       <ActionBarPrimitive.FeedbackPositive asChild>
         <TooltipIconButton
           tooltip="Good response"
           variant="ghost"
-          className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+          className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+          style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
         >
-          <Codicon name="thumbsup" className="text-sm" />
+          <Codicon name="thumbsup" className="text-[12px]" />
         </TooltipIconButton>
       </ActionBarPrimitive.FeedbackPositive>
       <ActionBarPrimitive.FeedbackNegative asChild>
         <TooltipIconButton
           tooltip="Bad response"
           variant="ghost"
-          className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+          className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+          style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
         >
-          <Codicon name="thumbsdown" className="text-sm" />
+          <Codicon name="thumbsdown" className="text-[12px]" />
         </TooltipIconButton>
       </ActionBarPrimitive.FeedbackNegative>
       <BranchPickerPrimitive.Root hideWhenSingleBranch className="flex items-center gap-0.5">
@@ -240,9 +247,10 @@ const AssistantActionBar: FC = () => {
           <TooltipIconButton
             tooltip="Previous response"
             variant="ghost"
-            className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+            className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+            style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
           >
-            <Codicon name="chevron-left" className="text-sm" />
+            <Codicon name="chevron-left" className="text-[12px]" />
           </TooltipIconButton>
         </BranchPickerPrimitive.Previous>
         <span className="text-xs text-muted-foreground/60 tabular-nums">
@@ -254,9 +262,10 @@ const AssistantActionBar: FC = () => {
           <TooltipIconButton
             tooltip="Next response"
             variant="ghost"
-            className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+            className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+            style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
           >
-            <Codicon name="chevron-right" className="text-sm" />
+            <Codicon name="chevron-right" className="text-[12px]" />
           </TooltipIconButton>
         </BranchPickerPrimitive.Next>
       </BranchPickerPrimitive.Root>
@@ -314,9 +323,10 @@ const UserActionBar: FC = () => {
         <TooltipIconButton
           tooltip="Edit message"
           variant="ghost"
-          className="h-6 w-6 rounded text-muted-foreground/60 hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+          className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+          style={{ width: 20, height: 20, color: 'var(--vscode-icon-foreground)' }}
         >
-          <Codicon name="edit" className="text-sm" />
+          <Codicon name="edit" className="text-[12px]" />
         </TooltipIconButton>
       </ActionBarPrimitive.Edit>
     </ActionBarPrimitive.Root>

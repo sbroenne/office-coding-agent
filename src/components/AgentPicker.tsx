@@ -74,12 +74,13 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex h-7 items-center gap-1 rounded px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 transition-colors hover:bg-accent"
+            style={{ height: 22, color: 'var(--vscode-icon-foreground)', fontSize: 12 }}
             aria-label="Select agent"
             title={`Agent: ${displayName}`}
           >
-            <Codicon name="robot" className="text-base" />
-            <span className="text-xs">{displayName}</span>
+            <Codicon name="robot" className="text-[12px]" />
+            <span className="truncate max-w-[80px]">{displayName}</span>
           </button>
         </Popover.Trigger>
 

@@ -69,11 +69,12 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+            style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
             aria-label="Agent skills"
             title="Agent skills"
           >
-            <Codicon name="lightbulb-sparkle" className="text-base" />
+            <Codicon name="lightbulb-sparkle" className="text-[14px]" />
             {activeCount > 0 && activeSkillNames !== null && (
               <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-medium tabular-nums text-primary-foreground">
                 {activeCount}
