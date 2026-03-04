@@ -457,11 +457,9 @@ describe('Thread – AssistantMessage rendering', () => {
     });
   });
 
-  it('thinking indicator shows humanized tool name in the rendered DOM during streaming', async () => {
-    // Regression test: thinking indicator was stuck on "Thinking…" because the
-    // AuiIf wrapper depended on the AUI store's deferred useEffect sync.
-    // After the fix, the indicator reads directly from ThinkingContext
-    // (set via flushSync) so it updates immediately.
+  it('thinking indicator stays as Thinking during tool execution (VS Code behavior)', async () => {
+    // In VS Code, the "Thinking" label stays constant. Tool names are shown
+    // in the tool cards, not in the thinking indicator text.
     let resolveStream!: () => void;
     const streamGate = new Promise<void>(r => {
       resolveStream = r;
@@ -475,14 +473,13 @@ describe('Thread – AssistantMessage rendering', () => {
           toolName: 'get_range_values',
           arguments: { address: 'A1:C3' },
         });
-        // ── PAUSE ── thinking text should now say "Get range values…"
+        // ── PAUSE ── thinking text should stay as "Thinking…"
         await streamGate;
         yield makeEvent('tool.execution_complete', {
           toolCallId: 'tc1',
           success: true,
           result: { content: '[[1]]' },
         });
-        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Got it.' });
         yield IDLE_EVENT;
       },
       on: vi.fn(),
@@ -492,6 +489,8 @@ describe('Thread – AssistantMessage rendering', () => {
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
     const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
@@ -509,10 +508,10 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 150));
     });
 
-    // The thinking indicator should be visible with the humanized tool name
+    // The thinking indicator should show "Thinking…" (not the tool name)
     const indicator = document.querySelector('.aui-assistant-thinking-indicator');
     expect(indicator).toBeInTheDocument();
-    expect(indicator!.textContent).toContain('Get range values…');
+    expect(indicator!.textContent).toContain('Thinking…');
 
     // Release and finish
     await act(async () => {

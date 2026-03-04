@@ -14,7 +14,6 @@ import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
-import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
@@ -693,16 +692,14 @@ export function useOfficeChat(host: OfficeHostApp) {
           if (toolName === 'report_intent') {
             const intent = (args as Record<string, unknown> | undefined)?.intent;
             if (typeof intent === 'string' && intent) {
-              // flushSync forces React to commit this state update to the DOM
-              // immediately, before the for-await loop processes the next
-              // buffered event.  Without it, React 18 automatic batching can
-              // merge this update with a later setThinkingText(null), so the
-              // intermediate text never appears on screen.
               flushSync(() => setThinkingText(intent));
             }
             continue;
           }
-          flushSync(() => setThinkingText(`${humanizeToolName(toolName)}…`));
+          // Don't change thinkingText to tool name — it flashes too fast.
+          // The tool card itself shows the tool name with shimmer while running.
+          // Keep "Thinking…" as a stable anchor (matches VS Code behavior where
+          // the "Thinking" label stays constant and tools appear as timeline items).
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
@@ -726,12 +723,14 @@ export function useOfficeChat(host: OfficeHostApp) {
             updateAssistant();
           }
         } else if (event.type === 'assistant.message') {
+          // Update text content but DON'T clear thinking or mark complete here.
+          // The SDK sends assistant.message BEFORE tool calls (model's initial
+          // response) AND after (final response). Only session.idle reliably
+          // indicates the response is truly finished.
           streamText = event.data.content;
-          setThinkingText(null);
-          updateAssistant({ status: { type: 'complete', reason: 'stop' } });
+          updateAssistant();
         } else if (event.type === 'session.idle') {
-          // Stream ended — finalize message if it wasn't already completed by
-          // an assistant.message event (e.g. streaming-only responses).
+          // Stream truly ended — clear thinking and finalize
           setThinkingText(null);
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.error') {

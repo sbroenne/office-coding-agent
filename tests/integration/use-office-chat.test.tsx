@@ -262,8 +262,9 @@ describe('useOfficeChat', () => {
     expect((toolPart as { type: 'tool-call'; toolName: string }).toolName).toBe('get_range_values');
   });
 
-  it('sets thinkingText to humanized tool name on tool.execution_start', async () => {
-    // Use a slow session so we can observe thinkingText mid-stream
+  it('keeps thinkingText as Thinking during tool execution (VS Code behavior)', async () => {
+    // In VS Code, the "Thinking" label stays constant while tool cards show
+    // individual tool names. We don't flash the thinking text to tool names.
     let resolveIdle: () => void;
     const idlePromise = new Promise<void>(r => {
       resolveIdle = r;
@@ -284,7 +285,6 @@ describe('useOfficeChat', () => {
           success: true,
           result: { content: '[[1,2]]' },
         });
-        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' });
         yield IDLE_EVENT;
       },
       on: vi.fn(),
@@ -313,8 +313,8 @@ describe('useOfficeChat', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // thinkingText should show humanized tool name
-    expect(result.current.thinkingText).toBe('Get range values…');
+    // thinkingText should stay as "Thinking…" (not change to tool name)
+    expect(result.current.thinkingText).toBe('Thinking…');
 
     // Release the stream to complete
     await act(async () => {
