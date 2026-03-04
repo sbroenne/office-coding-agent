@@ -62,7 +62,7 @@ export interface CustomAgentPayload {
 }
 
 /** Extended session config for browser → proxy communication. */
-export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools'> {
+export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onPermissionRequest'> {
   tools?: Tool[];
   /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
   host?: string;
