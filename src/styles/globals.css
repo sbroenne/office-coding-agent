@@ -141,6 +141,70 @@ summary:focus-visible,
   height: 0;
 }
 
+/* ── VS Code Chain-of-Thought Timeline ── */
+/* The assistant message content area acts as the timeline container.
+   Tool cards and thinking indicators inside it get the vertical line. */
+.aui-assistant-message-content {
+  position: relative;
+}
+
+/* Tool cards: remove individual borders, add left padding for timeline */
+[data-slot='tool-fallback-root'] {
+  border: none !important;
+  border-radius: 0 !important;
+  position: relative;
+  padding-left: 20px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  margin-bottom: 0 !important;
+}
+
+/* Vertical chain-of-thought line on each tool card */
+[data-slot='tool-fallback-root']::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--vscode-chat-requestBorder);
+}
+
+/* Single tool card: short line just beside the icon */
+[data-slot='tool-fallback-root']:only-of-type::before {
+  display: none;
+}
+
+/* Tool status icon sits on top of the vertical line */
+.aui-tool-fallback-trigger-icon {
+  position: relative;
+  z-index: 1;
+  background: var(--vscode-editor-background);
+}
+
+/* Thinking indicator timeline styling */
+.aui-assistant-thinking-indicator {
+  position: relative;
+  padding-left: 20px !important;
+}
+.aui-assistant-thinking-indicator::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  bottom: -100%;
+  width: 1px;
+  background-color: var(--vscode-chat-requestBorder);
+}
+
+/* Collapsed tool content: compact styling */
+[data-slot='tool-fallback-content'] > div {
+  border-top: 1px solid var(--vscode-chat-requestBorder);
+  margin-top: 4px;
+  padding-top: 4px;
+  margin-left: 0;
+}
+
 /* Hide the raw code block that follows rendered choice/suggestion cards */
 .aui-choices-wrapper + .aui-md-pre,
 .aui-suggestions-wrapper + .aui-md-pre {
