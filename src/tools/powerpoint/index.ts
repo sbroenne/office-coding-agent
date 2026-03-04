@@ -431,20 +431,27 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
   {
     name: 'add_slide_from_code',
     description: `Add a richly formatted slide to the presentation using PptxGenJS code.
-Provide a JavaScript function body that receives a 'slide' parameter (PptxGenJS Slide object).
+Provide a JavaScript function body. The following variables are automatically injected:
+- slide  — PptxGenJS Slide object to build content on
+- W      — actual slide width in inches (e.g. 13.33 for 16:9, 10 for 4:3)
+- H      — actual slide height in inches (e.g. 7.5 for both 16:9 and 4:3)
+
+ALWAYS use W and H for layout — never hardcode slide dimensions.
+Content width formula: W - 1  (leaves 0.5" margin on each side).
+Safe area: x ≥ 0.5, y ≥ 0.5, x+w ≤ W-0.5, y+h ≤ H-0.5.
 
 PptxGenJS API reference:
-- Text:   slide.addText("Hello", { x:1, y:1, w:8, h:1, fontSize:24, bold:true, color:"363636" })
-- Bullets: slide.addText([{text:"Point 1",options:{bullet:true}},{text:"Point 2",options:{bullet:true}}], { x:0.5, y:1.5, w:9, h:3, fontSize:18 })
+- Text:   slide.addText("Hello", { x:0.5, y:0.5, w:W-1, h:1, fontSize:24, bold:true, color:"363636", shrinkText:true })
+- Bullets: slide.addText([{text:"Point 1",options:{bullet:true}},{text:"Point 2",options:{bullet:true}}], { x:0.5, y:1.5, w:W-1, h:H-2, fontSize:18, shrinkText:true })
 - Image (base64): slide.addImage({ data:"data:image/png;base64,...", x:1, y:1, w:4, h:3 })
-- Table:  slide.addTable([["H1","H2"],["R1","R2"]], { x:0.5, y:2, w:9, fontSize:14 })
+- Table:  slide.addTable([["H1","H2"],["R1","R2"]], { x:0.5, y:2, w:W-1, fontSize:14 })
 - Shape:  slide.addShape("rect", { x:1, y:1, w:3, h:1, fill:{ color:"FF0000" } })
 - All positions (x, y, w, h) are in inches.`,
     params: {
       code: {
         type: 'string',
         description:
-          "JavaScript code (function body) receiving a 'slide' parameter. Call PptxGenJS methods on it to build slide content.",
+          "JavaScript code (function body). Variables available: 'slide' (PptxGenJS Slide), 'W' (slide width in inches), 'H' (slide height in inches). Use W and H for all layout — never hardcode slide dimensions.",
       },
       replaceSlideIndex: {
         type: 'number',
@@ -471,8 +478,8 @@ PptxGenJS API reference:
       const slide = pptx.addSlide();
 
       /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
-      const buildSlide = new Function('slide', code);
-      buildSlide(slide);
+      const buildSlide = new Function('slide', 'W', 'H', code);
+      buildSlide(slide, slideW, slideH);
       /* eslint-enable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
 
       const base64 = (await pptx.write({ outputType: 'base64' })) as string;
@@ -519,9 +526,10 @@ PptxGenJS API reference:
         await context.sync();
       }
 
+      const layoutInfo = `(layout: ${slideW.toFixed(2)}" × ${slideH.toFixed(2)}")`;
       return replaceSlideIndex !== undefined
-        ? `Successfully replaced slide ${String(replaceSlideIndex + 1)}.`
-        : 'Successfully added new slide to the presentation.';
+        ? `Successfully replaced slide ${String(replaceSlideIndex + 1)} ${layoutInfo}.`
+        : `Successfully added new slide to the presentation ${layoutInfo}.`;
     },
   },
 
