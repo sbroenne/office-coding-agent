@@ -224,12 +224,28 @@ async function setup(): Promise<void> {
 async function testPptTools(): Promise<void> {
   log('── PowerPoint Tools ──');
 
-  // 1. get_presentation_overview
+  // 1. get_presentation_overview (must return text AND images)
   await runTool(powerPointConfigs, 'get_presentation_overview', {}, r => {
+    if (r && typeof r === 'object' && 'text' in (r as Record<string, unknown>)) {
+      const obj = r as { text: string; slides?: { slideNumber: number; image: string }[] };
+      if (!obj.text.includes('Total slides')) {
+        return `Expected "Total slides" in text, got: ${obj.text.substring(0, 100)}`;
+      }
+      if (!obj.slides || obj.slides.length === 0) {
+        return 'Expected slides with image data but got none — getImageAsBase64 may be called incorrectly';
+      }
+      const firstImage = obj.slides[0].image;
+      if (!firstImage.includes('data:image/png;base64,')) {
+        return `Expected base64 PNG data URL in slide image, got: ${firstImage.substring(0, 80)}`;
+      }
+      return null;
+    }
+    // Fallback: plain string result means images were not captured
     const s = safeString(r);
-    return s.includes('Total slides')
-      ? null
-      : `Expected "Total slides" in result, got: ${s.substring(0, 100)}`;
+    if (s.includes('Total slides')) {
+      return 'get_presentation_overview returned text only — slide images missing (getImageAsBase64 call may be broken)';
+    }
+    return `Expected structured result with text and slides, got: ${s.substring(0, 100)}`;
   });
 
   // 2. get_presentation_content (all slides)
@@ -338,23 +354,27 @@ async function testPptTools(): Promise<void> {
       : `Expected success message from duplicate_slide, got: ${s.substring(0, 100)}`;
   });
 
-  // 12. get_slide_image (may not be supported on older Office versions)
-  try {
-    const slideImageResult = await callTool(powerPointConfigs, 'get_slide_image', {
-      slideIndex: 0,
-      width: 400,
-    });
-    // execute() returns a raw base64 string directly
-    const s = safeString(slideImageResult);
-    if (s.includes('data:image') || s.includes('base64')) {
-      pass('get_slide_image');
-    } else {
-      fail('get_slide_image', `Expected base64 image data, got: ${s.substring(0, 100)}`);
+  // 12. get_slide_image
+  await runTool(
+    powerPointConfigs,
+    'get_slide_image',
+    { slideIndex: 0, width: 400 },
+    r => {
+      const s = safeString(r);
+      // Detect the "not available" fallback message — this means the API call
+      // is broken (e.g. wrong argument shape), not that the version is old.
+      if (s.includes('not available in this version')) {
+        return (
+          'get_slide_image returned "not available" error — ' +
+          'getImageAsBase64 may be called with wrong arguments (number instead of options object)'
+        );
+      }
+      if (s.includes('data:image') || s.includes('base64')) {
+        return null;
+      }
+      return `Expected base64 image data, got: ${s.substring(0, 100)}`;
     }
-  } catch (error) {
-    log(`  ⚠ get_slide_image: ${String(error)}`);
-    addTestResult(testValues, 'get_slide_image', 'conditional_pass', 'pass');
-  }
+  );
 
   // 13. clear_slide (clear the last slide added by add_slide_from_code/duplicate)
   let currentSlideCount = 0;
