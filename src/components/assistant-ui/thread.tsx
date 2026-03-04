@@ -9,9 +9,11 @@ import {
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useAuiState,
 } from '@assistant-ui/react';
 import { Codicon } from '@/components/Codicon';
-import type { FC, ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useThinkingText } from '@/contexts/ThinkingContext';
 
 export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
@@ -269,14 +271,95 @@ const AssistantActionBar: FC = () => {
  * parts. Uses CSS `order: -1` so tool cards appear visually ABOVE the text
  * response (matching VS Code Copilot Chat) while keeping text at DOM index 0
  * to prevent React 18 useSyncExternalStore tearing.
+ *
+ * When there are 2+ tools, shows a collapsible "Used N tools" header
+ * (matching VS Code Copilot Chat's grouped tool invocations). The group
+ * auto-collapses once all tools complete and stays expanded while any tool
+ * is still running. A single tool renders without the group header.
  */
 const ToolGroup: FC<{ startIndex: number; endIndex: number; children?: ReactNode }> = ({
+  startIndex,
+  endIndex,
   children,
-}) => (
-  <div className="aui-tool-group" style={{ order: -1 }}>
-    {children}
-  </div>
-);
+}) => {
+  const toolCount = endIndex - startIndex + 1;
+
+  // Read whether any tool in this range is still running
+  const isRunning = useAuiState(s => {
+    for (let i = startIndex; i <= endIndex; i++) {
+      const part = s.message.parts[i];
+      if (part?.type === 'tool-call' && part.status?.type === 'running') return true;
+    }
+    return false;
+  });
+
+  // Single tool — no group header, just render the card directly
+  if (toolCount <= 1) {
+    return (
+      <div className="aui-tool-group" style={{ order: -1 }}>
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <ToolGroupCollapsible isRunning={isRunning} toolCount={toolCount}>
+      {children}
+    </ToolGroupCollapsible>
+  );
+};
+
+/**
+ * Inner collapsible component for ToolGroup (2+ tools).
+ * Extracted so the hooks are only active when we actually need the collapsible.
+ */
+const ToolGroupCollapsible: FC<{
+  isRunning: boolean;
+  toolCount: number;
+  children?: ReactNode;
+}> = ({ isRunning, toolCount, children }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasAutoCollapsed = useRef(false);
+
+  // Auto-collapse once when every tool in the group completes
+  useEffect(() => {
+    if (!isRunning && !hasAutoCollapsed.current) {
+      hasAutoCollapsed.current = true;
+      setIsExpanded(false);
+    }
+  }, [isRunning]);
+
+  const toggle = useCallback(() => setIsExpanded(prev => !prev), []);
+
+  const headerText = isRunning ? `Running tools\u2026` : `Used ${toolCount} tools`;
+
+  return (
+    <div className="aui-tool-group" style={{ order: -1 }}>
+      <button
+        type="button"
+        onClick={toggle}
+        className="aui-tool-group-trigger flex w-full items-center gap-1.5 py-1 text-sm text-left"
+        aria-expanded={isExpanded}
+        data-slot="tool-group-trigger"
+      >
+        <Codicon
+          name={isExpanded ? 'chevron-down' : 'chevron-right'}
+          className="text-xs text-muted-foreground shrink-0"
+        />
+        <Codicon
+          name={isRunning ? 'loading~spin' : 'check'}
+          className={cn('shrink-0 text-sm', isRunning && 'codicon-modifier-spin')}
+        />
+        <span className={cn('font-medium', isRunning && 'chat-thinking-shimmer-text')}>
+          {headerText}
+        </span>
+      </button>
+      <div className="aui-tool-group-content" style={{ display: isExpanded ? undefined : 'none' }}>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const AssistantMessage: FC = () => {
   return (

@@ -150,6 +150,20 @@ summary:focus-visible,
   position: relative;
 }
 
+/* Tool group toggle button (visible when 2+ tools are grouped) */
+.aui-tool-group-trigger {
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  color: var(--vscode-foreground);
+  padding-left: 4px;
+}
+.aui-tool-group-trigger:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  border-radius: var(--vscode-cornerRadius-medium);
+}
+
 /* Tool cards: remove individual borders, add left padding for timeline */
 [data-slot='tool-fallback-root'] {
   border: none !important;
