@@ -55,10 +55,12 @@ function ToolFallbackRoot({
       data-slot="tool-fallback-root"
       open={isOpen}
       onOpenChange={handleOpenChange}
-      className={cn('aui-tool-fallback-root group/tool-fallback-root w-full', className)}
+      className={cn('aui-tool-fallback-root group/tool-fallback-root w-full py-2', className)}
       style={
         {
           '--animation-duration': `${ANIMATION_DURATION}ms`,
+          border: '1px solid var(--vscode-widget-border)',
+          borderRadius: 'var(--vscode-cornerRadius-medium)',
         } as React.CSSProperties
       }
       {...props}

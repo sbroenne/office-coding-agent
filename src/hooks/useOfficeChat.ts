@@ -114,6 +114,12 @@ export function useOfficeChat(host: OfficeHostApp) {
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
+  activeSkillNamesRef.current = activeSkillNames;
+  activeAgentIdRef.current = activeAgentId;
+  importedMcpServersRef.current = importedMcpServers;
+  activeMcpServerNamesRef.current = activeMcpServerNames;
+  npmSkillPackagesRef.current = npmSkillPackages;
+  evaluatePermissionRef.current = evaluatePermission;
 
   // Switch model mid-session when the user picks a different model
   useEffect(() => {
@@ -124,13 +130,6 @@ export function useOfficeChat(host: OfficeHostApp) {
       });
     }
   }, [activeModel]);
-
-  activeSkillNamesRef.current = activeSkillNames;
-  activeAgentIdRef.current = activeAgentId;
-  importedMcpServersRef.current = importedMcpServers;
-  activeMcpServerNamesRef.current = activeMcpServerNames;
-  npmSkillPackagesRef.current = npmSkillPackages;
-  evaluatePermissionRef.current = evaluatePermission;
 
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -652,7 +651,7 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
       // Keep tool-call parts in the completed message so they remain visible
-      // as a collapsible "thinking" section above the response text, matching
+      // as a collapsible "thinking" section above the text response, matching
       // VS Code Copilot Chat's behavior where completed tool calls stay visible.
       const content: ThreadMessageLike['content'] = [
         // Tool-call parts come FIRST so they appear above the text response,
@@ -684,6 +683,8 @@ export function useOfficeChat(host: OfficeHostApp) {
         if (cancelRef.current) break;
 
         if (event.type === 'assistant.message_delta') {
+          // First streaming delta clears the thinking indicator
+          setThinkingText(null);
           streamText += event.data.deltaContent;
           updateAssistant();
         } else if (event.type === 'tool.execution_start') {
@@ -711,7 +712,9 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {
           const { toolCallId, result } = event.data;
-          setThinkingText(null);
+          // Don't clear thinkingText here — keep showing the tool name until
+          // text starts streaming or the response completes. In VS Code, the
+          // thinking label stays visible throughout the tool execution phase.
           const existing = toolParts.get(toolCallId);
           if (existing) {
             const resultText = result
@@ -773,18 +776,6 @@ export function useOfficeChat(host: OfficeHostApp) {
       if (staleTimer) clearTimeout(staleTimer);
       setThinkingText(null);
       setIsRunning(false);
-    }
-  }, []);
-
-  const compactSession = useCallback(async () => {
-    const session = sessionRef.current;
-    if (session) {
-      try {
-        await session.compact();
-        console.log('[chat] session compacted');
-      } catch (err) {
-        console.warn('[chat] session.compact failed:', err);
-      }
     }
   }, []);
 
@@ -875,12 +866,23 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
+  const compactSession = useCallback(async () => {
+    const session = sessionRef.current;
+    if (session) {
+      try {
+        await session.compact();
+        console.log('[chat] session compacted');
+      } catch (err) {
+        console.warn('[chat] session.compact failed:', err);
+      }
+    }
+  }, []);
+
   return {
     runtime,
     sessionError,
     isConnecting,
     clearMessages,
-    compactSession,
     restoreSession,
     deleteSession,
     sessions,
@@ -890,6 +892,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    compactSession,
     thinkingText,
   };
 }

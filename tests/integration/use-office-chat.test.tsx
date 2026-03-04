@@ -33,11 +33,11 @@ function makeFakeSession(events: SessionEvent[]) {
     onPermissionRequest: vi.fn(() => () => undefined),
     destroy: vi.fn().mockResolvedValue(undefined),
     send: vi.fn().mockResolvedValue('msg-id'),
-    setModel: vi.fn().mockResolvedValue(undefined),
-    compact: vi.fn().mockResolvedValue(undefined),
     registerTools: vi.fn(),
     getToolHandler: vi.fn(),
     respondPermission: vi.fn().mockResolvedValue(undefined),
+    setModel: vi.fn().mockResolvedValue(undefined),
+    compact: vi.fn().mockResolvedValue(undefined),
     _dispatchEvent: vi.fn() as EventEmitter,
   };
 }
@@ -291,11 +291,11 @@ describe('useOfficeChat', () => {
       onPermissionRequest: vi.fn(() => () => undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue('msg-id'),
-      setModel: vi.fn().mockResolvedValue(undefined),
-      compact: vi.fn().mockResolvedValue(undefined),
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(session);
@@ -349,11 +349,11 @@ describe('useOfficeChat', () => {
       onPermissionRequest: vi.fn(() => () => undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue('msg-id'),
-      setModel: vi.fn().mockResolvedValue(undefined),
-      compact: vi.fn().mockResolvedValue(undefined),
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(session);
@@ -716,7 +716,7 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const agents = config.customAgents as Array<{ name: string; prompt: string }>;
+    const agents = config.customAgents as { name: string; prompt: string }[];
     expect(agents).toBeDefined();
     expect(agents).toHaveLength(1);
     expect(agents[0].name).toBe('Excel');
@@ -768,7 +768,7 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const skills = config.skills as Array<{ name: string; content: string }>;
+    const skills = config.skills as { name: string; content: string }[];
     expect(skills).toBeDefined();
     expect(skills.some(s => s.name === 'TestSkill')).toBe(true);
   });
@@ -827,11 +827,11 @@ describe('useOfficeChat', () => {
       onPermissionRequest: vi.fn(() => () => undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue('msg-id'),
-      setModel: vi.fn().mockResolvedValue(undefined),
-      compact: vi.fn().mockResolvedValue(undefined),
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(pausingSession);
@@ -874,7 +874,7 @@ describe('useOfficeChat', () => {
     const finalMessages = result.current.runtime.thread.getState().messages;
     const finalAssistant = finalMessages.find(m => m.role === 'assistant');
     const finalTextParts = finalAssistant!.content.filter(c => c.type === 'text');
-    expect(finalTextParts.length).toBe(1);
+    expect(finalTextParts).toHaveLength(1);
     expect((finalTextParts[0] as { text: string }).text).toBe('Got it.');
   });
 
@@ -899,11 +899,11 @@ describe('useOfficeChat', () => {
       onPermissionRequest: vi.fn(() => () => undefined),
       destroy: vi.fn().mockResolvedValue(undefined),
       send: vi.fn().mockResolvedValue('msg-id'),
-      setModel: vi.fn().mockResolvedValue(undefined),
-      compact: vi.fn().mockResolvedValue(undefined),
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(pausingSession);

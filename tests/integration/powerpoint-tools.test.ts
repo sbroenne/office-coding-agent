@@ -47,7 +47,6 @@ const EXPECTED_TOOL_NAMES = [
   'apply_slide_layout',
   'add_geometric_shape',
   'add_line',
-  'set_presentation_size',
 ] as const;
 
 // ─── Structural ───────────────────────────────────────────────────────────────
@@ -179,24 +178,5 @@ describe('Integration: content tool schemas', () => {
     const schema = toolsByName.get_presentation_content.parameters;
     expect(validate(schema, { slideIndex: 2 })).toBe(true);
     expect(validate(schema, { startIndex: 0, endIndex: 3 })).toBe(true);
-  });
-});
-
-// ─── set_presentation_size ────────────────────────────────────────────────────
-
-describe('Integration: set_presentation_size schema', () => {
-  it('requires width and height as numbers', () => {
-    const schema = toolsByName.set_presentation_size.parameters;
-    expect(validate(schema, { width: 13.33, height: 7.5 })).toBe(true);
-    expect(validate(schema, { width: 10, height: 7.5 })).toBe(true);
-    expect(validate(schema, {})).toBe(false);
-    expect(validate(schema, { width: 13.33 })).toBe(false);
-    expect(validate(schema, { height: 7.5 })).toBe(false);
-  });
-
-  it('rejects non-numeric values', () => {
-    const schema = toolsByName.set_presentation_size.parameters;
-    expect(validate(schema, { width: '13.33', height: 7.5 })).toBe(false);
-    expect(validate(schema, { width: 13.33, height: '7.5' })).toBe(false);
   });
 });

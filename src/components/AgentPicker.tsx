@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
+import { Check } from 'lucide-react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
@@ -55,10 +56,7 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
           isActive && 'bg-accent/50'
         )}
       >
-        <Codicon
-          name="check"
-          className={cn('mt-0.5 text-sm shrink-0', isActive ? 'opacity-100' : 'opacity-0')}
-        />
+        <Check className={cn('mt-0.5 size-3.5 shrink-0', isActive ? 'opacity-100' : 'opacity-0')} />
         <div className="min-w-0 flex-1">
           <div className="font-medium text-foreground">{agentName}</div>
           <div className="text-xs text-muted-foreground line-clamp-2">
@@ -74,13 +72,12 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 transition-colors hover:bg-accent"
-            style={{ height: 22, color: 'var(--vscode-icon-foreground)', fontSize: 12 }}
+            className="relative inline-flex h-7 items-center gap-1 rounded px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             aria-label="Select agent"
             title={`Agent: ${displayName}`}
           >
-            <Codicon name="robot" className="text-[12px]" />
-            <span className="truncate max-w-[80px]">{displayName}</span>
+            <Codicon name="robot" className="text-base" />
+            <span className="text-xs">{displayName}</span>
           </button>
         </Popover.Trigger>
 
