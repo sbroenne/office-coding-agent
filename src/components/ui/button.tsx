@@ -18,10 +18,10 @@ const buttonVariants = cva(
         link: 'text-[var(--vscode-textLink-foreground)] underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-8 px-3',
-        sm: 'h-7 px-2 text-xs',
-        lg: 'h-9 px-4',
-        icon: 'h-8 w-8',
+        default: 'h-[26px] px-3',
+        sm: 'h-[22px] px-2 text-[12px]',
+        lg: 'h-[30px] px-4',
+        icon: 'size-[22px]',
       },
     },
     defaultVariants: {

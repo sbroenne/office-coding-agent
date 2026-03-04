@@ -92,7 +92,7 @@ const ThreadWelcome: FC = () => {
           >
             <Codicon name="copilot" className="text-[12px]" />
           </div>
-          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-base duration-200">
+          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-[16px] duration-200">
             How can I help?
           </h1>
         </div>
@@ -337,22 +337,28 @@ const UserEditComposer: FC = () => {
   return (
     <ComposerPrimitive.Root className="flex w-full flex-col rounded-[var(--vscode-cornerRadius-large)] border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1 pt-2 outline-none transition-colors has-[textarea:focus-visible]:border-[var(--vscode-focusBorder)]">
       <ComposerPrimitive.Input
-        className="max-h-32 min-h-10 w-full resize-none bg-transparent px-3 pt-1 pb-2 text-sm outline-none placeholder:text-[var(--vscode-input-placeholderForeground)] focus-visible:ring-0"
+        className="max-h-32 min-h-[34px] w-full resize-none bg-transparent px-3 py-2 text-[13px] outline-none placeholder:text-[var(--vscode-input-placeholderForeground)] focus-visible:outline-none focus-visible:ring-0"
         rows={1}
       />
-      <div className="mx-1 mb-1.5 flex items-center justify-end gap-1 border-t border-border/40 pt-1">
+      <div className="mx-1 mb-1 flex items-center justify-end gap-1">
         <ComposerPrimitive.Cancel asChild>
           <TooltipIconButton
             tooltip="Cancel edit"
             variant="ghost"
-            className="h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-foreground"
+            className="rounded-[var(--vscode-cornerRadius-small)] px-2 text-[12px] hover:bg-accent"
+            style={{ height: 22, color: 'var(--vscode-icon-foreground)' }}
           >
             Cancel
           </TooltipIconButton>
         </ComposerPrimitive.Cancel>
         <ComposerPrimitive.Send asChild>
-          <TooltipIconButton tooltip="Send edit" variant="ghost" className="h-7 w-7 rounded-md">
-            <Codicon name="send" className="text-base" />
+          <TooltipIconButton
+            tooltip="Send edit"
+            variant="ghost"
+            className="rounded-[var(--vscode-cornerRadius-small)] hover:bg-accent"
+            style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
+          >
+            <Codicon name="send" className="text-[14px]" />
           </TooltipIconButton>
         </ComposerPrimitive.Send>
       </div>
