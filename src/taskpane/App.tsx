@@ -94,6 +94,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     sessionError,
     isConnecting,
     clearMessages,
+    compactSession,
     restoreSession,
     deleteSession,
     sessions,
@@ -131,6 +132,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
             <ChatHeader
               host={host}
               onClearMessages={clearMessages}
+              onCompactSession={() => void compactSession()}
               sessions={sessions}
               activeSessionId={activeSessionId}
               onRestoreSession={restoreSession}

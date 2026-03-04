@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Check, Square } from 'lucide-react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
@@ -46,9 +45,9 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
       >
         <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-border">
           {isActive ? (
-            <Check className="size-3 text-primary" />
+            <Codicon name="check" className="text-xs text-primary" />
           ) : (
-            <Square className="size-3 opacity-0" />
+            <Codicon name="primitive-square" className="text-xs opacity-0" />
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -70,11 +69,12 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="relative inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+            style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
             aria-label="Agent skills"
             title="Agent skills"
           >
-            <Codicon name="lightbulb-sparkle" className="text-base" />
+            <Codicon name="lightbulb-sparkle" className="text-[14px]" />
             {activeCount > 0 && activeSkillNames !== null && (
               <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-medium tabular-nums text-primary-foreground">
                 {activeCount}
@@ -85,7 +85,7 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
 
         <Popover.Portal>
           <Popover.Content
-            className="z-50 w-64 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+            className="z-50 w-64 max-h-80 overflow-y-auto rounded-[var(--vscode-cornerRadius-medium)] border border-border bg-popover p-1 shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
             sideOffset={4}
             align="start"
           >

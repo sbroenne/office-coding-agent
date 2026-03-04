@@ -14,7 +14,6 @@ import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
-import { humanizeToolName } from '@/utils/humanizeToolName';
 import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
@@ -98,6 +97,38 @@ export function useOfficeChat(host: OfficeHostApp) {
   // Guard against concurrent/stale initSession calls (React StrictMode double-mount)
   const initCounterRef = useRef(0);
   const restoredInitialSessionRef = useRef(false);
+
+  // Stable refs for settings that should NOT trigger session re-init when they change.
+  // initSession reads from these refs so the useCallback only re-creates when host
+  // changes — not on every skill/agent/MCP/model toggle mid-conversation.
+  // Without this, any store update (e.g. WorkIQ connecting, switching model) would
+  // tear down and restart the Copilot session, losing all conversation context.
+  // Model changes take effect on the next new conversation (same as VS Code Copilot).
+  const activeModelRef = useRef(activeModel);
+  const activeSkillNamesRef = useRef(activeSkillNames);
+  const activeAgentIdRef = useRef(activeAgentId);
+  const importedMcpServersRef = useRef(importedMcpServers);
+  const activeMcpServerNamesRef = useRef(activeMcpServerNames);
+  const npmSkillPackagesRef = useRef(npmSkillPackages);
+  const evaluatePermissionRef = useRef(evaluatePermission);
+  // Keep refs in sync on every render (runs synchronously, before any effects)
+  activeModelRef.current = activeModel;
+  activeSkillNamesRef.current = activeSkillNames;
+  activeAgentIdRef.current = activeAgentId;
+  importedMcpServersRef.current = importedMcpServers;
+  activeMcpServerNamesRef.current = activeMcpServerNames;
+  npmSkillPackagesRef.current = npmSkillPackages;
+  evaluatePermissionRef.current = evaluatePermission;
+
+  // Switch model mid-session when the user picks a different model
+  useEffect(() => {
+    const session = sessionRef.current;
+    if (session && activeModel) {
+      session.setModel(activeModel).catch(err => {
+        console.warn('[chat] model.switch failed:', err);
+      });
+    }
+  }, [activeModel]);
 
   const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -192,7 +223,7 @@ export function useOfficeChat(host: OfficeHostApp) {
         useMcpStatusStore.getState().setTools(payload.server, payload.tools);
       });
 
-      const resolvedAgent = resolveActiveAgent(activeAgentId, host);
+      const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
 
       // System prompt: only base + app prompt (no agent/skill concatenation)
       const systemContent = buildSystemPrompt(host);
@@ -211,8 +242,8 @@ export function useOfficeChat(host: OfficeHostApp) {
         .filter(s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost))
         .map(s => s.metadata.name);
       const disabledSkills =
-        activeSkillNames !== null
-          ? allHostSkillNames.filter(name => !activeSkillNames.includes(name))
+        activeSkillNamesRef.current !== null
+          ? allHostSkillNames.filter(name => !activeSkillNamesRef.current!.includes(name))
           : [];
 
       // Build custom agent config for the SDK
@@ -229,13 +260,13 @@ export function useOfficeChat(host: OfficeHostApp) {
       // Resolve active MCP servers (bundled + imported), intersect with agent allowlist if specified
       // Bundled servers require explicit opt-in (name must be in activeMcpServerNames).
       // When activeMcpServerNames is null (all active), only imported servers are included.
-      const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServers);
+      const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServersRef.current);
       let activeServers: typeof allServers;
-      if (activeMcpServerNames === null) {
+      if (activeMcpServerNamesRef.current === null) {
         // null = all imported active, bundled NOT active (require explicit opt-in)
         activeServers = allServers.filter(s => !BUNDLED_MCP_SERVERS.some(b => b.name === s.name));
       } else {
-        activeServers = allServers.filter(s => activeMcpServerNames.includes(s.name));
+        activeServers = allServers.filter(s => activeMcpServerNamesRef.current!.includes(s.name));
       }
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
@@ -248,7 +279,7 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       const session = await withTimeout(
         client.createSession({
-          model: activeModel,
+          model: activeModelRef.current,
           systemMessage: { mode: 'replace', content: systemContent },
           tools: getToolsForHost(host),
           mcpServers,
@@ -257,7 +288,8 @@ export function useOfficeChat(host: OfficeHostApp) {
           skills,
           disabledSkills,
           customAgents,
-          npmSkillPackages: npmSkillPackages.length > 0 ? npmSkillPackages : undefined,
+          npmSkillPackages:
+            npmSkillPackagesRef.current.length > 0 ? npmSkillPackagesRef.current : undefined,
         }),
         60_000,
         'session.create'
@@ -278,7 +310,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       console.log('[chat] Session created:', session.sessionId);
 
       session.onPermissionRequest(payload => {
-        const autoDecision = evaluatePermission(payload.request);
+        const autoDecision = evaluatePermissionRef.current(payload.request);
         if (autoDecision === 'approved') {
           void session.respondPermission(payload.requestId, 'approved');
           return;
@@ -300,14 +332,11 @@ export function useOfficeChat(host: OfficeHostApp) {
       }
     }
   }, [
-    activeModel,
+    // Only re-init the session when host changes — that requires a genuinely new
+    // connection. All other settings (model, skills, agents, MCP servers) are read
+    // via refs above so mid-conversation store updates never tear down an active
+    // session. The new values take effect on the next fresh conversation.
     host,
-    activeSkillNames,
-    activeAgentId,
-    importedMcpServers,
-    activeMcpServerNames,
-    evaluatePermission,
-    npmSkillPackages,
   ]);
 
   useEffect(() => {
@@ -620,16 +649,14 @@ export function useOfficeChat(host: OfficeHostApp) {
     let streamText = '';
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
+      // Keep tool-call parts in the completed message so they remain visible
+      // as a collapsible "thinking" section above the text response, matching
+      // VS Code Copilot Chat's behavior where completed tool calls stay visible.
       const content: ThreadMessageLike['content'] = [
-        // Text part comes FIRST so its array index stays stable even as tool-call
-        // parts are appended. Prepending tool-calls would shift the text part's
-        // index on every new tool invocation, causing React's useSyncExternalStore
-        // tearing-detection in MarkdownTextPrimitive (useMessagePartText) to see
-        // s.part.type === "tool-call" while MarkdownText is still mounted at the
-        // old index — triggering "MessagePartText can only be used inside text or
-        // reasoning message parts".
-        ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
+        // Tool-call parts come FIRST so they appear above the text response,
+        // matching VS Code's layout: thinking/tools section → then text.
         ...Array.from(toolParts.values()),
+        ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
     };
@@ -655,6 +682,8 @@ export function useOfficeChat(host: OfficeHostApp) {
         if (cancelRef.current) break;
 
         if (event.type === 'assistant.message_delta') {
+          // First streaming delta clears the thinking indicator
+          setThinkingText(null);
           streamText += event.data.deltaContent;
           updateAssistant();
         } else if (event.type === 'tool.execution_start') {
@@ -663,16 +692,14 @@ export function useOfficeChat(host: OfficeHostApp) {
           if (toolName === 'report_intent') {
             const intent = (args as Record<string, unknown> | undefined)?.intent;
             if (typeof intent === 'string' && intent) {
-              // flushSync forces React to commit this state update to the DOM
-              // immediately, before the for-await loop processes the next
-              // buffered event.  Without it, React 18 automatic batching can
-              // merge this update with a later setThinkingText(null), so the
-              // intermediate text never appears on screen.
               flushSync(() => setThinkingText(intent));
             }
             continue;
           }
-          flushSync(() => setThinkingText(`${humanizeToolName(toolName)}…`));
+          // Don't change thinkingText to tool name — it flashes too fast.
+          // The tool card itself shows the tool name with shimmer while running.
+          // Keep "Thinking…" as a stable anchor (matches VS Code behavior where
+          // the "Thinking" label stays constant and tools appear as timeline items).
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
@@ -682,6 +709,9 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {
           const { toolCallId, result } = event.data;
+          // Don't clear thinkingText here — keep showing the tool name until
+          // text starts streaming or the response completes. In VS Code, the
+          // thinking label stays visible throughout the tool execution phase.
           const existing = toolParts.get(toolCallId);
           if (existing) {
             const resultText = result
@@ -693,12 +723,14 @@ export function useOfficeChat(host: OfficeHostApp) {
             updateAssistant();
           }
         } else if (event.type === 'assistant.message') {
+          // Update text content but DON'T clear thinking or mark complete here.
+          // The SDK sends assistant.message BEFORE tool calls (model's initial
+          // response) AND after (final response). Only session.idle reliably
+          // indicates the response is truly finished.
           streamText = event.data.content;
-          setThinkingText(null);
-          updateAssistant({ status: { type: 'complete', reason: 'stop' } });
+          updateAssistant();
         } else if (event.type === 'session.idle') {
-          // Stream ended — finalize message if it wasn't already completed by
-          // an assistant.message event (e.g. streaming-only responses).
+          // Stream truly ended — clear thinking and finalize
           setThinkingText(null);
           updateAssistant({ status: { type: 'complete', reason: 'stop' } });
         } else if (event.type === 'session.error') {
@@ -833,6 +865,18 @@ export function useOfficeChat(host: OfficeHostApp) {
     convertMessage: (msg: ThreadMessageLike) => msg,
   });
 
+  const compactSession = useCallback(async () => {
+    const session = sessionRef.current;
+    if (session) {
+      try {
+        await session.compact();
+        console.log('[chat] session compacted');
+      } catch (err) {
+        console.warn('[chat] session.compact failed:', err);
+      }
+    }
+  }, []);
+
   return {
     runtime,
     sessionError,
@@ -847,6 +891,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    compactSession,
     thinkingText,
   };
 }

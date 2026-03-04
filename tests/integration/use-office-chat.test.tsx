@@ -36,6 +36,8 @@ function makeFakeSession(events: SessionEvent[]) {
     registerTools: vi.fn(),
     getToolHandler: vi.fn(),
     respondPermission: vi.fn().mockResolvedValue(undefined),
+    setModel: vi.fn().mockResolvedValue(undefined),
+    compact: vi.fn().mockResolvedValue(undefined),
     _dispatchEvent: vi.fn() as EventEmitter,
   };
 }
@@ -181,7 +183,9 @@ describe('useOfficeChat', () => {
     expect((textPart as { type: 'text'; text: string }).text).toBe('Hello!');
   });
 
-  it('includes tool-call parts when tool events fire', async () => {
+  it('keeps tool-call parts in completed message alongside text (VS Code behavior)', async () => {
+    // Tool-call parts remain visible in the completed message as a collapsible
+    // "thinking" section above the text response, matching VS Code Copilot Chat.
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
@@ -212,14 +216,55 @@ describe('useOfficeChat', () => {
 
     const messages = result.current.runtime.thread.getState().messages;
     const assistantContent = messages[1].content;
+    // Text part must be present
+    const textPart = assistantContent.find(c => c.type === 'text');
+    expect(textPart).toBeDefined();
+    expect((textPart as { type: 'text'; text: string }).text).toBe('Done!');
+    // Tool-call parts must ALSO be present (VS Code keeps them visible)
     const toolPart = assistantContent.find(c => c.type === 'tool-call');
     expect(toolPart).toBeDefined();
-    expect(toolPart!.type).toBe('tool-call');
+  });
+
+  it('keeps tool-call parts in completed message when there is no text', async () => {
+    // If the AI response is tool-only (no text), tool parts must be kept so the
+    // message is not empty.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'get_range_values',
+        arguments: { range: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: '42' },
+      }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Get A1'));
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const messages = result.current.runtime.thread.getState().messages;
+    const assistantContent = messages[1].content;
+    const toolPart = assistantContent.find(c => c.type === 'tool-call');
+    expect(toolPart).toBeDefined();
     expect((toolPart as { type: 'tool-call'; toolName: string }).toolName).toBe('get_range_values');
   });
 
-  it('sets thinkingText to humanized tool name on tool.execution_start', async () => {
-    // Use a slow session so we can observe thinkingText mid-stream
+  it('keeps thinkingText as Thinking during tool execution (VS Code behavior)', async () => {
+    // In VS Code, the "Thinking" label stays constant while tool cards show
+    // individual tool names. We don't flash the thinking text to tool names.
     let resolveIdle: () => void;
     const idlePromise = new Promise<void>(r => {
       resolveIdle = r;
@@ -240,7 +285,6 @@ describe('useOfficeChat', () => {
           success: true,
           result: { content: '[[1,2]]' },
         });
-        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' });
         yield IDLE_EVENT;
       },
       on: vi.fn(),
@@ -250,6 +294,8 @@ describe('useOfficeChat', () => {
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(session);
@@ -267,8 +313,8 @@ describe('useOfficeChat', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // thinkingText should show humanized tool name
-    expect(result.current.thinkingText).toBe('Get range values…');
+    // thinkingText should stay as "Thinking…" (not change to tool name)
+    expect(result.current.thinkingText).toBe('Thinking…');
 
     // Release the stream to complete
     await act(async () => {
@@ -306,6 +352,8 @@ describe('useOfficeChat', () => {
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(session);
@@ -668,7 +716,7 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const agents = config.customAgents as Array<{ name: string; prompt: string }>;
+    const agents = config.customAgents as { name: string; prompt: string }[];
     expect(agents).toBeDefined();
     expect(agents).toHaveLength(1);
     expect(agents[0].name).toBe('Excel');
@@ -720,7 +768,7 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const skills = config.skills as Array<{ name: string; content: string }>;
+    const skills = config.skills as { name: string; content: string }[];
     expect(skills).toBeDefined();
     expect(skills.some(s => s.name === 'TestSkill')).toBe(true);
   });
@@ -782,6 +830,8 @@ describe('useOfficeChat', () => {
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(pausingSession);
@@ -824,7 +874,7 @@ describe('useOfficeChat', () => {
     const finalMessages = result.current.runtime.thread.getState().messages;
     const finalAssistant = finalMessages.find(m => m.role === 'assistant');
     const finalTextParts = finalAssistant!.content.filter(c => c.type === 'text');
-    expect(finalTextParts.length).toBe(1);
+    expect(finalTextParts).toHaveLength(1);
     expect((finalTextParts[0] as { text: string }).text).toBe('Got it.');
   });
 
@@ -852,6 +902,8 @@ describe('useOfficeChat', () => {
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn() as EventEmitter,
     };
     const client = makeFakeClient(pausingSession);

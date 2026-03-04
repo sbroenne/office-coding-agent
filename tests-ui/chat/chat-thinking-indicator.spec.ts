@@ -47,7 +47,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await composer.press('Enter');
 
     // Wait for the response to complete
-    await expect(page.getByRole('button', { name: 'Cancel' })).not.toBeVisible({
+    await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({
       timeout: AI_TIMEOUT,
     });
 
@@ -80,7 +80,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await composer.press('Enter');
 
     // Wait for the response to complete — Cancel button disappears
-    await expect(page.getByRole('button', { name: 'Cancel' })).not.toBeVisible({
+    await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({
       timeout: AI_TIMEOUT,
     });
 
@@ -152,7 +152,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     expect(isAfterMessages).toBe(true);
 
     // Wait for response to finish
-    await expect(page.getByRole('button', { name: 'Cancel' })).not.toBeVisible({
+    await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({
       timeout: AI_TIMEOUT,
     });
 

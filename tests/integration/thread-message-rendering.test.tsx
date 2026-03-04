@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import type { AppendMessage } from '@assistant-ui/react';
 import type { SessionEvent } from '@github/copilot-sdk';
@@ -457,11 +457,9 @@ describe('Thread – AssistantMessage rendering', () => {
     });
   });
 
-  it('thinking indicator shows humanized tool name in the rendered DOM during streaming', async () => {
-    // Regression test: thinking indicator was stuck on "Thinking…" because the
-    // AuiIf wrapper depended on the AUI store's deferred useEffect sync.
-    // After the fix, the indicator reads directly from ThinkingContext
-    // (set via flushSync) so it updates immediately.
+  it('thinking indicator stays as Thinking during tool execution (VS Code behavior)', async () => {
+    // In VS Code, the "Thinking" label stays constant. Tool names are shown
+    // in the tool cards, not in the thinking indicator text.
     let resolveStream!: () => void;
     const streamGate = new Promise<void>(r => {
       resolveStream = r;
@@ -475,14 +473,13 @@ describe('Thread – AssistantMessage rendering', () => {
           toolName: 'get_range_values',
           arguments: { address: 'A1:C3' },
         });
-        // ── PAUSE ── thinking text should now say "Get range values…"
+        // ── PAUSE ── thinking text should stay as "Thinking…"
         await streamGate;
         yield makeEvent('tool.execution_complete', {
           toolCallId: 'tc1',
           success: true,
           result: { content: '[[1]]' },
         });
-        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Got it.' });
         yield IDLE_EVENT;
       },
       on: vi.fn(),
@@ -492,6 +489,8 @@ describe('Thread – AssistantMessage rendering', () => {
       registerTools: vi.fn(),
       getToolHandler: vi.fn(),
       respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
     const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
@@ -509,10 +508,10 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 150));
     });
 
-    // The thinking indicator should be visible with the humanized tool name
+    // The thinking indicator should show "Thinking…" (not the tool name)
     const indicator = document.querySelector('.aui-assistant-thinking-indicator');
     expect(indicator).toBeInTheDocument();
-    expect(indicator!.textContent).toContain('Get range values…');
+    expect(indicator!.textContent).toContain('Thinking…');
 
     // Release and finish
     await act(async () => {
@@ -577,5 +576,442 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ChoiceCards rendering & interaction
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('ChoiceCards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('renders a numbered list of choices from a markdown choices block', async () => {
+    const choicesJson = JSON.stringify([{ label: 'CSV' }, { label: 'Excel' }, { label: 'PDF' }]);
+    const content = `Which format?\n\`\`\`choices\n${choicesJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-choices-wrapper')).toBeInTheDocument();
+    });
+
+    // All three choice labels are present
+    expect(screen.getByText('CSV')).toBeInTheDocument();
+    expect(screen.getByText('Excel')).toBeInTheDocument();
+    expect(screen.getByText('PDF')).toBeInTheDocument();
+
+    // Number badges 1, 2, 3 are present
+    const wrapper = document.querySelector('.aui-choices-wrapper')!;
+    const badges = wrapper.querySelectorAll('span.text-right');
+    expect(badges[0]?.textContent?.trim()).toBe('1');
+    expect(badges[1]?.textContent?.trim()).toBe('2');
+    expect(badges[2]?.textContent?.trim()).toBe('3');
+
+    // Freeform textarea is present with the correct placeholder
+    const textarea = wrapper.querySelector('textarea');
+    expect(textarea).toBeInTheDocument();
+    expect(textarea?.placeholder).toBe('Enter custom answer');
+
+    // Freeform row is numbered n+1 (4)
+    const allBadges = wrapper.querySelectorAll('span.text-right');
+    expect(allBadges[3]?.textContent?.trim()).toBe('4');
+  });
+
+  it('clicking a choice appends the label as a user message', async () => {
+    const choicesJson = JSON.stringify([{ label: 'Use CSV' }, { label: 'Use Excel' }]);
+    const content = `Pick one:\n\`\`\`choices\n${choicesJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-choices-wrapper')).toBeInTheDocument();
+    });
+
+    // Click the first choice
+    const choiceButton = screen.getByText('Use CSV').closest('button')!;
+    await act(async () => {
+      fireEvent.click(choiceButton);
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // A user message with that label should now appear in the thread
+    await waitFor(() => {
+      const userMessages = document.querySelectorAll('[data-role="user"]');
+      const texts = Array.from(userMessages).map(el => el.textContent);
+      expect(texts.some(t => t?.includes('Use CSV'))).toBe(true);
+    });
+  });
+
+  it('submitting freeform textarea appends the typed text as a user message', async () => {
+    const choicesJson = JSON.stringify([{ label: 'Option A' }]);
+    const content = `\`\`\`choices\n${choicesJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('textarea[placeholder="Enter custom answer"]')).toBeInTheDocument();
+    });
+
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Enter custom answer"]')!;
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'My custom answer' } });
+      fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await waitFor(() => {
+      const userMessages = document.querySelectorAll('[data-role="user"]');
+      const texts = Array.from(userMessages).map(el => el.textContent);
+      expect(texts.some(t => t?.includes('My custom answer'))).toBe(true);
+    });
+  });
+
+  it('does not submit freeform text when Shift+Enter is pressed', async () => {
+    const choicesJson = JSON.stringify([{ label: 'Option A' }]);
+    const content = `\`\`\`choices\n${choicesJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('textarea[placeholder="Enter custom answer"]')).toBeInTheDocument();
+    });
+
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[placeholder="Enter custom answer"]')!;
+    const initialUserMessageCount = document.querySelectorAll('[data-role="user"]').length;
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Draft text' } });
+      // Shift+Enter should NOT submit
+      fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // User message count should not have changed
+    expect(document.querySelectorAll('[data-role="user"]').length).toBe(initialUserMessageCount);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// SuggestionLinks rendering & interaction
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('SuggestionLinks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('renders follow-up suggestion links from a markdown suggestions block', async () => {
+    const suggestionsJson = JSON.stringify([
+      { label: 'Create a chart' },
+      { label: 'Add a formula' },
+    ]);
+    const content = `Done! Here are some ideas:\n\`\`\`suggestions\n${suggestionsJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-suggestions-wrapper')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Create a chart')).toBeInTheDocument();
+    expect(screen.getByText('Add a formula')).toBeInTheDocument();
+
+    // Should be plain link-style buttons (no border, bg-transparent)
+    const wrapper = document.querySelector('.aui-suggestions-wrapper')!;
+    const buttons = wrapper.querySelectorAll('button');
+    expect(buttons.length).toBe(2);
+  });
+
+  it('does NOT render a freeform textarea (unlike choices)', async () => {
+    const suggestionsJson = JSON.stringify([{ label: 'Try something' }]);
+    const content = `\`\`\`suggestions\n${suggestionsJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-suggestions-wrapper')).toBeInTheDocument();
+    });
+
+    // Suggestions have no freeform textarea
+    expect(document.querySelector('.aui-suggestions-wrapper textarea')).not.toBeInTheDocument();
+  });
+
+  it('clicking a suggestion appends the label as a user message', async () => {
+    const suggestionsJson = JSON.stringify([{ label: 'Add a pivot table' }]);
+    const content = `\`\`\`suggestions\n${suggestionsJson}\n\`\`\``;
+
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-suggestions-wrapper')).toBeInTheDocument();
+    });
+
+    const suggestionButton = screen.getByText('Add a pivot table').closest('button')!;
+    await act(async () => {
+      fireEvent.click(suggestionButton);
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await waitFor(() => {
+      const userMessages = document.querySelectorAll('[data-role="user"]');
+      const texts = Array.from(userMessages).map(el => el.textContent);
+      expect(texts.some(t => t?.includes('Add a pivot table'))).toBe(true);
+    });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Thread UI — Reload / BranchPicker / Edit buttons
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Thread UI: Reload, BranchPicker, and Edit buttons', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('renders "Regenerate response" button in the assistant action bar', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Hello world.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // The action bar should exist
+    expect(document.querySelector('.aui-assistant-action-bar')).toBeInTheDocument();
+
+    // TooltipIconButton renders accessible name via sr-only span — use getByRole
+    const reloadBtn = screen.getByRole('button', { name: 'Regenerate response' });
+    expect(reloadBtn).toBeInTheDocument();
+  });
+
+  it('does NOT render branch navigation buttons when there is only one branch', async () => {
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Single response.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // BranchPickerPrimitive has hideWhenSingleBranch — prev/next should not be in DOM
+    const prevBtn = document.querySelector('button[title="Previous response"]');
+    const nextBtn = document.querySelector('button[title="Next response"]');
+    expect(prevBtn).not.toBeInTheDocument();
+    expect(nextBtn).not.toBeInTheDocument();
+  });
+
+  it('renders "Edit message" button in the user message action bar', async () => {
+    // Use a full session so the thread properly idles (hideWhenRunning needs the run to complete)
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Hello!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="user"]')).toBeInTheDocument();
+    });
+
+    // ActionBarPrimitive.Root with autohide="always" requires isHovering=true to render.
+    // AUI uses native addEventListener("mouseenter"), so fireEvent.mouseEnter triggers it.
+    const userMsg = document.querySelector('[data-role="user"]')!;
+    await act(async () => {
+      fireEvent.mouseEnter(userMsg);
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // TooltipIconButton renders accessible name via sr-only span — use getByRole
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Edit message' })).toBeInTheDocument();
+    });
+  });
+
+  it('user action bar has aui-user-action-bar class', async () => {
+    // Use a full session so the thread properly idles (hideWhenRunning needs the run to complete)
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Hello!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      getHook().runtime.thread.append(APPEND_MSG());
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="user"]')).toBeInTheDocument();
+    });
+
+    // Trigger hover so autohide="always" allows rendering
+    const userMsg = document.querySelector('[data-role="user"]')!;
+    await act(async () => {
+      fireEvent.mouseEnter(userMsg);
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.aui-user-action-bar')).toBeInTheDocument();
+    });
   });
 });

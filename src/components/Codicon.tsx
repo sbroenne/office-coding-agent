@@ -1,7 +1,7 @@
 /**
  * Thin wrapper around @vscode/codicons icon font.
  *
- * Usage:  <Codicon name="robot" className="text-base" />
+ * Usage:  <Codicon name="robot" className="text-[14px]" />
  *
  * Icon names: https://microsoft.github.io/vscode-codicons/dist/codicon.html
  */

@@ -8,6 +8,7 @@ import type { OfficeHostApp } from '@/services/office/host';
 export interface ChatHeaderProps {
   host: OfficeHostApp;
   onClearMessages: () => void;
+  onCompactSession?: () => void;
   sessions: SessionHistoryItem[];
   activeSessionId: string | null;
   onRestoreSession: (sessionId: string) => void;
@@ -18,6 +19,7 @@ export interface ChatHeaderProps {
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
   host: _host,
   onClearMessages,
+  onCompactSession,
   sessions,
   activeSessionId,
   onRestoreSession,
@@ -25,8 +27,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onOpenPanel,
 }) => {
   return (
-    <div className="flex items-center justify-between border-b border-border bg-background px-3 py-1.5">
-      <div className="flex items-center gap-2 min-w-0">
+    <div className="flex h-[35px] items-center justify-between border-b border-border bg-background px-2">
+      <div className="flex items-center gap-1 min-w-0">
         <SessionHistoryPicker
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -36,23 +38,34 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         />
       </div>
 
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <SkillPicker onOpenPanel={onOpenPanel} />
         <button
           onClick={() => onOpenPanel?.('permissions')}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+          style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
           aria-label="Permissions"
           title="Permissions"
         >
-          <Codicon name="shield" className="text-base" />
+          <Codicon name="shield" className="text-[14px]" />
+        </button>
+        <button
+          onClick={onCompactSession}
+          className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+          style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
+          aria-label="Compact conversation"
+          title="Compact conversation"
+        >
+          <Codicon name="fold" className="text-[14px]" />
         </button>
         <button
           onClick={onClearMessages}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+          style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
           aria-label="New conversation"
           title="New conversation"
         >
-          <Codicon name="comment-add" className="text-base" />
+          <Codicon name="comment-add" className="text-[14px]" />
         </button>
       </div>
     </div>
