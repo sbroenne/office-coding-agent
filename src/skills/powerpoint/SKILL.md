@@ -49,6 +49,7 @@ Use this as the default orchestration skill for all PowerPoint tasks.
 | Apply a layout to a slide     | `apply_slide_layout`       |
 | Copy a slide (text only)      | `duplicate_slide`          |
 | Set speaker notes             | `set_slide_notes`          |
+| Change slide dimensions       | `set_presentation_size`    |
 
 ## Choosing Between `set_presentation_content` and `add_slide_from_code`
 
