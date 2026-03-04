@@ -5,8 +5,12 @@ import type { OfficeHostApp } from '@/services/office/host';
 // Bundled skill imports — one per host-specific skill directory
 import excelSkillRaw from '@/skills/excel/SKILL.md';
 import powerpointSkillRaw from '@/skills/powerpoint/SKILL.md';
+import powerpointChartsSkillRaw from '@/skills/powerpoint/CHARTS_SKILL.md';
+import powerpointSpeakerNotesSkillRaw from '@/skills/powerpoint/SPEAKER_NOTES_SKILL.md';
 import powerpointDeckBuilderSkillRaw from '@/skills/powerpoint-deck-builder/SKILL.md';
 import powerpointFormattingSkillRaw from '@/skills/powerpoint-formatting/SKILL.md';
+import powerpointDeckArchetypesSkillRaw from '@/skills/powerpoint/DECK_ARCHETYPES_SKILL.md';
+import powerpointDesignSkillRaw from '@/skills/powerpoint/DESIGN_SKILL.md';
 import powerpointRedesignSkillRaw from '@/skills/powerpoint-redesign/SKILL.md';
 import wordSkillRaw from '@/skills/word/SKILL.md';
 import wordDocumentBuilderSkillRaw from '@/skills/word-document-builder/SKILL.md';
@@ -162,7 +166,11 @@ function loadBundledSkills(): AgentSkill[] {
   const bundledRawSkills = [
     excelSkillRaw,
     powerpointSkillRaw,
+    powerpointChartsSkillRaw,
+    powerpointSpeakerNotesSkillRaw,
     powerpointDeckBuilderSkillRaw,
+    powerpointDeckArchetypesSkillRaw,
+    powerpointDesignSkillRaw,
     powerpointFormattingSkillRaw,
     powerpointRedesignSkillRaw,
     wordSkillRaw,
