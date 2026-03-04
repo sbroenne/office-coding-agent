@@ -197,6 +197,19 @@ export class BrowserCopilotSession {
     });
   }
 
+  async setModel(modelId: string): Promise<void> {
+    await this.connection.sendRequest('model.switch', {
+      sessionId: this.sessionId,
+      model: modelId,
+    });
+  }
+
+  async compact(): Promise<void> {
+    await this.connection.sendRequest('session.compact', {
+      sessionId: this.sessionId,
+    });
+  }
+
   async destroy(): Promise<void> {
     await this.connection.sendRequest('session.destroy', {
       sessionId: this.sessionId,

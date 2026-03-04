@@ -114,6 +114,17 @@ export function useOfficeChat(host: OfficeHostApp) {
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
+
+  // Switch model mid-session when the user picks a different model
+  useEffect(() => {
+    const session = sessionRef.current;
+    if (session && activeModel) {
+      session.setModel(activeModel).catch(err => {
+        console.warn('[chat] model.switch failed:', err);
+      });
+    }
+  }, [activeModel]);
+
   activeSkillNamesRef.current = activeSkillNames;
   activeAgentIdRef.current = activeAgentId;
   importedMcpServersRef.current = importedMcpServers;
@@ -776,6 +787,18 @@ export function useOfficeChat(host: OfficeHostApp) {
     }
   }, []);
 
+  const compactSession = useCallback(async () => {
+    const session = sessionRef.current;
+    if (session) {
+      try {
+        await session.compact();
+        console.log('[chat] session compacted');
+      } catch (err) {
+        console.warn('[chat] session.compact failed:', err);
+      }
+    }
+  }, []);
+
   const clearMessages = useCallback(() => {
     setMessages([]);
     setPendingPermission(null);
@@ -868,6 +891,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     sessionError,
     isConnecting,
     clearMessages,
+    compactSession,
     restoreSession,
     deleteSession,
     sessions,

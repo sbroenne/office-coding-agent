@@ -552,6 +552,42 @@ async function handleConnection(ws) {
         break;
       }
 
+      case 'model.switch': {
+        const { sessionId, model } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.setModel(model);
+          console.log(`[proxy] model.switch: session ${sessionId} switched to ${model}`);
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] model.switch failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to switch model');
+        }
+        break;
+      }
+
+      case 'session.compact': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.compact();
+          console.log(`[proxy] session.compact: session ${sessionId} compacted`);
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] session.compact failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to compact session');
+        }
+        break;
+      }
+
       case 'session.destroy': {
         const { sessionId } = params || {};
         const session = sessions.get(sessionId);

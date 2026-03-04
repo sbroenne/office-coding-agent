@@ -8,6 +8,7 @@ import type { OfficeHostApp } from '@/services/office/host';
 export interface ChatHeaderProps {
   host: OfficeHostApp;
   onClearMessages: () => void;
+  onCompactSession?: () => void;
   sessions: SessionHistoryItem[];
   activeSessionId: string | null;
   onRestoreSession: (sessionId: string) => void;
@@ -18,6 +19,7 @@ export interface ChatHeaderProps {
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
   host: _host,
   onClearMessages,
+  onCompactSession,
   sessions,
   activeSessionId,
   onRestoreSession,
@@ -45,6 +47,14 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           title="Permissions"
         >
           <Codicon name="shield" className="text-base" />
+        </button>
+        <button
+          onClick={onCompactSession}
+          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          aria-label="Compact conversation"
+          title="Compact conversation"
+        >
+          <Codicon name="fold" className="text-base" />
         </button>
         <button
           onClick={onClearMessages}
