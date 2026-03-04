@@ -13,7 +13,14 @@
 // ─── Parameter Types ──────────────────────────────────────
 
 /** Supported types for tool parameters */
-export type ParamType = 'string' | 'number' | 'boolean' | 'string[]' | 'any[][]' | 'string[][]';
+export type ParamType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'number[]'
+  | 'string[]'
+  | 'any[][]'
+  | 'string[][]';
 
 /** A single tool parameter definition */
 export interface ParamDef {

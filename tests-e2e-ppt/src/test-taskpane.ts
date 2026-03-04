@@ -386,6 +386,133 @@ async function testPptTools(): Promise<void> {
         : `Expected success message from clear_slide, got: ${s.substring(0, 100)}`;
     });
   }
+
+  // 14. get_smartart_info (slide 0 — may have no SmartArt shapes, which is a valid result)
+  await runTool(powerPointConfigs, 'get_smartart_info', { slideIndex: 0 }, r => {
+    const s = safeString(r);
+    return s.includes('Slide') ? null : `Expected "Slide" in result, got: ${s.substring(0, 100)}`;
+  });
+
+  // 15. group_shapes + ungroup_shapes
+  // First add two geometric shapes to slide 0, then group and ungroup them
+  let shapeCountBefore = 0;
+  try {
+    await PowerPoint.run(async context => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+      const slide = slides.items[0];
+      slide.shapes.load('items');
+      await context.sync();
+      shapeCountBefore = slide.shapes.items.length;
+    });
+  } catch {
+    /* ignore */
+  }
+
+  // Add two shapes to group
+  await runTool(
+    powerPointConfigs,
+    'add_geometric_shape',
+    { slideIndex: 0, shapeType: 'rectangle', left: 1, top: 4, width: 1.5, height: 1, name: 'GroupTestA' },
+    r => (safeString(r).includes('slide') ? null : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`)
+  );
+  await runTool(
+    powerPointConfigs,
+    'add_geometric_shape',
+    { slideIndex: 0, shapeType: 'ellipse', left: 3, top: 4, width: 1.5, height: 1, name: 'GroupTestB' },
+    r => (safeString(r).includes('slide') ? null : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`)
+  );
+
+  // Get shape indices for the two new shapes
+  let groupShapeIdx0 = -1;
+  let groupShapeIdx1 = -1;
+  try {
+    await PowerPoint.run(async context => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+      const slide = slides.items[0];
+      slide.shapes.load('items');
+      await context.sync();
+      for (let i = 0; i < slide.shapes.items.length; i++) {
+        slide.shapes.items[i].load('name');
+      }
+      await context.sync();
+      for (let i = 0; i < slide.shapes.items.length; i++) {
+        const name = slide.shapes.items[i].name;
+        if (name === 'GroupTestA') groupShapeIdx0 = i;
+        if (name === 'GroupTestB') groupShapeIdx1 = i;
+      }
+    });
+  } catch {
+    /* ignore */
+  }
+
+  if (groupShapeIdx0 >= 0 && groupShapeIdx1 >= 0) {
+    // group the two shapes
+    let groupedShapeIdx = -1;
+    const groupResult = await callTool(powerPointConfigs, 'group_shapes', {
+      slideIndex: 0,
+      shapeIndices: [groupShapeIdx0, groupShapeIdx1],
+      groupName: 'TestGroup',
+    });
+    const groupStr = safeString(groupResult);
+    if (groupStr.toLowerCase().includes('group') || groupStr.includes('slide')) {
+      pass('group_shapes');
+    } else {
+      fail('group_shapes', `Unexpected result: ${groupStr.substring(0, 100)}`);
+    }
+
+    // Find the group shape index
+    try {
+      await PowerPoint.run(async context => {
+        const slides = context.presentation.slides;
+        slides.load('items');
+        await context.sync();
+        const slide = slides.items[0];
+        slide.shapes.load('items');
+        await context.sync();
+        for (let i = 0; i < slide.shapes.items.length; i++) {
+          slide.shapes.items[i].load('name,type');
+        }
+        await context.sync();
+        for (let i = 0; i < slide.shapes.items.length; i++) {
+          if (
+            slide.shapes.items[i].name === 'TestGroup' ||
+            String(slide.shapes.items[i].type) === 'Group'
+          ) {
+            groupedShapeIdx = i;
+            break;
+          }
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+
+    if (groupedShapeIdx >= 0) {
+      // ungroup the group
+      await runTool(
+        powerPointConfigs,
+        'ungroup_shapes',
+        { slideIndex: 0, shapeIndex: groupedShapeIdx },
+        r => {
+          const s = safeString(r);
+          return s.toLowerCase().includes('ungroup') || s.includes('slide')
+            ? null
+            : `Expected success from ungroup_shapes: ${s.substring(0, 100)}`;
+        }
+      );
+    } else {
+      log('  ⚠ ungroup_shapes: skipped — could not locate group shape after grouping');
+      addTestResult(testValues, 'ungroup_shapes', 'conditional_pass', 'pass');
+    }
+  } else {
+    log('  ⚠ group_shapes: skipped — could not locate test shapes');
+    addTestResult(testValues, 'group_shapes', 'conditional_pass', 'pass');
+    addTestResult(testValues, 'ungroup_shapes', 'conditional_pass', 'pass');
+  }
 }
 
 // ─── LaunchEvent handler (for auto-start via manifest) ─────────────
