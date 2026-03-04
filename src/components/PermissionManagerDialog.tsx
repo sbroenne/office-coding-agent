@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Folder, Trash2 } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { usePermissionStore } from '@/stores';
 
 interface BrowseResponse {
@@ -96,7 +96,7 @@ export const PermissionManagerPanel: React.FC = () => {
             onClick={() => setBrowseOpen(v => !v)}
             className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
           >
-            <Folder className="size-3" /> Browse
+            <Codicon name="folder" className="text-xs" /> Browse
           </button>
           {workingDirectory && (
             <button
@@ -136,7 +136,7 @@ export const PermissionManagerPanel: React.FC = () => {
                     onClick={() => void loadDir(`${browsePath}/${dir}`)}
                     className="flex w-full items-center gap-1 px-2 py-1 text-left text-xs hover:bg-accent"
                   >
-                    <Folder className="size-3" /> {dir}
+                    <Codicon name="folder" className="text-xs" /> {dir}
                   </button>
                 ))
               )}
@@ -191,7 +191,7 @@ export const PermissionManagerPanel: React.FC = () => {
                   aria-label="Remove rule"
                   title="Remove rule"
                 >
-                  <Trash2 className="size-3" />
+                  <Codicon name="trash" className="text-xs" />
                 </button>
               </div>
             ))}

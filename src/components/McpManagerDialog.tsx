@@ -1,17 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Square,
-  Play,
-  Trash2,
-  Upload,
-  FileText,
-} from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { parseMcpJsonFile } from '@/services/mcp';
 import { useSettingsStore, useMcpStatusStore } from '@/stores';
@@ -21,11 +9,11 @@ import { McpAddServerForm } from './McpAddServerForm';
 import { McpLogViewer } from './McpLogViewer';
 
 const STATUS_COLORS: Record<McpServerStatus | 'disabled', string> = {
-  connected: 'bg-emerald-500',
-  starting: 'bg-amber-400',
-  error: 'bg-red-500',
-  stopped: 'bg-zinc-400',
-  disabled: 'bg-zinc-300 dark:bg-zinc-600',
+  connected: 'bg-[var(--vscode-textLink-foreground)]',
+  starting: 'bg-[var(--vscode-descriptionForeground)]',
+  error: 'bg-[var(--vscode-errorForeground)]',
+  stopped: 'bg-[var(--vscode-descriptionForeground)]',
+  disabled: 'bg-[var(--vscode-descriptionForeground)] opacity-50',
 };
 
 const STATUS_LABELS: Record<McpServerStatus | 'disabled', string> = {
@@ -149,7 +137,7 @@ export const McpManagerPanel: React.FC = () => {
               setEditingServer(null);
             }}
           >
-            <Plus className="size-3.5" />
+            <Codicon name="add" className="text-sm" />
             Add
           </Button>
           <>
@@ -169,9 +157,9 @@ export const McpManagerPanel: React.FC = () => {
               aria-busy={isImporting}
             >
               {isImporting ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Codicon name="loading" className="text-sm codicon-modifier-spin" />
               ) : (
-                <Upload className="size-3.5" />
+                <Codicon name="cloud-upload" className="text-sm" />
               )}
               {isImporting ? 'Importing…' : 'Import'}
             </Button>
@@ -192,7 +180,7 @@ export const McpManagerPanel: React.FC = () => {
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100"
+          className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
         >
           {importStatus}
         </div>
@@ -201,7 +189,7 @@ export const McpManagerPanel: React.FC = () => {
         <div
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-700 dark:bg-red-900/30 dark:text-red-100"
+          className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
         >
           {importError}
         </div>
@@ -251,7 +239,7 @@ export const McpManagerPanel: React.FC = () => {
                       <div className="flex items-center gap-1.5">
                         <span className="truncate text-sm font-medium">{server.name}</span>
                         {bundled && (
-                          <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0 text-[9px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                          <span className="shrink-0 rounded-full bg-[var(--vscode-textLink-foreground)]/15 px-1.5 py-0 text-[9px] font-medium text-[var(--vscode-textLink-foreground)]">
                             Built-in
                           </span>
                         )}
@@ -263,7 +251,9 @@ export const McpManagerPanel: React.FC = () => {
                             : server.url)}
                       </p>
                       {status === 'error' && serverState?.error && (
-                        <p className="truncate text-[10px] text-red-500">{serverState.error}</p>
+                        <p className="truncate text-[10px] text-[var(--vscode-errorForeground)]">
+                          {serverState.error}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -278,9 +268,9 @@ export const McpManagerPanel: React.FC = () => {
                         title={`${toolCount} tool${toolCount === 1 ? '' : 's'}`}
                       >
                         {isExpanded ? (
-                          <ChevronDown className="size-3" />
+                          <Codicon name="chevron-down" className="text-xs" />
                         ) : (
-                          <ChevronRight className="size-3" />
+                          <Codicon name="chevron-right" className="text-xs" />
                         )}
                         {toolCount}
                       </button>
@@ -291,7 +281,7 @@ export const McpManagerPanel: React.FC = () => {
                       className={`inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground ${logServer === server.name ? 'bg-accent text-accent-foreground' : ''}`}
                       title="Show Output"
                     >
-                      <FileText className="size-3" />
+                      <Codicon name="output" className="text-xs" />
                     </button>
                     {/* Restart (re-toggle) */}
                     {isServerActive(server.name) && (
@@ -308,7 +298,7 @@ export const McpManagerPanel: React.FC = () => {
                         className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         title="Restart"
                       >
-                        <RefreshCw className="size-3" />
+                        <Codicon name="refresh" className="text-xs" />
                       </button>
                     )}
                     {/* Start/Stop */}
@@ -318,9 +308,9 @@ export const McpManagerPanel: React.FC = () => {
                       title={isServerActive(server.name) ? 'Stop' : 'Start'}
                     >
                       {isServerActive(server.name) ? (
-                        <Square className="size-3" />
+                        <Codicon name="primitive-square" className="text-xs" />
                       ) : (
-                        <Play className="size-3" />
+                        <Codicon name="play" className="text-xs" />
                       )}
                     </button>
                     {/* Edit (imported only) */}
@@ -333,7 +323,7 @@ export const McpManagerPanel: React.FC = () => {
                         className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         title="Edit"
                       >
-                        <Pencil className="size-3" />
+                        <Codicon name="edit" className="text-xs" />
                       </button>
                     )}
                     {/* Remove (imported only) */}
@@ -343,7 +333,7 @@ export const McpManagerPanel: React.FC = () => {
                         className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-accent"
                         title="Remove"
                       >
-                        <Trash2 className="size-3" />
+                        <Codicon name="trash" className="text-xs" />
                       </button>
                     )}
                   </div>

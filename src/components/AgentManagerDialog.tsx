@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Download, Loader2, Trash2, Upload } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { getBundledAgents } from '@/services/agents';
 import { parseAgentsZipFile, parseAgentMarkdownFile } from '@/services/extensions/zipImportService';
@@ -109,9 +109,9 @@ export const AgentManagerPanel: React.FC = () => {
             title="Import agents from ZIP"
           >
             {isImporting ? (
-              <Loader2 className="size-3.5 animate-spin" />
+              <Codicon name="loading" className="text-sm codicon-modifier-spin" />
             ) : (
-              <Upload className="size-3.5" />
+              <Codicon name="cloud-upload" className="text-sm" />
             )}
             ZIP
           </Button>
@@ -123,7 +123,7 @@ export const AgentManagerPanel: React.FC = () => {
             aria-busy={isImporting}
             title="Import a single agent .md file"
           >
-            <Upload className="size-3.5" />
+            <Codicon name="cloud-upload" className="text-sm" />
             .md
           </Button>
         </div>
@@ -133,7 +133,7 @@ export const AgentManagerPanel: React.FC = () => {
         <div
           role="status"
           aria-live="polite"
-          className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100"
+          className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
         >
           {importStatus}
         </div>
@@ -142,7 +142,7 @@ export const AgentManagerPanel: React.FC = () => {
         <div
           role="alert"
           aria-live="assertive"
-          className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-900 dark:border-red-700 dark:bg-red-900/30 dark:text-red-100"
+          className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
         >
           {importError}
         </div>
@@ -173,7 +173,7 @@ export const AgentManagerPanel: React.FC = () => {
                 aria-label={`Download ${agent.metadata.name} as template`}
                 title="Download as template"
               >
-                <Download className="size-3.5" />
+                <Codicon name="cloud-download" className="text-sm" />
               </Button>
             </div>
           ))
@@ -194,9 +194,9 @@ export const AgentManagerPanel: React.FC = () => {
               title="Download all custom agents as ZIP"
             >
               {isDownloadingAll ? (
-                <Loader2 className="size-3 animate-spin" />
+                <Codicon name="loading" className="text-xs codicon-modifier-spin" />
               ) : (
-                <Download className="size-3" />
+                <Codicon name="cloud-download" className="text-xs" />
               )}
               Download all
             </Button>
@@ -225,7 +225,7 @@ export const AgentManagerPanel: React.FC = () => {
                   aria-label={`Download ${agent.metadata.name}`}
                   title="Download as .md"
                 >
-                  <Download className="size-3.5" />
+                  <Codicon name="cloud-download" className="text-sm" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -235,7 +235,7 @@ export const AgentManagerPanel: React.FC = () => {
                   aria-label={`Remove ${agent.metadata.name}`}
                   title="Remove"
                 >
-                  <Trash2 className="size-3.5" />
+                  <Codicon name="trash" className="text-sm" />
                 </Button>
               </div>
             </div>

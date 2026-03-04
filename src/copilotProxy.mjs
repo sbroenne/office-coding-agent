@@ -450,6 +450,7 @@ async function handleConnection(ws) {
         try {
           await ensureStarted();
           session = await client.createSession({
+            clientName: 'office-coding-agent',
             model,
             sessionId,
             systemMessage,
@@ -461,6 +462,14 @@ async function handleConnection(ws) {
             customAgents: customAgents?.length > 0 ? customAgents : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
+              // Auto-approve custom-tool permissions — these are tools explicitly
+              // registered by the session creator, not built-in filesystem tools.
+              // The SDK v0.1.28+ denies all permissions by default; our own tools
+              // should always be allowed to execute.
+              if (request.kind === 'custom-tool') {
+                console.log(`[proxy] permission.request auto-approved: ${request.kind}`);
+                return { kind: 'approved' };
+              }
               const decision = await requestPermissionDecision(session.sessionId, request);
               console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision}`);
               return { kind: decision };
@@ -540,6 +549,42 @@ async function handleConnection(ws) {
         }
         const messageId = await session.send({ prompt, attachments, mode });
         sendResponse(id, { messageId });
+        break;
+      }
+
+      case 'model.switch': {
+        const { sessionId, model } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.setModel(model);
+          console.log(`[proxy] model.switch: session ${sessionId} switched to ${model}`);
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] model.switch failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to switch model');
+        }
+        break;
+      }
+
+      case 'session.compact': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.compact();
+          console.log(`[proxy] session.compact: session ${sessionId} compacted`);
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] session.compact failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to compact session');
+        }
         break;
       }
 

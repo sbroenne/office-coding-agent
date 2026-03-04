@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Copy, Trash2 } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { useMcpStatusStore } from '@/stores';
 
@@ -58,7 +58,7 @@ export const McpLogViewer: React.FC<McpLogViewerProps> = ({ serverName }) => {
             title="Copy logs"
             disabled={logs.length === 0}
           >
-            <Copy className="size-3" />
+            <Codicon name="copy" className="text-xs" />
           </Button>
           <Button
             variant="ghost"
@@ -68,7 +68,7 @@ export const McpLogViewer: React.FC<McpLogViewerProps> = ({ serverName }) => {
             title="Clear logs"
             disabled={logs.length === 0}
           >
-            <Trash2 className="size-3" />
+            <Codicon name="trash" className="text-xs" />
           </Button>
         </div>
       </div>
@@ -78,7 +78,7 @@ export const McpLogViewer: React.FC<McpLogViewerProps> = ({ serverName }) => {
         className="h-[160px] overflow-y-auto rounded-md border border-border bg-black/90 p-2 font-mono text-[10px] leading-4"
       >
         {logs.length === 0 ? (
-          <span className="text-zinc-500">
+          <span className="text-muted-foreground">
             No output yet — logs appear when the server connects
           </span>
         ) : (
@@ -87,13 +87,13 @@ export const McpLogViewer: React.FC<McpLogViewerProps> = ({ serverName }) => {
               key={i}
               className={
                 entry.level === 'error'
-                  ? 'text-red-400'
+                  ? 'text-[var(--vscode-errorForeground)]'
                   : entry.level === 'warn'
-                    ? 'text-amber-400'
-                    : 'text-zinc-300'
+                    ? 'text-[var(--vscode-descriptionForeground)]'
+                    : 'text-foreground'
               }
             >
-              <span className="text-zinc-500">
+              <span className="text-muted-foreground">
                 {entry.timestamp.split('T')[1]?.split('.')[0] ?? entry.timestamp}
               </span>{' '}
               {entry.message}

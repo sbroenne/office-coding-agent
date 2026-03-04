@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { History, ChevronDown, Trash2 } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 
@@ -42,18 +42,19 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <button
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 transition-colors hover:bg-accent"
+            style={{ height: 22, color: 'var(--vscode-icon-foreground)', fontSize: 12 }}
             aria-label="Session history"
             title="Session history"
           >
-            <History className="size-4" />
-            <ChevronDown className="size-3 opacity-60" />
+            <Codicon name="history" className="text-[14px]" />
+            <Codicon name="chevron-down" className="text-[10px] opacity-60" />
           </button>
         </Popover.Trigger>
 
         <Popover.Portal>
           <Popover.Content
-            className="z-50 w-72 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md outline-none"
+            className="z-50 w-72 max-h-80 overflow-y-auto rounded-[var(--vscode-cornerRadius-medium)] border border-border bg-popover p-1 shadow-md outline-none"
             sideOffset={4}
             align="start"
           >
@@ -101,7 +102,7 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
                       aria-label="Delete session"
                       title="Delete session"
                     >
-                      <Trash2 className="size-3" />
+                      <Codicon name="trash" className="text-xs" />
                     </button>
                   </div>
                 </div>

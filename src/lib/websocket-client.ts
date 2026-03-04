@@ -62,7 +62,7 @@ export interface CustomAgentPayload {
 }
 
 /** Extended session config for browser → proxy communication. */
-export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools'> {
+export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onPermissionRequest'> {
   tools?: Tool[];
   /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
   host?: string;
@@ -194,6 +194,19 @@ export class BrowserCopilotSession {
       sessionId: this.sessionId,
       requestId,
       decision,
+    });
+  }
+
+  async setModel(modelId: string): Promise<void> {
+    await this.connection.sendRequest('model.switch', {
+      sessionId: this.sessionId,
+      model: modelId,
+    });
+  }
+
+  async compact(): Promise<void> {
+    await this.connection.sendRequest('session.compact', {
+      sessionId: this.sessionId,
     });
   }
 

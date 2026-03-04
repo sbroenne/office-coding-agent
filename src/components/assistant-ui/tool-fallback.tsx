@@ -1,11 +1,11 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { AlertCircleIcon, CheckIcon, ChevronDownIcon, LoaderIcon, XCircleIcon } from 'lucide-react';
 import {
   useScrollLock,
   type ToolCallMessagePartStatus,
   type ToolCallMessagePartComponent,
 } from '@assistant-ui/react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { humanizeToolName } from '@/utils/humanizeToolName';
 import { toolResultSummary } from '@/utils/toolResultSummary';
@@ -55,13 +55,12 @@ function ToolFallbackRoot({
       data-slot="tool-fallback-root"
       open={isOpen}
       onOpenChange={handleOpenChange}
-      className={cn(
-        'aui-tool-fallback-root group/tool-fallback-root w-full rounded-lg border py-3',
-        className
-      )}
+      className={cn('aui-tool-fallback-root group/tool-fallback-root w-full py-2', className)}
       style={
         {
           '--animation-duration': `${ANIMATION_DURATION}ms`,
+          border: '1px solid var(--vscode-widget-border)',
+          borderRadius: 'var(--vscode-cornerRadius-medium)',
         } as React.CSSProperties
       }
       {...props}
@@ -73,11 +72,12 @@ function ToolFallbackRoot({
 
 type ToolStatus = ToolCallMessagePartStatus['type'];
 
-const statusIconMap: Record<ToolStatus, React.ElementType> = {
-  running: LoaderIcon,
-  complete: CheckIcon,
-  incomplete: XCircleIcon,
-  'requires-action': AlertCircleIcon,
+/** Maps tool status to codicon name */
+const statusCodiconMap: Record<ToolStatus, string> = {
+  running: 'loading~spin',
+  complete: 'check',
+  incomplete: 'error',
+  'requires-action': 'warning',
 };
 
 function ToolFallbackTrigger({
@@ -95,7 +95,7 @@ function ToolFallbackTrigger({
   const isRunning = statusType === 'running';
   const isCancelled = status?.type === 'incomplete' && status.reason === 'cancelled';
 
-  const Icon = statusIconMap[statusType];
+  const codiconName = statusCodiconMap[statusType];
   const friendlyName = humanizeToolName(toolName);
   const summary = !isRunning && result !== undefined ? toolResultSummary(result) : null;
 
@@ -103,17 +103,17 @@ function ToolFallbackTrigger({
     <CollapsibleTrigger
       data-slot="tool-fallback-trigger"
       className={cn(
-        'aui-tool-fallback-trigger group/trigger flex w-full items-center gap-2 px-4 text-sm transition-colors',
+        'aui-tool-fallback-trigger group/trigger flex w-full items-center gap-2 px-3 text-sm transition-colors',
         className
       )}
       {...props}
     >
-      <Icon
-        data-slot="tool-fallback-trigger-icon"
+      <Codicon
+        name={codiconName}
         className={cn(
-          'aui-tool-fallback-trigger-icon size-4 shrink-0',
+          'aui-tool-fallback-trigger-icon shrink-0 text-sm',
           isCancelled && 'text-muted-foreground',
-          isRunning && 'animate-spin'
+          isRunning && 'codicon-modifier-spin'
         )}
       />
       <span
@@ -123,28 +123,20 @@ function ToolFallbackTrigger({
           isCancelled && 'text-muted-foreground line-through'
         )}
       >
-        <span>
+        <span className={cn(isRunning && 'chat-thinking-shimmer-text')}>
           <b>{friendlyName}</b>
         </span>
-        {isRunning && (
-          <span
-            aria-hidden
-            data-slot="tool-fallback-trigger-shimmer"
-            className="aui-tool-fallback-trigger-shimmer shimmer pointer-events-none absolute inset-0 motion-reduce:animate-none"
-          >
-            <b>{friendlyName}</b>
-          </span>
-        )}
       </span>
       {summary && (
         <span className="ml-1 min-w-0 flex-1 truncate text-xs text-muted-foreground">
           {summary}
         </span>
       )}
-      <ChevronDownIcon
+      <Codicon
+        name="chevron-down"
         data-slot="tool-fallback-trigger-chevron"
         className={cn(
-          'aui-tool-fallback-trigger-chevron ml-auto size-4 shrink-0',
+          'aui-tool-fallback-trigger-chevron ml-auto shrink-0 text-sm',
           'transition-transform duration-200 ease-out',
           'group-data-[state=closed]/trigger:-rotate-90',
           'group-data-[state=open]/trigger:rotate-0'
@@ -169,7 +161,12 @@ function ToolFallbackContent({
       )}
       {...props}
     >
-      <div className="mt-3 flex flex-col gap-2 border-t pt-2">{children}</div>
+      <div
+        className="mt-2 flex flex-col gap-2 pt-2"
+        style={{ borderTop: '1px solid var(--vscode-widget-border)' }}
+      >
+        {children}
+      </div>
     </CollapsibleContent>
   );
 }
@@ -186,11 +183,19 @@ function ToolFallbackArgs({
   return (
     <div
       data-slot="tool-fallback-args"
-      className={cn('aui-tool-fallback-args px-4', className)}
+      className={cn('aui-tool-fallback-args px-3', className)}
       {...props}
     >
       <p className="mb-1 text-xs font-semibold text-muted-foreground">Input</p>
-      <pre className="aui-tool-fallback-args-value whitespace-pre-wrap text-xs">{argsText}</pre>
+      <pre
+        className="aui-tool-fallback-args-value whitespace-pre-wrap rounded-[var(--vscode-cornerRadius-medium)] p-2 text-xs"
+        style={{
+          fontFamily: 'var(--vscode-monospace-font)',
+          background: 'var(--vscode-editorWidget-background)',
+        }}
+      >
+        {argsText}
+      </pre>
     </div>
   );
 }
@@ -207,13 +212,20 @@ function ToolFallbackResult({
   return (
     <div
       data-slot="tool-fallback-result"
-      className={cn('aui-tool-fallback-result border-t border-dashed px-4 pt-2', className)}
+      className={cn('aui-tool-fallback-result px-3 pt-2', className)}
+      style={{ borderTop: '1px dashed var(--vscode-widget-border)' }}
       {...props}
     >
       <p className="aui-tool-fallback-result-header mb-1 text-xs font-semibold text-muted-foreground">
         Output
       </p>
-      <pre className="aui-tool-fallback-result-content whitespace-pre-wrap text-xs">
+      <pre
+        className="aui-tool-fallback-result-content whitespace-pre-wrap rounded-[var(--vscode-cornerRadius-medium)] p-2 text-xs"
+        style={{
+          fontFamily: 'var(--vscode-monospace-font)',
+          background: 'var(--vscode-editorWidget-background)',
+        }}
+      >
         {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
       </pre>
     </div>
@@ -240,13 +252,21 @@ function ToolFallbackError({
   return (
     <div
       data-slot="tool-fallback-error"
-      className={cn('aui-tool-fallback-error px-4', className)}
+      className={cn('aui-tool-fallback-error px-3', className)}
       {...props}
     >
-      <p className="aui-tool-fallback-error-header font-semibold text-muted-foreground">
+      <p
+        className="aui-tool-fallback-error-header font-semibold"
+        style={{ color: 'var(--vscode-errorForeground)' }}
+      >
         {headerText}
       </p>
-      <p className="aui-tool-fallback-error-reason text-muted-foreground">{errorText}</p>
+      <p
+        className="aui-tool-fallback-error-reason"
+        style={{ color: 'var(--vscode-errorForeground)' }}
+      >
+        {errorText}
+      </p>
     </div>
   );
 }
@@ -255,7 +275,7 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
   const isCancelled = status?.type === 'incomplete' && status.reason === 'cancelled';
 
   return (
-    <ToolFallbackRoot className={cn(isCancelled && 'border-muted-foreground/30 bg-muted/30')}>
+    <ToolFallbackRoot className={cn(isCancelled && 'opacity-60')}>
       <ToolFallbackTrigger toolName={toolName} status={status} result={result as unknown} />
       <ToolFallbackContent>
         <ToolFallbackError status={status} />

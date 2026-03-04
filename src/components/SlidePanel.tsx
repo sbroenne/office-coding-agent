@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 
 interface SlidePanelProps {
   open: boolean;
@@ -105,17 +105,18 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
       onKeyDown={handleFocusTrap}
     >
       {/* Panel header */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 shrink-0">
+      <div className="flex h-[35px] items-center gap-2 border-b border-border px-3 shrink-0">
         <button
           onClick={onClose}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+          style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
           aria-label="Back"
           title="Back"
         >
-          <ArrowLeft className="size-4" />
+          <Codicon name="arrow-left" className="text-[14px]" />
         </button>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold truncate">{title}</h2>
+          <h2 className="text-[13px] font-semibold truncate">{title}</h2>
           {description && (
             <p className="text-[10px] text-muted-foreground truncate">{description}</p>
           )}
