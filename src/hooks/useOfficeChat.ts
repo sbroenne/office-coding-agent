@@ -649,14 +649,15 @@ export function useOfficeChat(host: OfficeHostApp) {
     let streamText = '';
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
-      // Keep tool-call parts in the completed message so they remain visible
-      // as a collapsible "thinking" section above the text response, matching
-      // VS Code Copilot Chat's behavior where completed tool calls stay visible.
+      // Text part MUST come before tool-call parts to prevent index-shift
+      // tearing: when text is streaming at index 0 and a tool-call arrives,
+      // prepending the tool-call would shift the text to index 1, causing
+      // React 18's useSyncExternalStore to see a tool-call where it expects
+      // text → "MessagePartText can only be used inside text or reasoning
+      // message parts." Keeping text at index 0 avoids the shift entirely.
       const content: ThreadMessageLike['content'] = [
-        // Tool-call parts come FIRST so they appear above the text response,
-        // matching VS Code's layout: thinking/tools section → then text.
-        ...Array.from(toolParts.values()),
         ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
+        ...Array.from(toolParts.values()),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
     };
