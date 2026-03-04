@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import type { McpTransportType } from '@/types';
 
@@ -110,7 +110,7 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
           onClick={onCancel}
           className="rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
         >
-          <X className="size-3.5" />
+          <Codicon name="close" className="text-sm" />
         </button>
       </div>
 
@@ -123,7 +123,7 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
             onChange={e => setName(e.target.value)}
             readOnly={editMode}
             placeholder="my-server"
-            className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-[-1px]"
           />
         </div>
 
@@ -136,7 +136,7 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
             value={description}
             onChange={e => setDescription(e.target.value)}
             placeholder="What this server does"
-            className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-[-1px]"
           />
         </div>
 
@@ -168,7 +168,7 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
                 value={command}
                 onChange={e => setCommand(e.target.value)}
                 placeholder="npx"
-                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-[-1px]"
               />
             </div>
             <div>
@@ -180,7 +180,7 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
                 value={args}
                 onChange={e => setArgs(e.target.value)}
                 placeholder="-y @microsoft/workiq mcp"
-                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-[-1px]"
               />
             </div>
           </>
@@ -193,7 +193,7 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder="https://example.com/mcp"
-                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 text-xs focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-[-1px]"
               />
             </div>
             <div>
@@ -205,14 +205,14 @@ export const McpAddServerForm: React.FC<McpAddServerFormProps> = ({
                 onChange={e => setHeadersText(e.target.value)}
                 placeholder='{"Authorization": "Bearer ..."}'
                 rows={2}
-                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px] focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-0.5 w-full rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px] focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-[-1px]"
               />
             </div>
           </>
         )}
       </div>
 
-      {error && <p className="text-[10px] text-red-500">{error}</p>}
+      {error && <p className="text-[10px] text-[var(--vscode-errorForeground)]">{error}</p>}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
