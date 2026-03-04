@@ -21,6 +21,34 @@ Branch protection is enforced on GitHub (ruleset ID `13260767`). Any attempt to 
 
 **PRs must be merged via squash merge only.** Merge commits and rebase merges are disabled in the repository settings. When asking the user to merge a PR, always tell them to use **"Squash and merge"** on GitHub.
 
+## ⛔ UI GOLDEN RULE: LOOK AND FEEL IDENTICAL TO VS CODE
+
+**The add-in must look and feel identical to VS Code's Copilot Chat — no exceptions.**
+
+Every UI element, interaction, and visual detail must match what a user sees in VS Code's Copilot Chat panel. When in doubt, open VS Code's Copilot Chat and copy what you see.
+
+### Design System
+- **Colors:** Use `--vscode-*` CSS custom properties from `src/styles/vscode-theme.css` — NEVER hardcode colors or use non-VS-Code values
+- **Icons:** Use codicons (`@vscode/codicons`) for ALL icons — NEVER use lucide-react or other icon libraries for new icons
+- **Typography:** VS Code font stack (13px Segoe UI) — NEVER change the base font size or family
+- **Spacing & Radii:** Use VS Code corner radii (2px small, 4px medium, 8px large) and compact spacing — NEVER use large padding or oversized elements
+- **Focus:** 1px solid `--vscode-focusBorder` outline — NEVER use box-shadow rings
+
+### Chat Components
+- **Messages:** Full-width, no chat bubbles. Assistant messages have a 22px Copilot avatar + "Copilot" label header
+- **User messages:** Plain text, no border or background box
+- **Thinking indicator:** Shimmer gradient animation (`chat-thinking-shimmer`) on text — NEVER use spinners or pulse animations
+- **Tool invocations:** Collapsible sections with codicon chevron + shimmer on running tool name
+- **Follow-up suggestions:** Blue link-colored text (`textLink-foreground`) with sparkle codicon — NEVER use bordered cards
+- **Welcome screen:** Centered Copilot avatar, compact heading, blue link-colored suggestion items
+- **Composer input:** VS Code input background/border, 8px border-radius, no toolbar divider line
+
+### When Adding New UI
+1. First, check how VS Code's Copilot Chat does it (open VS Code or check `microsoft/vscode` source)
+2. Copy the HTML structure and CSS patterns from VS Code
+3. Use the same class naming conventions and design tokens
+4. If VS Code doesn't have a precedent for the feature, use the closest VS Code UI pattern (panel, quick pick, dialog, etc.)
+
 ## Project Overview
 
 **office-coding-agent** is a Microsoft Office add-in with a single task pane UI and host-routed AI runtime behavior. The current implementation is **Excel-first**, but tools and prompts are selected by host (`excel`, `powerpoint`, etc.) to support future hosts without changing the UI.

@@ -450,6 +450,7 @@ async function handleConnection(ws) {
         try {
           await ensureStarted();
           session = await client.createSession({
+            clientName: 'office-coding-agent',
             model,
             sessionId,
             systemMessage,
