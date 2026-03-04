@@ -73,13 +73,15 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
 
       // Capture PNG thumbnail for every slide
       interface SlideWithImage {
-        getImageAsBase64(width: number): { value: string };
+        getImageAsBase64(options?: { width?: number; height?: number }): { value: string };
       }
       const imageResults: { value: string }[] = [];
       let imagesSupported = true;
       try {
         for (const slide of slides.items) {
-          imageResults.push((slide as unknown as SlideWithImage).getImageAsBase64(thumbnailWidth));
+          imageResults.push(
+            (slide as unknown as SlideWithImage).getImageAsBase64({ width: thumbnailWidth })
+          );
         }
         await context.sync();
       } catch {
@@ -219,14 +221,14 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
       }
 
       const slide = slides.items[slideIndex];
-      // getImageAsBase64 is available in PowerPoint requirement set 1.5+
+      // getImageAsBase64 is available in PowerPoint API set 1.8+
       interface SlideWithImage {
-        getImageAsBase64(width: number): { value: string };
+        getImageAsBase64(options?: { width?: number; height?: number }): { value: string };
       }
 
       let imageResult: { value: string };
       try {
-        imageResult = (slide as unknown as SlideWithImage).getImageAsBase64(width);
+        imageResult = (slide as unknown as SlideWithImage).getImageAsBase64({ width });
         await context.sync();
       } catch {
         return (
