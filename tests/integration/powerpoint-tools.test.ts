@@ -50,6 +50,16 @@ const EXPECTED_TOOL_NAMES = [
   'group_shapes',
   'ungroup_shapes',
   'get_smartart_info',
+  'get_theme_colors',
+  'get_presentation_properties',
+  'set_presentation_properties',
+  'get_selected_text_range',
+  'set_shape_alt_text',
+  'get_hyperlinks',
+  'add_hyperlink',
+  'fetch_image_as_base64',
+  'get_table_data',
+  'set_table_cell',
 ] as const;
 
 // ─── Structural ───────────────────────────────────────────────────────────────
