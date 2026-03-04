@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { History, ChevronDown, Trash2 } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 
@@ -46,8 +46,8 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
             aria-label="Session history"
             title="Session history"
           >
-            <History className="size-4" />
-            <ChevronDown className="size-3 opacity-60" />
+            <Codicon name="history" className="text-base" />
+            <Codicon name="chevron-down" className="text-xs opacity-60" />
           </button>
         </Popover.Trigger>
 
@@ -101,7 +101,7 @@ export const SessionHistoryPicker: React.FC<SessionHistoryPickerProps> = ({
                       aria-label="Delete session"
                       title="Delete session"
                     >
-                      <Trash2 className="size-3" />
+                      <Codicon name="trash" className="text-xs" />
                     </button>
                   </div>
                 </div>

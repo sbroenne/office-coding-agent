@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Copy, Trash2 } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { useMcpStatusStore } from '@/stores';
 
@@ -58,7 +58,7 @@ export const McpLogViewer: React.FC<McpLogViewerProps> = ({ serverName }) => {
             title="Copy logs"
             disabled={logs.length === 0}
           >
-            <Copy className="size-3" />
+            <Codicon name="copy" className="text-xs" />
           </Button>
           <Button
             variant="ghost"
@@ -68,7 +68,7 @@ export const McpLogViewer: React.FC<McpLogViewerProps> = ({ serverName }) => {
             title="Clear logs"
             disabled={logs.length === 0}
           >
-            <Trash2 className="size-3" />
+            <Codicon name="trash" className="text-xs" />
           </Button>
         </div>
       </div>

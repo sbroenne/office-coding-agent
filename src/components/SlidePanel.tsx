@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 
 interface SlidePanelProps {
   open: boolean;
@@ -112,7 +112,7 @@ export const SlidePanel: React.FC<SlidePanelProps> = ({
           aria-label="Back"
           title="Back"
         >
-          <ArrowLeft className="size-4" />
+          <Codicon name="arrow-left" className="text-base" />
         </button>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold truncate">{title}</h2>

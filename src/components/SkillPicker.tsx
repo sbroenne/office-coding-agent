@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Check, Square } from 'lucide-react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
@@ -46,9 +45,9 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
       >
         <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-border">
           {isActive ? (
-            <Check className="size-3 text-primary" />
+            <Codicon name="check" className="text-xs text-primary" />
           ) : (
-            <Square className="size-3 opacity-0" />
+            <Codicon name="primitive-square" className="text-xs opacity-0" />
           )}
         </div>
         <div className="min-w-0 flex-1">

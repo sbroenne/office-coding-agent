@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 import type { OfficeHostApp } from '@/services/office/host';
 
@@ -63,7 +63,7 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
                       aria-label="Delete session"
                       title="Delete session"
                     >
-                      <Trash2 className="size-3" />
+                      <Codicon name="trash" className="text-xs" />
                     </button>
                   </div>
                 </div>

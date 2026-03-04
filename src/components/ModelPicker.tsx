@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Check, ChevronDown } from 'lucide-react';
+import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
 import type { CopilotModel, ModelProvider } from '@/types';
@@ -39,7 +39,7 @@ export const ModelPicker: React.FC = () => {
           title="Select model"
         >
           <span className="max-w-[110px] truncate">{displayLabel}</span>
-          <ChevronDown className="size-3 shrink-0 opacity-50" />
+          <Codicon name="chevron-down" className="text-xs shrink-0 opacity-50" />
         </button>
       </Popover.Trigger>
 
@@ -75,11 +75,9 @@ export const ModelPicker: React.FC = () => {
                           isActive && 'bg-accent/50'
                         )}
                       >
-                        <Check
-                          className={cn(
-                            'size-3.5 shrink-0',
-                            isActive ? 'opacity-100' : 'opacity-0'
-                          )}
+                        <Codicon
+                          name="check"
+                          className={cn('text-sm shrink-0', isActive ? 'opacity-100' : 'opacity-0')}
                         />
                         <span className="truncate text-foreground">{model.name}</span>
                       </button>
