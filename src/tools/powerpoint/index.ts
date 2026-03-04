@@ -4,7 +4,41 @@ import pptxgen from 'pptxgenjs';
 
 /* global PowerPoint */
 
-// ─── Internal helper (within a PowerPoint.run context — no inner runs) ────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+const PTS_PER_INCH = 72;
+
+/** Read the active presentation's slide dimensions in inches.
+ *  Falls back to 16:9 widescreen (13.33" × 7.5") when the API is unavailable. */
+async function getSlideDimensionsInches(
+  context: PowerPoint.RequestContext
+): Promise<{ width: number; height: number }> {
+  try {
+    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+    const pres = context.presentation as any;
+    pres.load('width,height');
+    await context.sync();
+    const w = pres.width as number;
+    const h = pres.height as number;
+    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+    if (typeof w === 'number' && w > 0 && typeof h === 'number' && h > 0) {
+      return { width: w / PTS_PER_INCH, height: h / PTS_PER_INCH };
+    }
+  } catch {
+    // width/height not available in this version of PowerPoint
+  }
+  return { width: 13.33, height: 7.5 }; // default: widescreen 16:9
+}
+
+/** Return a human-readable aspect ratio label for display. */
+function aspectRatioLabel(w: number, h: number): string {
+  const ratio = w / h;
+  if (Math.abs(ratio - 16 / 9) < 0.05) return '16:9';
+  if (Math.abs(ratio - 4 / 3) < 0.05) return '4:3';
+  if (Math.abs(ratio - 16 / 10) < 0.05) return '16:10';
+  return 'custom';
+}
+
 async function loadSlideTexts(
   slides: PowerPoint.SlideCollection,
   start: number,
@@ -69,6 +103,9 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
       const slideCount = slides.items.length;
       if (slideCount === 0) return 'Presentation has no slides.';
 
+      const { width: slideW, height: slideH } = await getSlideDimensionsInches(context);
+      const aspect = aspectRatioLabel(slideW, slideH);
+
       const textLines = await loadSlideTexts(slides, 0, slideCount - 1, context);
 
       // Capture PNG thumbnail for every slide
@@ -90,6 +127,7 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
         `Presentation Overview`,
         `${'='.repeat(40)}`,
         `Total slides: ${String(slideCount)}`,
+        `Slide dimensions: ${slideW.toFixed(2)}" × ${slideH.toFixed(2)}" (${aspect})`,
         ``,
         ...textLines,
       ].join('\n');
@@ -421,8 +459,15 @@ PptxGenJS API reference:
         replaceSlideIndex?: number;
       };
 
+      // Detect the actual presentation slide dimensions so the PptxGenJS layout matches.
+      // Without this, PptxGenJS defaults to 16:9 (13.33"×7.5") regardless of the actual
+      // presentation size, causing content to overflow or be mispositioned on 4:3 and other formats.
+      const { width: slideW, height: slideH } = await getSlideDimensionsInches(context);
+
       // Build the pptxgenjs slide (pure JS, no Office context needed)
       const pptx = new pptxgen();
+      pptx.defineLayout({ name: 'PRES', width: slideW, height: slideH });
+      pptx.layout = 'PRES';
       const slide = pptx.addSlide();
 
       /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
@@ -713,12 +758,14 @@ PptxGenJS API reference:
         );
       }
 
+      const { width: slideW, height: slideH } = await getSlideDimensionsInches(context);
+
       const slide = slides.items[slideIndex];
       slide.shapes.load('items');
       await context.sync();
 
       if (slide.shapes.items.length === 0) {
-        return `Slide ${String(slideIndex + 1)} has no shapes.`;
+        return `Slide ${String(slideIndex + 1)} has no shapes. Slide dimensions: ${slideW.toFixed(2)}" × ${slideH.toFixed(2)}"`;
       }
 
       for (const shape of slide.shapes.items) {
@@ -731,12 +778,18 @@ PptxGenJS API reference:
       }
       await context.sync();
 
-      const PTS_PER_INCH = 72;
+      const overflowShapes: number[] = [];
       const lines = slide.shapes.items.map((shape, i) => {
-        const x = (shape.left / PTS_PER_INCH).toFixed(2);
-        const y = (shape.top / PTS_PER_INCH).toFixed(2);
-        const w = (shape.width / PTS_PER_INCH).toFixed(2);
-        const h = (shape.height / PTS_PER_INCH).toFixed(2);
+        const x = shape.left / PTS_PER_INCH;
+        const y = shape.top / PTS_PER_INCH;
+        const w = shape.width / PTS_PER_INCH;
+        const h = shape.height / PTS_PER_INCH;
+        const right = x + w;
+        const bottom = y + h;
+        // 0.01" tolerance accounts for floating-point conversion between points and inches
+        const overflows = right > slideW + 0.01 || bottom > slideH + 0.01 || x < -0.01 || y < -0.01;
+        if (overflows) overflowShapes.push(i);
+        const overflowFlag = overflows ? ' ⚠️ OVERFLOW' : '';
         let text = '';
         try {
           text = shape.textFrame.textRange.text?.trim() ?? '';
@@ -746,10 +799,15 @@ PptxGenJS API reference:
         const textPart = text
           ? ` | text: "${text.length > 60 ? `${text.substring(0, 60)}\u2026` : text}"`
           : '';
-        return `[${i}] "${shape.name}" type:${String(shape.type)} — x:${x}" y:${y}" w:${w}" h:${h}"${textPart}`;
+        return `[${i}] "${shape.name}" type:${String(shape.type)} — x:${x.toFixed(2)}" y:${y.toFixed(2)}" w:${w.toFixed(2)}" h:${h.toFixed(2)}" (right:${right.toFixed(2)}" bottom:${bottom.toFixed(2)}")${textPart}${overflowFlag}`;
       });
 
-      return `Slide ${String(slideIndex + 1)} — ${String(slide.shapes.items.length)} shape(s):\n${lines.join('\n')}`;
+      const header = `Slide ${String(slideIndex + 1)} — ${String(slide.shapes.items.length)} shape(s) | Slide: ${slideW.toFixed(2)}" × ${slideH.toFixed(2)}"`;
+      const overflowWarning =
+        overflowShapes.length > 0
+          ? `\n⚠️ OVERFLOW DETECTED on shape(s): [${overflowShapes.join(', ')}] — content extends beyond slide bounds!`
+          : '';
+      return `${header}\n${lines.join('\n')}${overflowWarning}`;
     },
   },
 
@@ -1022,7 +1080,6 @@ PptxGenJS API reference:
         );
       }
 
-      const PTS_PER_INCH = 72;
       const shape = slide.shapes.items[shapeIndex];
       if (left !== undefined) shape.left = left * PTS_PER_INCH;
       if (top !== undefined) shape.top = top * PTS_PER_INCH;
@@ -1293,7 +1350,6 @@ PptxGenJS API reference:
       }
 
       const slide = slides.items[slideIndex];
-      const PTS_PER_INCH = 72;
 
       const options: PowerPoint.ShapeAddOptions = {
         left: left * PTS_PER_INCH,
@@ -1373,7 +1429,6 @@ PptxGenJS API reference:
       }
 
       const slide = slides.items[slideIndex];
-      const PTS_PER_INCH = 72;
 
       // Bounding box derived from start/end points
       const options: PowerPoint.ShapeAddOptions = {
@@ -1398,6 +1453,48 @@ PptxGenJS API reference:
 
       await context.sync();
       return `Added ${connectorType} line from (${String(startX)}", ${String(startY)}") to (${String(endX)}", ${String(endY)}") on slide ${String(slideIndex + 1)}.`;
+    },
+  },
+
+  {
+    name: 'set_presentation_size',
+    description:
+      'Change the slide dimensions of the entire presentation (e.g., switch between 16:9 widescreen and 4:3 standard). ' +
+      'Use get_presentation_overview first to check the current dimensions. ' +
+      'Common sizes: 16:9 widescreen = 13.33" × 7.5", 4:3 standard = 10" × 7.5", 16:10 = 10" × 6.25".',
+    params: {
+      width: {
+        type: 'number',
+        description:
+          'New slide width in inches. Examples: 13.33 (16:9 widescreen), 10 (4:3 standard or 16:10).',
+      },
+      height: {
+        type: 'number',
+        description: 'New slide height in inches. Examples: 7.5 (16:9 or 4:3), 6.25 (16:10).',
+      },
+    },
+    execute: async (context, args) => {
+      const { width, height } = args as { width: number; height: number };
+      if (width <= 0 || height <= 0) {
+        throw new Error('Width and height must be positive numbers.');
+      }
+      try {
+        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+        const pres = context.presentation as any;
+        pres.width = width * PTS_PER_INCH;
+        pres.height = height * PTS_PER_INCH;
+        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment */
+        await context.sync();
+        const aspect = aspectRatioLabel(width, height);
+        return `Set presentation slide size to ${width.toFixed(2)}" × ${height.toFixed(2)}" (${aspect}).`;
+      } catch {
+        const aspect = aspectRatioLabel(width, height);
+        throw new Error(
+          `Cannot set presentation size programmatically in this version of PowerPoint. ` +
+            `To change to ${width.toFixed(2)}" × ${height.toFixed(2)}" (${aspect}): ` +
+            `go to Design → Slide Size → Custom Slide Size in PowerPoint and enter the desired dimensions.`
+        );
+      }
     },
   },
 ];
