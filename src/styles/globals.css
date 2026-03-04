@@ -207,6 +207,9 @@ summary:focus-visible,
 
 /* Hide the raw code block that follows rendered choice/suggestion cards */
 .aui-choices-wrapper + .aui-md-pre,
-.aui-suggestions-wrapper + .aui-md-pre {
+.aui-suggestions-wrapper + .aui-md-pre,
+/* Also hide pre blocks containing suggestions/choices code directly */
+.aui-md-pre:has(.language-suggestions),
+.aui-md-pre:has(.language-choices) {
   display: none;
 }

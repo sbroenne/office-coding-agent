@@ -183,9 +183,9 @@ describe('useOfficeChat', () => {
     expect((textPart as { type: 'text'; text: string }).text).toBe('Hello!');
   });
 
-  it('drops tool-call parts from completed message when text is present', async () => {
-    // Tool-call parts are shown during streaming but stripped from the final content
-    // once the message is complete with text, so they do not clutter the thread.
+  it('keeps tool-call parts in completed message alongside text (VS Code behavior)', async () => {
+    // Tool-call parts remain visible in the completed message as a collapsible
+    // "thinking" section above the text response, matching VS Code Copilot Chat.
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
@@ -220,9 +220,9 @@ describe('useOfficeChat', () => {
     const textPart = assistantContent.find(c => c.type === 'text');
     expect(textPart).toBeDefined();
     expect((textPart as { type: 'text'; text: string }).text).toBe('Done!');
-    // Tool-call parts must be absent in the completed message (dropped to avoid cluttering thread)
+    // Tool-call parts must ALSO be present (VS Code keeps them visible)
     const toolPart = assistantContent.find(c => c.type === 'tool-call');
-    expect(toolPart).toBeUndefined();
+    expect(toolPart).toBeDefined();
   });
 
   it('keeps tool-call parts in completed message when there is no text', async () => {

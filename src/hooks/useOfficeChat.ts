@@ -651,25 +651,14 @@ export function useOfficeChat(host: OfficeHostApp) {
     let streamText = '';
 
     const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
-      // When the message is complete and has text, drop tool-call parts so they no
-      // longer render below the final response. Tool calls are already surfaced as
-      // progress indicators during streaming — keeping them in the completed content
-      // makes past actions visible at the bottom of every response, cluttering the
-      // thread. If the message has no text (tool-only result) we keep tool parts so
-      // the message is not empty.
-      const isComplete = extra?.status?.type === 'complete';
-      const includeToolParts = !isComplete || !streamText;
-
+      // Keep tool-call parts in the completed message so they remain visible
+      // as a collapsible "thinking" section above the response text, matching
+      // VS Code Copilot Chat's behavior where completed tool calls stay visible.
       const content: ThreadMessageLike['content'] = [
-        // Text part comes FIRST so its array index stays stable even as tool-call
-        // parts are appended. Prepending tool-calls would shift the text part's
-        // index on every new tool invocation, causing React's useSyncExternalStore
-        // tearing-detection in MarkdownTextPrimitive (useMessagePartText) to see
-        // s.part.type === "tool-call" while MarkdownText is still mounted at the
-        // old index — triggering "MessagePartText can only be used inside text or
-        // reasoning message parts".
+        // Tool-call parts come FIRST so they appear above the text response,
+        // matching VS Code's layout: thinking/tools section → then text.
+        ...Array.from(toolParts.values()),
         ...(streamText ? [{ type: 'text' as const, text: streamText }] : []),
-        ...(includeToolParts ? Array.from(toolParts.values()) : []),
       ];
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
     };

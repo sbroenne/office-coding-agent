@@ -359,7 +359,10 @@ const defaultComponents = memoizeMarkdownComponents({
         (kid.props.className?.includes('language-choices') === true ||
           kid.props.className?.includes('language-suggestions') === true)
     );
-    if (isCustomBlock) return null;
+    // Also check via the className prop on pre itself (some markdown renderers put it there)
+    const preIsCustom =
+      className?.includes('language-choices') ?? className?.includes('language-suggestions');
+    if (isCustomBlock || preIsCustom) return null;
     return (
       <pre
         className={cn(
