@@ -477,10 +477,23 @@ PptxGenJS API reference:
       pptx.layout = 'PRES';
       const slide = pptx.addSlide();
 
-      /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
-      const buildSlide = new Function('slide', 'W', 'H', code);
-      buildSlide(slide, slideW, slideH);
-      /* eslint-enable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
+      /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-function-type */
+      let buildSlide: Function;
+      try {
+        buildSlide = new Function('slide', 'W', 'H', code);
+      } catch (err) {
+        throw new Error(
+          `Syntax error in slide code: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      try {
+        buildSlide(slide, slideW, slideH);
+      } catch (err) {
+        throw new Error(
+          `Runtime error in slide code: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      /* eslint-enable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-function-type */
 
       const base64 = (await pptx.write({ outputType: 'base64' })) as string;
 
@@ -501,12 +514,13 @@ PptxGenJS API reference:
             `Invalid replaceSlideIndex ${String(replaceSlideIndex)}. Must be 0-${String(slideCount - 1)}.`
           );
         }
-        if (replaceSlideIndex > 0) {
-          const prevSlide = slides.items[replaceSlideIndex - 1];
-          prevSlide.load('id');
-          await context.sync();
-          insertOptions.targetSlideId = prevSlide.id;
-        }
+        // Insert AFTER the slide being replaced so it lands at replaceSlideIndex + 1.
+        // Then delete the original at replaceSlideIndex. This correctly handles index 0
+        // (without a targetSlideId the API appends to the end instead).
+        const anchorSlide = slides.items[replaceSlideIndex];
+        anchorSlide.load('id');
+        await context.sync();
+        insertOptions.targetSlideId = anchorSlide.id;
       } else if (slideCount > 0) {
         const lastSlide = slides.items[slideCount - 1];
         lastSlide.load('id');
@@ -518,10 +532,10 @@ PptxGenJS API reference:
       await context.sync();
 
       if (replaceSlideIndex !== undefined) {
-        // After insert the old slide has shifted by 1
+        // The new slide is now at replaceSlideIndex + 1; the original is still at replaceSlideIndex.
         slides.load('items');
         await context.sync();
-        const oldSlide = slides.items[replaceSlideIndex + 1];
+        const oldSlide = slides.items[replaceSlideIndex];
         oldSlide.delete();
         await context.sync();
       }

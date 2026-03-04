@@ -74,7 +74,7 @@ When creating multiple slides, vary the layout:
 - **Colors**: 6-digit hex without # (`"4472C4"`)
 - **Margins**: x ≥ 0.5, y ≥ 0.5, x+w ≤ W−0.5, y+h ≤ H−0.5 — `W` and `H` are injected automatically
 - **`shrinkText: true`** on all `addText()` calls
-- **Prefer 3 columns** over 4 — more room for text
+- **Prefer 3 columns** over 4 — use the formula: `const colW = (W - 1 - 0.2) / 3` (splits available width into 3 equal columns with 0.1" gaps)
 
 ## Final Summary
 

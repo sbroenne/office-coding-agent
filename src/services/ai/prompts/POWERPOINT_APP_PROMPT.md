@@ -63,6 +63,17 @@ slide.addText([
   { text: "Point 2", options: { bullet: true } },
 ], { x: 0.5, y: 2.5, w: W-1, h: H-3, fontSize: 16, shrinkText: true });
 
+// 3-column layout — colW divides available width into 3 equal columns with 0.1" gaps
+const colW = (W - 1 - 0.2) / 3;  // 0.2" = 2 gaps × 0.1"
+const col0 = 0.5, col1 = col0 + colW + 0.1, col2 = col1 + colW + 0.1;
+const bodyY = 2.2, bodyH = H - bodyY - 0.5;
+slide.addText("Column 1", { x: col0, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
+slide.addText("Body text here", { x: col0, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
+slide.addText("Column 2", { x: col1, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
+slide.addText("Body text here", { x: col1, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
+slide.addText("Column 3", { x: col2, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
+slide.addText("Body text here", { x: col2, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
+
 // Table
 slide.addTable([["Header 1", "Header 2"], ["Row 1", "Data"]], { x: 0.5, y: 2, w: W-1, fontSize: 14 });
 
