@@ -50,6 +50,9 @@ Use this as the default orchestration skill for all PowerPoint tasks.
 | Copy a slide (text only)      | `duplicate_slide`          |
 | Set speaker notes             | `set_slide_notes`          |
 | Change slide dimensions       | `set_presentation_size`    |
+| Group shapes together         | `group_shapes`             |
+| Ungroup a grouped shape       | `ungroup_shapes`           |
+| Inspect SmartArt on a slide   | `get_smartart_info`        |
 
 ## Choosing Between `set_presentation_content` and `add_slide_from_code`
 
@@ -81,3 +84,80 @@ Use this as the default orchestration skill for all PowerPoint tasks.
 ## Multi-Step Requests
 
 Execute all requested steps in sequence where possible. If one step fails, report the failure clearly and continue with independent remaining steps.
+
+## Grouping & Ungrouping Shapes
+
+- Use `get_slide_shapes` first to identify shape indices and types.
+- **Group**: `group_shapes` takes a list of shape indices and combines them into a single group. Requires PowerPoint 1.8 API (desktop/web only).
+- **Ungroup**: `ungroup_shapes` on a shape with type `Group` releases its children back to the slide.
+- After grouping/ungrouping, call `get_slide_shapes` again to see the updated shape list.
+
+## SmartArt
+
+SmartArt graphics cannot be **created** via the Office.js API, but they can be **inspected** and **replaced**:
+
+1. **Inspect** — Use `get_smartart_info` to list SmartArt shapes on a slide (position, size, index).
+2. **Read** — SmartArt shapes appear as type `SmartArt` or `Diagram` in `get_slide_shapes`.
+3. **Replace** — Delete the SmartArt shape with `delete_shape`, then recreate it visually with `add_slide_from_code` using PptxGenJS shapes, arrows, and text boxes.
+
+### Common SmartArt Patterns (with `add_slide_from_code`)
+
+**Process / Chevron Flow (horizontal)**
+```js
+const steps = ['Step 1', 'Step 2', 'Step 3'];
+const n = steps.length;
+const bw = (W - 1) / n - 0.15; // box width with gap
+steps.forEach((label, i) => {
+  const x = 0.5 + i * (bw + 0.15);
+  slide.addShape('rightArrow', { x, y: 2.5, w: bw, h: 1.2, fill: { color: '4472C4' } });
+  slide.addText(label, { x, y: 2.5, w: bw, h: 1.2, align: 'center', valign: 'middle', color: 'FFFFFF', fontSize: 14, bold: true, shrinkText: true });
+});
+```
+
+**Cycle (circular process)**
+```js
+const items = ['Plan', 'Do', 'Check', 'Act'];
+const cx = W / 2, cy = H / 2, r = 1.8;
+items.forEach((label, i) => {
+  const angle = (i / items.length) * 2 * Math.PI - Math.PI / 2;
+  const x = cx + r * Math.cos(angle) - 0.6;
+  const y = cy + r * Math.sin(angle) - 0.4;
+  slide.addShape('ellipse', { x, y, w: 1.2, h: 0.8, fill: { color: '4472C4' } });
+  slide.addText(label, { x, y, w: 1.2, h: 0.8, align: 'center', valign: 'middle', color: 'FFFFFF', fontSize: 13, bold: true, shrinkText: true });
+});
+```
+
+**Hierarchy / Org Chart**
+```js
+// Top node
+slide.addShape('rect', { x: W/2 - 1, y: 0.5, w: 2, h: 0.6, fill: { color: '4472C4' }, line: { color: 'FFFFFF' } });
+slide.addText('CEO', { x: W/2 - 1, y: 0.5, w: 2, h: 0.6, align: 'center', valign: 'middle', color: 'FFFFFF', fontSize: 14, bold: true, shrinkText: true });
+// Child nodes + connector lines below
+```
+
+**Matrix (4-quadrant)**
+```js
+const labels = [['Urgent\n+ Important', 'Not Urgent\n+ Important'], ['Urgent\n+ Not Important', 'Not Urgent\n+ Not Important']];
+const colors = ['C00000', 'ED7D31', 'FFC000', '70AD47'];
+labels.flat().forEach((label, i) => {
+  const x = 0.5 + (i % 2) * ((W - 1) / 2 + 0.1);
+  const y = 1.5 + Math.floor(i / 2) * ((H - 2) / 2 + 0.1);
+  slide.addShape('rect', { x, y, w: (W - 1.2) / 2, h: (H - 2.2) / 2, fill: { color: colors[i] } });
+  slide.addText(label, { x, y, w: (W - 1.2) / 2, h: (H - 2.2) / 2, align: 'center', valign: 'middle', color: 'FFFFFF', fontSize: 14, bold: true, shrinkText: true });
+});
+```
+
+**Pyramid (stacked)**
+```js
+const tiers = ['Strategy', 'Tactics', 'Operations'];
+const totalH = H - 2.5;
+tiers.forEach((label, i) => {
+  const tierH = totalH / tiers.length;
+  const tierW = (W - 1) * (1 - i * 0.25);
+  const x = (W - tierW) / 2;
+  const y = 0.8 + i * tierH;
+  slide.addShape('isoscelesTri', { x, y, w: tierW, h: tierH - 0.05, fill: { color: ['4472C4', '70AD47', 'FFC000'][i] } });
+  slide.addText(label, { x, y: y + tierH * 0.25, w: tierW, h: tierH * 0.5, align: 'center', valign: 'middle', color: 'FFFFFF', fontSize: 14, bold: true, shrinkText: true });
+});
+```
+

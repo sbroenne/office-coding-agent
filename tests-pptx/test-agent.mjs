@@ -80,6 +80,8 @@ const mockHandlers = {
   add_line: () => 'Line added.', get_slide_notes: () => '(no notes)',
   set_slide_notes: () => 'Notes set.', duplicate_slide: () => 'Duplicated.',
   apply_slide_layout: () => 'Layout applied.', get_selected_shapes: () => '(no shapes selected)',
+  group_shapes: () => 'Grouped.', ungroup_shapes: () => 'Ungrouped.',
+  get_smartart_info: () => 'No SmartArt shapes found.',
 };
 
 // ─── Tool schemas ──────────────────────────────────────────────────────
@@ -108,6 +110,9 @@ const toolDefs = [
   { name: 'duplicate_slide', description: 'Duplicate slide', parameters: { type: 'object', properties: { sourceSlideIndex: { type: 'number' } }, required: ['sourceSlideIndex'] } },
   { name: 'apply_slide_layout', description: 'Apply layout', parameters: { type: 'object', properties: { slideIndex: { type: 'number' }, layoutIndex: { type: 'number' } }, required: ['slideIndex', 'layoutIndex'] } },
   { name: 'get_selected_shapes', description: 'Get selected shapes', parameters: { type: 'object', properties: {}, required: [] } },
+  { name: 'group_shapes', description: 'Group shapes', parameters: { type: 'object', properties: { slideIndex: { type: 'number' }, shapeIndices: { type: 'array', items: { type: 'number' } } }, required: ['slideIndex', 'shapeIndices'] } },
+  { name: 'ungroup_shapes', description: 'Ungroup a group shape', parameters: { type: 'object', properties: { slideIndex: { type: 'number' }, shapeIndex: { type: 'number' } }, required: ['slideIndex', 'shapeIndex'] } },
+  { name: 'get_smartart_info', description: 'Inspect SmartArt shapes', parameters: { type: 'object', properties: { slideIndex: { type: 'number' } }, required: ['slideIndex'] } },
 ];
 
 // ─── LSP / JSON-RPC ────────────────────────────────────────────────────

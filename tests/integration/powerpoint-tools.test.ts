@@ -47,6 +47,9 @@ const EXPECTED_TOOL_NAMES = [
   'apply_slide_layout',
   'add_geometric_shape',
   'add_line',
+  'group_shapes',
+  'ungroup_shapes',
+  'get_smartart_info',
 ] as const;
 
 // ─── Structural ───────────────────────────────────────────────────────────────
@@ -178,5 +181,64 @@ describe('Integration: content tool schemas', () => {
     const schema = toolsByName.get_presentation_content.parameters;
     expect(validate(schema, { slideIndex: 2 })).toBe(true);
     expect(validate(schema, { startIndex: 0, endIndex: 3 })).toBe(true);
+  });
+});
+
+// ─── Grouping tools ───────────────────────────────────────────────────────────
+
+describe('Integration: group_shapes schema', () => {
+  it('requires slideIndex and shapeIndices', () => {
+    const schema = toolsByName.group_shapes.parameters;
+    expect(validate(schema, { slideIndex: 0, shapeIndices: [0, 1] })).toBe(true);
+    expect(validate(schema, { slideIndex: 0 })).toBe(false);
+    expect(validate(schema, { shapeIndices: [0, 1] })).toBe(false);
+  });
+
+  it('accepts an optional groupName', () => {
+    const schema = toolsByName.group_shapes.parameters;
+    expect(validate(schema, { slideIndex: 0, shapeIndices: [0, 1, 2], groupName: 'MyGroup' })).toBe(
+      true
+    );
+  });
+
+  it('requires shapeIndices to be an array of numbers', () => {
+    const schema = toolsByName.group_shapes.parameters;
+    expect(validate(schema, { slideIndex: 0, shapeIndices: ['a', 'b'] })).toBe(false);
+    expect(validate(schema, { slideIndex: 0, shapeIndices: 'not-an-array' })).toBe(false);
+  });
+
+  it('config exposes shapeIndices param as number[] type', () => {
+    const paramDef = configsByName.group_shapes.params.shapeIndices;
+    expect(paramDef).toBeDefined();
+    expect(paramDef.type).toBe('number[]');
+  });
+});
+
+describe('Integration: ungroup_shapes schema', () => {
+  it('requires slideIndex and shapeIndex', () => {
+    const schema = toolsByName.ungroup_shapes.parameters;
+    expect(validate(schema, { slideIndex: 0, shapeIndex: 2 })).toBe(true);
+    expect(validate(schema, { slideIndex: 0 })).toBe(false);
+    expect(validate(schema, {})).toBe(false);
+  });
+
+  it('rejects non-number shapeIndex', () => {
+    const schema = toolsByName.ungroup_shapes.parameters;
+    expect(validate(schema, { slideIndex: 0, shapeIndex: 'two' })).toBe(false);
+  });
+});
+
+// ─── SmartArt tool ────────────────────────────────────────────────────────────
+
+describe('Integration: get_smartart_info schema', () => {
+  it('requires slideIndex', () => {
+    const schema = toolsByName.get_smartart_info.parameters;
+    expect(validate(schema, { slideIndex: 0 })).toBe(true);
+    expect(validate(schema, {})).toBe(false);
+  });
+
+  it('rejects non-number slideIndex', () => {
+    const schema = toolsByName.get_smartart_info.parameters;
+    expect(validate(schema, { slideIndex: 'first' })).toBe(false);
   });
 });

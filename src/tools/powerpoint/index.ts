@@ -1400,6 +1400,214 @@ PptxGenJS API reference:
       return `Added ${connectorType} line from (${String(startX)}", ${String(startY)}") to (${String(endX)}", ${String(endY)}") on slide ${String(slideIndex + 1)}.`;
     },
   },
+
+  {
+    name: 'group_shapes',
+    description:
+      'Group multiple shapes on a slide into a single group shape. Use get_slide_shapes first to identify the shape indices. ' +
+      'Requires PowerPoint 16.0.17531+ (requirement set 1.8).',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndices: {
+        type: 'number[]',
+        description:
+          'Array of 0-based shape indices (from get_slide_shapes) to group together. Must contain at least 2 indices.',
+      },
+      groupName: {
+        type: 'string',
+        required: false,
+        description: 'Optional name for the resulting group shape.',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndices, groupName } = args as {
+        slideIndex: number;
+        shapeIndices: number[];
+        groupName?: string;
+      };
+
+      if (!Array.isArray(shapeIndices) || shapeIndices.length < 2) {
+        throw new Error('shapeIndices must be an array of at least 2 shape indices.');
+      }
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      for (const idx of shapeIndices) {
+        if (idx < 0 || idx >= shapeCount) {
+          throw new Error(
+            `Invalid shapeIndex ${String(idx)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+          );
+        }
+      }
+
+      // Load IDs for selected shapes
+      const selectedShapes = shapeIndices.map(i => slide.shapes.items[i]);
+      for (const s of selectedShapes) {
+        s.load('id,name');
+      }
+      await context.sync();
+
+      try {
+        const shapeIds = selectedShapes.map(s => s.id);
+        const groupShape = slide.shapes.addGroup(shapeIds);
+        if (groupName) groupShape.name = groupName;
+        groupShape.load('name,id');
+        await context.sync();
+
+        const names = selectedShapes.map(s => `"${s.name}"`).join(', ');
+        return `Grouped ${String(shapeIndices.length)} shapes (${names}) into group "${groupShape.name}" on slide ${String(slideIndex + 1)}.`;
+      } catch {
+        throw new Error(
+          'group_shapes requires PowerPoint 16.0.17531+ (requirement set 1.8). Ensure shapes are not already in a group and belong to the same slide.'
+        );
+      }
+    },
+  },
+
+  {
+    name: 'ungroup_shapes',
+    description:
+      'Ungroup a grouped shape on a slide, releasing its child shapes back to the slide. ' +
+      'Use get_slide_shapes first to identify the group shape index (type will be "Group"). ' +
+      'Requires PowerPoint 16.0.17531+ (requirement set 1.8).',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: {
+        type: 'number',
+        description:
+          '0-based index of the group shape to ungroup (from get_slide_shapes, type should be "Group").',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex } = args as { slideIndex: number; shapeIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      if (shapeIndex < 0 || shapeIndex >= shapeCount) {
+        throw new Error(
+          `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+        );
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      shape.load('name,type');
+      await context.sync();
+
+      if (shape.type !== PowerPoint.ShapeType.group) {
+        throw new Error(
+          `Shape [${String(shapeIndex)}] "${shape.name}" is not a group (type: ${String(shape.type)}). Use get_slide_shapes to find a shape with type "Group".`
+        );
+      }
+
+      const groupName = shape.name;
+
+      try {
+        const shapeGroup = shape.group;
+
+        // Load child shapes before ungrouping to report count
+        shapeGroup.shapes.load('items');
+        await context.sync();
+        const childCount = shapeGroup.shapes.items.length;
+
+        shapeGroup.ungroup();
+        await context.sync();
+
+        return `Ungrouped "${groupName}" on slide ${String(slideIndex + 1)}, releasing ${String(childCount)} shape(s).`;
+      } catch {
+        throw new Error(
+          `Failed to ungroup shape "${groupName}". Ensure it is a valid group shape. group_shapes requires PowerPoint 16.0.17531+ (requirement set 1.8).`
+        );
+      }
+    },
+  },
+
+  {
+    name: 'get_smartart_info',
+    description:
+      'List all SmartArt and diagram shapes on a slide with their index, name, position, and size. ' +
+      'Use this to inspect existing SmartArt graphics. Note: SmartArt content cannot be modified via the Office.js API — ' +
+      'use add_slide_from_code with PptxGenJS to create SmartArt-like visuals programmatically.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex } = args as { slideIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      for (const shape of slide.shapes.items) {
+        shape.load('name,type,left,top,width,height');
+      }
+      await context.sync();
+
+      const PTS_PER_INCH = 72;
+      const smartArtShapes = slide.shapes.items
+        .map((shape, i) => ({ shape, i }))
+        .filter(
+          ({ shape }) =>
+            shape.type === PowerPoint.ShapeType.smartArt ||
+            shape.type === PowerPoint.ShapeType.diagram
+        );
+
+      if (smartArtShapes.length === 0) {
+        return `Slide ${String(slideIndex + 1)} has no SmartArt or diagram shapes.\n\nTip: To create SmartArt-like visuals, use add_slide_from_code with PptxGenJS shapes and connectors.`;
+      }
+
+      const lines = smartArtShapes.map(({ shape, i }) => {
+        const x = (shape.left / PTS_PER_INCH).toFixed(2);
+        const y = (shape.top / PTS_PER_INCH).toFixed(2);
+        const w = (shape.width / PTS_PER_INCH).toFixed(2);
+        const h = (shape.height / PTS_PER_INCH).toFixed(2);
+        return `[${i}] "${shape.name}" type:${String(shape.type)} — x:${x}" y:${y}" w:${w}" h:${h}"`;
+      });
+
+      return (
+        `Slide ${String(slideIndex + 1)} — ${String(smartArtShapes.length)} SmartArt/diagram shape(s):\n${lines.join('\n')}\n\n` +
+        `Note: SmartArt content cannot be modified via the Office.js API. To replace with editable content, delete the SmartArt shape and use add_slide_from_code to create a similar visual layout.`
+      );
+    },
+  },
 ];
 
 export const powerPointTools = createPptTools(powerPointConfigs);
