@@ -83,10 +83,14 @@ const WorkingCollapsible: FC<WorkingCollapsibleProps> = ({ isRunning, toolCount,
 
 interface ToolGroupProps {
   parts: ToolCallPart[];
+  /** Whether the parent message is still streaming (not just tools) */
+  isMessageRunning?: boolean;
 }
 
-export const ToolGroup: FC<ToolGroupProps> = ({ parts }) => {
-  const isRunning = parts.some(p => p.status?.type === 'running');
+export const ToolGroup: FC<ToolGroupProps> = ({ parts, isMessageRunning = false }) => {
+  const hasRunningTool = parts.some(p => p.status?.type === 'running');
+  // Show as "running" if any tool is running OR the message is still streaming
+  const isRunning = hasRunningTool || isMessageRunning;
 
   return (
     <WorkingCollapsible isRunning={isRunning} toolCount={parts.length}>
