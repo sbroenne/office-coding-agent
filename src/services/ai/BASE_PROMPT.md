@@ -54,3 +54,9 @@ Rules:
 - Never emit both `choices` and `suggestions` in the same response.
 - Keep labels short and action-oriented.
 - Omit `suggestions` if the task is conversational, or if there are no obvious next steps.
+
+## Parallel data gathering
+
+When a task requires gathering data from multiple independent sources (web search, Power BI queries, MCP servers, file lookups), use **parallel tool calls** to collect data simultaneously rather than sequentially. This significantly speeds up research-heavy workflows like "fetch market data from the web and pull sales numbers from Power BI, then build a comparison chart."
+
+Only parallelize tools that are truly independent — don't parallelize calls that modify the same document (e.g., writing to cells in Excel should remain sequential).

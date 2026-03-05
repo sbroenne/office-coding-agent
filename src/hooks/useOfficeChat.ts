@@ -711,9 +711,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {
           const { toolCallId, result } = event.data;
-          // Don't clear thinkingText here — keep showing the tool name until
-          // text starts streaming or the response completes. In VS Code, the
-          // thinking label stays visible throughout the tool execution phase.
           const existing = toolParts.get(toolCallId);
           if (existing) {
             const resultText = result
@@ -724,6 +721,9 @@ export function useOfficeChat(host: OfficeHostApp) {
             toolParts.set(toolCallId, { ...existing, result: resultText });
             updateAssistant();
           }
+          // Reset thinking text to "Thinking…" so the shimmer reappears
+          // in the gap between this tool completing and the next action.
+          setThinkingText(DEFAULT_THINKING_TEXT);
         } else if (event.type === 'assistant.message') {
           // Update text content but DON'T clear thinking or mark complete here.
           // The SDK sends assistant.message BEFORE tool calls (model's initial
@@ -867,9 +867,34 @@ export function useOfficeChat(host: OfficeHostApp) {
     onNew,
     onCancel: () => {
       cancelRef.current = true;
-      // Do not set isRunning=false here — the streaming loop's `finally` block
-      // handles it after the current iteration actually finishes. Setting it
-      // prematurely causes the UI to show "idle" while events are still processing.
+
+      // Immediately update UI: mark the running message as incomplete/cancelled
+      // and clear thinking text so the user gets instant feedback.
+      flushSync(() => {
+        setThinkingText(null);
+        setIsRunning(false);
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant' && last.status?.type !== 'complete') {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, status: { type: 'incomplete', reason: 'cancelled' } },
+            ];
+          }
+          return prev;
+        });
+      });
+
+      // Also destroy and recreate the session to actually stop the SDK query.
+      // Without this, the proxy/SDK keeps processing events until the response
+      // finishes naturally.
+      const session = sessionRef.current;
+      if (session) {
+        void session.destroy().catch(() => {/* ignore */});
+        sessionRef.current = null;
+        void initSessionRef.current();
+      }
+
       return Promise.resolve();
     },
     convertMessage: (msg: ThreadMessageLike) => msg,

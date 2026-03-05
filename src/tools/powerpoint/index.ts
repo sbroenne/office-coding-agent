@@ -423,13 +423,35 @@ PptxGenJS API reference:
         replaceSlideIndex?: number;
       };
 
-      // Build the pptxgenjs slide (pure JS, no Office context needed)
+      // Read actual slide dimensions from the presentation.
+      // Default to standard 16:9 (13.33" × 7.5") if API unavailable.
+      const PTS_PER_INCH = 72;
+      let W = 13.33;
+      let H = 7.5;
+      try {
+        /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
+        (context.presentation as any).load('slideWidth,slideHeight');
+        await context.sync();
+        const rawW = (context.presentation as any).slideWidth as number | undefined;
+        const rawH = (context.presentation as any).slideHeight as number | undefined;
+        /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
+        if (typeof rawW === 'number' && rawW > 0) W = rawW / PTS_PER_INCH;
+        if (typeof rawH === 'number' && rawH > 0) H = rawH / PTS_PER_INCH;
+      } catch {
+        // slideWidth/slideHeight not available on this Office version — use defaults
+      }
+
+      // Build the pptxgenjs slide matching the target presentation dimensions.
+      // PptxGenJS defaults to 13.33"×7.5" (16:9). If the target is different
+      // (e.g. 10"×7.5" for 4:3), content positioned for 13.33" would overflow.
       const pptx = new pptxgen();
+      pptx.defineLayout({ name: 'CUSTOM', width: W, height: H });
+      pptx.layout = 'CUSTOM';
       const slide = pptx.addSlide();
 
       /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
-      const buildSlide = new Function('slide', code);
-      buildSlide(slide);
+      const buildSlide = new Function('slide', 'W', 'H', code);
+      buildSlide(slide, W, H);
       /* eslint-enable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
 
       const base64 = (await pptx.write({ outputType: 'base64' })) as string;

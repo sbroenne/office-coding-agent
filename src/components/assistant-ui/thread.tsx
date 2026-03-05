@@ -13,8 +13,18 @@ import {
 } from '@assistant-ui/react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
-import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThinkingText } from '@/contexts/ThinkingContext';
+
+/**
+ * Pool of rotating progress labels matching VS Code's
+ * defaultThinkingMessages and toolMessages arrays.
+ */
+const TOOL_LABELS = ['Processing', 'Preparing', 'Loading', 'Analyzing', 'Evaluating'];
+
+function pickLabel(pool: string[]): string {
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
   leftToolbar,
@@ -38,7 +48,7 @@ export const Thread: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> =
           }}
         />
 
-        <ThreadLevelThinkingIndicator />
+        {/* Thinking indicator is now inline inside AssistantMessage — no thread-level indicator */}
 
         <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer sticky bottom-0 mt-auto flex w-full flex-col gap-2 overflow-visible bg-background px-3 pb-3">
           <ThreadScrollToBottom />
@@ -82,34 +92,29 @@ const ThreadWelcome: FC = () => {
     <div className="aui-thread-welcome-root my-auto flex w-full grow flex-col px-4">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex w-full flex-col items-center justify-center">
-          <div
-            className="mb-2 flex items-center justify-center rounded-full"
-            style={{
-              width: 28,
-              height: 28,
-              background: 'var(--vscode-chat-avatarBackground)',
-              color: 'var(--vscode-chat-avatarForeground)',
-            }}
-          >
-            <Codicon name="copilot" className="text-sm" />
+          <div style={{ marginBottom: 24 }}>
+            <Codicon
+              name="copilot"
+              className="text-[40px] text-[var(--vscode-descriptionForeground)]"
+            />
           </div>
-          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-base duration-200">
+          <h1
+            className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold duration-200"
+            style={{ fontSize: 13 }}
+          >
             How can I help?
           </h1>
         </div>
 
-        <div className="mt-4 flex w-full flex-col">
+        <div className="chat-welcome-suggested-prompts mt-4">
+          <p className="chat-welcome-suggested-prompts-title">Try asking</p>
           {SUGGESTIONS.map((suggestion, idx) => (
             <ThreadPrimitive.Suggestion
               key={suggestion.prompt}
               {...suggestion}
-              className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-center gap-2 rounded-[var(--vscode-cornerRadius-medium)] px-2 py-1.5 text-left text-[12px] transition-colors duration-150 hover:bg-[var(--vscode-list-hoverBackground)]"
-              style={{
-                animationDelay: `${100 + idx * 50}ms`,
-                color: 'var(--vscode-textLink-foreground)',
-              }}
+              className="chat-welcome-suggested-prompt fade-in animate-in fill-mode-both duration-150"
+              style={{ animationDelay: `${100 + idx * 50}ms` }}
             >
-              <Codicon name="sparkle" className="shrink-0 text-[11px]" />
               {suggestion.prompt}
             </ThreadPrimitive.Suggestion>
           ))}
@@ -136,17 +141,17 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
         <div className="flex items-center gap-0.5">{leftToolbar}</div>
         <div className="flex items-center gap-0.5">
           {rightToolbar}
-          <AuiIf condition={s => !s.thread.isRunning}>
-            <ComposerPrimitive.Send asChild>
-              <TooltipIconButton
-                tooltip="Send"
-                variant="ghost"
-                className="aui-composer-send h-7 w-7 rounded-md transition-opacity"
-              >
-                <Codicon name="send" className="text-base" />
-              </TooltipIconButton>
-            </ComposerPrimitive.Send>
-          </AuiIf>
+          {/* Send button — always visible. When running, sending a new message
+              cancels the current response and redirects (VS Code "steer" behavior). */}
+          <ComposerPrimitive.Send asChild>
+            <TooltipIconButton
+              tooltip="Send"
+              variant="ghost"
+              className="aui-composer-send h-7 w-7 rounded-md transition-opacity"
+            >
+              <Codicon name="send" className="text-base" />
+            </TooltipIconButton>
+          </ComposerPrimitive.Send>
           <AuiIf condition={s => s.thread.isRunning}>
             <ComposerPrimitive.Cancel asChild>
               <TooltipIconButton
@@ -175,21 +180,33 @@ const MessageError: FC = () => {
 };
 
 /**
- * Thread-level thinking indicator with VS Code shimmer effect.
- * Rendered once after ThreadPrimitive.Messages so it always appears below the
- * last message. Reads directly from ThinkingContext.
+ * Inline working progress line, rendered inside AssistantMessage.
+ * Matches VS Code's ChatWorkingProgressContentPart —
+ * a shimmer "Working" / "Thinking" line that appears before
+ * any response text and disappears when text arrives.
  */
-const ThreadLevelThinkingIndicator: FC = () => {
+const InlineWorkingProgress: FC = () => {
   const thinkingText = useThinkingText();
-  if (thinkingText === null) return null;
+  const isRunning = useAuiState(s => s.thread.isRunning);
+
+  const hasTextContent = useAuiState(s =>
+    s.message.parts.some(p => p.type === 'text' && p.text.trim().length > 0)
+  );
+
+  const hasRunningTool = useAuiState(s =>
+    s.message.parts.some(p => p.type === 'tool-call' && p.status?.type === 'running')
+  );
+
+  // Show when: thinking text is set, thread is running, no text content yet,
+  // and no tool is currently executing (tools have their own shimmer).
+  // This covers: initial "Thinking…", AND the gap between tool completion
+  // and the next action where the model is deciding what to do.
+  if (!thinkingText || !isRunning || hasTextContent || hasRunningTool) return null;
+
   return (
-    <div className="aui-assistant-message-root" data-role="assistant">
-      <div
-        className="aui-assistant-thinking-indicator fade-in animate-in duration-150 flex items-center gap-2 px-4 py-1.5"
-        style={{ fontSize: 13 }}
-      >
-        <span className="chat-thinking-shimmer-text">{thinkingText}</span>
-      </div>
+    <div className="inline-working-progress progress-container shimmer-progress" style={{ order: -2 }}>
+      <Codicon name="circle-filled" className="progress-status-icon shrink-0" />
+      <span className="progress-step">{thinkingText}</span>
     </div>
   );
 };
@@ -268,14 +285,11 @@ const AssistantActionBar: FC = () => {
 
 /**
  * ToolGroup wrapper — rendered by assistant-ui around consecutive tool-call
- * parts. Uses CSS `order: -1` so tool cards appear visually ABOVE the text
- * response (matching VS Code Copilot Chat) while keeping text at DOM index 0
- * to prevent React 18 useSyncExternalStore tearing.
+ * parts. Matches VS Code's "Working" collapsible box pattern.
  *
- * When there are 2+ tools, shows a collapsible "Used N tools" header
- * (matching VS Code Copilot Chat's grouped tool invocations). The group
- * auto-collapses once all tools complete and stays expanded while any tool
- * is still running. A single tool renders without the group header.
+ * Single tool: bare progress line with order:-1 positioning.
+ * Multi-tool: VS Code "Working" collapsible box with chain-of-thought
+ * line, shimmer title, and auto-collapse on completion.
  */
 const ToolGroup: FC<{ startIndex: number; endIndex: number; children?: ReactNode }> = ({
   startIndex,
@@ -284,7 +298,6 @@ const ToolGroup: FC<{ startIndex: number; endIndex: number; children?: ReactNode
 }) => {
   const toolCount = endIndex - startIndex + 1;
 
-  // Read whether any tool in this range is still running
   const isRunning = useAuiState(s => {
     for (let i = startIndex; i <= endIndex; i++) {
       const part = s.message.parts[i];
@@ -293,27 +306,27 @@ const ToolGroup: FC<{ startIndex: number; endIndex: number; children?: ReactNode
     return false;
   });
 
-  // Single tool — no group header, just render the card directly
+  // Single tool — bare progress line, no Working box
   if (toolCount <= 1) {
     return (
-      <div className="aui-tool-group" style={{ order: -1 }}>
+      <div className="chat-tool-single" style={{ order: -1 }}>
         {children}
       </div>
     );
   }
 
   return (
-    <ToolGroupCollapsible isRunning={isRunning} toolCount={toolCount}>
+    <WorkingCollapsible isRunning={isRunning} toolCount={toolCount}>
       {children}
-    </ToolGroupCollapsible>
+    </WorkingCollapsible>
   );
 };
 
 /**
- * Inner collapsible component for ToolGroup (2+ tools).
- * Extracted so the hooks are only active when we actually need the collapsible.
+ * VS Code "Working" collapsible box for multi-tool groups.
+ * Matches ChatThinkingContentPart from VS Code source.
  */
-const ToolGroupCollapsible: FC<{
+const WorkingCollapsible: FC<{
   isRunning: boolean;
   toolCount: number;
   children?: ReactNode;
@@ -321,7 +334,14 @@ const ToolGroupCollapsible: FC<{
   const [isExpanded, setIsExpanded] = useState(true);
   const hasAutoCollapsed = useRef(false);
 
-  // Auto-collapse once when every tool in the group completes
+  // Rotating spinner label
+  const spinnerLabel = useMemo(
+    () => (isRunning ? pickLabel(TOOL_LABELS) : ''),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isRunning]
+  );
+
+  // Auto-collapse once when every tool completes
   useEffect(() => {
     if (!isRunning && !hasAutoCollapsed.current) {
       hasAutoCollapsed.current = true;
@@ -331,31 +351,56 @@ const ToolGroupCollapsible: FC<{
 
   const toggle = useCallback(() => setIsExpanded(prev => !prev), []);
 
-  const headerText = isRunning ? `Running tools\u2026` : `Used ${toolCount} tools`;
+  const completionTitle = `Finished with ${toolCount} step${toolCount !== 1 ? 's' : ''}`;
 
   return (
-    <div className="aui-tool-group" style={{ order: -1 }}>
+    <div
+      className={cn(
+        'chat-thinking-box',
+        isRunning && 'chat-thinking-active',
+        !isExpanded && 'chat-thinking-collapsed'
+      )}
+      style={{ order: -1 }}
+    >
+      {/* Collapsible header button */}
       <button
         type="button"
         onClick={toggle}
-        className="aui-tool-group-trigger flex w-full items-center gap-1.5 py-1 text-sm text-left"
+        className="chat-thinking-header"
         aria-expanded={isExpanded}
-        data-slot="tool-group-trigger"
       >
         <Codicon
-          name={isExpanded ? 'chevron-down' : 'chevron-right'}
-          className="text-xs text-muted-foreground shrink-0"
+          name={isRunning ? 'circle-filled' : 'check'}
+          className={cn(
+            'chat-thinking-header-icon',
+            !isRunning && 'text-muted-foreground'
+          )}
         />
-        <Codicon
-          name={isRunning ? 'loading~spin' : 'check'}
-          className={cn('shrink-0 text-sm', isRunning && 'codicon-modifier-spin')}
-        />
-        <span className={cn('font-medium', isRunning && 'chat-thinking-shimmer-text')}>
-          {headerText}
+        <span className={cn(isRunning ? 'chat-thinking-title-shimmer' : 'chat-thinking-title-done')}>
+          {isRunning ? 'Working' : completionTitle}
         </span>
+        <Codicon
+          name={isExpanded ? 'chevron-down' : 'chevron-right'}
+          className="chat-collapsible-hover-chevron"
+        />
       </button>
-      <div className="aui-tool-group-content" style={{ display: isExpanded ? undefined : 'none' }}>
+
+      {/* Collapsible content with chain-of-thought line */}
+      <div
+        className="chat-thinking-collapsible"
+        style={{ display: isExpanded ? undefined : 'none' }}
+      >
         {children}
+
+        {/* Spinner at bottom while running */}
+        {isRunning && (
+          <div className="chat-thinking-spinner-item chat-thinking-tool-wrapper">
+            <span className="chat-thinking-icon">
+              <Codicon name="circle-filled" className="text-xs" />
+            </span>
+            <span className="chat-thinking-spinner-label">{spinnerLabel}</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -367,24 +412,9 @@ const AssistantMessage: FC = () => {
       className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-2 duration-150"
       data-role="assistant"
     >
-      {/* Copilot avatar header */}
-      <div className="mb-1.5 flex items-center gap-2 px-4">
-        <div
-          className="flex items-center justify-center rounded-full"
-          style={{
-            width: 22,
-            height: 22,
-            background: 'var(--vscode-chat-avatarBackground)',
-            color: 'var(--vscode-chat-avatarForeground)',
-          }}
-        >
-          <Codicon name="copilot" className="text-[12px]" />
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 600 }} className="text-foreground">
-          Copilot
-        </span>
-      </div>
+      {/* VS Code hides avatar + name for the default Copilot agent */}
       <div className="aui-assistant-message-content flex flex-col wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
+        <InlineWorkingProgress />
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
@@ -454,7 +484,7 @@ const UserMessage: FC = () => {
       className="aui-user-message-root fade-in slide-in-from-bottom-1 group/message relative flex w-full animate-in px-4 py-2 duration-150"
       data-role="user"
     >
-      <div className="aui-user-message-content wrap-break-word w-full text-foreground text-[13px] leading-[1.5em]">
+      <div className="aui-user-message-bubble wrap-break-word text-foreground text-[13px] leading-[1.5em]">
         <MessagePrimitive.Content />
       </div>
       <UserActionBar />

@@ -333,7 +333,7 @@ async function testPptTools(): Promise<void> {
     }
   );
 
-  // 10. add_slide_from_code
+  // 10. add_slide_from_code (hardcoded positions)
   const simpleSlideCode = [
     'slide.addText("E2E Test Slide", { x: 1, y: 1, w: 8, h: 1.5, fontSize: 36, bold: true });',
     'slide.addText("Created by e2e automated tests", { x: 1, y: 3, w: 8, h: 1, fontSize: 18 });',
@@ -344,6 +344,32 @@ async function testPptTools(): Promise<void> {
     return s.toLowerCase().includes('success') || s.includes('slide')
       ? null
       : `Expected success message from add_slide_from_code, got: ${s.substring(0, 100)}`;
+  });
+
+  // 10b. add_slide_from_code with W and H (tests that slide dimensions are injected)
+  const dynamicSlideCode = [
+    'if (typeof W !== "number" || W <= 0) throw new Error("W not injected or invalid: " + W);',
+    'if (typeof H !== "number" || H <= 0) throw new Error("H not injected or invalid: " + H);',
+    'slide.addText("Dynamic Layout Test", { x: 0.5, y: 0.5, w: W-1, h: 1, fontSize: 28, bold: true, shrinkText: true });',
+    'slide.addText("W=" + W.toFixed(2) + " H=" + H.toFixed(2), { x: 0.5, y: 2, w: W-1, h: H-3, fontSize: 16, shrinkText: true });',
+  ].join('\n');
+
+  await runTool(powerPointConfigs, 'add_slide_from_code', { code: dynamicSlideCode }, r => {
+    const s = safeString(r);
+    return s.toLowerCase().includes('success') || s.includes('slide')
+      ? null
+      : `Expected add_slide_from_code with W/H to succeed, got: ${s.substring(0, 200)}`;
+  });
+
+  // 10c. Overflow detection — verify get_slide_shapes can detect overflow
+  // Checks slide 0 (always exists). The tool reports "⚠️ OVERFLOW" for any out-of-bounds shape.
+  // If 10b's W/H injection was wrong, shapes would overflow and this would catch it.
+  await runTool(powerPointConfigs, 'get_slide_shapes', { slideIndex: 0 }, r => {
+    const s = safeString(r);
+    if (s.includes('OVERFLOW')) {
+      return `Slide 0 has overflowing shapes: ${s.substring(0, 300)}`;
+    }
+    return null;
   });
 
   // 11. duplicate_slide

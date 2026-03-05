@@ -125,38 +125,42 @@ const ChoiceCards: FC<{ code: string }> = ({ code }) => {
   if (!choices || choices.length === 0) return null;
 
   return (
-    <div className="aui-choices-wrapper mt-2 flex flex-col">
-      {choices.map((choice, i) => (
-        <button
-          key={choice.label}
-          onClick={() => handleChoice(choice.label)}
-          title={choice.description}
-          className="flex items-baseline gap-3 rounded-[var(--vscode-cornerRadius-medium)] px-2 py-1 text-left text-sm transition-colors hover:bg-[var(--vscode-list-hoverBackground)]"
-        >
-          <span className="w-4 shrink-0 text-right text-xs text-muted-foreground select-none">
-            {i + 1}
-          </span>
-          <span className="text-foreground">{choice.label}</span>
-        </button>
-      ))}
-      <div className="flex items-baseline gap-3 px-2 py-1">
-        <span className="w-4 shrink-0 text-right text-xs text-muted-foreground select-none">
-          {choices.length + 1}
-        </span>
-        <textarea
-          className="flex-1 resize-none bg-transparent text-sm text-foreground outline-none border-b transition-colors placeholder:text-[var(--vscode-input-placeholderForeground)]"
-          style={{ borderColor: 'var(--vscode-widget-border)' }}
-          placeholder="Enter custom answer"
-          rows={1}
-          value={freeformText}
-          onChange={e => setFreeformText(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleFreeform();
-            }
-          }}
-        />
+    <div className="aui-choices-wrapper chat-question-carousel-container">
+      <div className="chat-question-input-container">
+        <div className="chat-question-list">
+          {choices.map((choice, i) => (
+            <button
+              key={choice.label}
+              onClick={() => handleChoice(choice.label)}
+              title={choice.description}
+              className="chat-question-list-item"
+            >
+              <span className="chat-question-list-number">{i + 1}</span>
+              <span className="chat-question-list-label">
+                <span className="chat-question-list-label-title">{choice.label}</span>
+                {choice.description && (
+                  <span className="chat-question-list-label-desc">{choice.description}</span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="chat-question-freeform">
+          <span className="chat-question-freeform-number">{choices.length + 1}</span>
+          <textarea
+            className="chat-question-freeform-textarea"
+            placeholder="Enter custom answer"
+            rows={1}
+            value={freeformText}
+            onChange={e => setFreeformText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleFreeform();
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );
