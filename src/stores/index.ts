@@ -3,3 +3,4 @@ export { useChatStore } from './chatStore';
 export { useSessionHistoryStore } from './sessionHistoryStore';
 export { usePermissionStore } from './permissionStore';
 export { useMcpStatusStore } from './mcpStatusStore';
+export { useMemoryStore } from './memoryStore';
