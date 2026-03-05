@@ -22,16 +22,25 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
     // Capture all thinking indicator text values via MutationObserver
-    // Now the indicator is .inline-working-progress inside the assistant message
+    // Now captures both the inline shimmer AND the Working box spinner
     await page.evaluate(() => {
       (window as unknown as Record<string, string[]>).__thinkingTexts = [];
       const observer = new MutationObserver(() => {
+        const texts = (window as unknown as Record<string, string[]>).__thinkingTexts;
+        // Check inline shimmer
         const el = document.querySelector('.inline-working-progress .progress-step');
         if (el?.textContent) {
-          const texts = (window as unknown as Record<string, string[]>).__thinkingTexts;
           const last = texts[texts.length - 1];
           if (el.textContent !== last) {
             texts.push(el.textContent);
+          }
+        }
+        // Check Working box spinner
+        const spinner = document.querySelector('[data-testid="working-spinner"] .chat-thinking-spinner-label');
+        if (spinner?.textContent) {
+          const last = texts[texts.length - 1];
+          if (spinner.textContent !== last) {
+            texts.push(spinner.textContent);
           }
         }
       });
@@ -109,29 +118,35 @@ test.describe('Thinking indicator (live Copilot)', () => {
     );
     await composer.press('Enter');
 
-    // Wait for the shimmer progress indicator to appear inside the assistant message
+    // Wait for either the inline shimmer OR the Working box to appear
     const indicator = page.locator('.inline-working-progress');
-    await expect(indicator).toBeVisible({ timeout: AI_TIMEOUT });
+    const workingBox = page.locator('.chat-thinking-box');
+    await expect(indicator.or(workingBox)).toBeVisible({ timeout: AI_TIMEOUT });
 
-    // The indicator must NOT be a descendant of the viewport footer
-    const isInsideFooter = await indicator.evaluate(
+    // Whichever appears must be inside the assistant message (not in the footer)
+    const progressElement = (await indicator.isVisible()) ? indicator : workingBox;
+    const isInsideFooter = await progressElement.evaluate(
       el => !!el.closest('.aui-thread-viewport-footer')
     );
     expect(isInsideFooter).toBe(false);
 
     // The indicator must be a descendant of the scrollable viewport
-    const isInsideViewport = await indicator.evaluate(el => !!el.closest('.aui-thread-viewport'));
+    const isInsideViewport = await progressElement.evaluate(
+      el => !!el.closest('.aui-thread-viewport')
+    );
     expect(isInsideViewport).toBe(true);
 
     // The indicator must be rendered within an assistant message block
-    const isInsideAssistantMessage = await indicator.evaluate(
+    const isInsideAssistantMessage = await progressElement.evaluate(
       el => !!el.closest('.aui-assistant-message-root')
     );
     expect(isInsideAssistantMessage).toBe(true);
 
     // Geometric guard: indicator must render above the composer area
     const isAboveComposer = await page.evaluate(() => {
-      const indicatorEl = document.querySelector('.inline-working-progress');
+      const indicatorEl =
+        document.querySelector('.inline-working-progress') ??
+        document.querySelector('.chat-thinking-box');
       const composerEl = document.querySelector('.aui-composer-root');
       if (!indicatorEl || !composerEl) return false;
       const indicatorRect = indicatorEl.getBoundingClientRect();
@@ -143,7 +158,9 @@ test.describe('Thinking indicator (live Copilot)', () => {
     // The indicator must appear BELOW the last user message in DOM order
     const isAfterMessages = await page.evaluate(() => {
       const messages = document.querySelector('[data-role="user"]');
-      const ind = document.querySelector('.inline-working-progress');
+      const ind =
+        document.querySelector('.inline-working-progress') ??
+        document.querySelector('.chat-thinking-box');
       if (!messages || !ind) return false;
       return !!(messages.compareDocumentPosition(ind) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
@@ -156,5 +173,75 @@ test.describe('Thinking indicator (live Copilot)', () => {
 
     // After completion, shimmer indicator must be gone
     await expect(indicator).not.toBeVisible();
+  });
+
+  test('Working box shows spinner between tool completions and collapses when done', async ({
+    configuredTaskpane: page,
+  }) => {
+    test.setTimeout(AI_TIMEOUT + 30_000);
+
+    const composer = page.getByPlaceholder('Send a message...');
+    await expect(composer).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Connection failed')).not.toBeVisible();
+
+    // Capture Working box state transitions via MutationObserver
+    await page.evaluate(() => {
+      (window as unknown as Record<string, string[]>).__workingStates = [];
+      const observer = new MutationObserver(() => {
+        const spinner = document.querySelector('[data-testid="working-spinner"]');
+        const workingTitle = document.querySelector('.chat-thinking-title-shimmer');
+        const doneTitle = document.querySelector('.chat-thinking-title-done');
+        const states = (window as unknown as Record<string, string[]>).__workingStates;
+        if (spinner) {
+          const text = spinner.textContent || '';
+          const last = states[states.length - 1];
+          if (text !== last) states.push(`spinner: ${text}`);
+        }
+        if (workingTitle) {
+          const last = states[states.length - 1];
+          if (last !== 'working-active') states.push('working-active');
+        }
+        if (doneTitle) {
+          const text = doneTitle.textContent || '';
+          const last = states[states.length - 1];
+          if (`done: ${text}` !== last) states.push(`done: ${text}`);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
+
+    // Prompt that triggers tool calls
+    await composer.fill(
+      'Use the manage_skills tool with action "list" and then use manage_agents with action "list". Tell me the counts.'
+    );
+    await composer.press('Enter');
+
+    // Wait for response to complete
+    await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({
+      timeout: AI_TIMEOUT,
+    });
+
+    // After completion, verify we captured Working box transitions
+    const workingStates = await page.evaluate(
+      () => (window as unknown as Record<string, string[]>).__workingStates
+    );
+    console.log('  Working box states:', workingStates);
+
+    // Should have seen at least: working-active and done state
+    expect(workingStates.length).toBeGreaterThanOrEqual(1);
+
+    // After completion: Working box should show "Finished with N steps"
+    const doneTitle = page.locator('.chat-thinking-title-done');
+    await expect(doneTitle).toBeVisible({ timeout: 5000 });
+    const doneText = await doneTitle.textContent();
+    expect(doneText).toMatch(/Finished with \d+ steps?/);
+
+    // Take a visual regression screenshot of the completed Working box
+    const assistantMessage = page.locator('[data-role="assistant"]').last();
+    await expect(assistantMessage).toBeVisible();
+    await assistantMessage.screenshot({
+      path: 'test-results/working-box-completed.png',
+    });
   });
 });

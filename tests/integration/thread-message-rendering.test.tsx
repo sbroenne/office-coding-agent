@@ -92,7 +92,7 @@ function renderThreadWithHook(host: 'excel' = 'excel') {
     const chat = useOfficeChat(host);
     hookRef = chat;
     return (
-      <ChatActionsContext.Provider value={{ send: chat.send }}>
+      <ChatActionsContext.Provider value={{ send: chat.send, enqueue: () => {} }}>
         <MessageList
           messages={chat.messages}
           isRunning={chat.isRunning}
@@ -578,6 +578,366 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Working box spinner between tool steps (visual regression)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Working box spinner between tool steps (thinking gap fix)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('shows spinner inside Working box after a tool completes (inter-step thinking)', async () => {
+    // KEY regression test for the thinking gap bug.
+    // After a tool completes and before the next tool/text starts,
+    // the spinner inside the Working box must show "Thinking…"
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'A1:C3' },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1,2,3]]' },
+        });
+        // ── PAUSE ── model is thinking between tools
+        await streamGate;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Here is the data.' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Inline shimmer should NOT show (tools exist now)
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
+
+    // Working box must be present with "Working" header
+    const workingHeader = document.querySelector('.chat-thinking-title-shimmer');
+    expect(workingHeader).toBeInTheDocument();
+    expect(workingHeader!.textContent).toBe('Working');
+
+    // Spinner inside Working box must show "Thinking…"
+    const spinner = document.querySelector('[data-testid="working-spinner"]');
+    expect(spinner).toBeInTheDocument();
+    expect(spinner!.textContent).toContain('Thinking');
+
+    // The spinner label must have the shimmer CSS class
+    const spinnerLabel = spinner!.querySelector('.chat-thinking-spinner-label');
+    expect(spinnerLabel).toBeInTheDocument();
+
+    // Release stream and finish
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // After completion, spinner should be gone (Working box collapses)
+    expect(document.querySelector('[data-testid="working-spinner"]')).not.toBeInTheDocument();
+  });
+
+  it('spinner hides while a tool is actively running', async () => {
+    // When a tool is running, its card shows shimmer — no need for spinner
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'A1:C3' },
+        });
+        // ── PAUSE ── tool is running
+        await streamGate;
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1]]' },
+        });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Tool card should exist (running)
+    expect(document.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
+
+    // Spinner must NOT show while a tool is actively running
+    expect(document.querySelector('[data-testid="working-spinner"]')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+  });
+
+  it('spinner shows intent text from report_intent between tools', async () => {
+    // When report_intent fires, its text should appear as the spinner label
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'A1' },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[42]]' },
+        });
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'ri1',
+          toolName: 'report_intent',
+          arguments: { intent: 'Formatting the table' },
+        });
+        // ── PAUSE ── spinner should show "Formatting the table"
+        await streamGate;
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc2',
+          toolName: 'set_range_format',
+          arguments: { address: 'A1:D10', format: { bold: true } },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc2',
+          success: true,
+          result: { content: 'OK' },
+        });
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Formatted!' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Spinner should show the intent text
+    const spinner = document.querySelector('[data-testid="working-spinner"]');
+    expect(spinner).toBeInTheDocument();
+    expect(spinner!.textContent).toContain('Formatting the table');
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 300));
+    });
+  });
+
+  it('inter-step thinking works even after text has been streamed', async () => {
+    // CRITICAL regression: once text streams, the old code permanently killed
+    // the thinking indicator because of `!hasText`. Now the Working box
+    // spinner takes over.
+    let resolveStream!: () => void;
+    const streamGate = new Promise<void>(r => {
+      resolveStream = r;
+    });
+
+    const pausingSession = {
+      sessionId: 'test-session-id',
+      async *query() {
+        // Model first outputs some text
+        yield makeEvent('assistant.message_delta', {
+          messageId: 'msg1',
+          deltaContent: 'Let me check that. ',
+        });
+        // Then calls a tool
+        yield makeEvent('tool.execution_start', {
+          toolCallId: 'tc1',
+          toolName: 'get_range_values',
+          arguments: { address: 'A1:B2' },
+        });
+        yield makeEvent('tool.execution_complete', {
+          toolCallId: 'tc1',
+          success: true,
+          result: { content: '[[1,2],[3,4]]' },
+        });
+        // ── PAUSE ── inter-step thinking after text + tool
+        await streamGate;
+        yield makeEvent('assistant.message', {
+          messageId: 'msg1',
+          content: 'Let me check that. The data shows values 1-4.',
+        });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn(),
+    };
+    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // Text has been streamed — inline shimmer is correctly hidden
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
+
+    // But the Working box spinner MUST show (this was the bug)
+    const spinner = document.querySelector('[data-testid="working-spinner"]');
+    expect(spinner).toBeInTheDocument();
+    expect(spinner!.textContent).toContain('Thinking');
+
+    // Working box should still be expanded and active
+    const workingTitle = document.querySelector('.chat-thinking-title-shimmer');
+    expect(workingTitle).toBeInTheDocument();
+
+    await act(async () => {
+      resolveStream();
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    // After completion, spinner gone
+    expect(document.querySelector('[data-testid="working-spinner"]')).not.toBeInTheDocument();
+  });
+
+  it('Working box shows correct completion title and collapses after all tools finish', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1]]' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'set_range_values',
+        arguments: { address: 'B1', values: [[2]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Done.')).toBeInTheDocument();
+    });
+
+    // After completion: Working box header shows "Finished with 2 steps"
+    const doneTitle = document.querySelector('.chat-thinking-title-done');
+    expect(doneTitle).toBeInTheDocument();
+    expect(doneTitle!.textContent).toBe('Finished with 2 steps');
+
+    // Working box should auto-collapse (collapsible content hidden)
+    const collapsible = document.querySelector('.chat-thinking-collapsible');
+    expect(collapsible).toBeInTheDocument();
+    expect((collapsible as HTMLElement).style.display).toBe('none');
   });
 });
 

@@ -10,6 +10,8 @@ interface ChatPanelProps {
   isRunning: boolean;
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
+  onEnqueue?: (text: string) => void;
+  queuedCount?: number;
   onOpenPanel?: (panel: string) => void;
 }
 
@@ -33,6 +35,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isRunning,
   onSend,
   onCancel,
+  onEnqueue,
+  queuedCount,
   onOpenPanel,
 }) => {
   return (
@@ -42,8 +46,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         isRunning={isRunning}
         onSend={onSend}
         onCancel={onCancel}
-        onFeedback={() => {/* TODO */}}
-        onRegenerate={() => {/* TODO */}}
+        onEnqueue={onEnqueue}
+        queuedCount={queuedCount}
+        onFeedback={() => {
+          /* TODO */
+        }}
+        onRegenerate={() => {
+          /* TODO */
+        }}
         leftToolbar={
           <>
             <AgentPicker onOpenPanel={onOpenPanel} />

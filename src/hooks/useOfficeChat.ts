@@ -137,6 +137,14 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
   const activePermissionRequestRef = useRef<string | null>(null);
 
+  // Prompt queue: prompts enqueued via Ctrl+Q while a response is in flight.
+  // Ref is the source of truth (avoids stale closures in send); state drives UI.
+  const queueRef = useRef<string[]>([]);
+  const [queuedPrompts, setQueuedPrompts] = useState<string[]>([]);
+  // Ref to call send() from inside its own finally block (auto-dequeue).
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const sendRef = useRef<(text: string) => Promise<void>>(async () => {});
+
   const deserializeMessages = useCallback((rawMessages: unknown[]): ChatMessage[] => {
     return rawMessages
       .filter((msg): msg is Record<string, unknown> => typeof msg === 'object' && msg !== null)
@@ -787,11 +795,40 @@ export function useOfficeChat(host: OfficeHostApp) {
       // Ensure thinkingText is cleared and isRunning is reset
       setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, thinkingText: null } : m)));
       setIsRunning(false);
+
+      // Auto-dequeue: if prompts were enqueued via Ctrl+Q, send the next one.
+      const next = queueRef.current.shift();
+      if (next !== undefined) {
+        setQueuedPrompts([...queueRef.current]);
+        // Defer to avoid re-entering send() synchronously from its own finally
+        setTimeout(() => void sendRef.current(next), 0);
+      }
     }
+  }, []);
+
+  // Keep sendRef in sync so auto-dequeue can call the latest send()
+  sendRef.current = send;
+
+  /** Enqueue a prompt to run after the current response finishes. */
+  const enqueue = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    queueRef.current = [...queueRef.current, trimmed];
+    setQueuedPrompts([...queueRef.current]);
+  }, []);
+
+  /** Clear all queued prompts. */
+  const clearQueue = useCallback(() => {
+    queueRef.current = [];
+    setQueuedPrompts([]);
   }, []);
 
   const cancel = useCallback(() => {
     cancelRef.current = true;
+
+    // Clear any queued prompts — user cancelled, don't auto-send more
+    queueRef.current = [];
+    setQueuedPrompts([]);
 
     // Immediately update UI: mark the running message as incomplete/cancelled
     // and clear thinking text so the user gets instant feedback.
@@ -826,6 +863,9 @@ export function useOfficeChat(host: OfficeHostApp) {
     setMessages([]);
     setPendingPermission(null);
     activePermissionRequestRef.current = null;
+    // Clear queued prompts on new conversation
+    queueRef.current = [];
+    setQueuedPrompts([]);
     createSession(host);
     void initSession();
   }, [createSession, host, initSession]);
@@ -925,5 +965,8 @@ export function useOfficeChat(host: OfficeHostApp) {
     denyPermission,
     allowPermissionAlways,
     compactSession,
+    enqueue,
+    queuedPrompts,
+    clearQueue,
   };
 }
