@@ -1,6 +1,13 @@
 export type { CopilotModel, ModelProvider, UserSettings } from './settings';
 export { DEFAULT_SETTINGS, inferProvider, BUNDLED_MCP_SERVERS } from './settings';
-export type { ChatMessage, Suggestion, ToolCall } from './chat';
+export type {
+  ChatMessage,
+  ChatMessagePart,
+  ChatMessageStatus,
+  TextPart,
+  ToolCallPart,
+  ToolCallStatus,
+} from './chat';
 export type {
   RangeData,
   TableInfo,

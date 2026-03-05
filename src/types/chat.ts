@@ -1,35 +1,42 @@
-/** A suggested prompt shown to the user */
-export interface Suggestion {
-  /** Unique suggestion ID */
-  id: string;
-  /** Display text */
+/** Status of a tool call within a message */
+export interface ToolCallStatus {
+  type: 'running' | 'complete' | 'incomplete';
+  reason?: 'cancelled' | 'error';
+  error?: unknown;
+}
+
+/** A tool-call part within a chat message */
+export interface ToolCallPart {
+  type: 'tool-call';
+  toolCallId: string;
+  toolName: string;
+  argsText: string;
+  result?: string;
+  status?: ToolCallStatus;
+}
+
+/** A text part within a chat message */
+export interface TextPart {
+  type: 'text';
   text: string;
-  /** Optional icon */
-  icon?: string;
 }
 
-/** A chat message in the conversation history */
+/** Union of all message content parts */
+export type ChatMessagePart = TextPart | ToolCallPart;
+
+/** Overall status of a chat message */
+export type ChatMessageStatus =
+  | { type: 'running' }
+  | { type: 'complete'; reason: 'stop' }
+  | { type: 'incomplete'; reason: 'cancelled' | 'error'; error?: string };
+
+/** A single message in the chat thread */
 export interface ChatMessage {
-  /** Message role */
-  role: 'user' | 'assistant' | 'tool';
-  /** Text content */
-  content: string;
-  /** Whether this message is currently being streamed */
-  isStreaming?: boolean;
-  /** Tool calls made by the assistant in this message */
-  toolCalls?: ToolCall[];
-  /** For tool-result messages: the ID of the tool call this result belongs to */
-  toolCallId?: string;
-}
-
-/** A tool call made by the assistant */
-export interface ToolCall {
-  /** Unique tool call ID */
   id: string;
-  /** Name of the function that was called */
-  functionName: string;
-  /** Serialized JSON arguments */
-  arguments: string;
-  /** Parsed argument object */
-  parsedArguments?: Record<string, unknown>;
+  role: 'user' | 'assistant';
+  content: ChatMessagePart[];
+  status?: ChatMessageStatus;
+  /** Per-message thinking/working text (shimmer label). Null = not thinking. */
+  thinkingText?: string | null;
+  createdAt: Date;
 }

@@ -73,8 +73,6 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.12.11",
-    "@assistant-ui/react-markdown": "^0.12.4",
     "@github/copilot": "^0.0.414",
     "@github/copilot-sdk": "^0.1.30",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -93,6 +91,7 @@
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "skillpm": "^0.0.4",
     "tailwind-merge": "^3.5.0",

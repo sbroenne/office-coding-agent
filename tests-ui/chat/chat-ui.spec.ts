@@ -121,7 +121,8 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
 
     const pinnedToBottom = await page.evaluate(async () => {
-      await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+      // Wait for messages to render and scroll to settle
+      await new Promise(resolve => setTimeout(resolve, 500));
       const viewport = document.querySelector('.aui-thread-viewport') as HTMLElement | null;
       if (!viewport) return false;
       const delta = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
