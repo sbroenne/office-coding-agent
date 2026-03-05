@@ -141,17 +141,17 @@ const Composer: FC<{ leftToolbar?: ReactNode; rightToolbar?: ReactNode }> = ({
         <div className="flex items-center gap-0.5">{leftToolbar}</div>
         <div className="flex items-center gap-0.5">
           {rightToolbar}
-          <AuiIf condition={s => !s.thread.isRunning}>
-            <ComposerPrimitive.Send asChild>
-              <TooltipIconButton
-                tooltip="Send"
-                variant="ghost"
-                className="aui-composer-send h-7 w-7 rounded-md transition-opacity"
-              >
-                <Codicon name="send" className="text-base" />
-              </TooltipIconButton>
-            </ComposerPrimitive.Send>
-          </AuiIf>
+          {/* Send button — always visible. When running, sending a new message
+              cancels the current response and redirects (VS Code "steer" behavior). */}
+          <ComposerPrimitive.Send asChild>
+            <TooltipIconButton
+              tooltip="Send"
+              variant="ghost"
+              className="aui-composer-send h-7 w-7 rounded-md transition-opacity"
+            >
+              <Codicon name="send" className="text-base" />
+            </TooltipIconButton>
+          </ComposerPrimitive.Send>
           <AuiIf condition={s => s.thread.isRunning}>
             <ComposerPrimitive.Cancel asChild>
               <TooltipIconButton
