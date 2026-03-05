@@ -73,13 +73,15 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
 
       // Capture PNG thumbnail for every slide
       interface SlideWithImage {
-        getImageAsBase64(width: number): { value: string };
+        getImageAsBase64(options?: { width?: number; height?: number }): { value: string };
       }
       const imageResults: { value: string }[] = [];
       let imagesSupported = true;
       try {
         for (const slide of slides.items) {
-          imageResults.push((slide as unknown as SlideWithImage).getImageAsBase64(thumbnailWidth));
+          imageResults.push(
+            (slide as unknown as SlideWithImage).getImageAsBase64({ width: thumbnailWidth })
+          );
         }
         await context.sync();
       } catch {
@@ -219,14 +221,14 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
       }
 
       const slide = slides.items[slideIndex];
-      // getImageAsBase64 is available in PowerPoint requirement set 1.5+
+      // getImageAsBase64 is available in PowerPoint API set 1.8+
       interface SlideWithImage {
-        getImageAsBase64(width: number): { value: string };
+        getImageAsBase64(options?: { width?: number; height?: number }): { value: string };
       }
 
       let imageResult: { value: string };
       try {
-        imageResult = (slide as unknown as SlideWithImage).getImageAsBase64(width);
+        imageResult = (slide as unknown as SlideWithImage).getImageAsBase64({ width });
         await context.sync();
       } catch {
         return (
@@ -1398,6 +1400,748 @@ PptxGenJS API reference:
 
       await context.sync();
       return `Added ${connectorType} line from (${String(startX)}", ${String(startY)}") to (${String(endX)}", ${String(endY)}") on slide ${String(slideIndex + 1)}.`;
+    },
+  },
+
+  {
+    name: 'group_shapes',
+    description:
+      'Group multiple shapes on a slide into a single group shape. Use get_slide_shapes first to identify the shape indices. ' +
+      'Requires PowerPoint 16.0.17531+ (requirement set 1.8).',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndices: {
+        type: 'number[]',
+        description:
+          'Array of 0-based shape indices (from get_slide_shapes) to group together. Must contain at least 2 indices.',
+      },
+      groupName: {
+        type: 'string',
+        required: false,
+        description: 'Optional name for the resulting group shape.',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndices, groupName } = args as {
+        slideIndex: number;
+        shapeIndices: number[];
+        groupName?: string;
+      };
+
+      if (!Array.isArray(shapeIndices) || shapeIndices.length < 2) {
+        throw new Error('shapeIndices must be an array of at least 2 shape indices.');
+      }
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      for (const idx of shapeIndices) {
+        if (idx < 0 || idx >= shapeCount) {
+          throw new Error(
+            `Invalid shapeIndex ${String(idx)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+          );
+        }
+      }
+
+      // Load IDs for selected shapes
+      const selectedShapes = shapeIndices.map(i => slide.shapes.items[i]);
+      for (const s of selectedShapes) {
+        s.load('id,name');
+      }
+      await context.sync();
+
+      try {
+        const shapeIds = selectedShapes.map(s => s.id);
+        const groupShape = slide.shapes.addGroup(shapeIds);
+        if (groupName) groupShape.name = groupName;
+        groupShape.load('name,id');
+        await context.sync();
+
+        const names = selectedShapes.map(s => `"${s.name}"`).join(', ');
+        return `Grouped ${String(shapeIndices.length)} shapes (${names}) into group "${groupShape.name}" on slide ${String(slideIndex + 1)}.`;
+      } catch {
+        throw new Error(
+          'group_shapes requires PowerPoint 16.0.17531+ (requirement set 1.8). Ensure shapes are not already in a group and belong to the same slide.'
+        );
+      }
+    },
+  },
+
+  {
+    name: 'ungroup_shapes',
+    description:
+      'Ungroup a grouped shape on a slide, releasing its child shapes back to the slide. ' +
+      'Use get_slide_shapes first to identify the group shape index (type will be "Group"). ' +
+      'Requires PowerPoint 16.0.17531+ (requirement set 1.8).',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: {
+        type: 'number',
+        description:
+          '0-based index of the group shape to ungroup (from get_slide_shapes, type should be "Group").',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex } = args as { slideIndex: number; shapeIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      const shapeCount = slide.shapes.items.length;
+      if (shapeIndex < 0 || shapeIndex >= shapeCount) {
+        throw new Error(
+          `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(shapeCount)} shape(s).`
+        );
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      shape.load('name,type');
+      await context.sync();
+
+      if (shape.type !== PowerPoint.ShapeType.group) {
+        throw new Error(
+          `Shape [${String(shapeIndex)}] "${shape.name}" is not a group (type: ${String(shape.type)}). Use get_slide_shapes to find a shape with type "Group".`
+        );
+      }
+
+      const groupName = shape.name;
+
+      try {
+        const shapeGroup = shape.group;
+
+        // Load child shapes before ungrouping to report count
+        shapeGroup.shapes.load('items');
+        await context.sync();
+        const childCount = shapeGroup.shapes.items.length;
+
+        shapeGroup.ungroup();
+        await context.sync();
+
+        return `Ungrouped "${groupName}" on slide ${String(slideIndex + 1)}, releasing ${String(childCount)} shape(s).`;
+      } catch {
+        throw new Error(
+          `Failed to ungroup shape "${groupName}". Ensure it is a valid group shape. group_shapes requires PowerPoint 16.0.17531+ (requirement set 1.8).`
+        );
+      }
+    },
+  },
+
+  {
+    name: 'get_smartart_info',
+    description:
+      'List all SmartArt and diagram shapes on a slide with their index, name, position, and size. ' +
+      'Use this to inspect existing SmartArt graphics. Note: SmartArt content cannot be modified via the Office.js API — ' +
+      'use add_slide_from_code with PptxGenJS to create SmartArt-like visuals programmatically.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex } = args as { slideIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      const slideCount = slides.items.length;
+      if (slideIndex < 0 || slideIndex >= slideCount) {
+        throw new Error(
+          `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount - 1)}.`
+        );
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      for (const shape of slide.shapes.items) {
+        shape.load('name,type,left,top,width,height');
+      }
+      await context.sync();
+
+      const PTS_PER_INCH = 72;
+      const smartArtShapes = slide.shapes.items
+        .map((shape, i) => ({ shape, i }))
+        .filter(
+          ({ shape }) =>
+            shape.type === PowerPoint.ShapeType.smartArt ||
+            shape.type === PowerPoint.ShapeType.diagram
+        );
+
+      if (smartArtShapes.length === 0) {
+        return `Slide ${String(slideIndex + 1)} has no SmartArt or diagram shapes.\n\nTip: To create SmartArt-like visuals, use add_slide_from_code with PptxGenJS shapes and connectors.`;
+      }
+
+      const lines = smartArtShapes.map(({ shape, i }) => {
+        const x = (shape.left / PTS_PER_INCH).toFixed(2);
+        const y = (shape.top / PTS_PER_INCH).toFixed(2);
+        const w = (shape.width / PTS_PER_INCH).toFixed(2);
+        const h = (shape.height / PTS_PER_INCH).toFixed(2);
+        return `[${i}] "${shape.name}" type:${String(shape.type)} — x:${x}" y:${y}" w:${w}" h:${h}"`;
+      });
+
+      return (
+        `Slide ${String(slideIndex + 1)} — ${String(smartArtShapes.length)} SmartArt/diagram shape(s):\n${lines.join('\n')}\n\n` +
+        `Note: SmartArt content cannot be modified via the Office.js API. To replace with editable content, delete the SmartArt shape and use add_slide_from_code to create a similar visual layout.`
+      );
+    },
+  },
+
+  // ─── Theme & Properties Tools ──────────────────────────────────────────────
+
+  {
+    name: 'get_theme_colors',
+    description:
+      'Read the presentation theme color palette from the first slide master. Returns the named theme colors ' +
+      '(e.g., dk1, dk2, lt1, lt2, accent1–accent6, hlink, folHlink) so you can use brand-consistent colors ' +
+      'instead of hardcoded hex values. Call this early when creating slides to match the presentation style.',
+    params: {},
+    execute: async context => {
+      const masters = context.presentation.slideMasters;
+      masters.load('items');
+      await context.sync();
+
+      if (masters.items.length === 0) return 'No slide masters found.';
+
+      interface ThemeColor {
+        name: string;
+        hexColor: string;
+      }
+      interface ThemeScheme {
+        load(props: string): void;
+        colors: ThemeColor[];
+      }
+
+      const master = masters.items[0];
+      let scheme: ThemeScheme;
+      try {
+        scheme = (master as unknown as { themeColorScheme: ThemeScheme }).themeColorScheme;
+        scheme.load('colors');
+        await context.sync();
+      } catch {
+        return 'Theme color scheme API not available in this PowerPoint version. Use standard colors.';
+      }
+
+      const colors = scheme.colors.map((c: ThemeColor) => `${c.name}: #${c.hexColor}`);
+      return `Theme Colors:\n${colors.join('\n')}`;
+    },
+  },
+
+  {
+    name: 'get_presentation_properties',
+    description:
+      'Read presentation document properties: title, subject, author, keywords, and category.',
+    params: {},
+    execute: async context => {
+      interface DocProps {
+        load(props: string): void;
+        title: string;
+        subject: string;
+        author: string;
+        keywords: string;
+        category: string;
+      }
+
+      let props: DocProps;
+      try {
+        props = (context.presentation as unknown as { properties: DocProps }).properties;
+        props.load('title,subject,author,keywords,category');
+        await context.sync();
+      } catch {
+        return 'Document properties API not available in this PowerPoint version.';
+      }
+
+      return [
+        `Title: ${props.title || '(empty)'}`,
+        `Subject: ${props.subject || '(empty)'}`,
+        `Author: ${props.author || '(empty)'}`,
+        `Keywords: ${props.keywords || '(empty)'}`,
+        `Category: ${props.category || '(empty)'}`,
+      ].join('\n');
+    },
+  },
+
+  {
+    name: 'set_presentation_properties',
+    description:
+      'Set presentation document properties. Only provided fields are updated; others are left unchanged.',
+    params: {
+      title: { type: 'string', required: false, description: 'Presentation title.' },
+      subject: { type: 'string', required: false, description: 'Presentation subject.' },
+      author: { type: 'string', required: false, description: 'Author name.' },
+      keywords: { type: 'string', required: false, description: 'Keywords (comma-separated).' },
+      category: { type: 'string', required: false, description: 'Category.' },
+    },
+    execute: async (context, args) => {
+      const { title, subject, author, keywords, category } = args as Record<
+        string,
+        string | undefined
+      >;
+
+      interface DocProps {
+        load(props: string): void;
+        title: string;
+        subject: string;
+        author: string;
+        keywords: string;
+        category: string;
+      }
+
+      let props: DocProps;
+      try {
+        props = (context.presentation as unknown as { properties: DocProps }).properties;
+        props.load('title,subject,author,keywords,category');
+        await context.sync();
+      } catch {
+        return 'Document properties API not available in this PowerPoint version.';
+      }
+
+      const updated: string[] = [];
+      if (title !== undefined) {
+        props.title = title;
+        updated.push('title');
+      }
+      if (subject !== undefined) {
+        props.subject = subject;
+        updated.push('subject');
+      }
+      if (author !== undefined) {
+        props.author = author;
+        updated.push('author');
+      }
+      if (keywords !== undefined) {
+        props.keywords = keywords;
+        updated.push('keywords');
+      }
+      if (category !== undefined) {
+        props.category = category;
+        updated.push('category');
+      }
+
+      if (updated.length === 0) return 'No properties specified to update.';
+
+      await context.sync();
+      return `Updated: ${updated.join(', ')}.`;
+    },
+  },
+
+  // ─── Selection & Text Tools ────────────────────────────────────────────────
+
+  {
+    name: 'get_selected_text_range',
+    description:
+      'Read the currently selected text in PowerPoint. Use this when the user says "rephrase this", ' +
+      '"translate this", "make this shorter", or refers to selected content. Returns the selected text ' +
+      'and the slide index where the selection is.',
+    params: {},
+    execute: async context => {
+      interface TextRangeResult {
+        load(props: string): void;
+        text: string;
+        isNullObject?: boolean;
+      }
+      interface PresentationExt {
+        getSelectedTextRangeOrNullObject(): TextRangeResult;
+      }
+
+      let textRange: TextRangeResult;
+      try {
+        textRange = (
+          context.presentation as unknown as PresentationExt
+        ).getSelectedTextRangeOrNullObject();
+        textRange.load('text');
+        await context.sync();
+      } catch {
+        return 'Selected text range API not available in this PowerPoint version. Ask the user to tell you the text they want to change.';
+      }
+
+      if (textRange.isNullObject || !textRange.text) {
+        return 'No text is currently selected. Ask the user to select some text first.';
+      }
+
+      return `Selected text: "${textRange.text}"`;
+    },
+  },
+
+  // ─── Accessibility Tools ───────────────────────────────────────────────────
+
+  {
+    name: 'set_shape_alt_text',
+    description:
+      'Set the alternative text (alt text) on a shape for accessibility. ' +
+      'Use this for images, charts, and decorative shapes so screen readers can describe them.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: { type: 'number', description: '0-based shape index (from get_slide_shapes).' },
+      altText: {
+        type: 'string',
+        description: 'Descriptive alt text for the shape. For decorative shapes, use empty string.',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex, altText } = args as {
+        slideIndex: number;
+        shapeIndex: number;
+        altText: string;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      if (slideIndex < 0 || slideIndex >= slides.items.length) {
+        return `Invalid slideIndex ${String(slideIndex)}. Presentation has ${String(slides.items.length)} slides (0-based).`;
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
+        return `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(slide.shapes.items.length)} shapes (0-based).`;
+      }
+
+      interface ShapeWithAlt {
+        altTextDescription: string;
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      try {
+        (shape as unknown as ShapeWithAlt).altTextDescription = altText;
+        await context.sync();
+      } catch {
+        return 'Alt text API not available for this shape or PowerPoint version.';
+      }
+
+      return `Set alt text on shape ${String(shapeIndex)} of slide ${String(slideIndex + 1)}: "${altText || '(decorative)'}"`;
+    },
+  },
+
+  // ─── Hyperlink Tools ───────────────────────────────────────────────────────
+
+  {
+    name: 'get_hyperlinks',
+    description:
+      'List all hyperlinks on a slide. Returns the shape name/index, linked text, and URL for each hyperlink.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex } = args as { slideIndex: number };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      if (slideIndex < 0 || slideIndex >= slides.items.length) {
+        return `Invalid slideIndex ${String(slideIndex)}. Presentation has ${String(slides.items.length)} slides (0-based).`;
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      interface Hyperlink {
+        address: string;
+        screenTip?: string;
+      }
+      interface HyperlinkCollection {
+        load(props: string): void;
+        items: Hyperlink[];
+      }
+      interface ShapeWithLinks {
+        hyperlinks: HyperlinkCollection;
+        name: string;
+      }
+
+      const links: string[] = [];
+      for (const shapeItem of slide.shapes.items) {
+        const shape = shapeItem as unknown as ShapeWithLinks;
+        try {
+          shape.hyperlinks.load('items');
+        } catch {
+          continue;
+        }
+      }
+
+      try {
+        await context.sync();
+      } catch {
+        return 'Hyperlink API not available in this PowerPoint version.';
+      }
+
+      for (let i = 0; i < slide.shapes.items.length; i++) {
+        const shape = slide.shapes.items[i] as unknown as ShapeWithLinks;
+        try {
+          if (shape.hyperlinks?.items) {
+            for (const link of shape.hyperlinks.items) {
+              links.push(
+                `Shape ${String(i)} ("${shape.name || 'unnamed'}"): ${link.address}${link.screenTip ? ` (tooltip: ${link.screenTip})` : ''}`
+              );
+            }
+          }
+        } catch {
+          // shape may not support hyperlinks
+        }
+      }
+
+      if (links.length === 0) return `No hyperlinks found on slide ${String(slideIndex + 1)}.`;
+      return `Hyperlinks on slide ${String(slideIndex + 1)}:\n${links.join('\n')}`;
+    },
+  },
+
+  {
+    name: 'add_hyperlink',
+    description:
+      'Add a hyperlink to an existing shape on a slide. The entire shape becomes clickable.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: { type: 'number', description: '0-based shape index (from get_slide_shapes).' },
+      url: { type: 'string', description: 'The URL to link to (e.g., "https://example.com").' },
+      screenTip: { type: 'string', required: false, description: 'Tooltip text shown on hover.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex, url, screenTip } = args as {
+        slideIndex: number;
+        shapeIndex: number;
+        url: string;
+        screenTip?: string;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      if (slideIndex < 0 || slideIndex >= slides.items.length) {
+        return `Invalid slideIndex ${String(slideIndex)}. Presentation has ${String(slides.items.length)} slides (0-based).`;
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
+        return `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(slide.shapes.items.length)} shapes (0-based).`;
+      }
+
+      interface ShapeWithHyperlink {
+        hyperlink: { url: string; screenTip?: string };
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      try {
+        const shapeExt = shape as unknown as ShapeWithHyperlink;
+        shapeExt.hyperlink = { url, ...(screenTip ? { screenTip } : {}) };
+        await context.sync();
+      } catch {
+        return 'Hyperlink API not available for this shape or PowerPoint version.';
+      }
+
+      return `Added hyperlink "${url}" to shape ${String(shapeIndex)} on slide ${String(slideIndex + 1)}.`;
+    },
+  },
+  {
+    name: 'fetch_image_as_base64',
+    description:
+      'Fetch an image from a URL and return it as a base64 data URI. Use the returned data URI with add_slide_from_code\'s slide.addImage({data: "..."}) to place the image on a slide.',
+    params: {
+      url: { type: 'string', description: 'The image URL to fetch (must be HTTPS).' },
+    },
+    execute: async (_context, args) => {
+      const { url } = args as { url: string };
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return `Failed to fetch image: HTTP ${String(response.status)}`;
+        const blob = await response.blob();
+        const buffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        const base64 = btoa(binary);
+        const mime = response.headers.get('content-type') ?? 'image/png';
+        return `data:${mime};base64,${base64}`;
+      } catch (err) {
+        return `Failed to fetch image: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    },
+  },
+
+  // ─── Table tools ──────────────────────────────────────────────────────────────
+
+  {
+    name: 'get_table_data',
+    description:
+      'Read all cell values from a table shape on a slide. Use get_slide_shapes first to find table shape indices (shapes with type "Table").',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: {
+        type: 'number',
+        description: '0-based shape index of the table (from get_slide_shapes).',
+      },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex } = args as {
+        slideIndex: number;
+        shapeIndex: number;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      if (slideIndex < 0 || slideIndex >= slides.items.length) {
+        return `Invalid slideIndex ${String(slideIndex)}. Presentation has ${String(slides.items.length)} slides (0-based).`;
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
+        return `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(slide.shapes.items.length)} shapes (0-based).`;
+      }
+
+      interface TableCell {
+        body: { text: string };
+        load(props: string): void;
+      }
+      interface TableShape {
+        table: {
+          rowCount: number;
+          columnCount: number;
+          getCell(row: number, column: number): TableCell;
+          load(props: string): void;
+        };
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      try {
+        const tableShape = shape as unknown as TableShape;
+        tableShape.table.load('rowCount,columnCount');
+        await context.sync();
+
+        const { rowCount, columnCount } = tableShape.table;
+        const cells: TableCell[] = [];
+        for (let r = 0; r < rowCount; r++) {
+          for (let c = 0; c < columnCount; c++) {
+            const cell = tableShape.table.getCell(r, c);
+            cell.load('body/text');
+            cells.push(cell);
+          }
+        }
+        await context.sync();
+
+        const rows: string[] = [];
+        for (let r = 0; r < rowCount; r++) {
+          const cols: string[] = [];
+          for (let c = 0; c < columnCount; c++) {
+            cols.push(cells[r * columnCount + c].body.text);
+          }
+          rows.push(`Row ${String(r)}: ${cols.join(' | ')}`);
+        }
+
+        return `Table on slide ${String(slideIndex + 1)} (${String(rowCount)} rows × ${String(columnCount)} columns):\n${rows.join('\n')}`;
+      } catch {
+        return `Shape ${String(shapeIndex)} on slide ${String(slideIndex + 1)} is not a table or table access is not supported.`;
+      }
+    },
+  },
+
+  {
+    name: 'set_table_cell',
+    description:
+      'Update the text in a specific cell of a table shape. Use get_table_data first to see current values.',
+    params: {
+      slideIndex: { type: 'number', description: '0-based slide index.' },
+      shapeIndex: { type: 'number', description: '0-based shape index of the table.' },
+      row: { type: 'number', description: '0-based row index.' },
+      column: { type: 'number', description: '0-based column index.' },
+      text: { type: 'string', description: 'New text for the cell.' },
+    },
+    execute: async (context, args) => {
+      const { slideIndex, shapeIndex, row, column, text } = args as {
+        slideIndex: number;
+        shapeIndex: number;
+        row: number;
+        column: number;
+        text: string;
+      };
+
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+
+      if (slideIndex < 0 || slideIndex >= slides.items.length) {
+        return `Invalid slideIndex ${String(slideIndex)}. Presentation has ${String(slides.items.length)} slides (0-based).`;
+      }
+
+      const slide = slides.items[slideIndex];
+      slide.shapes.load('items');
+      await context.sync();
+
+      if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
+        return `Invalid shapeIndex ${String(shapeIndex)}. Slide ${String(slideIndex + 1)} has ${String(slide.shapes.items.length)} shapes (0-based).`;
+      }
+
+      interface TableCell {
+        body: { text: string };
+        load(props: string): void;
+      }
+      interface TableShape {
+        table: {
+          rowCount: number;
+          columnCount: number;
+          getCell(row: number, column: number): TableCell;
+          load(props: string): void;
+        };
+      }
+
+      const shape = slide.shapes.items[shapeIndex];
+      try {
+        const tableShape = shape as unknown as TableShape;
+        tableShape.table.load('rowCount,columnCount');
+        await context.sync();
+
+        const { rowCount, columnCount } = tableShape.table;
+        if (row < 0 || row >= rowCount) {
+          return `Invalid row ${String(row)}. Table has ${String(rowCount)} rows (0-based).`;
+        }
+        if (column < 0 || column >= columnCount) {
+          return `Invalid column ${String(column)}. Table has ${String(columnCount)} columns (0-based).`;
+        }
+
+        const cell = tableShape.table.getCell(row, column);
+        cell.body.text = text;
+        await context.sync();
+
+        return `Updated cell (${String(row)}, ${String(column)}) on slide ${String(slideIndex + 1)} to "${text}".`;
+      } catch {
+        return `Shape ${String(shapeIndex)} on slide ${String(slideIndex + 1)} is not a table or table access is not supported.`;
+      }
     },
   },
 ];

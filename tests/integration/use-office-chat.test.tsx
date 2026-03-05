@@ -382,6 +382,192 @@ describe('useOfficeChat', () => {
     expect(result.current.thinkingText).toBeNull();
   });
 
+  it('shows Asking [AgentName] in thinkingText when subagent.started fires', async () => {
+    let resolveIdle: () => void;
+    const idlePromise = new Promise<void>(r => {
+      resolveIdle = r;
+    });
+
+    const session = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('subagent.started', {
+          toolCallId: 'sa1',
+          agentName: 'Specialist',
+          agentDisplayName: 'Specialist Agent',
+          agentDescription: 'Handles specialist tasks',
+        });
+        // Pause so the test can observe thinkingText
+        await idlePromise;
+        yield makeEvent('subagent.completed', {
+          toolCallId: 'sa1',
+          agentName: 'Specialist',
+          agentDisplayName: 'Specialist Agent',
+        });
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Do something'));
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // thinkingText should show the sub-agent display name
+    expect(result.current.thinkingText).toBe('Asking Specialist Agent…');
+
+    // Release the stream to complete
+    await act(async () => {
+      resolveIdle!();
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // After completion, thinkingText should be cleared
+    expect(result.current.thinkingText).toBeNull();
+  });
+
+  it('resets thinkingText to Thinking… when subagent.completed fires', async () => {
+    let resolveAfterCompleted: () => void;
+    const afterCompletedPromise = new Promise<void>(r => {
+      resolveAfterCompleted = r;
+    });
+
+    const session = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('subagent.started', {
+          toolCallId: 'sa2',
+          agentName: 'Specialist',
+          agentDisplayName: 'Specialist Agent',
+          agentDescription: 'desc',
+        });
+        yield makeEvent('subagent.completed', {
+          toolCallId: 'sa2',
+          agentName: 'Specialist',
+          agentDisplayName: 'Specialist Agent',
+        });
+        // Pause after sub-agent completed so we can observe the reset text
+        await afterCompletedPromise;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Do something'));
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // After subagent.completed, thinkingText should be reset to 'Thinking…'
+    expect(result.current.thinkingText).toBe('Thinking…');
+
+    await act(async () => {
+      resolveAfterCompleted!();
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    expect(result.current.thinkingText).toBeNull();
+  });
+
+  it('resets thinkingText to Thinking… when subagent.failed fires', async () => {
+    let resolveAfterFailed: () => void;
+    const afterFailedPromise = new Promise<void>(r => {
+      resolveAfterFailed = r;
+    });
+
+    const session = {
+      sessionId: 'test-session-id',
+      async *query() {
+        yield makeEvent('subagent.started', {
+          toolCallId: 'sa3',
+          agentName: 'Specialist',
+          agentDisplayName: 'Specialist Agent',
+          agentDescription: 'desc',
+        });
+        yield makeEvent('subagent.failed', {
+          toolCallId: 'sa3',
+          agentName: 'Specialist',
+          agentDisplayName: 'Specialist Agent',
+          error: 'Sub-agent encountered an error',
+        });
+        // Pause after failure so we can observe the reset text
+        await afterFailedPromise;
+        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'I could not delegate' });
+        yield IDLE_EVENT;
+      },
+      on: vi.fn(),
+      onPermissionRequest: vi.fn(() => () => undefined),
+      destroy: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue('msg-id'),
+      registerTools: vi.fn(),
+      getToolHandler: vi.fn(),
+      respondPermission: vi.fn().mockResolvedValue(undefined),
+      setModel: vi.fn().mockResolvedValue(undefined),
+      compact: vi.fn().mockResolvedValue(undefined),
+      _dispatchEvent: vi.fn() as EventEmitter,
+    };
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    await act(async () => {
+      result.current.runtime.thread.append(APPEND_MSG('Do something'));
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // After subagent.failed, thinkingText should be reset to 'Thinking…'
+    expect(result.current.thinkingText).toBe('Thinking…');
+
+    await act(async () => {
+      resolveAfterFailed!();
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    expect(result.current.thinkingText).toBeNull();
+  });
+
   it('sets session error when createWebSocketClient rejects', async () => {
     mockCreate.mockRejectedValue(new Error('server unavailable'));
 
@@ -587,7 +773,7 @@ describe('useOfficeChat', () => {
 
   // ─── Per-agent tool scoping ─────────────────────────────────────────────────
 
-  it('passes availableTools to createSession when active agent specifies tools', async () => {
+  it('passes per-agent tools restriction via customAgents when active agent specifies tools', async () => {
     useSettingsStore.getState().importAgents([
       {
         metadata: {
@@ -614,7 +800,13 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    expect(config.availableTools).toEqual(['create_chart', 'format_range']);
+    // With sub-agent support, tools restrictions move to per-agent customAgents config
+    // rather than the session-level availableTools.
+    expect(config.availableTools).toBeUndefined();
+    const agents = config.customAgents as Array<{ name: string; tools: string[] | null }>;
+    const scopedAgent = agents.find(a => a.name === 'Scoped');
+    expect(scopedAgent).toBeDefined();
+    expect(scopedAgent?.tools).toEqual(['create_chart', 'format_range']);
   });
 
   it('does not pass availableTools when active agent has no tools restriction', async () => {

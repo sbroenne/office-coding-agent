@@ -224,12 +224,28 @@ async function setup(): Promise<void> {
 async function testPptTools(): Promise<void> {
   log('── PowerPoint Tools ──');
 
-  // 1. get_presentation_overview
+  // 1. get_presentation_overview (must return text AND images)
   await runTool(powerPointConfigs, 'get_presentation_overview', {}, r => {
+    if (r && typeof r === 'object' && 'text' in (r as Record<string, unknown>)) {
+      const obj = r as { text: string; slides?: { slideNumber: number; image: string }[] };
+      if (!obj.text.includes('Total slides')) {
+        return `Expected "Total slides" in text, got: ${obj.text.substring(0, 100)}`;
+      }
+      if (!obj.slides || obj.slides.length === 0) {
+        return 'Expected slides with image data but got none — getImageAsBase64 may be called incorrectly';
+      }
+      const firstImage = obj.slides[0].image;
+      if (!firstImage.includes('data:image/png;base64,')) {
+        return `Expected base64 PNG data URL in slide image, got: ${firstImage.substring(0, 80)}`;
+      }
+      return null;
+    }
+    // Fallback: plain string result means images were not captured
     const s = safeString(r);
-    return s.includes('Total slides')
-      ? null
-      : `Expected "Total slides" in result, got: ${s.substring(0, 100)}`;
+    if (s.includes('Total slides')) {
+      return 'get_presentation_overview returned text only — slide images missing (getImageAsBase64 call may be broken)';
+    }
+    return `Expected structured result with text and slides, got: ${s.substring(0, 100)}`;
   });
 
   // 2. get_presentation_content (all slides)
@@ -338,23 +354,27 @@ async function testPptTools(): Promise<void> {
       : `Expected success message from duplicate_slide, got: ${s.substring(0, 100)}`;
   });
 
-  // 12. get_slide_image (may not be supported on older Office versions)
-  try {
-    const slideImageResult = await callTool(powerPointConfigs, 'get_slide_image', {
-      slideIndex: 0,
-      width: 400,
-    });
-    // execute() returns a raw base64 string directly
-    const s = safeString(slideImageResult);
-    if (s.includes('data:image') || s.includes('base64')) {
-      pass('get_slide_image');
-    } else {
-      fail('get_slide_image', `Expected base64 image data, got: ${s.substring(0, 100)}`);
+  // 12. get_slide_image
+  await runTool(
+    powerPointConfigs,
+    'get_slide_image',
+    { slideIndex: 0, width: 400 },
+    r => {
+      const s = safeString(r);
+      // Detect the "not available" fallback message — this means the API call
+      // is broken (e.g. wrong argument shape), not that the version is old.
+      if (s.includes('not available in this version')) {
+        return (
+          'get_slide_image returned "not available" error — ' +
+          'getImageAsBase64 may be called with wrong arguments (number instead of options object)'
+        );
+      }
+      if (s.includes('data:image') || s.includes('base64')) {
+        return null;
+      }
+      return `Expected base64 image data, got: ${s.substring(0, 100)}`;
     }
-  } catch (error) {
-    log(`  ⚠ get_slide_image: ${String(error)}`);
-    addTestResult(testValues, 'get_slide_image', 'conditional_pass', 'pass');
-  }
+  );
 
   // 13. clear_slide (clear the last slide added by add_slide_from_code/duplicate)
   let currentSlideCount = 0;
@@ -385,6 +405,133 @@ async function testPptTools(): Promise<void> {
         ? null
         : `Expected success message from clear_slide, got: ${s.substring(0, 100)}`;
     });
+  }
+
+  // 14. get_smartart_info (slide 0 — may have no SmartArt shapes, which is a valid result)
+  await runTool(powerPointConfigs, 'get_smartart_info', { slideIndex: 0 }, r => {
+    const s = safeString(r);
+    return s.includes('Slide') ? null : `Expected "Slide" in result, got: ${s.substring(0, 100)}`;
+  });
+
+  // 15. group_shapes + ungroup_shapes
+  // First add two geometric shapes to slide 0, then group and ungroup them
+  let shapeCountBefore = 0;
+  try {
+    await PowerPoint.run(async context => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+      const slide = slides.items[0];
+      slide.shapes.load('items');
+      await context.sync();
+      shapeCountBefore = slide.shapes.items.length;
+    });
+  } catch {
+    /* ignore */
+  }
+
+  // Add two shapes to group
+  await runTool(
+    powerPointConfigs,
+    'add_geometric_shape',
+    { slideIndex: 0, shapeType: 'rectangle', left: 1, top: 4, width: 1.5, height: 1, name: 'GroupTestA' },
+    r => (safeString(r).includes('slide') ? null : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`)
+  );
+  await runTool(
+    powerPointConfigs,
+    'add_geometric_shape',
+    { slideIndex: 0, shapeType: 'ellipse', left: 3, top: 4, width: 1.5, height: 1, name: 'GroupTestB' },
+    r => (safeString(r).includes('slide') ? null : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`)
+  );
+
+  // Get shape indices for the two new shapes
+  let groupShapeIdx0 = -1;
+  let groupShapeIdx1 = -1;
+  try {
+    await PowerPoint.run(async context => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+      const slide = slides.items[0];
+      slide.shapes.load('items');
+      await context.sync();
+      for (let i = 0; i < slide.shapes.items.length; i++) {
+        slide.shapes.items[i].load('name');
+      }
+      await context.sync();
+      for (let i = 0; i < slide.shapes.items.length; i++) {
+        const name = slide.shapes.items[i].name;
+        if (name === 'GroupTestA') groupShapeIdx0 = i;
+        if (name === 'GroupTestB') groupShapeIdx1 = i;
+      }
+    });
+  } catch {
+    /* ignore */
+  }
+
+  if (groupShapeIdx0 >= 0 && groupShapeIdx1 >= 0) {
+    // group the two shapes
+    let groupedShapeIdx = -1;
+    const groupResult = await callTool(powerPointConfigs, 'group_shapes', {
+      slideIndex: 0,
+      shapeIndices: [groupShapeIdx0, groupShapeIdx1],
+      groupName: 'TestGroup',
+    });
+    const groupStr = safeString(groupResult);
+    if (groupStr.toLowerCase().includes('group') || groupStr.includes('slide')) {
+      pass('group_shapes');
+    } else {
+      fail('group_shapes', `Unexpected result: ${groupStr.substring(0, 100)}`);
+    }
+
+    // Find the group shape index
+    try {
+      await PowerPoint.run(async context => {
+        const slides = context.presentation.slides;
+        slides.load('items');
+        await context.sync();
+        const slide = slides.items[0];
+        slide.shapes.load('items');
+        await context.sync();
+        for (let i = 0; i < slide.shapes.items.length; i++) {
+          slide.shapes.items[i].load('name,type');
+        }
+        await context.sync();
+        for (let i = 0; i < slide.shapes.items.length; i++) {
+          if (
+            slide.shapes.items[i].name === 'TestGroup' ||
+            String(slide.shapes.items[i].type) === 'Group'
+          ) {
+            groupedShapeIdx = i;
+            break;
+          }
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+
+    if (groupedShapeIdx >= 0) {
+      // ungroup the group
+      await runTool(
+        powerPointConfigs,
+        'ungroup_shapes',
+        { slideIndex: 0, shapeIndex: groupedShapeIdx },
+        r => {
+          const s = safeString(r);
+          return s.toLowerCase().includes('ungroup') || s.includes('slide')
+            ? null
+            : `Expected success from ungroup_shapes: ${s.substring(0, 100)}`;
+        }
+      );
+    } else {
+      log('  ⚠ ungroup_shapes: skipped — could not locate group shape after grouping');
+      addTestResult(testValues, 'ungroup_shapes', 'conditional_pass', 'pass');
+    }
+  } else {
+    log('  ⚠ group_shapes: skipped — could not locate test shapes');
+    addTestResult(testValues, 'group_shapes', 'conditional_pass', 'pass');
+    addTestResult(testValues, 'ungroup_shapes', 'conditional_pass', 'pass');
   }
 }
 

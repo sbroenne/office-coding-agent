@@ -74,9 +74,9 @@ describe('buildSkillContext', () => {
 });
 
 describe('getSkills', () => {
-  it('returns all 13 bundled skills', () => {
+  it('returns all 17 bundled skills', () => {
     const skills = getSkills();
-    expect(skills.length).toBe(13);
+    expect(skills.length).toBe(17);
   });
 
   it('includes the excel skill', () => {
@@ -109,14 +109,18 @@ describe('getSkill', () => {
   });
 });
 
-// Regression: all 13 bundled skills must be loaded (not just excel)
+// Regression: all 17 bundled skills must be loaded (not just excel)
 describe('bundled skill loading', () => {
   const expectedSkills = [
     { name: 'excel', host: 'excel' },
     { name: 'powerpoint', host: 'powerpoint' },
+    { name: 'powerpoint-charts', host: 'powerpoint' },
+    { name: 'powerpoint-deck-archetypes', host: 'powerpoint' },
     { name: 'powerpoint-deck-builder', host: 'powerpoint' },
+    { name: 'powerpoint-design', host: 'powerpoint' },
     { name: 'powerpoint-formatting', host: 'powerpoint' },
     { name: 'powerpoint-redesign', host: 'powerpoint' },
+    { name: 'powerpoint-speaker-notes', host: 'powerpoint' },
     { name: 'Word Document Editing', host: 'word' },
     { name: 'word-document-builder', host: 'word' },
     { name: 'word-formatting', host: 'word' },
@@ -127,8 +131,8 @@ describe('bundled skill loading', () => {
     { name: 'outlook-email-analysis', host: 'outlook' },
   ];
 
-  it('loads exactly 13 bundled skills', () => {
-    expect(getBundledSkills()).toHaveLength(13);
+  it('loads exactly 17 bundled skills', () => {
+    expect(getBundledSkills()).toHaveLength(17);
   });
 
   it.each(expectedSkills)('loads $name skill targeting $host', ({ name, host }) => {
@@ -143,9 +147,9 @@ describe('bundled skill loading', () => {
     expect(excelSkills).toHaveLength(1);
   });
 
-  it('includes 4 powerpoint skills', () => {
+  it('includes 8 powerpoint skills', () => {
     const pptSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('powerpoint'));
-    expect(pptSkills).toHaveLength(4);
+    expect(pptSkills).toHaveLength(8);
   });
 
   it('includes 4 word skills', () => {
