@@ -15,6 +15,7 @@ import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { type FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useThinkingText } from '@/contexts/ThinkingContext';
+import { detectOfficeHost } from '@/services/office/host';
 
 /**
  * Pool of rotating progress labels matching VS Code's
@@ -78,16 +79,48 @@ interface SuggestionItem {
   autoSend: boolean;
 }
 
-const SUGGESTIONS: SuggestionItem[] = [
-  { prompt: 'Summarize my data', autoSend: true },
-  { prompt: 'Create a chart from selected data', autoSend: true },
-  { prompt: 'Format the table as currency', autoSend: true },
-  { prompt: 'Find and highlight duplicates', autoSend: true },
-  { prompt: 'Add a formula to calculate totals', autoSend: true },
-  { prompt: 'Clean up and organize my sheet', autoSend: true },
+const SUGGESTIONS_BY_HOST: Record<string, SuggestionItem[]> = {
+  excel: [
+    { prompt: 'Summarize my data', autoSend: true },
+    { prompt: 'Create a chart from selected data', autoSend: true },
+    { prompt: 'Format the table as currency', autoSend: true },
+    { prompt: 'Find and highlight duplicates', autoSend: true },
+    { prompt: 'Add a formula to calculate totals', autoSend: true },
+    { prompt: 'Clean up and organize my sheet', autoSend: true },
+  ],
+  powerpoint: [
+    { prompt: 'Create a title slide for my presentation', autoSend: true },
+    { prompt: 'Add a slide with 3 key points', autoSend: true },
+    { prompt: 'Create a chart slide from data', autoSend: true },
+    { prompt: 'Redesign this slide with better layout', autoSend: true },
+    { prompt: 'Add speaker notes to all slides', autoSend: true },
+    { prompt: 'Create a 5-slide presentation about...', autoSend: false },
+  ],
+  word: [
+    { prompt: 'Summarize this document', autoSend: true },
+    { prompt: 'Fix grammar and improve clarity', autoSend: true },
+    { prompt: 'Create a table of contents', autoSend: true },
+    { prompt: 'Translate this paragraph to...', autoSend: false },
+    { prompt: 'Write an executive summary', autoSend: true },
+    { prompt: 'Format headings and structure', autoSend: true },
+  ],
+  outlook: [
+    { prompt: 'Draft a reply to this email', autoSend: true },
+    { prompt: 'Summarize this email thread', autoSend: true },
+    { prompt: 'Make this email more professional', autoSend: true },
+    { prompt: 'Write a follow-up email', autoSend: true },
+  ],
+};
+
+const DEFAULT_SUGGESTIONS: SuggestionItem[] = [
+  { prompt: 'What can you help me with?', autoSend: true },
+  { prompt: 'Tell me about your capabilities', autoSend: true },
 ];
 
 const ThreadWelcome: FC = () => {
+  const host = detectOfficeHost();
+  const suggestions = SUGGESTIONS_BY_HOST[host] ?? DEFAULT_SUGGESTIONS;
+
   return (
     <div className="aui-thread-welcome-root my-auto flex w-full grow flex-col px-4">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
@@ -108,7 +141,7 @@ const ThreadWelcome: FC = () => {
 
         <div className="chat-welcome-suggested-prompts mt-4">
           <p className="chat-welcome-suggested-prompts-title">Try asking</p>
-          {SUGGESTIONS.map((suggestion, idx) => (
+          {suggestions.map((suggestion, idx) => (
             <ThreadPrimitive.Suggestion
               key={suggestion.prompt}
               {...suggestion}
