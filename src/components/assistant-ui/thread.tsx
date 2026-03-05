@@ -188,17 +188,20 @@ const MessageError: FC = () => {
 const InlineWorkingProgress: FC = () => {
   const thinkingText = useThinkingText();
   const isRunning = useAuiState(s => s.thread.isRunning);
-  const hasContent = useAuiState(s => {
-    const parts = s.message.parts;
-    return parts.some(
-      p =>
-        (p.type === 'text' && p.text.trim().length > 0) ||
-        p.type === 'tool-call'
-    );
-  });
 
-  // Hide when: no thinking text, message has any content (text or tools), or not running
-  if (!thinkingText || hasContent || !isRunning) return null;
+  const hasTextContent = useAuiState(s =>
+    s.message.parts.some(p => p.type === 'text' && p.text.trim().length > 0)
+  );
+
+  const hasRunningTool = useAuiState(s =>
+    s.message.parts.some(p => p.type === 'tool-call' && p.status?.type === 'running')
+  );
+
+  // Show when: thinking text is set, thread is running, no text content yet,
+  // and no tool is currently executing (tools have their own shimmer).
+  // This covers: initial "Thinking…", AND the gap between tool completion
+  // and the next action where the model is deciding what to do.
+  if (!thinkingText || !isRunning || hasTextContent || hasRunningTool) return null;
 
   return (
     <div className="inline-working-progress progress-container shimmer-progress" style={{ order: -2 }}>

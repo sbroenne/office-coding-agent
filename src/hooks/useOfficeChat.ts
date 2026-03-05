@@ -711,9 +711,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {
           const { toolCallId, result } = event.data;
-          // Don't clear thinkingText here — keep showing the tool name until
-          // text starts streaming or the response completes. In VS Code, the
-          // thinking label stays visible throughout the tool execution phase.
           const existing = toolParts.get(toolCallId);
           if (existing) {
             const resultText = result
@@ -724,6 +721,9 @@ export function useOfficeChat(host: OfficeHostApp) {
             toolParts.set(toolCallId, { ...existing, result: resultText });
             updateAssistant();
           }
+          // Reset thinking text to "Thinking…" so the shimmer reappears
+          // in the gap between this tool completing and the next action.
+          setThinkingText(DEFAULT_THINKING_TEXT);
         } else if (event.type === 'assistant.message') {
           // Update text content but DON'T clear thinking or mark complete here.
           // The SDK sends assistant.message BEFORE tool calls (model's initial
