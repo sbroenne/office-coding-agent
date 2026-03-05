@@ -56,6 +56,7 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   const segments = segmentParts(content);
   const textParts = content.filter((p): p is TextPart => p.type === 'text');
   const hasText = textParts.some(p => p.text.trim().length > 0);
+  const hasTools = content.some(p => p.type === 'tool-call');
   const hasRunningTool = content.some(p => p.type === 'tool-call' && p.status?.type === 'running');
 
   // Full message text for copy button
@@ -64,9 +65,10 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   const isMessageRunning = status?.type === 'running';
   const isError = status?.type === 'incomplete' && status.reason === 'error';
 
-  // Show inline working progress: only on last message, when thinking, no text yet, no running tool
+  // Show inline working progress: only on last message, when thinking,
+  // no text yet, no tool cards at all, and no running tool
   const showThinking =
-    isLast && isRunning && isMessageRunning && !!thinkingText && !hasText && !hasRunningTool;
+    isLast && isRunning && isMessageRunning && !!thinkingText && !hasText && !hasTools && !hasRunningTool;
 
   return (
     <div
@@ -88,7 +90,7 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
         {/* Tool groups and text */}
         {segments.map((seg, i) => {
           if (seg.type === 'tools') {
-            return <ToolGroup key={i} parts={seg.parts} />;
+            return <ToolGroup key={i} parts={seg.parts} isMessageRunning={isLast && isRunning && isMessageRunning} />;
           }
           // Only render non-empty text parts (or last part while streaming)
           const text = seg.part.text;
