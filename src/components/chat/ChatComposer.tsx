@@ -105,7 +105,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         handleSend();
-      } else if (e.key === 'q' && (e.ctrlKey || e.metaKey)) {
+      } else if (e.key === 'q' && e.shiftKey && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         handleEnqueue();
       } else if (e.key === 'ArrowUp') {
@@ -156,7 +156,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
                 color: 'var(--vscode-badge-foreground)',
                 background: 'var(--vscode-badge-background)',
               }}
-              title={`${queuedCount} prompt${queuedCount !== 1 ? 's' : ''} queued (Ctrl+Q)`}
+              title={`${queuedCount} prompt${queuedCount !== 1 ? 's' : ''} queued (Ctrl+Shift+Q)`}
               data-testid="queue-badge"
             >
               <Codicon name="layers" className="text-[10px]" />
@@ -172,7 +172,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
             <button
               type="button"
               onClick={handleEnqueue}
-              title="Queue prompt (Ctrl+Q)"
+              title="Queue prompt (Ctrl+Shift+Q)"
               className="aui-composer-enqueue h-7 rounded-md flex items-center justify-center gap-1 px-1.5 transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)]"
               style={{ color: 'var(--vscode-textLink-foreground)', fontSize: 11 }}
               data-testid="enqueue-button"
