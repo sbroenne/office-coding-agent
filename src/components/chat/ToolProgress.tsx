@@ -1,30 +1,21 @@
 import { memo, useState, useCallback } from 'react';
-import {
-  type ToolCallMessagePartStatus,
-  type ToolCallMessagePartComponent,
-} from '@assistant-ui/react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { humanizeToolName } from '@/utils/humanizeToolName';
 import { toolResultSummary } from '@/utils/toolResultSummary';
 import { getToolIcon } from '@/utils/toolIcon';
+import type { ToolCallPart } from '@/types';
 
-type ToolStatus = ToolCallMessagePartStatus['type'];
+interface ToolProgressProps {
+  part: ToolCallPart;
+}
 
-/**
- * VS Code-style progress line for a tool invocation.
- *
- * Matches VS Code's `.progress-container` layout:
- *   [tool-icon] [shimmer-text]          — while running
- *   [check]     [muted past-tense text] — when complete
- *
- * No borders, no cards. Flat inline progress line.
- */
-const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, result, status }) => {
+const ToolProgressImpl: React.FC<ToolProgressProps> = ({ part }) => {
+  const { toolName, argsText, result, status } = part;
   const [isExpanded, setIsExpanded] = useState(false);
   const toggle = useCallback(() => setIsExpanded(prev => !prev), []);
 
-  const statusType: ToolStatus = status?.type ?? 'complete';
+  const statusType = status?.type ?? 'complete';
   const isRunning = statusType === 'running';
   const isCancelled = status?.type === 'incomplete' && status.reason === 'cancelled';
   const isError = statusType === 'incomplete' && !isCancelled;
@@ -32,7 +23,11 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
   const friendlyName = humanizeToolName(toolName);
   const toolIcon = getToolIcon(toolName);
   const summary = !isRunning && result !== undefined ? toolResultSummary(result) : null;
-  const hasDetails = !!(argsText || result !== undefined || (status?.type === 'incomplete' && status.error));
+  const hasDetails = !!(
+    argsText ||
+    result !== undefined ||
+    (status?.type === 'incomplete' && status.error)
+  );
 
   return (
     <div
@@ -51,21 +46,13 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
         aria-expanded={hasDetails ? isExpanded : undefined}
         data-slot="tool-fallback-trigger"
       >
-        {/* Tool-type icon on the chain-of-thought line */}
         <span className="chat-thinking-icon">
           <Codicon name={toolIcon} className="text-xs" />
         </span>
 
-        {/* Status icon: hidden in shimmer mode, check when done */}
         <Codicon
           name={
-            isRunning
-              ? 'circle-filled'
-              : isError
-                ? 'error'
-                : isCancelled
-                  ? 'circle-slash'
-                  : 'check'
+            isRunning ? 'circle-filled' : isError ? 'error' : isCancelled ? 'circle-slash' : 'check'
           }
           className={cn(
             'progress-status-icon shrink-0',
@@ -74,21 +61,10 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
           )}
         />
 
-        {/* Tool name + summary */}
-        <span
-          className={cn(
-            'progress-step',
-            isCancelled && 'line-through'
-          )}
-        >
-          {friendlyName}
-        </span>
+        <span className={cn('progress-step', isCancelled && 'line-through')}>{friendlyName}</span>
 
-        {summary && (
-          <span className="progress-summary">{String(summary)}</span>
-        )}
+        {summary && <span className="progress-summary">{String(summary)}</span>}
 
-        {/* Hover chevron (appears on hover, like VS Code) */}
         {hasDetails && (
           <Codicon
             name={isExpanded ? 'chevron-down' : 'chevron-right'}
@@ -100,7 +76,6 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
       {/* Expandable tool details */}
       {isExpanded && hasDetails && (
         <div className="tool-details-expanded">
-          {/* Error */}
           {status?.type === 'incomplete' && !!status.error && (
             <div className="tool-details-section">
               <p
@@ -117,7 +92,6 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
             </div>
           )}
 
-          {/* Input */}
           {argsText && (
             <div className="tool-details-section">
               <p className="tool-details-label">Input</p>
@@ -125,7 +99,6 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
             </div>
           )}
 
-          {/* Output */}
           {result !== undefined && !isCancelled && (
             <div className="tool-details-section">
               <p className="tool-details-label">Output</p>
@@ -140,7 +113,4 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({ toolName, argsText, re
   );
 };
 
-const ToolFallback = memo(ToolFallbackImpl) as ToolCallMessagePartComponent;
-ToolFallback.displayName = 'ToolFallback';
-
-export { ToolFallback };
+export const ToolProgress = memo(ToolProgressImpl);

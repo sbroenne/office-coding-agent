@@ -1,7 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
-import { useExternalStoreRuntime } from '@assistant-ui/react';
-import type { ThreadMessageLike, AppendMessage } from '@assistant-ui/react';
 import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
@@ -15,6 +13,7 @@ import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
 import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
+import type { ChatMessage, ToolCallPart } from '@/types';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
@@ -131,15 +130,14 @@ export function useOfficeChat(host: OfficeHostApp) {
     }
   }, [activeModel]);
 
-  const [messages, setMessages] = useState<ThreadMessageLike[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
-  const [thinkingText, setThinkingText] = useState<string | null>(null);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
   const activePermissionRequestRef = useRef<string | null>(null);
 
-  const deserializeMessages = useCallback((rawMessages: unknown[]): ThreadMessageLike[] => {
+  const deserializeMessages = useCallback((rawMessages: unknown[]): ChatMessage[] => {
     return rawMessages
       .filter((msg): msg is Record<string, unknown> => typeof msg === 'object' && msg !== null)
       .map(msg => {
@@ -149,13 +147,14 @@ export function useOfficeChat(host: OfficeHostApp) {
             ? new Date(createdAtRaw)
             : new Date();
         return {
-          ...(msg as ThreadMessageLike),
+          ...(msg as unknown as ChatMessage),
           createdAt,
+          thinkingText: null,
         };
       });
   }, []);
 
-  const deriveSessionTitle = useCallback((nextMessages: ThreadMessageLike[]): string => {
+  const deriveSessionTitle = useCallback((nextMessages: ChatMessage[]): string => {
     const firstUser = nextMessages.find(m => m.role === 'user');
     const contentParts: unknown[] = Array.isArray(firstUser?.content) ? firstUser.content : [];
     const textPart = contentParts.find(
@@ -383,19 +382,12 @@ export function useOfficeChat(host: OfficeHostApp) {
     };
   }, [initSession]);
 
-  const onNew = useCallback(async (message: AppendMessage) => {
-    const userText = (message.content as readonly { type: string; text?: string }[])
-      .filter(
-        (c): c is { type: string; text: string } => c.type === 'text' && typeof c.text === 'string'
-      )
-      .map(c => c.text)
-      .join('\n');
-
+  const send = useCallback(async (userText: string) => {
     if (!userText.trim()) return;
 
     const client = clientRef.current;
     if (!sessionRef.current || !client) {
-      const errorMsg: ThreadMessageLike = {
+      const errorMsg: ChatMessage = {
         id: generateId(),
         role: 'assistant',
         content: [
@@ -461,7 +453,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       setIsRunning(true);
 
       let streamText = '';
-      const updateText = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
+      const updateText = (extra?: Partial<Pick<ChatMessage, 'status'>>) => {
         setMessages(prev =>
           prev.map(m =>
             m.id === assistantId
@@ -549,7 +541,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       setIsRunning(true);
 
       let streamText = '';
-      const updateText = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
+      const updateText = (extra?: Partial<Pick<ChatMessage, 'status'>>) => {
         setMessages(prev =>
           prev.map(m =>
             m.id === assistantId
@@ -615,47 +607,37 @@ export function useOfficeChat(host: OfficeHostApp) {
     const assistantId = generateId();
     cancelRef.current = false;
 
-    const userMsg: ThreadMessageLike = {
+    const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
       content: [{ type: 'text', text: userText }],
       createdAt: new Date(),
     };
 
-    const assistantMsg: ThreadMessageLike = {
+    const assistantMsg: ChatMessage = {
       id: assistantId,
       role: 'assistant',
       content: [],
       status: { type: 'running' },
+      thinkingText: DEFAULT_THINKING_TEXT,
       createdAt: new Date(),
     };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setIsRunning(true);
-    // Set explicit default text so the standalone ThinkingIndicator renders
-    // immediately via React context — no dependency on the runtime's deferred
-    // useEffect adapter sync.
-    setThinkingText(DEFAULT_THINKING_TEXT);
 
-    const toolParts = new Map<
-      string,
-      {
-        type: 'tool-call';
-        toolCallId: string;
-        toolName: string;
-        argsText: string;
-        result?: unknown;
-      }
-    >();
+    /** Update thinkingText on the specific assistant message */
+    const setThinkingForAssistant = (text: string | null) => {
+      setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, thinkingText: text } : m)));
+    };
+
+    const toolParts = new Map<string, ToolCallPart>();
     let streamText = '';
 
-    const updateAssistant = (extra?: Partial<Pick<ThreadMessageLike, 'status'>>) => {
-      // Text part is ALWAYS at index 0 — even when empty — to prevent
-      // React 18 useSyncExternalStore tearing. Without a stable text part,
-      // adding text later would prepend it, shifting tool-call indices and
-      // causing MarkdownText to read a tool-call part → crash. Tool cards
-      // appear visually above text via CSS order (ToolGroup has order: -1).
-      const content: ThreadMessageLike['content'] = [
+    const updateAssistant = (extra?: Partial<Pick<ChatMessage, 'status' | 'thinkingText'>>) => {
+      // Text part is ALWAYS at index 0 — even when empty — to prevent tearing.
+      // Tool cards appear visually above text via CSS order (ToolGroup has order: -1).
+      const content: ChatMessage['content'] = [
         { type: 'text' as const, text: streamText },
         ...Array.from(toolParts.values()),
       ];
@@ -673,7 +655,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       const resetStaleTimer = () => {
         if (staleTimer) clearTimeout(staleTimer);
         staleTimer = setTimeout(() => {
-          setThinkingText('Still waiting for a response…');
+          setThinkingForAssistant('Still waiting for a response…');
         }, STALE_TIMEOUT);
       };
       resetStaleTimer();
@@ -684,28 +666,27 @@ export function useOfficeChat(host: OfficeHostApp) {
 
         if (event.type === 'assistant.message_delta') {
           // First streaming delta clears the thinking indicator
-          setThinkingText(null);
           streamText += event.data.deltaContent;
-          updateAssistant();
+          updateAssistant({ thinkingText: null });
         } else if (event.type === 'tool.execution_start') {
           const { toolCallId, toolName, arguments: args } = event.data;
           // report_intent is an internal SDK tool — surface intent as thinking text
           if (toolName === 'report_intent') {
             const intent = (args as Record<string, unknown> | undefined)?.intent;
             if (typeof intent === 'string' && intent) {
-              flushSync(() => setThinkingText(intent));
+              flushSync(() => setThinkingForAssistant(intent));
             }
             continue;
           }
           // Don't change thinkingText to tool name — it flashes too fast.
           // The tool card itself shows the tool name with shimmer while running.
-          // Keep "Thinking…" as a stable anchor (matches VS Code behavior where
-          // the "Thinking" label stays constant and tools appear as timeline items).
+          // Keep "Thinking…" as a stable anchor.
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
             toolName,
             argsText: JSON.stringify(args ?? {}),
+            status: { type: 'running' },
           });
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {
@@ -717,12 +698,16 @@ export function useOfficeChat(host: OfficeHostApp) {
                 ? result.content
                 : JSON.stringify(result)
               : '';
-            toolParts.set(toolCallId, { ...existing, result: resultText });
+            toolParts.set(toolCallId, {
+              ...existing,
+              result: resultText,
+              status: { type: 'complete' },
+            });
             updateAssistant();
           }
           // Reset thinking text to "Thinking…" so the shimmer reappears
           // in the gap between this tool completing and the next action.
-          setThinkingText(DEFAULT_THINKING_TEXT);
+          setThinkingForAssistant(DEFAULT_THINKING_TEXT);
         } else if (event.type === 'assistant.message') {
           // Update text content but DON'T clear thinking or mark complete here.
           // The SDK sends assistant.message BEFORE tool calls (model's initial
@@ -732,22 +717,23 @@ export function useOfficeChat(host: OfficeHostApp) {
           updateAssistant();
         } else if (event.type === 'session.idle') {
           // Stream truly ended — clear thinking and finalize
-          setThinkingText(null);
-          updateAssistant({ status: { type: 'complete', reason: 'stop' } });
+          updateAssistant({ status: { type: 'complete', reason: 'stop' }, thinkingText: null });
         } else if (event.type === 'session.error') {
-          setThinkingText(null);
           updateAssistant({
             status: { type: 'incomplete', reason: 'error', error: event.data.message },
+            thinkingText: null,
           });
           break;
         } else if (event.type === 'subagent.started') {
           // A sub-agent has been invoked — show which agent is being asked
           flushSync(() =>
-            setThinkingText(`Asking ${event.data.agentDisplayName || event.data.agentName}…`)
+            setThinkingForAssistant(
+              `Asking ${event.data.agentDisplayName || event.data.agentName}…`
+            )
           );
         } else if (event.type === 'subagent.completed' || event.type === 'subagent.failed') {
           // Sub-agent finished — return to generic thinking indicator
-          setThinkingText(DEFAULT_THINKING_TEXT);
+          setThinkingForAssistant(DEFAULT_THINKING_TEXT);
         }
       }
     } catch (err) {
@@ -766,6 +752,7 @@ export function useOfficeChat(host: OfficeHostApp) {
                   ...m,
                   content: [{ type: 'text', text: '🔄 Session lost — reconnecting…' }],
                   status: { type: 'complete', reason: 'stop' },
+                  thinkingText: null,
                 }
               : m
           )
@@ -775,15 +762,52 @@ export function useOfficeChat(host: OfficeHostApp) {
         setMessages(prev =>
           prev.map(m =>
             m.id === assistantId
-              ? { ...m, status: { type: 'incomplete', reason: 'error', error: errMsg } }
+              ? {
+                  ...m,
+                  status: { type: 'incomplete', reason: 'error', error: errMsg },
+                  thinkingText: null,
+                }
               : m
           )
         );
       }
     } finally {
       if (staleTimer) clearTimeout(staleTimer);
-      setThinkingText(null);
+      // Ensure thinkingText is cleared and isRunning is reset
+      setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, thinkingText: null } : m)));
       setIsRunning(false);
+    }
+  }, []);
+
+  const cancel = useCallback(() => {
+    cancelRef.current = true;
+
+    // Immediately update UI: mark the running message as incomplete/cancelled
+    // and clear thinking text so the user gets instant feedback.
+    flushSync(() => {
+      setIsRunning(false);
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'assistant' && last.status?.type !== 'complete') {
+          return [
+            ...prev.slice(0, -1),
+            { ...last, status: { type: 'incomplete', reason: 'cancelled' }, thinkingText: null },
+          ];
+        }
+        return prev;
+      });
+    });
+
+    // Also destroy and recreate the session to actually stop the SDK query.
+    // Without this, the proxy/SDK keeps processing events until the response
+    // finishes naturally.
+    const session = sessionRef.current;
+    if (session) {
+      void session.destroy().catch(() => {
+        /* ignore */
+      });
+      sessionRef.current = null;
+      void initSessionRef.current();
     }
   }, []);
 
@@ -860,45 +884,6 @@ export function useOfficeChat(host: OfficeHostApp) {
     void respondPermission('approved');
   }, [addPermissionRule, pendingPermission, respondPermission]);
 
-  const runtime = useExternalStoreRuntime<ThreadMessageLike>({
-    isRunning,
-    messages,
-    onNew,
-    onCancel: () => {
-      cancelRef.current = true;
-
-      // Immediately update UI: mark the running message as incomplete/cancelled
-      // and clear thinking text so the user gets instant feedback.
-      flushSync(() => {
-        setThinkingText(null);
-        setIsRunning(false);
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last?.role === 'assistant' && last.status?.type !== 'complete') {
-            return [
-              ...prev.slice(0, -1),
-              { ...last, status: { type: 'incomplete', reason: 'cancelled' } },
-            ];
-          }
-          return prev;
-        });
-      });
-
-      // Also destroy and recreate the session to actually stop the SDK query.
-      // Without this, the proxy/SDK keeps processing events until the response
-      // finishes naturally.
-      const session = sessionRef.current;
-      if (session) {
-        void session.destroy().catch(() => {/* ignore */});
-        sessionRef.current = null;
-        void initSessionRef.current();
-      }
-
-      return Promise.resolve();
-    },
-    convertMessage: (msg: ThreadMessageLike) => msg,
-  });
-
   const compactSession = useCallback(async () => {
     const session = sessionRef.current;
     if (session) {
@@ -912,7 +897,10 @@ export function useOfficeChat(host: OfficeHostApp) {
   }, []);
 
   return {
-    runtime,
+    messages,
+    isRunning,
+    send,
+    cancel,
     sessionError,
     isConnecting,
     clearMessages,
@@ -926,6 +914,5 @@ export function useOfficeChat(host: OfficeHostApp) {
     denyPermission,
     allowPermissionAlways,
     compactSession,
-    thinkingText,
   };
 }

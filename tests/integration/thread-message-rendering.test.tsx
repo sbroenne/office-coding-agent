@@ -14,14 +14,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
-import { AssistantRuntimeProvider } from '@assistant-ui/react';
-import type { AppendMessage } from '@assistant-ui/react';
 import type { SessionEvent } from '@github/copilot-sdk';
-import { Thread } from '@/components/assistant-ui/thread';
+import { MessageList } from '@/components/chat/MessageList';
+import { ChatActionsContext } from '@/contexts/ChatActionsContext';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
-import { ThinkingContext } from '@/contexts/ThinkingContext';
 
 // ─── Fake session / client ────────────────────────────────────────────────────
 
@@ -74,17 +72,6 @@ function makeEvent<T extends SessionEvent['type']>(
 
 const IDLE_EVENT = makeEvent('session.idle', {});
 
-const APPEND_MSG = (): AppendMessage => ({
-  parentId: null,
-  sourceId: null,
-  runConfig: undefined,
-  role: 'user',
-  content: [{ type: 'text', text: 'test' }],
-  attachments: [],
-  metadata: { custom: {} },
-  createdAt: new Date(),
-});
-
 vi.mock('@/lib/websocket-client', () => ({
   createWebSocketClient: vi.fn(),
 }));
@@ -95,8 +82,8 @@ const mockCreate = vi.mocked(createWebSocketClient);
 // ─── Shared test wrapper ──────────────────────────────────────────────────────
 
 /**
- * Renders the Thread with a real (faked) useOfficeChat runtime and returns
- * the hook result so tests can drive messages through `runtime.thread.append`.
+ * Renders MessageList with a real (faked) useOfficeChat and returns
+ * the hook result so tests can drive messages through `send`.
  */
 function renderThreadWithHook(host: 'excel' = 'excel') {
   let hookRef: ReturnType<typeof useOfficeChat> | undefined;
@@ -105,11 +92,17 @@ function renderThreadWithHook(host: 'excel' = 'excel') {
     const chat = useOfficeChat(host);
     hookRef = chat;
     return (
-      <AssistantRuntimeProvider runtime={chat.runtime}>
-        <ThinkingContext.Provider value={chat.thinkingText}>
-          <Thread />
-        </ThinkingContext.Provider>
-      </AssistantRuntimeProvider>
+      <ChatActionsContext.Provider value={{ send: chat.send }}>
+        <MessageList
+          messages={chat.messages}
+          isRunning={chat.isRunning}
+          onSend={chat.send}
+          onCancel={chat.cancel}
+          onRegenerate={vi.fn()}
+          onFeedback={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </ChatActionsContext.Provider>
     );
   }
 
@@ -141,7 +134,7 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -179,7 +172,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -223,7 +216,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -253,7 +246,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -291,7 +284,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -315,7 +308,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -369,7 +362,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -433,7 +426,7 @@ describe('Thread – AssistantMessage rendering', () => {
 
     // Start the stream — it will pause after the tool completes
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 150));
     });
 
@@ -506,7 +499,7 @@ describe('Thread – AssistantMessage rendering', () => {
 
     // Start the stream — it will pause after tool.execution_start
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 150));
     });
 
@@ -571,7 +564,7 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 150));
     });
 
@@ -624,7 +617,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -655,7 +648,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -692,7 +685,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -745,7 +738,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -803,7 +796,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     });
 
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 150));
     });
 
@@ -872,7 +865,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     });
 
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 150));
     });
 
@@ -915,7 +908,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -960,7 +953,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -1001,7 +994,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -1053,7 +1046,7 @@ describe('ChoiceCards', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1100,7 +1093,7 @@ describe('ChoiceCards', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1140,7 +1133,7 @@ describe('ChoiceCards', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1180,7 +1173,7 @@ describe('ChoiceCards', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1234,7 +1227,7 @@ describe('SuggestionLinks', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1268,7 +1261,7 @@ describe('SuggestionLinks', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1297,7 +1290,7 @@ describe('SuggestionLinks', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1344,7 +1337,7 @@ describe('Thread UI: Reload, BranchPicker, and Edit buttons', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1374,7 +1367,7 @@ describe('Thread UI: Reload, BranchPicker, and Edit buttons', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 200));
     });
 
@@ -1404,7 +1397,7 @@ describe('Thread UI: Reload, BranchPicker, and Edit buttons', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 
@@ -1441,7 +1434,7 @@ describe('Thread UI: Reload, BranchPicker, and Edit buttons', () => {
       await new Promise(r => setTimeout(r, 100));
     });
     await act(async () => {
-      getHook().runtime.thread.append(APPEND_MSG());
+      void getHook().send('test');
       await new Promise(r => setTimeout(r, 300));
     });
 

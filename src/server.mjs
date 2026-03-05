@@ -73,10 +73,12 @@ async function createServer() {
       const requestedPath = typeof req.query.path === 'string' ? req.query.path : process.cwd();
       const absolutePath = path.resolve(requestedPath);
 
-      // Security: restrict browsing to home directory and below
+      // Security: restrict browsing to home directory or current working directory
       const homeDir = os.homedir();
-      if (!absolutePath.startsWith(homeDir)) {
-        res.status(403).json({ error: 'Browsing is restricted to the home directory.' });
+      const cwdDir = process.cwd();
+      const isAllowed = absolutePath.startsWith(homeDir) || absolutePath.startsWith(cwdDir);
+      if (!isAllowed) {
+        res.status(403).json({ error: 'Browsing is restricted to the home or project directory.' });
         return;
       }
 
@@ -86,9 +88,10 @@ async function createServer() {
         .map(entry => entry.name)
         .sort((a, b) => a.localeCompare(b));
       const parent = path.dirname(absolutePath);
+      const parentAllowed = parent !== absolutePath && (parent.startsWith(homeDir) || parent.startsWith(cwdDir));
       res.json({
         path: absolutePath,
-        parent: parent === absolutePath || !parent.startsWith(homeDir) ? null : parent,
+        parent: parentAllowed ? parent : null,
         dirs,
       });
     } catch (error) {

@@ -37,9 +37,15 @@ async function waitForCompletedToolCard(page: import('@playwright/test').Page) {
     timeout: AI_TIMEOUT,
   });
 
-  // At least one tool card must have rendered
+  // The Working box auto-collapses after completion — expand it to access tool cards
+  const workingBox = page.locator('.chat-thinking-box').first();
+  await expect(workingBox).toBeVisible({ timeout: 5_000 });
+  const header = workingBox.locator('.chat-thinking-header');
+  await header.click();
+
+  // Now the tool card should be visible inside the expanded Working box
   const card = page.locator('[data-slot="tool-fallback-root"]').first();
-  await expect(card).toBeVisible({ timeout: 5_000 });
+  await expect(card).toBeVisible({ timeout: 3_000 });
   return card;
 }
 
