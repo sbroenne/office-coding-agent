@@ -225,8 +225,19 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
 
-      // System prompt: only base + app prompt (no agent/skill concatenation)
-      const systemContent = buildSystemPrompt(host);
+      // System prompt: base + app prompt + user memories
+      let systemContent = buildSystemPrompt(host);
+
+      // Inject persistent user memories if any exist
+      try {
+        const { useMemoryStore } = await import('@/stores/memoryStore');
+        const memoryContext = useMemoryStore.getState().buildMemoryContext();
+        if (memoryContext) {
+          systemContent += `\n\n${memoryContext}`;
+        }
+      } catch {
+        // Memory store not available — continue without memories
+      }
 
       // Build imported skill payloads for the proxy to write to disk
       const importedHostSkills = getImportedSkills().filter(
