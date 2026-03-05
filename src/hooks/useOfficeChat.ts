@@ -263,14 +263,13 @@ export function useOfficeChat(host: OfficeHostApp) {
             }))
           : undefined;
 
-      // Resolve active MCP servers (bundled + imported), intersect with active agent allowlist
-      // if specified. Bundled servers require explicit opt-in (name must be in activeMcpServerNames).
-      // When activeMcpServerNames is null (all active), only imported servers are included.
+      // Resolve active MCP servers (bundled + imported), intersect with active agent allowlist.
+      // When activeMcpServerNames is null (default), ALL servers are active (bundled + imported).
       const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServersRef.current);
       let activeServers: typeof allServers;
       if (activeMcpServerNamesRef.current === null) {
-        // null = all imported active, bundled NOT active (require explicit opt-in)
-        activeServers = allServers.filter(s => !BUNDLED_MCP_SERVERS.some(b => b.name === s.name));
+        // null = all active (same convention as activeSkillNames)
+        activeServers = allServers;
       } else {
         activeServers = allServers.filter(s => activeMcpServerNamesRef.current!.includes(s.name));
       }
