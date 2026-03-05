@@ -141,84 +141,286 @@ summary:focus-visible,
   height: 0;
 }
 
-/* ── VS Code Chain-of-Thought Timeline ── */
-/* The assistant message content area is a flex column so the ToolGroup
-   wrapper (order: -1) renders visually above the text part (order: 0),
-   matching VS Code Copilot Chat's layout: tools above → text below.
-   The DOM order stays text-first to prevent React 18 tearing. */
+/* ── VS Code Chain-of-Thought & Tool Progress ──
+   Matches VS Code's .progress-container, .chat-thinking-box,
+   and chatThinkingContent.css patterns exactly. */
+
+/* Position context for tool groups and single tools */
 .aui-assistant-message-content {
   position: relative;
 }
 
-/* Tool group toggle button (visible when 2+ tools are grouped) */
-.aui-tool-group-trigger {
+/* ── Progress Container (each tool line) ── */
+/* Matches VS Code: display: flex; align-items: center; gap: 4px; margin: 0 0 6px 0; */
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  padding-top: 2px;
   cursor: pointer;
   background: none;
   border: none;
   font-family: inherit;
   color: var(--vscode-foreground);
-  padding-left: 4px;
+  width: 100%;
+  text-align: left;
 }
-.aui-tool-group-trigger:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-  border-radius: var(--vscode-cornerRadius-medium);
-}
-
-/* Tool cards: remove individual borders, add left padding for timeline */
-[data-slot='tool-fallback-root'] {
-  border: none !important;
-  border-radius: 0 !important;
-  position: relative;
-  padding-left: 20px !important;
-  padding-top: 4px !important;
-  padding-bottom: 4px !important;
-  margin-bottom: 0 !important;
+.progress-container.pointer-events-none {
+  cursor: default;
 }
 
-/* Vertical chain-of-thought line on each tool card */
-[data-slot='tool-fallback-root']::before {
-  content: '';
+/* Status icon: 12px, hidden in shimmer mode */
+.progress-status-icon {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+.progress-status-icon::before {
+  font-size: 12px;
+}
+
+/* Shimmer progress: hide status icon, shimmer on text */
+.shimmer-progress .progress-status-icon {
+  display: none;
+}
+.shimmer-progress .progress-step {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-descriptionForeground) 0%,
+    var(--vscode-descriptionForeground) 30%,
+    var(--vscode-chat-thinkingShimmer) 50%,
+    var(--vscode-descriptionForeground) 70%,
+    var(--vscode-descriptionForeground) 100%
+  );
+  background-size: 400% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chat-thinking-shimmer 2s linear infinite;
+}
+
+/* Progress step text */
+.progress-step {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.923em; /* 12px when base is 13px */
+  margin: 0;
+  white-space: normal;
+}
+
+/* Progress summary (inline after tool name) */
+.progress-summary {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.846em; /* 11px */
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+/* ── Hover Chevron (VS Code pattern: visible only on hover) ── */
+.chat-collapsible-hover-chevron {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0;
+  transition: opacity 0.1s ease-in-out;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.chat-collapsible-hover-chevron.codicon-chevron-down {
+  opacity: 1;
+}
+button:hover .chat-collapsible-hover-chevron,
+.progress-container:hover .chat-collapsible-hover-chevron {
+  opacity: 1;
+}
+
+/* ── Tool-Type Icons (on chain-of-thought line) ── */
+.chat-thinking-icon {
   position: absolute;
   left: 5px;
+  top: 9px;
+  width: 12px;
+  height: 12px;
+  font-size: 12px;
+  line-height: 12px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+  z-index: 1;
+}
+
+/* ── "Working" Collapsible Box ── */
+/* Matches VS Code's ChatThinkingContentPart / chat-thinking-box */
+.chat-thinking-box {
+  margin-bottom: 6px;
+}
+
+/* Header button */
+.chat-thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.923em; /* 12px */
+  line-height: 1.5em;
+  color: var(--vscode-descriptionForeground);
+  border-radius: var(--vscode-cornerRadius-medium);
+  text-align: left;
+}
+.chat-thinking-header:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.chat-thinking-header-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.chat-thinking-header-icon::before {
+  font-size: 12px;
+}
+
+/* Shimmer on "Working" title */
+.chat-thinking-title-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-descriptionForeground) 0%,
+    var(--vscode-descriptionForeground) 30%,
+    var(--vscode-chat-thinkingShimmer) 50%,
+    var(--vscode-descriptionForeground) 70%,
+    var(--vscode-descriptionForeground) 100%
+  );
+  background-size: 400% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chat-thinking-shimmer 2s linear infinite;
+}
+
+.chat-thinking-title-done {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Collapsible content area with border */
+.chat-thinking-collapsible {
+  border: 1px solid var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-medium);
+  margin-top: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Chain-of-Thought Lines (inside Working box) ── */
+.chat-thinking-collapsible .chat-tool-progress-wrapper {
+  position: relative;
+  padding: 4px 12px 4px 28px;
+}
+.chat-thinking-collapsible .chat-tool-progress-wrapper::before {
+  content: '';
+  position: absolute;
+  left: 10.5px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  border-radius: 0;
+  background-color: var(--vscode-chat-requestBorder);
+  mask-image: linear-gradient(to bottom, #000 0 5px, transparent 5px 25px, #000 24px 100%);
+}
+.chat-thinking-collapsible .chat-tool-progress-wrapper:first-child::before {
+  mask-image: linear-gradient(to bottom, transparent 0 25px, #000 25px 100%);
+}
+.chat-thinking-collapsible .chat-tool-progress-wrapper:last-child::before,
+.chat-thinking-collapsible .chat-thinking-spinner-item:last-child::before {
+  mask-image: linear-gradient(to bottom, #000 0 5px, transparent 5px 100%);
+}
+.chat-thinking-collapsible .chat-tool-progress-wrapper:only-child::before {
+  background: none;
+  mask-image: none;
+}
+
+/* Progress container inside Working box: reset margins, adapt to padding */
+.chat-thinking-collapsible .progress-container {
+  margin: 0;
+  padding-top: 0;
+}
+
+/* ── Spinner Item (inside Working box) ── */
+.chat-thinking-spinner-item {
+  position: relative;
+  padding: 6px 12px 6px 28px;
+  font-size: 0.923em;
+}
+.chat-thinking-spinner-item::before {
+  content: '';
+  position: absolute;
+  left: 10.5px;
   top: 0;
   bottom: 0;
   width: 1px;
   background-color: var(--vscode-chat-requestBorder);
+  mask-image: linear-gradient(to bottom, #000 0 5px, transparent 5px 25px, #000 24px 100%);
+}
+.chat-thinking-spinner-label {
+  background: linear-gradient(
+    90deg,
+    var(--vscode-descriptionForeground) 0%,
+    var(--vscode-descriptionForeground) 30%,
+    var(--vscode-chat-thinkingShimmer) 50%,
+    var(--vscode-descriptionForeground) 70%,
+    var(--vscode-descriptionForeground) 100%
+  );
+  background-size: 400% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: chat-thinking-shimmer 2s linear infinite;
+  color: var(--vscode-descriptionForeground);
 }
 
-/* Single tool card: hide vertical line (no chain to connect) */
-[data-slot='tool-fallback-root']:only-child::before {
+/* ── Single Tool (no Working box) ── */
+.chat-tool-single .chat-tool-progress-wrapper {
+  padding-left: 4px;
+}
+.chat-tool-single .chat-thinking-icon {
   display: none;
 }
 
-/* Tool status icon sits on top of the vertical line */
-.aui-tool-fallback-trigger-icon {
-  position: relative;
-  z-index: 1;
-  background: var(--vscode-editor-background);
-}
-
-/* Thinking indicator timeline styling */
-.aui-assistant-thinking-indicator {
-  position: relative;
-  padding-left: 20px !important;
-}
-.aui-assistant-thinking-indicator::before {
-  content: '';
-  position: absolute;
-  left: 5px;
-  top: 50%;
-  bottom: -100%;
-  width: 1px;
-  background-color: var(--vscode-chat-requestBorder);
-}
-
-/* Collapsed tool content: compact styling */
-[data-slot='tool-fallback-content'] > div {
-  border-top: 1px solid var(--vscode-chat-requestBorder);
+/* ── Expanded Tool Details ── */
+.tool-details-expanded {
   margin-top: 4px;
-  padding-top: 4px;
-  margin-left: 0;
+  padding: 6px 0;
+  border-top: 1px solid var(--vscode-chat-requestBorder);
+}
+.tool-details-section {
+  padding: 4px 6px;
+}
+.tool-details-section + .tool-details-section {
+  border-top: 1px dashed var(--vscode-widget-border);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+.tool-details-label {
+  margin-bottom: 4px;
+  font-size: 0.846em;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+}
+.tool-details-code {
+  white-space: pre-wrap;
+  border-radius: var(--vscode-cornerRadius-medium);
+  padding: 6px 8px;
+  font-family: var(--vscode-monospace-font);
+  font-size: 0.846em;
+  background: var(--vscode-editorWidget-background);
+  margin: 0;
+  overflow-x: auto;
 }
 
 /* Hide the raw code block that follows rendered choice/suggestion cards */
