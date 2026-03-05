@@ -18,10 +18,13 @@ export class WebSocketMessageReader extends AbstractMessageReader implements Mes
   private buffer = new Uint8Array(0);
   private callback: DataCallback | null = null;
   private decoder = new TextDecoder();
+  private _handleMessage: (event: MessageEvent) => void;
+  private _handleError: () => void;
+  private _handleClose: () => void;
 
   constructor(private socket: WebSocket) {
     super();
-    this.socket.addEventListener('message', event => {
+    this._handleMessage = (event: MessageEvent) => {
       void (async () => {
         let bytes: Uint8Array;
         if (event.data instanceof Blob) {
@@ -39,15 +42,21 @@ export class WebSocketMessageReader extends AbstractMessageReader implements Mes
 
         this.processBuffer();
       })();
-    });
+    };
+    this._handleError = () => this.fireError(new Error('WebSocket error'));
+    this._handleClose = () => this.fireClose();
 
-    this.socket.addEventListener('error', () => {
-      this.fireError(new Error('WebSocket error'));
-    });
+    this.socket.addEventListener('message', this._handleMessage);
+    this.socket.addEventListener('error', this._handleError);
+    this.socket.addEventListener('close', this._handleClose);
+  }
 
-    this.socket.addEventListener('close', () => {
-      this.fireClose();
-    });
+  dispose(): void {
+    super.dispose();
+    this.socket.removeEventListener('message', this._handleMessage);
+    this.socket.removeEventListener('error', this._handleError);
+    this.socket.removeEventListener('close', this._handleClose);
+    this.callback = null;
   }
 
   private processBuffer(): void {

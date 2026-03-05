@@ -38,7 +38,8 @@ describe('Integration: McpManagerPanel', () => {
     renderWithProviders(<McpManagerPanel />);
 
     expect(screen.getByText('workiq')).toBeInTheDocument();
-    expect(screen.getByText('Built-in')).toBeInTheDocument();
+    expect(screen.getByText('powerbi')).toBeInTheDocument();
+    expect(screen.getAllByText('Built-in').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole('button', { name: /Import/i })).toBeInTheDocument();
   });
 
@@ -138,7 +139,8 @@ describe('Integration: McpManagerPanel', () => {
   it('bundled servers show Built-in badge', () => {
     renderWithProviders(<McpManagerPanel />);
 
-    expect(screen.getByText('Built-in')).toBeInTheDocument();
+    expect(screen.getAllByText('Built-in').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('workiq')).toBeInTheDocument();
+    expect(screen.getByText('powerbi')).toBeInTheDocument();
   });
 });

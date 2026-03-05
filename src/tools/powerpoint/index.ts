@@ -577,11 +577,16 @@ PptxGenJS API reference:
       }
 
       const shape = shapes.items[shapeIndex];
-      shape.textFrame.textRange.load('text');
-      await context.sync();
-
-      shape.textFrame.textRange.text = text;
-      await context.sync();
+      try {
+        shape.textFrame.textRange.load('text');
+        await context.sync();
+        shape.textFrame.textRange.text = text;
+        await context.sync();
+      } catch {
+        throw new Error(
+          `Shape ${String(shapeIndex)} on slide ${String(slideIndex + 1)} does not support text (it may be a line, connector, image, or chart). Use get_slide_shapes to inspect shape types.`
+        );
+      }
 
       return `Updated shape ${String(shapeIndex + 1)} on slide ${String(slideIndex + 1)}.`;
     },

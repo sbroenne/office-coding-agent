@@ -72,6 +72,14 @@ async function createServer() {
     try {
       const requestedPath = typeof req.query.path === 'string' ? req.query.path : process.cwd();
       const absolutePath = path.resolve(requestedPath);
+
+      // Security: restrict browsing to home directory and below
+      const homeDir = os.homedir();
+      if (!absolutePath.startsWith(homeDir)) {
+        res.status(403).json({ error: 'Browsing is restricted to the home directory.' });
+        return;
+      }
+
       const entries = await fs.promises.readdir(absolutePath, { withFileTypes: true });
       const dirs = entries
         .filter(entry => entry.isDirectory())
@@ -80,7 +88,7 @@ async function createServer() {
       const parent = path.dirname(absolutePath);
       res.json({
         path: absolutePath,
-        parent: parent === absolutePath ? null : parent,
+        parent: parent === absolutePath || !parent.startsWith(homeDir) ? null : parent,
         dirs,
       });
     } catch (error) {
