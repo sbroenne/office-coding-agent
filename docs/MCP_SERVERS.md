@@ -5,7 +5,7 @@ The office-coding-agent supports **MCP (Model Context Protocol) servers** that p
 ## Overview
 
 ```
-Browser task pane (React + assistant-ui)
+Browser task pane (React)
          ↓ WebSocket
 Node.js proxy server (src/server.mjs)
          ↓ @github/copilot-sdk (tool routing)

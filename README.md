@@ -1,6 +1,6 @@
 # Office Coding Agent
 
-An Office add-in that embeds GitHub Copilot as an AI assistant in Excel, PowerPoint, Word, and Outlook. Built with React, [assistant-ui](https://github.com/assistant-ui/assistant-ui), Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). The Copilot SDK integration architecture is based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
+An Office add-in that embeds GitHub Copilot as an AI assistant in Excel, PowerPoint, Word, and Outlook. Built with React, Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). The Copilot SDK integration architecture is based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
 
 > **Research Project Disclaimer**
 >
@@ -9,7 +9,7 @@ An Office add-in that embeds GitHub Copilot as an AI assistant in Excel, PowerPo
 ## How It Works
 
 ```
-Office Task Pane (React + assistant-ui)
+Office Task Pane (React)
       ↓ WebSocket (wss://localhost:3000/api/copilot)
 Node.js proxy server  (src/server.mjs)
       ↓ @github/copilot-sdk (manages CLI lifecycle internally)
