@@ -61,6 +61,10 @@ The `code` parameter receives three variables injected automatically at runtime:
 Content width = `W - 1` (0.5" margin each side). Safe area: x ≥ 0.5, y ≥ 0.5, x+w ≤ W-0.5, y+h ≤ H-0.5.
 Always add `shrinkText: true` to every `addText()` call.
 
+All positions (x, y, w, h) are in **inches**. Colors: 6-digit hex without # prefix (`"4472C4"`).
+
+### Text
+
 ```js
 // Title + subtitle
 slide.addText("Title", { x: 0.5, y: 0.5, w: W-1, h: 1, fontSize: 32, bold: true, color: "363636", shrinkText: true });
@@ -72,22 +76,23 @@ slide.addText([
   { text: "Point 2", options: { bullet: true } },
 ], { x: 0.5, y: 2.5, w: W-1, h: H-3, fontSize: 16, shrinkText: true });
 
-// 3-column layout — colW divides available width into 3 equal columns with 0.1" gaps
-const colW = (W - 1 - 0.2) / 3;  // 0.2" = 2 gaps × 0.1"
-const col0 = 0.5, col1 = col0 + colW + 0.1, col2 = col1 + colW + 0.1;
-const bodyY = 2.2, bodyH = H - bodyY - 0.5;
-slide.addText("Column 1", { x: col0, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
-slide.addText("Body text here", { x: col0, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
-slide.addText("Column 2", { x: col1, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
-slide.addText("Body text here", { x: col1, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
-slide.addText("Column 3", { x: col2, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
-slide.addText("Body text here", { x: col2, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
+// Numbered bullets
+slide.addText([
+  { text: "First", options: { bullet: { type: "number" } } },
+  { text: "Second", options: { bullet: { type: "number" } } },
+], { x: 0.5, y: 2.5, w: W-1, h: H-3, fontSize: 16, shrinkText: true });
 
-// Table
-slide.addTable([["Header 1", "Header 2"], ["Row 1", "Data"]], { x: 0.5, y: 2, w: W-1, fontSize: 14 });
+// Text with hyperlink
+slide.addText([
+  { text: "Visit our website", options: { hyperlink: { url: "https://example.com", tooltip: "Example" } } },
+], { x: 0.5, y: 5, w: W-1, h: 0.5, fontSize: 14, shrinkText: true });
 
-// Shape
-slide.addShape("rect", { x: 1, y: 1, w: 3, h: 1, fill: { color: "4472C4" } });
+// Text inside a shape
+slide.addText("Inside a rounded rectangle", {
+  shape: "roundRect", x: 0.5, y: 2, w: W-1, h: 1.5,
+  fill: { color: "4472C4" }, color: "FFFFFF", fontSize: 18,
+  align: "center", valign: "middle", rectRadius: 0.2, shrinkText: true,
+});
 
 // Label + description — ALWAYS a SINGLE string with colon
 slide.addText([
@@ -95,7 +100,162 @@ slide.addText([
 ], { x: 0.5, y: 2, w: W-1, h: H-2.5, shrinkText: true });
 ```
 
-All positions (x, y, w, h) are in **inches**. Colors: 6-digit hex without # prefix (`"4472C4"`).
+Text options: `fontSize`, `fontFace`, `color`, `bold`, `italic`, `underline`, `align` (left/center/right), `valign` (top/middle/bottom), `lineSpacing`, `paraSpaceBefore`, `paraSpaceAfter`, `margin`, `fill: { color }`, `shadow: { type, color, blur, offset, angle }`, `outline: { size, color }`, `breakLine: true` (force line break in arrays).
+
+### Multi-Column Layout
+
+```js
+const colW = (W - 1 - 0.2) / 3;  // 0.2" = 2 gaps × 0.1"
+const col0 = 0.5, col1 = col0 + colW + 0.1, col2 = col1 + colW + 0.1;
+const bodyY = 2.2, bodyH = H - bodyY - 0.5;
+slide.addText("Column 1", { x: col0, y: 1.5, w: colW, h: 0.5, fontSize: 16, bold: true, color: "4472C4", shrinkText: true });
+slide.addText("Body text here", { x: col0, y: bodyY, w: colW, h: bodyH, fontSize: 14, shrinkText: true });
+```
+
+### Tables
+
+```js
+// Simple table
+slide.addTable([["Header 1", "Header 2"], ["Row 1", "Data"]], { x: 0.5, y: 2, w: W-1, fontSize: 14 });
+
+// Styled table with cell-level formatting
+slide.addTable([
+  [
+    { text: "Product", options: { bold: true, fill: { color: "4472C4" }, color: "FFFFFF", align: "center" } },
+    { text: "Revenue", options: { bold: true, fill: { color: "4472C4" }, color: "FFFFFF", align: "center" } },
+  ],
+  [
+    { text: "Widget A", options: { fill: { color: "F2F2F2" } } },
+    { text: "$1,200", options: { fill: { color: "F2F2F2" }, align: "right" } },
+  ],
+  ["Widget B", { text: "$3,400", options: { align: "right" } }],
+], {
+  x: 0.5, y: 2, w: W-1, fontSize: 13,
+  colW: [(W-1)*0.6, (W-1)*0.4],
+  border: { type: "solid", pt: 0.5, color: "CFCFCF" },
+  rowH: [0.4, 0.35, 0.35],
+});
+```
+
+Table options: `colW` (array of column widths or single uniform width), `rowH` (array or uniform), `border: { type, pt, color }` (type: "none"/"solid"/"dash"), `align`, `valign`, `fontFace`, `fontSize`, `color`, `fill`, `margin`, `colspan`, `rowspan`.
+
+### Charts
+
+```js
+// Bar chart
+slide.addChart("bar", [
+  { name: "Q1", labels: ["Jan","Feb","Mar"], values: [10, 20, 15] },
+  { name: "Q2", labels: ["Jan","Feb","Mar"], values: [25, 18, 30] },
+], {
+  x: 0.5, y: 2, w: W-1, h: H-3,
+  showTitle: true, title: "Quarterly Sales",
+  showValue: true, showLegend: true, legendPos: "b",
+  chartColors: ["4472C4", "ED7D31"],
+});
+
+// Line chart
+slide.addChart("line", [
+  { name: "Revenue", labels: ["2020","2021","2022","2023"], values: [100,150,200,280] },
+], {
+  x: 0.5, y: 2, w: W-1, h: H-3,
+  showTitle: true, title: "Revenue Trend",
+  showLegend: false, showValue: true,
+  lineDataSymbol: "circle", lineDataSymbolSize: 8,
+  chartColors: ["4472C4"],
+});
+
+// Pie chart
+slide.addChart("pie", [
+  { name: "Market Share", labels: ["Us","Competitor A","Competitor B","Other"], values: [45, 25, 20, 10] },
+], {
+  x: 1, y: 1.5, w: W-2, h: H-2.5,
+  showTitle: true, title: "Market Share",
+  showPercent: true, showLegend: true, legendPos: "b",
+  chartColors: ["4472C4", "ED7D31", "A5A5A5", "FFC000"],
+});
+
+// Doughnut chart
+slide.addChart("doughnut", [
+  { name: "Budget", labels: ["R&D","Marketing","Operations"], values: [40, 35, 25] },
+], {
+  x: 1, y: 1.5, w: W-2, h: H-2.5,
+  showTitle: true, title: "Budget Allocation",
+  showPercent: true, holeSize: 50,
+  chartColors: ["4472C4", "ED7D31", "70AD47"],
+});
+
+// Combo chart (bar + line)
+slide.addChart(
+  [
+    { type: "bar", data: [{ name: "Sales", labels: ["Q1","Q2","Q3","Q4"], values: [100,200,150,300] }], options: { chartColors: ["4472C4"] } },
+    { type: "line", data: [{ name: "Target", labels: ["Q1","Q2","Q3","Q4"], values: [150,150,150,150] }], options: { chartColors: ["ED7D31"] } },
+  ],
+  { x: 0.5, y: 2, w: W-1, h: H-3, showLegend: true, showTitle: true, title: "Sales vs Target" }
+);
+```
+
+Chart types: `"bar"`, `"bar3d"`, `"line"`, `"area"`, `"pie"`, `"doughnut"`, `"scatter"`, `"bubble"`, `"radar"`.
+
+Chart options: `showTitle`, `title`, `titleFontSize`, `showLegend`, `legendPos` (b/t/l/r/tr), `showValue`, `showPercent`, `showLabel`, `chartColors` (array of hex), `chartArea: { fill: { color } }`, `plotArea: { fill: { color } }`, `catAxisTitle`, `valAxisTitle`, `catAxisLabelRotate`, `valAxisLabelFormatCode` (e.g. `"$#,##0"`), `barDir` ("bar" for horizontal, default vertical), `barGapWidthPct`, `lineDataSymbol` ("circle"/"square"/"triangle"/"none"), `lineDataSymbolSize`, `lineSmooth: true`.
+
+### Images
+
+```js
+// Image from base64 data (use fetch_image_as_base64 tool to get the data URI first)
+slide.addImage({ data: "image/png;base64,iVBORw0KGgo...", x: 0.5, y: 2, w: 4, h: 3 });
+
+// Image with sizing (contain = fit within area preserving aspect ratio)
+slide.addImage({
+  data: imageDataUri,
+  x: 0.5, y: 2, w: W-1, h: H-3,
+  sizing: { type: "contain", w: W-1, h: H-3 },
+});
+
+// Rounded image
+slide.addImage({ data: imageDataUri, x: 1, y: 1.5, w: 3, h: 3, rounding: true });
+```
+
+Image options: `x`, `y`, `w`, `h`, `sizing: { type, w, h }` (type: "contain"/"cover"/"crop"), `rounding: true` (circle), `rotate` (degrees), `flipH`, `flipV`, `hyperlink: { url }`, `altText`, `transparency` (0-100).
+
+**Important**: Images cannot be loaded from URLs at runtime — use the `fetch_image_as_base64` tool first, then pass the returned data URI to `slide.addImage({ data: ... })`.
+
+### Shapes
+
+```js
+// Rectangle with fill
+slide.addShape("rect", { x: 0.5, y: 2, w: 3, h: 1.5, fill: { color: "4472C4" } });
+
+// Rounded rectangle
+slide.addShape("roundRect", { x: 0.5, y: 2, w: 3, h: 1.5, fill: { color: "70AD47" }, rectRadius: 0.2 });
+
+// Ellipse / circle
+slide.addShape("ellipse", { x: 5, y: 2, w: 2, h: 2, fill: { color: "ED7D31" } });
+
+// Line
+slide.addShape("line", { x: 0.5, y: 4, w: W-1, h: 0, line: { color: "CFCFCF", width: 1 } });
+
+// Shape with border
+slide.addShape("rect", {
+  x: 0.5, y: 2, w: 3, h: 1.5,
+  fill: { color: "FFFFFF" },
+  line: { color: "4472C4", width: 1.5 },
+  shadow: { type: "outer", color: "000000", blur: 6, offset: 3, angle: 45 },
+});
+```
+
+Common shape types: `"rect"`, `"roundRect"`, `"ellipse"`, `"triangle"`, `"diamond"`, `"hexagon"`, `"star5"`, `"heart"`, `"cloud"`, `"line"`, `"arrowRight"`, `"chevron"`.
+
+Shape options: `fill: { color }`, `line: { color, width, dashType }` (dashType: "solid"/"dash"/"lgDash"/"dot"), `rectRadius` (rounded corners 0-1), `rotate` (degrees), `shadow: { type, color, blur, offset, angle }`, `flipH`, `flipV`, `hyperlink: { url }`.
+
+### Slide Background
+
+```js
+// Solid color background
+slide.background = { color: "1A1A2E" };
+
+// Gradient background (not supported — use a full-slide shape instead)
+slide.addShape("rect", { x: 0, y: 0, w: W, h: H, fill: { color: "1A1A2E" } });
+```
 
 ### PptxGenJS Anti-Patterns (cause bugs)
 
