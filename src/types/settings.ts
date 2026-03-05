@@ -71,4 +71,10 @@ export const BUNDLED_MCP_SERVERS: McpServerConfig[] = [
     command: 'npx',
     args: ['-y', '@microsoft/workiq', 'mcp'],
   },
+  {
+    name: 'powerbi',
+    description: 'Power BI — query semantic models, generate DAX, explore data',
+    transport: 'http',
+    url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
+  },
 ];
