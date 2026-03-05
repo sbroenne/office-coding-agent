@@ -92,34 +92,29 @@ const ThreadWelcome: FC = () => {
     <div className="aui-thread-welcome-root my-auto flex w-full grow flex-col px-4">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
         <div className="aui-thread-welcome-message flex w-full flex-col items-center justify-center">
-          <div
-            className="mb-2 flex items-center justify-center rounded-full"
-            style={{
-              width: 28,
-              height: 28,
-              background: 'var(--vscode-chat-avatarBackground)',
-              color: 'var(--vscode-chat-avatarForeground)',
-            }}
-          >
-            <Codicon name="copilot" className="text-sm" />
+          <div style={{ marginBottom: 24 }}>
+            <Codicon
+              name="copilot"
+              className="text-[40px] text-[var(--vscode-descriptionForeground)]"
+            />
           </div>
-          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold text-base duration-200">
+          <h1
+            className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both font-semibold duration-200"
+            style={{ fontSize: 13 }}
+          >
             How can I help?
           </h1>
         </div>
 
-        <div className="mt-4 flex w-full flex-col">
+        <div className="chat-welcome-suggested-prompts mt-4">
+          <p className="chat-welcome-suggested-prompts-title">Try asking</p>
           {SUGGESTIONS.map((suggestion, idx) => (
             <ThreadPrimitive.Suggestion
               key={suggestion.prompt}
               {...suggestion}
-              className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both flex items-center gap-2 rounded-[var(--vscode-cornerRadius-medium)] px-2 py-1.5 text-left text-[12px] transition-colors duration-150 hover:bg-[var(--vscode-list-hoverBackground)]"
-              style={{
-                animationDelay: `${100 + idx * 50}ms`,
-                color: 'var(--vscode-textLink-foreground)',
-              }}
+              className="chat-welcome-suggested-prompt fade-in animate-in fill-mode-both duration-150"
+              style={{ animationDelay: `${100 + idx * 50}ms` }}
             >
-              <Codicon name="sparkle" className="shrink-0 text-[11px]" />
               {suggestion.prompt}
             </ThreadPrimitive.Suggestion>
           ))}
@@ -410,23 +405,7 @@ const AssistantMessage: FC = () => {
       className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-2 duration-150"
       data-role="assistant"
     >
-      {/* Copilot avatar header */}
-      <div className="mb-1.5 flex items-center gap-2 px-4">
-        <div
-          className="flex items-center justify-center rounded-full"
-          style={{
-            width: 22,
-            height: 22,
-            background: 'var(--vscode-chat-avatarBackground)',
-            color: 'var(--vscode-chat-avatarForeground)',
-          }}
-        >
-          <Codicon name="copilot" className="text-[12px]" />
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 600 }} className="text-foreground">
-          Copilot
-        </span>
-      </div>
+      {/* VS Code hides avatar + name for the default Copilot agent */}
       <div className="aui-assistant-message-content flex flex-col wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
         <InlineWorkingProgress />
         <MessagePrimitive.Parts
@@ -498,7 +477,7 @@ const UserMessage: FC = () => {
       className="aui-user-message-root fade-in slide-in-from-bottom-1 group/message relative flex w-full animate-in px-4 py-2 duration-150"
       data-role="user"
     >
-      <div className="aui-user-message-content wrap-break-word w-full text-foreground text-[13px] leading-[1.5em]">
+      <div className="aui-user-message-bubble wrap-break-word text-foreground text-[13px] leading-[1.5em]">
         <MessagePrimitive.Content />
       </div>
       <UserActionBar />

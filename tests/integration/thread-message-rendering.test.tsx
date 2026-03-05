@@ -1058,9 +1058,9 @@ describe('ChoiceCards', () => {
     expect(screen.getByText('Excel')).toBeInTheDocument();
     expect(screen.getByText('PDF')).toBeInTheDocument();
 
-    // Number badges 1, 2, 3 are present
+    // Number badges 1, 2, 3 are present (now using VS Code carousel class names)
     const wrapper = document.querySelector('.aui-choices-wrapper')!;
-    const badges = wrapper.querySelectorAll('span.text-right');
+    const badges = wrapper.querySelectorAll('.chat-question-list-number');
     expect(badges[0]?.textContent?.trim()).toBe('1');
     expect(badges[1]?.textContent?.trim()).toBe('2');
     expect(badges[2]?.textContent?.trim()).toBe('3');
@@ -1071,8 +1071,8 @@ describe('ChoiceCards', () => {
     expect(textarea?.placeholder).toBe('Enter custom answer');
 
     // Freeform row is numbered n+1 (4)
-    const allBadges = wrapper.querySelectorAll('span.text-right');
-    expect(allBadges[3]?.textContent?.trim()).toBe('4');
+    const freeformNumber = wrapper.querySelector('.chat-question-freeform-number');
+    expect(freeformNumber?.textContent?.trim()).toBe('4');
   });
 
   it('clicking a choice appends the label as a user message', async () => {

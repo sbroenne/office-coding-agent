@@ -54,6 +54,7 @@
   /* ── Chat-specific ── */
   --vscode-chat-requestBorder: #e0e0e0;
   --vscode-chat-requestBubbleBackground: #f4f4f480;
+  --vscode-chat-requestBubbleHoverBackground: #e8e8e880;
   --vscode-interactive-session-foreground: #3b3b3b;
   --vscode-chat-list-background: #ffffff;
   --vscode-chat-avatarBackground: #e5e5e5;
@@ -73,6 +74,7 @@
   --vscode-cornerRadius-small: 2px;
   --vscode-cornerRadius-medium: 4px;
   --vscode-cornerRadius-large: 8px;
+  --vscode-cornerRadius-xLarge: 12px;
 
   /* ── Chat typography (relative to 13px base) ── */
   --vscode-chat-font-size-body-xs: 0.846em;
@@ -136,6 +138,7 @@
   /* ── Chat-specific ── */
   --vscode-chat-requestBorder: #383838;
   --vscode-chat-requestBubbleBackground: #2c2c2c80;
+  --vscode-chat-requestBubbleHoverBackground: #36363680;
   --vscode-interactive-session-foreground: #cccccc;
   --vscode-chat-list-background: #1f1f1f;
   --vscode-chat-avatarBackground: #313131;

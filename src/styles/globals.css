@@ -431,3 +431,161 @@ button:hover .chat-collapsible-hover-chevron,
 .aui-md-pre:has(.language-choices) {
   display: none;
 }
+
+/* ── VS Code Question Carousel Card (Choices) ── */
+.chat-question-carousel-container {
+  margin: 8px 0;
+  border: 1px solid var(--vscode-chat-requestBorder);
+  border-radius: var(--vscode-cornerRadius-large);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chat-question-input-container {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+.chat-question-list {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  padding: 0;
+}
+.chat-question-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: var(--vscode-cornerRadius-medium);
+  user-select: none;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  color: var(--vscode-foreground);
+  font-size: var(--vscode-chat-font-size-body-s);
+  transition: background-color 0.1s;
+}
+.chat-question-list-item:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+.chat-question-list-number {
+  font-size: var(--vscode-chat-font-size-body-s);
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+  min-width: 1ch;
+  text-align: right;
+}
+.chat-question-list-label {
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  display: flex;
+  flex-direction: column;
+}
+.chat-question-list-label-title {
+  font-weight: 500;
+  line-height: 1.4;
+}
+.chat-question-list-label-desc {
+  font-weight: normal;
+  color: var(--vscode-descriptionForeground);
+  font-size: var(--vscode-chat-font-size-body-xs);
+}
+.chat-question-freeform {
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 12px;
+}
+.chat-question-freeform-number {
+  font-size: var(--vscode-chat-font-size-body-s);
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+  min-width: 1ch;
+  text-align: right;
+}
+.chat-question-freeform-textarea {
+  width: 100%;
+  min-height: 24px;
+  max-height: 200px;
+  padding: 3px 8px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-chat-requestBorder));
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: 4px;
+  resize: none;
+  font-family: inherit;
+  font-size: var(--vscode-chat-font-size-body-s);
+  box-sizing: border-box;
+  overflow-y: hidden;
+  align-content: center;
+}
+.chat-question-freeform-textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  border-color: var(--vscode-focusBorder);
+}
+.chat-question-freeform-textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+/* ── User Message Bubbles (VS Code pattern) ── */
+.aui-user-message-root {
+  align-items: flex-end;
+}
+.aui-user-message-bubble {
+  background-color: var(--vscode-chat-requestBubbleBackground);
+  border-radius: var(--vscode-cornerRadius-xLarge);
+  padding: 8px 12px;
+  max-width: 90%;
+  margin-left: auto;
+  width: fit-content;
+  position: relative;
+}
+.aui-user-message-bubble:hover {
+  cursor: pointer;
+  background-color: var(--vscode-chat-requestBubbleHoverBackground);
+}
+
+/* ── Welcome Suggestion Pills (VS Code pattern) ── */
+.chat-welcome-suggested-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+}
+.chat-welcome-suggested-prompts-title {
+  width: 100%;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 4px 0;
+  text-align: left;
+}
+.chat-welcome-suggested-prompt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background-color: var(--vscode-editorWidget-background);
+  cursor: pointer;
+  border: 1px solid var(--vscode-chat-requestBorder, var(--vscode-input-background, transparent));
+  width: fit-content;
+  margin: 0;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+  transition: background-color 0.1s;
+}
+.chat-welcome-suggested-prompt:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
