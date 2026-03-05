@@ -441,8 +441,12 @@ PptxGenJS API reference:
         // slideWidth/slideHeight not available on this Office version — use defaults
       }
 
-      // Build the pptxgenjs slide (pure JS, no Office context needed)
+      // Build the pptxgenjs slide matching the target presentation dimensions.
+      // PptxGenJS defaults to 13.33"×7.5" (16:9). If the target is different
+      // (e.g. 10"×7.5" for 4:3), content positioned for 13.33" would overflow.
       const pptx = new pptxgen();
+      pptx.defineLayout({ name: 'CUSTOM', width: W, height: H });
+      pptx.layout = 'CUSTOM';
       const slide = pptx.addSlide();
 
       /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */

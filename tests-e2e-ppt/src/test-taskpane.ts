@@ -361,6 +361,17 @@ async function testPptTools(): Promise<void> {
       : `Expected add_slide_from_code with W/H to succeed, got: ${s.substring(0, 200)}`;
   });
 
+  // 10c. Overflow detection — verify get_slide_shapes can detect overflow
+  // Checks slide 0 (always exists). The tool reports "⚠️ OVERFLOW" for any out-of-bounds shape.
+  // If 10b's W/H injection was wrong, shapes would overflow and this would catch it.
+  await runTool(powerPointConfigs, 'get_slide_shapes', { slideIndex: 0 }, r => {
+    const s = safeString(r);
+    if (s.includes('OVERFLOW')) {
+      return `Slide 0 has overflowing shapes: ${s.substring(0, 300)}`;
+    }
+    return null;
+  });
+
   // 11. duplicate_slide
   await runTool(powerPointConfigs, 'duplicate_slide', { sourceIndex: 0 }, r => {
     const s = safeString(r);
