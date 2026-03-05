@@ -1,10 +1,15 @@
 import React from 'react';
 import { Codicon } from '@/components/Codicon';
-import { Thread } from '@/components/assistant-ui/thread';
+import { MessageList } from '@/components/chat/MessageList';
 import { AgentPicker } from './AgentPicker';
 import { ModelPicker } from './ModelPicker';
+import type { ChatMessage } from '@/types';
 
 interface ChatPanelProps {
+  messages: ChatMessage[];
+  isRunning: boolean;
+  onSend: (text: string) => void | Promise<void>;
+  onCancel: () => void;
   onOpenPanel?: (panel: string) => void;
 }
 
@@ -23,10 +28,20 @@ const McpPill: React.FC<{ onOpenPanel?: (panel: string) => void }> = ({ onOpenPa
   );
 };
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ onOpenPanel }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+  messages,
+  isRunning,
+  onSend,
+  onCancel,
+  onOpenPanel,
+}) => {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <Thread
+      <MessageList
+        messages={messages}
+        isRunning={isRunning}
+        onSend={onSend}
+        onCancel={onCancel}
         leftToolbar={
           <>
             <AgentPicker onOpenPanel={onOpenPanel} />

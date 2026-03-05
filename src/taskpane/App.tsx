@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { AssistantRuntimeProvider } from '@assistant-ui/react';
 import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
@@ -12,7 +11,7 @@ import { SessionHistoryPanel } from '@/components/SessionHistoryDialog';
 import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
 import { useSettingsStore } from '@/stores';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
-import { ThinkingContext } from '@/contexts/ThinkingContext';
+import { ChatActionsContext } from '@/contexts/ChatActionsContext';
 import { detectOfficeHost } from '@/services/office/host';
 import type { OfficeHostApp } from '@/services/office/host';
 
@@ -90,7 +89,10 @@ const PANEL_TITLES: Record<string, { title: string; description?: string }> = {
 
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
   const {
-    runtime,
+    messages,
+    isRunning,
+    send,
+    cancel,
     sessionError,
     isConnecting,
     clearMessages,
@@ -103,7 +105,6 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
-    thinkingText,
   } = useOfficeChat(host);
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -118,70 +119,74 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     : '';
 
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <ThinkingContext.Provider value={thinkingText}>
-        <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
-          {/* Main chat view */}
-          <div
-            className={`flex h-full flex-col will-change-transform transition-transform duration-300 ease-in-out ${
-              activePanel ? '-translate-x-full' : 'translate-x-0'
-            }`}
-            aria-hidden={!!activePanel}
-            inert={activePanel ? ('' as unknown as boolean) : undefined}
-          >
-            <ChatHeader
-              host={host}
-              onClearMessages={clearMessages}
-              onCompactSession={() => void compactSession()}
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              onRestoreSession={restoreSession}
-              onDeleteSession={deleteSession}
+    <ChatActionsContext.Provider value={{ send }}>
+      <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+        {/* Main chat view */}
+        <div
+          className={`flex h-full flex-col will-change-transform transition-transform duration-300 ease-in-out ${
+            activePanel ? '-translate-x-full' : 'translate-x-0'
+          }`}
+          aria-hidden={!!activePanel}
+          inert={activePanel ? ('' as unknown as boolean) : undefined}
+        >
+          <ChatHeader
+            host={host}
+            onClearMessages={clearMessages}
+            onCompactSession={() => void compactSession()}
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onRestoreSession={restoreSession}
+            onDeleteSession={deleteSession}
+            onOpenPanel={setActivePanel}
+          />
+          {isConnecting && !sessionError && <ConnectingBanner />}
+          {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
+          {pendingPermission && (
+            <PermissionBanner
+              kind={pendingPermission.request.kind}
+              detail={permissionDetail}
+              onApprove={approvePermission}
+              onDeny={denyPermission}
+              onAlwaysAllow={allowPermissionAlways}
+            />
+          )}
+          <ChatErrorBoundary>
+            <ChatPanel
+              messages={messages}
+              isRunning={isRunning}
+              onSend={send}
+              onCancel={cancel}
               onOpenPanel={setActivePanel}
             />
-            {isConnecting && !sessionError && <ConnectingBanner />}
-            {sessionError && <SessionErrorBanner error={sessionError} onRetry={clearMessages} />}
-            {pendingPermission && (
-              <PermissionBanner
-                kind={pendingPermission.request.kind}
-                detail={permissionDetail}
-                onApprove={approvePermission}
-                onDeny={denyPermission}
-                onAlwaysAllow={allowPermissionAlways}
+          </ChatErrorBoundary>
+        </div>
+
+        {/* Slide panels */}
+        {Object.entries(PANEL_TITLES).map(([key, { title, description }]) => (
+          <SlidePanel
+            key={key}
+            open={activePanel === key}
+            onClose={closePanel}
+            title={title}
+            description={description}
+          >
+            {key === 'mcp' && <McpManagerPanel />}
+            {key === 'agents' && <AgentManagerPanel />}
+            {key === 'skills' && <SkillManagerPanel />}
+            {key === 'history' && (
+              <SessionHistoryPanel
+                host={host}
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                onRestoreSession={restoreSession}
+                onDeleteSession={deleteSession}
               />
             )}
-            <ChatErrorBoundary>
-              <ChatPanel onOpenPanel={setActivePanel} />
-            </ChatErrorBoundary>
-          </div>
-
-          {/* Slide panels */}
-          {Object.entries(PANEL_TITLES).map(([key, { title, description }]) => (
-            <SlidePanel
-              key={key}
-              open={activePanel === key}
-              onClose={closePanel}
-              title={title}
-              description={description}
-            >
-              {key === 'mcp' && <McpManagerPanel />}
-              {key === 'agents' && <AgentManagerPanel />}
-              {key === 'skills' && <SkillManagerPanel />}
-              {key === 'history' && (
-                <SessionHistoryPanel
-                  host={host}
-                  sessions={sessions}
-                  activeSessionId={activeSessionId}
-                  onRestoreSession={restoreSession}
-                  onDeleteSession={deleteSession}
-                />
-              )}
-              {key === 'permissions' && <PermissionManagerPanel />}
-            </SlidePanel>
-          ))}
-        </div>
-      </ThinkingContext.Provider>
-    </AssistantRuntimeProvider>
+            {key === 'permissions' && <PermissionManagerPanel />}
+          </SlidePanel>
+        ))}
+      </div>
+    </ChatActionsContext.Provider>
   );
 };
 

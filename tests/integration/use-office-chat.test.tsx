@@ -3,13 +3,12 @@
  *
  * Mocks createWebSocketClient to return a fake client/session so we can
  * simulate Copilot session events and verify the hook maps them correctly
- * to ThreadMessageLike[] for assistant-ui.
+ * to ChatMessage[] for the custom chat UI.
  */
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import type { AppendMessage } from '@assistant-ui/react';
 import type { SessionEvent } from '@github/copilot-sdk';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -82,16 +81,6 @@ function makeEvent<T extends SessionEvent['type']>(
 
 const IDLE_EVENT = makeEvent('session.idle', {});
 
-const APPEND_MSG = (text: string): AppendMessage => ({
-  parentId: null,
-  sourceId: null,
-  runConfig: undefined,
-  role: 'user',
-  content: [{ type: 'text', text }],
-  attachments: [],
-  metadata: { custom: {} },
-  createdAt: new Date(),
-});
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(React.Fragment, null, children);
@@ -119,7 +108,7 @@ describe('useOfficeChat', () => {
     });
 
     expect(result.current.sessionError).toBeNull();
-    expect(result.current.runtime).toBeTruthy();
+    expect(result.current.messages).toBeDefined();
   });
 
   it('adds user + assistant messages when onNew is called', async () => {
@@ -137,11 +126,11 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Say hello'));
+      void result.current.send('Say hello');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    const messages = result.current.runtime.thread.getState().messages;
+    const messages = result.current.messages;
     expect(messages).toHaveLength(2);
     expect(messages[0].role).toBe('user');
     expect(messages[1].role).toBe('assistant');
@@ -170,11 +159,11 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Say hello'));
+      void result.current.send('Say hello');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    const messages = result.current.runtime.thread.getState().messages;
+    const messages = result.current.messages;
     expect(messages.length).toBeGreaterThanOrEqual(2);
     const assistantContent = messages[1].content;
     const textPart = assistantContent.find(c => c.type === 'text');
@@ -210,11 +199,11 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Read A1:B2'));
+      void result.current.send('Read A1:B2');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    const messages = result.current.runtime.thread.getState().messages;
+    const messages = result.current.messages;
     const assistantContent = messages[1].content;
     // Text part must be present
     const textPart = assistantContent.find(c => c.type === 'text');
@@ -251,11 +240,11 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Get A1'));
+      void result.current.send('Get A1');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    const messages = result.current.runtime.thread.getState().messages;
+    const messages = result.current.messages;
     const assistantContent = messages[1].content;
     const toolPart = assistantContent.find(c => c.type === 'tool-call');
     expect(toolPart).toBeDefined();
@@ -309,12 +298,12 @@ describe('useOfficeChat', () => {
 
     // Send a message — the stream will pause after tool.execution_start
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Read'));
+      void result.current.send('Read');
       await new Promise(r => setTimeout(r, 50));
     });
 
     // thinkingText should stay as "Thinking…" (not change to tool name)
-    expect(result.current.thinkingText).toBe('Thinking…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Thinking…');
 
     // Release the stream to complete
     await act(async () => {
@@ -323,7 +312,7 @@ describe('useOfficeChat', () => {
     });
 
     // After completion, thinkingText should be cleared
-    expect(result.current.thinkingText).toBeNull();
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
   it('report_intent overrides tool name in thinkingText', async () => {
@@ -366,12 +355,12 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Read'));
+      void result.current.send('Read');
       await new Promise(r => setTimeout(r, 50));
     });
 
     // report_intent should surface the raw intent text
-    expect(result.current.thinkingText).toBe('Reading the spreadsheet');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Reading the spreadsheet');
 
     // Release the stream to complete
     await act(async () => {
@@ -379,7 +368,7 @@ describe('useOfficeChat', () => {
       await new Promise(r => setTimeout(r, 100));
     });
 
-    expect(result.current.thinkingText).toBeNull();
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
   it('shows Asking [AgentName] in thinkingText when subagent.started fires', async () => {
@@ -428,12 +417,12 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Do something'));
+      void result.current.send('Do something');
       await new Promise(r => setTimeout(r, 50));
     });
 
     // thinkingText should show the sub-agent display name
-    expect(result.current.thinkingText).toBe('Asking Specialist Agent…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Asking Specialist Agent…');
 
     // Release the stream to complete
     await act(async () => {
@@ -442,7 +431,7 @@ describe('useOfficeChat', () => {
     });
 
     // After completion, thinkingText should be cleared
-    expect(result.current.thinkingText).toBeNull();
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
   it('resets thinkingText to Thinking… when subagent.completed fires', async () => {
@@ -491,19 +480,19 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Do something'));
+      void result.current.send('Do something');
       await new Promise(r => setTimeout(r, 50));
     });
 
     // After subagent.completed, thinkingText should be reset to 'Thinking…'
-    expect(result.current.thinkingText).toBe('Thinking…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Thinking…');
 
     await act(async () => {
       resolveAfterCompleted!();
       await new Promise(r => setTimeout(r, 100));
     });
 
-    expect(result.current.thinkingText).toBeNull();
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
   it('resets thinkingText to Thinking… when subagent.failed fires', async () => {
@@ -553,19 +542,19 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Do something'));
+      void result.current.send('Do something');
       await new Promise(r => setTimeout(r, 50));
     });
 
     // After subagent.failed, thinkingText should be reset to 'Thinking…'
-    expect(result.current.thinkingText).toBe('Thinking…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Thinking…');
 
     await act(async () => {
       resolveAfterFailed!();
       await new Promise(r => setTimeout(r, 100));
     });
 
-    expect(result.current.thinkingText).toBeNull();
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
   it('sets session error when createWebSocketClient rejects', async () => {
@@ -623,11 +612,11 @@ describe('useOfficeChat', () => {
 
     // Session failed — now try to send a message
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Hello'));
+      void result.current.send('Hello');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    const messages = result.current.runtime.thread.getState().messages;
+    const messages = result.current.messages;
     expect(messages).toHaveLength(2);
     expect(messages[0].role).toBe('user');
     expect(messages[1].role).toBe('assistant');
@@ -674,18 +663,18 @@ describe('useOfficeChat', () => {
 
     // Send a message to populate messages
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Hi'));
+      void result.current.send('Hi');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    expect(result.current.runtime.thread.getState().messages.length).toBeGreaterThan(0);
+    expect(result.current.messages.length).toBeGreaterThan(0);
 
     await act(async () => {
       result.current.clearMessages();
       await new Promise(r => setTimeout(r, 100));
     });
 
-    expect(result.current.runtime.thread.getState().messages).toHaveLength(0);
+    expect(result.current.messages).toHaveLength(0);
     expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 
@@ -1038,12 +1027,12 @@ describe('useOfficeChat', () => {
 
     // Start the stream — pauses after tool.execution_complete
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Read'));
+      void result.current.send('Read');
       await new Promise(r => setTimeout(r, 100));
     });
 
     // Inspect intermediate message content
-    const messages = result.current.runtime.thread.getState().messages;
+    const messages = result.current.messages;
     const assistant = messages.find(m => m.role === 'assistant');
     expect(assistant).toBeDefined();
 
@@ -1051,12 +1040,8 @@ describe('useOfficeChat', () => {
     const toolParts = assistant!.content.filter(c => c.type === 'tool-call');
     expect(toolParts.length).toBeGreaterThanOrEqual(1);
 
-    // Must NOT have an empty text part — this is what caused the crash
-    const textParts = assistant!.content.filter(c => c.type === 'text');
-    for (const tp of textParts) {
-      expect((tp as { text: string }).text.trim().length).toBeGreaterThan(0);
-    }
-
+    // Tool parts are present; empty text parts are allowed in the new custom UI
+    // (components handle empty text gracefully by rendering null)
     // Release the stream
     await act(async () => {
       resolveStream();
@@ -1064,16 +1049,17 @@ describe('useOfficeChat', () => {
     });
 
     // After completion, text should be present
-    const finalMessages = result.current.runtime.thread.getState().messages;
+    const finalMessages = result.current.messages;
     const finalAssistant = finalMessages.find(m => m.role === 'assistant');
     const finalTextParts = finalAssistant!.content.filter(c => c.type === 'text');
     expect(finalTextParts).toHaveLength(1);
     expect((finalTextParts[0] as { text: string }).text).toBe('Got it.');
   });
 
-  it('initial assistant message has no empty text part (content starts as [])', async () => {
-    // Regression: initial assistant message had content: [{ type: 'text', text: '' }]
-    // which fromThreadMessageLike() would strip, causing crashes on first render.
+  it('initial assistant message starts with empty content (content: [])', async () => {
+    // When send() fires, the hook creates an assistant message immediately with
+    // content: [] before any stream events arrive. This avoids crashes from
+    // rendering empty text parts.
     let resolveStream!: () => void;
     const streamGate = new Promise<void>(r => {
       resolveStream = r;
@@ -1109,20 +1095,15 @@ describe('useOfficeChat', () => {
     });
 
     await act(async () => {
-      result.current.runtime.thread.append(APPEND_MSG('Hi'));
+      void result.current.send('Hi');
       await new Promise(r => setTimeout(r, 100));
     });
 
-    // The assistant message exists in running state
-    const messages = result.current.runtime.thread.getState().messages;
+    // The assistant message starts with empty content before stream events
+    const messages = result.current.messages;
     const assistant = messages.find(m => m.role === 'assistant');
     expect(assistant).toBeDefined();
-
-    // No empty text part should be in the content
-    const textParts = assistant!.content.filter(c => c.type === 'text');
-    for (const tp of textParts) {
-      expect((tp as { text: string }).text.trim().length).toBeGreaterThan(0);
-    }
+    expect(assistant!.content).toHaveLength(0);
 
     await act(async () => {
       resolveStream();
