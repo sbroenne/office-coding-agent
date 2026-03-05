@@ -716,7 +716,7 @@ describe('useOfficeChat', () => {
     });
   });
 
-  it('does not pass mcpServers when no MCP servers are imported', async () => {
+  it('includes bundled MCP servers by default (even with no imported servers)', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -728,7 +728,8 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    expect(config.mcpServers).toBeUndefined();
+    // Bundled servers (e.g. WorkIQ) are included by default
+    expect(config.mcpServers).toBeDefined();
   });
 
   it('does not pass mcpServers when all servers are toggled off', async () => {
