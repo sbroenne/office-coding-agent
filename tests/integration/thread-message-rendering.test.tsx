@@ -190,9 +190,8 @@ describe('Thread – AssistantMessage rendering', () => {
     // text or reasoning message parts".
     //
     // When a response ends with a tool-call part and has no text part,
-    // @assistant-ui's EmptyPartFallback was previously rendered, which called
-    // useMessagePartText() in the wrong context and threw.
-    // The fix: Empty: () => null + unstable_showEmptyOnNonTextEnd={false}.
+    // rendering the message must handle the empty text section gracefully
+    // without throwing.
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
