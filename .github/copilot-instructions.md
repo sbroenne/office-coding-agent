@@ -55,7 +55,7 @@ Every UI element, interaction, and visual detail must match what a user sees in 
 
 ## Key Technologies
 
-- **React 18** + **assistant-ui** + **Radix UI** + **Tailwind CSS v4** — task pane UI (Thread, ToolFallback, Popovers); **VS Code design system** via `vscode-theme.css` (`--vscode-*` CSS custom properties) and **codicons** (`@vscode/codicons`) for all icons
+- **React 18** + **Radix UI** + **Tailwind CSS v4** — task pane UI (MessageList, ChatComposer, AssistantMessage, UserMessage, MarkdownContent, ToolProgress, ActionBar); **VS Code design system** via `vscode-theme.css` (`--vscode-*` CSS custom properties) and **codicons** (`@vscode/codicons`) for all icons
 - **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
 - **WebSocket + JSON-RPC** — browser-to-proxy transport (`src/lib/websocket-client.ts`, `src/lib/websocket-transport.ts`)
 - **Express + HTTPS** — local proxy server (`src/server.mjs`) that bridges WebSocket to the Copilot CLI
@@ -71,14 +71,14 @@ Every UI element, interaction, and visual detail must match what a user sees in 
 The add-in routes messages through a **local proxy server** — the browser cannot call the Copilot API directly.
 
 ```
-Browser task pane (React + assistant-ui)
+Browser task pane (React)
          ↓ WebSocket (wss://localhost:3000/api/copilot)
 Node.js proxy server  (src/server.mjs + src/copilotProxy.mjs)
          ↓ @github/copilot-sdk (manages CLI lifecycle internally)
 GitHub Copilot API
 ```
 
-The `useOfficeChat` hook creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, and maps incoming `SessionEvent` objects to `ThreadMessage[]` for assistant-ui via `useExternalStoreRuntime`.
+The `useOfficeChat` hook creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, and maps incoming `SessionEvent` objects to `ChatMessage[]` state with per-message `thinkingText` fields.
 
 ### Agent System
 
@@ -161,7 +161,7 @@ Bundled skill files in `src/skills/` provide additional context injected into th
 The task pane is split into three areas:
 
 - **ChatHeader** — "AI Chat" title + SkillPicker (icon-only with badge) + New Conversation button + Settings gear (SettingsDialog)
-- **ChatPanel** — message list (Thread), Copilot-style progress indicators, choice cards, error bar, Composer, and an **input toolbar** below the input box with AgentPicker + ModelPicker (GitHub Copilot-style)
+- **ChatPanel** — message list (MessageList), Copilot-style progress indicators, choice cards, error bar, ChatComposer, and an **input toolbar** below the input box with AgentPicker + ModelPicker (GitHub Copilot-style)
 - **App** — owns settings dialog state, detects system theme and Office host; no setup wizard (Copilot CLI handles auth)
 
 ## Testing Strategy
@@ -303,11 +303,11 @@ The task pane is split into three areas:
 
 ### UX Patterns
 
-- **Dynamic thinking indicator** — `ThinkingIndicator` in `thread.tsx` displays dynamic text during tool execution. Text sources: (1) `report_intent` SDK events set the raw intent string (e.g. "Reading the spreadsheet"); (2) every `tool.execution_start` sets the humanized tool name via `humanizeToolName()` (e.g. "Get range values…"). When no text is set, falls back to "Thinking…". Text is provided via `ThinkingContext` (`src/contexts/ThinkingContext.ts`), populated by `useOfficeChat`, and cleared on stream completion.
+- **Dynamic thinking indicator** — `ThinkingIndicator` component displays dynamic text during tool execution. Text sources: (1) `report_intent` SDK events set the raw intent string (e.g. "Reading the spreadsheet"); (2) every `tool.execution_start` sets the humanized tool name via `humanizeToolName()` (e.g. "Get range values…"). When no text is set, falls back to "Thinking…". Text is stored per-message via the `thinkingText` field on `ChatMessage`, and cleared on stream completion.
 - **Copilot-style progress indicators** — VS Code shimmer effect (`chat-thinking-shimmer` CSS animation using `background-clip: text` gradient animation matching VS Code Copilot Chat) + phase labels (auto-derived via `humanizeToolName()`)
 - **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners
-- **Input toolbar** — AgentPicker + ModelPicker below Composer (GitHub Copilot-style)
+- **Input toolbar** — AgentPicker + ModelPicker below ChatComposer (GitHub Copilot-style)
 
 ### Styling
 
@@ -339,16 +339,22 @@ npm run validate          # Validate manifests/manifest.dev.xml
 
 ## Key Files
 
-- `src/taskpane/App.tsx` — root component, settings dialog state, theme detection, Office host detection, `ThinkingContext` provider
-- `src/hooks/useOfficeChat.ts` — main hook: WebSocket session lifecycle → `useExternalStoreRuntime`, `report_intent` → `thinkingText`
-- `src/contexts/ThinkingContext.ts` — React context for dynamic thinking indicator text (populated from `report_intent`)
+- `src/taskpane/App.tsx` — root component, settings dialog state, theme detection, Office host detection
+- `src/hooks/useOfficeChat.ts` — main hook: WebSocket session lifecycle → `ChatMessage[]` state, `report_intent` → per-message `thinkingText`
 - `src/lib/websocket-client.ts` — `WebSocketCopilotClient`, `BrowserCopilotSession`, `createWebSocketClient`
 - `src/lib/websocket-transport.ts` — JSON-RPC WebSocket transport (browser-compatible)
 - `src/server.mjs` — Express HTTPS server (port 3000): Vite dev middleware + Copilot WebSocket proxy
 - `src/copilotProxy.mjs` — bridges WebSocket to `@github/copilot-sdk` CopilotClient
 - `src/components/ChatHeader.tsx` — header: title, SkillPicker, new convo, Settings
-- `src/components/ChatPanel.tsx` — messages, progress, input, AgentPicker, ModelPicker
+- `src/components/ChatPanel.tsx` — messages (MessageList), progress, input (ChatComposer), AgentPicker, ModelPicker
 - `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI
+- `src/components/chat/MessageList.tsx` — renders `ChatMessage[]` as AssistantMessage, UserMessage, or ToolProgress components
+- `src/components/chat/ChatComposer.tsx` — text input for user messages
+- `src/components/chat/AssistantMessage.tsx` — assistant message with MarkdownContent + ToolGroup
+- `src/components/chat/UserMessage.tsx` — user message display
+- `src/components/chat/MarkdownContent.tsx` — renders Markdown with syntax highlighting
+- `src/components/chat/ToolProgress.tsx` — tool execution progress and results
+- `src/components/chat/ActionBar.tsx` — action buttons (copy, retry, etc.)
 - `src/components/AgentPicker.tsx` — single-select agent dropdown (Radix Popover)
 - `src/components/ModelPicker.tsx` — model selection dropdown (dynamic, fetched from Copilot API)
 - `src/components/SkillPicker.tsx` — icon-only skill toggle with badge count
@@ -365,11 +371,10 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
 - `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
 - `src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers` tools
-- `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`
+- `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`, `ChatMessage` (stores `thinkingText` per message)
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
 - `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
 - `src/styles/vscode-theme.css` — VS Code design tokens (`--vscode-*` CSS custom properties for dark/light themes)
 - `taskpane.html` — Vite HTML entry point (root level, references `src/taskpane/index.tsx`)
-- `vitest.config.ts` — unit test config (jsdom, `@/` alias, setup file, globals)
 - `vitest.config.ts` — unified vitest config with two named projects: `unit` (30s) and `integration` (60s, live Copilot tests)
 - `tests/setup.ts` — `OfficeRuntime.storage` mock + polyfills (ResizeObserver, matchMedia, etc.)
