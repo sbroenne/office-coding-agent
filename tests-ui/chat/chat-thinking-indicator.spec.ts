@@ -18,17 +18,15 @@ test.describe('Thinking indicator (live Copilot)', () => {
     const composer = page.getByPlaceholder('Send a message...');
     await expect(composer).toBeVisible({ timeout: 5000 });
 
-    // Wait for the WebSocket session to be established before sending.
-    // The app shows "Connecting to Copilot..." during handshake; we wait for
-    // it to disappear so that sessionRef.current is populated.
     await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
     // Capture all thinking indicator text values via MutationObserver
+    // Now the indicator is .progress-container.shimmer-progress inside the assistant message
     await page.evaluate(() => {
       (window as unknown as Record<string, string[]>).__thinkingTexts = [];
       const observer = new MutationObserver(() => {
-        const el = document.querySelector('.aui-assistant-thinking-indicator span');
+        const el = document.querySelector('.progress-container.shimmer-progress .progress-step');
         if (el?.textContent) {
           const texts = (window as unknown as Record<string, string[]>).__thinkingTexts;
           const last = texts[texts.length - 1];
@@ -96,7 +94,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     }
   });
 
-  test('thinking indicator renders inline in message stream, not inside the sticky footer', async ({
+  test('thinking indicator renders inline in assistant message, not inside the sticky footer', async ({
     configuredTaskpane: page,
   }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
@@ -111,8 +109,8 @@ test.describe('Thinking indicator (live Copilot)', () => {
     );
     await composer.press('Enter');
 
-    // Wait for the thinking indicator to appear
-    const indicator = page.locator('.aui-assistant-thinking-indicator');
+    // Wait for the shimmer progress indicator to appear inside the assistant message
+    const indicator = page.locator('.progress-container.shimmer-progress');
     await expect(indicator).toBeVisible({ timeout: AI_TIMEOUT });
 
     // The indicator must NOT be a descendant of the viewport footer
@@ -133,7 +131,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
 
     // Geometric guard: indicator must render above the composer area
     const isAboveComposer = await page.evaluate(() => {
-      const indicatorEl = document.querySelector('.aui-assistant-thinking-indicator');
+      const indicatorEl = document.querySelector('.progress-container.shimmer-progress');
       const composerEl = document.querySelector('.aui-composer-root');
       if (!indicatorEl || !composerEl) return false;
       const indicatorRect = indicatorEl.getBoundingClientRect();
@@ -142,10 +140,10 @@ test.describe('Thinking indicator (live Copilot)', () => {
     });
     expect(isAboveComposer).toBe(true);
 
-    // The indicator must appear BELOW the last message in DOM order
+    // The indicator must appear BELOW the last user message in DOM order
     const isAfterMessages = await page.evaluate(() => {
       const messages = document.querySelector('[data-role="user"]');
-      const ind = document.querySelector('.aui-assistant-thinking-indicator');
+      const ind = document.querySelector('.progress-container.shimmer-progress');
       if (!messages || !ind) return false;
       return !!(messages.compareDocumentPosition(ind) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
@@ -156,7 +154,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
       timeout: AI_TIMEOUT,
     });
 
-    // After completion, indicator must be gone
+    // After completion, shimmer indicator must be gone
     await expect(indicator).not.toBeVisible();
   });
 });

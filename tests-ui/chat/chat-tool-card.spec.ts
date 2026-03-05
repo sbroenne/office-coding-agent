@@ -69,8 +69,8 @@ test.describe('Tool card UX (live Copilot)', () => {
     const card = await waitForCompletedToolCard(page);
     const trigger = card.locator('[data-slot="tool-fallback-trigger"]');
 
-    // A non-empty summary span should appear between the name and the chevron
-    const summary = trigger.locator('span.text-muted-foreground');
+    // A non-empty summary span should appear (VS Code progress-summary class)
+    const summary = trigger.locator('.progress-summary');
     await expect(summary).toBeVisible({ timeout: 5_000 });
     const text = await summary.textContent();
     expect(text?.trim().length).toBeGreaterThan(0);
@@ -83,16 +83,14 @@ test.describe('Tool card UX (live Copilot)', () => {
 
     const card = await waitForCompletedToolCard(page);
 
-    // Open the card
+    // Open the card by clicking the progress line
     await card.locator('[data-slot="tool-fallback-trigger"]').click();
 
-    const args = card.locator('[data-slot="tool-fallback-args"]');
-    await expect(args).toBeVisible({ timeout: 3_000 });
+    const details = card.locator('.tool-details-expanded');
+    await expect(details).toBeVisible({ timeout: 3_000 });
 
     // Must have "Input" as section header
-    await expect(args).toContainText('Input');
-    // Must NOT use old "Result:" naming
-    await expect(args).not.toContainText('Result:');
+    await expect(details).toContainText('Input');
   });
 
   test('expanded card shows "Output" header (not "Result:" old label)', async ({
@@ -105,13 +103,13 @@ test.describe('Tool card UX (live Copilot)', () => {
     // Open the card
     await card.locator('[data-slot="tool-fallback-trigger"]').click();
 
-    const result = card.locator('[data-slot="tool-fallback-result"]');
-    await expect(result).toBeVisible({ timeout: 3_000 });
+    const details = card.locator('.tool-details-expanded');
+    await expect(details).toBeVisible({ timeout: 3_000 });
 
     // Must use the new "Output" header
-    await expect(result).toContainText('Output');
+    await expect(details).toContainText('Output');
     // Must NOT use old "Result:" naming
-    await expect(result).not.toContainText('Result:');
+    await expect(details).not.toContainText('Result:');
   });
 
   test('report_intent does not produce a tool card in the thread', async ({
