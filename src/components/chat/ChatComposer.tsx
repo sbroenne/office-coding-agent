@@ -127,6 +127,9 @@ export const ChatComposer: FC<ChatComposerProps> = ({
     [handleSend, handleEnqueue, navigateHistory]
   );
 
+  // Dynamic placeholder: hint at queue shortcut when agent is running
+  const activePlaceholder = isRunning ? 'Type here, Ctrl+Shift+Q to queue...' : placeholder;
+
   return (
     <div className="aui-composer-root relative flex w-full flex-col rounded-[var(--vscode-cornerRadius-large)] border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] overflow-hidden outline-none transition-colors focus-within:border-[var(--vscode-focusBorder)]">
       <textarea
@@ -134,7 +137,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
+        placeholder={activePlaceholder}
         rows={1}
         autoFocus={autoFocus}
         aria-label="Message input"
@@ -166,6 +169,27 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         </div>
         <div className="flex items-center gap-0.5">
           {rightToolbar}
+
+          {/* Shortcut hint — shown when running, no text, and no queued items */}
+          {isRunning && !text.trim() && queuedCount === 0 && (
+            <span
+              className="text-[11px] px-1"
+              style={{ color: 'var(--vscode-descriptionForeground)' }}
+            >
+              <kbd
+                className="rounded px-1 py-0.5 text-[10px]"
+                style={{
+                  background: 'var(--vscode-keybindingLabel-background)',
+                  border:
+                    '1px solid var(--vscode-keybindingLabel-border, var(--vscode-widget-border))',
+                  color: 'var(--vscode-keybindingLabel-foreground)',
+                }}
+              >
+                Ctrl+Shift+Q
+              </kbd>{' '}
+              to queue
+            </span>
+          )}
 
           {/* Enqueue button — shown when running and text is entered */}
           {isRunning && text.trim() && onEnqueue && (
