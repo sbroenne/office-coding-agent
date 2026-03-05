@@ -1,4 +1,4 @@
-import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type FC, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { UserMessage } from './UserMessage';
@@ -119,6 +119,8 @@ interface MessageListProps {
   isRunning: boolean;
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
+  onEnqueue?: (text: string) => void;
+  queuedCount?: number;
   onEdit?: (messageId: string, newText: string) => void;
   onRegenerate?: (messageId: string) => void;
   onFeedback?: (messageId: string, kind: 'positive' | 'negative') => void;
@@ -131,6 +133,8 @@ export const MessageList: FC<MessageListProps> = ({
   isRunning,
   onSend,
   onCancel,
+  onEnqueue,
+  queuedCount,
   onEdit,
   onRegenerate,
   onFeedback,
@@ -176,6 +180,20 @@ export const MessageList: FC<MessageListProps> = ({
 
   const isEmpty = messages.length === 0;
 
+  // Extract user message texts in reverse chronological order for Up/Down history
+  const userHistory = useMemo(
+    () =>
+      messages
+        .filter(m => m.role === 'user')
+        .map(m => {
+          const textPart = m.content.find(p => p.type === 'text');
+          return textPart?.type === 'text' ? textPart.text : '';
+        })
+        .filter(Boolean)
+        .reverse(),
+    [messages]
+  );
+
   return (
     <div className="aui-root aui-thread-root flex flex-1 min-h-0 flex-col bg-background">
       <div
@@ -210,7 +228,10 @@ export const MessageList: FC<MessageListProps> = ({
           <ChatComposer
             onSend={onSend}
             onCancel={onCancel}
+            onEnqueue={onEnqueue}
             isRunning={isRunning}
+            queuedCount={queuedCount}
+            history={userHistory}
             leftToolbar={leftToolbar}
             rightToolbar={rightToolbar}
           />
