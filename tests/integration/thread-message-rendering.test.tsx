@@ -295,13 +295,13 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 200));
     });
 
-    // After the stream completes, the thinking indicator should be gone
+    // After the stream completes, the shimmer thinking progress should be gone
     await waitFor(() => {
-      expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+      expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
     });
   });
 
-  it('thinking indicator is rendered at the thread level, not inside individual messages', async () => {
+  it('thinking indicator is rendered inside the assistant message, not at thread level', async () => {
     const session = makeFakeSession([
       makeEvent('assistant.message', { messageId: 'msg1', content: 'Done' }),
       IDLE_EVENT,
@@ -323,9 +323,11 @@ describe('Thread – AssistantMessage rendering', () => {
       expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
     });
 
-    // The thinking indicator should NOT be inside any assistant message
+    // The thinking indicator is now rendered INSIDE the assistant message (as InlineWorkingProgress)
+    // After completion, it should not be visible
     const assistantMsg = document.querySelector('[data-role="assistant"]');
-    const indicatorInsideMsg = assistantMsg?.querySelector('.aui-assistant-thinking-indicator');
+    const indicatorInsideMsg = assistantMsg?.querySelector('.inline-working-progress');
+    // After completion (text arrived), the shimmer progress should be gone
     expect(indicatorInsideMsg).toBeNull();
   });
 
@@ -508,10 +510,18 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 150));
     });
 
-    // The thinking indicator should show "Thinking…" (not the tool name)
-    const indicator = document.querySelector('.aui-assistant-thinking-indicator');
-    expect(indicator).toBeInTheDocument();
-    expect(indicator!.textContent).toContain('Thinking…');
+    // The shimmer progress hides once a tool card appears (VS Code behavior)
+    // Tool cards handle their own shimmer on the tool name while running
+    const indicator = document.querySelector('.inline-working-progress');
+    const toolCard = document.querySelector('[data-slot="tool-fallback-root"]');
+
+    // Either: shimmer is gone (tool card appeared) or shimmer is visible (tool hasn't rendered yet)
+    // Once the tool card is in the DOM, shimmer must be gone
+    if (toolCard) {
+      expect(indicator).not.toBeInTheDocument();
+    }
+    // At minimum, a tool card should exist since tool.execution_start was emitted
+    expect(toolCard).toBeInTheDocument();
 
     // Release and finish
     await act(async () => {
@@ -520,7 +530,7 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     // Indicator should be gone after completion
-    expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
   });
 
   it('thinking indicator shows report_intent text in the rendered DOM', async () => {
@@ -565,8 +575,8 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 150));
     });
 
-    // The thinking indicator should show the intent text, not "Thinking…"
-    const indicator = document.querySelector('.aui-assistant-thinking-indicator');
+    // The thinking indicator should show the intent text inside the assistant message
+    const indicator = document.querySelector('.inline-working-progress');
     expect(indicator).toBeInTheDocument();
     expect(indicator!.textContent).toContain('Analyzing your data');
 
@@ -575,7 +585,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 200));
     });
 
-    expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
   });
 });
 
@@ -622,12 +632,12 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       expect(screen.getByText('Got it.')).toBeInTheDocument();
     });
 
-    // Tool card must be inside a .aui-tool-group wrapper
-    const toolGroup = document.querySelector('.aui-tool-group');
+    // Tool card must be inside a .chat-tool-single wrapper (single tool, no Working box)
+    const toolGroup = document.querySelector('.chat-tool-single');
     expect(toolGroup).toBeInTheDocument();
     expect(toolGroup!.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
 
-    // The ToolGroup wrapper must have order: -1 for CSS visual reordering
+    // The wrapper must have order: -1 for CSS visual reordering
     expect((toolGroup as HTMLElement).style.order).toBe('-1');
   });
 
@@ -690,14 +700,14 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       expect(screen.getByText('Updated B1.')).toBeInTheDocument();
     });
 
-    // Verify both text and ToolGroup exist inside message content
+    // Verify both text and tool wrapper exist inside message content
     const content = document.querySelector('.aui-assistant-message-content');
-    const toolGroup = content!.querySelector('.aui-tool-group');
+    const toolGroup = content!.querySelector('.chat-tool-single');
     const toolCard = toolGroup!.querySelector('[data-slot="tool-fallback-root"]');
     expect(toolGroup).toBeInTheDocument();
     expect(toolCard).toBeInTheDocument();
 
-    // ToolGroup has order: -1 → visually above text (order: 0 default)
+    // Tool wrapper has order: -1 → visually above text (order: 0 default)
     expect((toolGroup as HTMLElement).style.order).toBe('-1');
   });
 
@@ -743,7 +753,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       expect(screen.getByText('Both done.')).toBeInTheDocument();
     });
 
-    const toolGroups = document.querySelectorAll('.aui-tool-group');
+    const toolGroups = document.querySelectorAll('.chat-thinking-box');
     expect(toolGroups).toHaveLength(1);
 
     const toolCards = toolGroups[0]!.querySelectorAll('[data-slot="tool-fallback-root"]');
@@ -1000,7 +1010,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     });
 
     // Tool cards must still be visible after completion
-    const toolGroup = document.querySelector('.aui-tool-group');
+    const toolGroup = document.querySelector('.chat-tool-single');
     expect(toolGroup).toBeInTheDocument();
 
     const toolCard = toolGroup!.querySelector('[data-slot="tool-fallback-root"]');
@@ -1010,8 +1020,8 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     const checkIcon = toolCard!.querySelector('.codicon-check');
     expect(checkIcon).toBeInTheDocument();
 
-    // Thinking indicator must be gone
-    expect(document.querySelector('.aui-assistant-thinking-indicator')).not.toBeInTheDocument();
+    // Thinking indicator must be gone (no longer has old class — inline working progress hides when complete)
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
   });
 });
 
@@ -1056,9 +1066,9 @@ describe('ChoiceCards', () => {
     expect(screen.getByText('Excel')).toBeInTheDocument();
     expect(screen.getByText('PDF')).toBeInTheDocument();
 
-    // Number badges 1, 2, 3 are present
+    // Number badges 1, 2, 3 are present (now using VS Code carousel class names)
     const wrapper = document.querySelector('.aui-choices-wrapper')!;
-    const badges = wrapper.querySelectorAll('span.text-right');
+    const badges = wrapper.querySelectorAll('.chat-question-list-number');
     expect(badges[0]?.textContent?.trim()).toBe('1');
     expect(badges[1]?.textContent?.trim()).toBe('2');
     expect(badges[2]?.textContent?.trim()).toBe('3');
@@ -1069,8 +1079,8 @@ describe('ChoiceCards', () => {
     expect(textarea?.placeholder).toBe('Enter custom answer');
 
     // Freeform row is numbered n+1 (4)
-    const allBadges = wrapper.querySelectorAll('span.text-right');
-    expect(allBadges[3]?.textContent?.trim()).toBe('4');
+    const freeformNumber = wrapper.querySelector('.chat-question-freeform-number');
+    expect(freeformNumber?.textContent?.trim()).toBe('4');
   });
 
   it('clicking a choice appends the label as a user message', async () => {
