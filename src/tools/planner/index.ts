@@ -92,3 +92,28 @@ export function extractPlanFromEvents(
   }
   return null;
 }
+
+/**
+ * Last-resort: parse a JSON slide plan from the planner's text output.
+ * The model sometimes outputs the plan as a JSON code block instead of calling the tool.
+ */
+export function parsePlanFromText(text: string): DeckPlan | null {
+  // Try to find JSON in a code block first
+  const codeBlockMatch = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/.exec(text);
+  const candidates = codeBlockMatch ? [codeBlockMatch[1]] : [];
+
+  // Also try the entire text as JSON (model may output raw JSON)
+  candidates.push(text.trim());
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as Record<string, unknown>;
+      if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+        return parsed as unknown as DeckPlan;
+      }
+    } catch {
+      // Not valid JSON — continue
+    }
+  }
+  return null;
+}
