@@ -8,7 +8,12 @@
 import type { WebSocketCopilotClient } from '@/lib/websocket-client';
 import type { SessionEvent } from '@github/copilot-sdk';
 import { runSubSession } from '@/lib/session-factory';
-import { submitPlanTool, getLastPlan } from '@/tools/planner';
+import {
+  submitPlanTool,
+  getLastPlan,
+  extractPlanFromEvents,
+  parsePlanFromText,
+} from '@/tools/planner';
 import type { DeckPlan, SlidePlan } from '@/tools/planner';
 import { getToolsForHost } from '@/tools';
 import plannerPromptRaw from '@/services/ai/prompts/PLANNER_PROMPT.md?raw';
@@ -41,12 +46,15 @@ export interface DeckOrchestratorCallbacks {
  * Build the worker prompt for a batch of slides.
  */
 function buildWorkerPrompt(slides: SlidePlan[], totalSlides: number): string {
-  const tasks = slides.map(slide =>
-    `### Slide ${String(slide.index + 1)} of ${String(totalSlides)}
+  const tasks = slides
+    .map(
+      slide =>
+        `### Slide ${String(slide.index + 1)} of ${String(totalSlides)}
 - **Title**: ${slide.title}
 - **Layout**: ${slide.layout}
 - **Content**: ${slide.content}`
-  ).join('\n\n');
+    )
+    .join('\n\n');
 
   return `${workerPromptRaw}
 
@@ -77,12 +85,14 @@ export async function orchestrateDeck(
   userPrompt: string,
   callbacks: DeckOrchestratorCallbacks,
   signal?: AbortSignal,
-  mode: DeckMode = 'fast',
+  mode: DeckMode = 'fast'
 ): Promise<void> {
   // fast = all slides in one session, deep = 1 slide per session
   const BATCH_SIZE = mode === 'deep' ? 1 : Infinity;
   // --- Phase 1: Planner ---
-  callbacks.onText(`📋 Erstelle Plan… (${mode === 'deep' ? 'Deep — 1 Slide/Worker' : 'Fast — alle Slides in 1 Session'})\n`);
+  callbacks.onText(
+    `📋 Erstelle Plan… (${mode === 'deep' ? 'Deep — 1 Slide/Worker' : 'Fast — alle Slides in 1 Session'})\n`
+  );
 
   const plannerResult = await runSubSession(
     client,
@@ -92,11 +102,11 @@ export async function orchestrateDeck(
       tools: [submitPlanTool],
     },
     userPrompt,
-    (event) => {
+    event => {
       if (event.type === 'assistant.message_delta') {
         callbacks.onText(event.data.deltaContent);
       }
-    },
+    }
   );
 
   if (!plannerResult.success) {
@@ -104,10 +114,24 @@ export async function orchestrateDeck(
     return;
   }
 
-  // Get plan captured by the submit_plan tool handler
-  const plan = getLastPlan();
+  // Get plan: try handler capture → event extraction → text parsing (in order)
+  let plan =
+    getLastPlan() ??
+    extractPlanFromEvents(
+      plannerResult.events as { type: string; data: Record<string, unknown> }[]
+    );
 
   if (!plan || plan.slides.length === 0) {
+    // Last resort: try to parse a JSON plan from the streamed text
+    plan = parsePlanFromText(plannerResult.text);
+  }
+
+  if (!plan || plan.slides.length === 0) {
+    console.error(
+      '[deck-orchestrator] No plan found. Events:',
+      plannerResult.events.map(e => e.type)
+    );
+    console.error('[deck-orchestrator] Planner text output:', plannerResult.text.slice(0, 500));
     callbacks.onError('Planner did not produce a valid slide plan.');
     return;
   }
@@ -141,20 +165,20 @@ export async function orchestrateDeck(
     callbacks.onText(`\n🔄 Slides ${batchLabel}/${String(plan.slides.length)}…\n`);
 
     const workerPrompt = buildWorkerPrompt(batchSlides, plan.slides.length);
-    const userMsg = batchSlides.map(s =>
-      `Slide ${String(s.index + 1)}: "${s.title}" — Layout: ${s.layout}. ${s.content}`
-    ).join('\n');
+    const userMsg = batchSlides
+      .map(s => `Slide ${String(s.index + 1)}: "${s.title}" — Layout: ${s.layout}. ${s.content}`)
+      .join('\n');
 
     const workerResult = await runSubSession(
       client,
       { model, systemPrompt: workerPrompt, tools: pptTools },
       userMsg,
-      (event) => {
+      event => {
         callbacks.onWorkerEvent?.(batchStart, event);
         if (event.type === 'assistant.message_delta') {
           callbacks.onText(event.data.deltaContent);
         }
-      },
+      }
     );
 
     // Mark batch results
@@ -167,7 +191,9 @@ export async function orchestrateDeck(
     if (workerResult.success) {
       callbacks.onText(`\n✅ Slides ${batchLabel} fertig\n`);
     } else {
-      callbacks.onText(`\n❌ Slides ${batchLabel} fehlgeschlagen: ${workerResult.error ?? 'unknown'}\n`);
+      callbacks.onText(
+        `\n❌ Slides ${batchLabel} fehlgeschlagen: ${workerResult.error ?? 'unknown'}\n`
+      );
     }
   }
 
