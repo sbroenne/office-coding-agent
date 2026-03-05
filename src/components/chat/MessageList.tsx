@@ -144,7 +144,14 @@ export const MessageList: FC<MessageListProps> = ({
   const userScrolledUp = useRef(false);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    bottomRef.current?.scrollIntoView({ behavior, block: 'end' });
+    const el = viewportRef.current;
+    if (el) {
+      if (behavior === 'instant') {
+        el.scrollTop = el.scrollHeight;
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior });
+      }
+    }
     userScrolledUp.current = false;
     setShowScrollToBottom(false);
   }, []);
@@ -152,7 +159,8 @@ export const MessageList: FC<MessageListProps> = ({
   // Auto-scroll when messages change, unless user has scrolled up
   useEffect(() => {
     if (!userScrolledUp.current) {
-      scrollToBottom('smooth');
+      // Use instant scroll on mount/restore, smooth on subsequent updates
+      scrollToBottom('instant');
     }
   }, [messages, scrollToBottom]);
 

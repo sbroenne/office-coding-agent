@@ -42,6 +42,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         isRunning={isRunning}
         onSend={onSend}
         onCancel={onCancel}
+        onFeedback={() => {/* TODO */}}
+        onRegenerate={() => {/* TODO */}}
         leftToolbar={
           <>
             <AgentPicker onOpenPanel={onOpenPanel} />
