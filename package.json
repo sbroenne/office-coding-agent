@@ -1,6 +1,6 @@
 {
   "name": "office-coding-agent",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "main": "src/tray/main.cjs",
   "description": "Office coding agent add-in with host-routed AI chat",
