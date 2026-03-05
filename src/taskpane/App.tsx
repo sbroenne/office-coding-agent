@@ -105,6 +105,8 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    enqueue,
+    queuedPrompts,
   } = useOfficeChat(host);
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -119,7 +121,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     : '';
 
   return (
-    <ChatActionsContext.Provider value={{ send }}>
+    <ChatActionsContext.Provider value={{ send, enqueue }}>
       <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
         {/* Main chat view */}
         <div
@@ -156,6 +158,8 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               isRunning={isRunning}
               onSend={send}
               onCancel={cancel}
+              onEnqueue={enqueue}
+              queuedCount={queuedPrompts.length}
               onOpenPanel={setActivePanel}
             />
           </ChatErrorBoundary>

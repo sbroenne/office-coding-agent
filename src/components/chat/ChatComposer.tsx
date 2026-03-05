@@ -5,7 +5,11 @@ import { cn } from '@/lib/utils';
 interface ChatComposerProps {
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
+  onEnqueue?: (text: string) => void;
   isRunning: boolean;
+  queuedCount?: number;
+  /** Previous user messages for Up/Down arrow history navigation. */
+  history?: string[];
   placeholder?: string;
   leftToolbar?: ReactNode;
   rightToolbar?: ReactNode;
@@ -15,7 +19,10 @@ interface ChatComposerProps {
 export const ChatComposer: FC<ChatComposerProps> = ({
   onSend,
   onCancel,
+  onEnqueue,
   isRunning,
+  queuedCount = 0,
+  history = [],
   placeholder = 'Send a message...',
   leftToolbar,
   rightToolbar,
@@ -23,6 +30,11 @@ export const ChatComposer: FC<ChatComposerProps> = ({
 }) => {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // History navigation state: -1 = composing new text, 0 = most recent, etc.
+  const historyIndexRef = useRef(-1);
+  // Stash the in-progress draft when the user starts navigating history
+  const draftRef = useRef('');
 
   // Auto-resize textarea as content changes
   useEffect(() => {
@@ -36,17 +48,83 @@ export const ChatComposer: FC<ChatComposerProps> = ({
     const trimmed = text.trim();
     if (!trimmed) return;
     setText('');
+    historyIndexRef.current = -1;
+    draftRef.current = '';
     void onSend(trimmed);
   }, [text, onSend]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
+  const handleEnqueue = useCallback(() => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (!isRunning) {
+      setText('');
+      historyIndexRef.current = -1;
+      draftRef.current = '';
+      void onSend(trimmed);
+      return;
+    }
+    setText('');
+    historyIndexRef.current = -1;
+    draftRef.current = '';
+    onEnqueue?.(trimmed);
+  }, [text, isRunning, onSend, onEnqueue]);
+
+  /** Navigate through history (reversed: index 0 = most recent). */
+  const navigateHistory = useCallback(
+    (direction: 'up' | 'down') => {
+      if (history.length === 0) return;
+
+      const idx = historyIndexRef.current;
+
+      if (direction === 'up') {
+        if (idx === -1) {
+          // Save current draft before navigating
+          draftRef.current = text;
+        }
+        const nextIdx = Math.min(idx + 1, history.length - 1);
+        if (nextIdx === idx && idx !== -1) return; // already at oldest
+        historyIndexRef.current = nextIdx;
+        setText(history[nextIdx]);
+      } else {
+        // down
+        if (idx <= -1) return; // already at draft
+        const nextIdx = idx - 1;
+        historyIndexRef.current = nextIdx;
+        if (nextIdx === -1) {
+          setText(draftRef.current);
+        } else {
+          setText(history[nextIdx]);
+        }
       }
     },
-    [handleSend]
+    [history, text]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        handleSend();
+      } else if (e.key === 'q' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleEnqueue();
+      } else if (e.key === 'ArrowUp') {
+        // Only navigate history when cursor is at start of input (single-line behavior)
+        const el = textareaRef.current;
+        if (el?.selectionStart === 0 && el.selectionEnd === 0) {
+          e.preventDefault();
+          navigateHistory('up');
+        }
+      } else if (e.key === 'ArrowDown') {
+        // Only navigate history when cursor is at end of input
+        const el = textareaRef.current;
+        if (el && el.selectionStart === el.value.length && el.selectionEnd === el.value.length) {
+          e.preventDefault();
+          navigateHistory('down');
+        }
+      }
+    },
+    [handleSend, handleEnqueue, navigateHistory]
   );
 
   return (
@@ -68,9 +146,41 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         style={{ overflow: 'hidden' }}
       />
       <div className="aui-composer-action flex items-center justify-between px-1.5 pb-1">
-        <div className="flex items-center gap-0.5">{leftToolbar}</div>
+        <div className="flex items-center gap-0.5">
+          {leftToolbar}
+          {/* Queue badge — shows number of enqueued prompts */}
+          {queuedCount > 0 && (
+            <span
+              className="inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 text-[11px] leading-[18px]"
+              style={{
+                color: 'var(--vscode-badge-foreground)',
+                background: 'var(--vscode-badge-background)',
+              }}
+              title={`${queuedCount} prompt${queuedCount !== 1 ? 's' : ''} queued (Ctrl+Q)`}
+              data-testid="queue-badge"
+            >
+              <Codicon name="layers" className="text-[10px]" />
+              {queuedCount}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-0.5">
           {rightToolbar}
+
+          {/* Enqueue button — shown when running and text is entered */}
+          {isRunning && text.trim() && onEnqueue && (
+            <button
+              type="button"
+              onClick={handleEnqueue}
+              title="Queue prompt (Ctrl+Q)"
+              className="aui-composer-enqueue h-7 rounded-md flex items-center justify-center gap-1 px-1.5 transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+              style={{ color: 'var(--vscode-textLink-foreground)', fontSize: 11 }}
+              data-testid="enqueue-button"
+            >
+              <Codicon name="add" className="text-xs" />
+              <span>Queue</span>
+            </button>
+          )}
 
           {/* Send button — always visible and functional */}
           <button

@@ -57,7 +57,6 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   const textParts = content.filter((p): p is TextPart => p.type === 'text');
   const hasText = textParts.some(p => p.text.trim().length > 0);
   const hasTools = content.some(p => p.type === 'tool-call');
-  const hasRunningTool = content.some(p => p.type === 'tool-call' && p.status?.type === 'running');
 
   // Full message text for copy button
   const fullText = textParts.map(p => p.text).join('');
@@ -65,10 +64,12 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   const isMessageRunning = status?.type === 'running';
   const isError = status?.type === 'incomplete' && status.reason === 'error';
 
-  // Show inline working progress: only on last message, when thinking,
-  // no text yet, no tool cards at all, and no running tool
+  // Show inline "Thinking…" shimmer ONLY before any tools or text appear.
+  // Once tools exist, the Working box takes over all thinking indication
+  // (its spinner shows thinkingText between tool steps). Once text streams,
+  // the text itself is the visible progress — no shimmer needed.
   const showThinking =
-    isLast && isRunning && isMessageRunning && !!thinkingText && !hasText && !hasTools && !hasRunningTool;
+    isLast && isRunning && isMessageRunning && !!thinkingText && !hasText && !hasTools;
 
   return (
     <div
@@ -90,7 +91,14 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
         {/* Tool groups and text */}
         {segments.map((seg, i) => {
           if (seg.type === 'tools') {
-            return <ToolGroup key={i} parts={seg.parts} isMessageRunning={isLast && isRunning && isMessageRunning} />;
+            return (
+              <ToolGroup
+                key={i}
+                parts={seg.parts}
+                isMessageRunning={isLast && isRunning && isMessageRunning}
+                thinkingText={thinkingText}
+              />
+            );
           }
           // Only render non-empty text parts (or last part while streaming)
           const text = seg.part.text;
