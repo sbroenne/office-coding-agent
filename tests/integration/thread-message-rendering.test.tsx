@@ -297,7 +297,7 @@ describe('Thread – AssistantMessage rendering', () => {
 
     // After the stream completes, the shimmer thinking progress should be gone
     await waitFor(() => {
-      expect(document.querySelector('.progress-container.shimmer-progress')).not.toBeInTheDocument();
+      expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
     });
   });
 
@@ -326,7 +326,7 @@ describe('Thread – AssistantMessage rendering', () => {
     // The thinking indicator is now rendered INSIDE the assistant message (as InlineWorkingProgress)
     // After completion, it should not be visible
     const assistantMsg = document.querySelector('[data-role="assistant"]');
-    const indicatorInsideMsg = assistantMsg?.querySelector('.progress-container.shimmer-progress');
+    const indicatorInsideMsg = assistantMsg?.querySelector('.inline-working-progress');
     // After completion (text arrived), the shimmer progress should be gone
     expect(indicatorInsideMsg).toBeNull();
   });
@@ -510,10 +510,18 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 150));
     });
 
-    // The thinking indicator should show "Thinking…" inside the assistant message
-    const indicator = document.querySelector('.progress-container.shimmer-progress');
-    expect(indicator).toBeInTheDocument();
-    expect(indicator!.textContent).toContain('Thinking…');
+    // The shimmer progress hides once a tool card appears (VS Code behavior)
+    // Tool cards handle their own shimmer on the tool name while running
+    const indicator = document.querySelector('.inline-working-progress');
+    const toolCard = document.querySelector('[data-slot="tool-fallback-root"]');
+
+    // Either: shimmer is gone (tool card appeared) or shimmer is visible (tool hasn't rendered yet)
+    // Once the tool card is in the DOM, shimmer must be gone
+    if (toolCard) {
+      expect(indicator).not.toBeInTheDocument();
+    }
+    // At minimum, a tool card should exist since tool.execution_start was emitted
+    expect(toolCard).toBeInTheDocument();
 
     // Release and finish
     await act(async () => {
@@ -522,7 +530,7 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     // Indicator should be gone after completion
-    expect(document.querySelector('.progress-container.shimmer-progress')).not.toBeInTheDocument();
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
   });
 
   it('thinking indicator shows report_intent text in the rendered DOM', async () => {
@@ -568,7 +576,7 @@ describe('Thread – AssistantMessage rendering', () => {
     });
 
     // The thinking indicator should show the intent text inside the assistant message
-    const indicator = document.querySelector('.progress-container.shimmer-progress');
+    const indicator = document.querySelector('.inline-working-progress');
     expect(indicator).toBeInTheDocument();
     expect(indicator!.textContent).toContain('Analyzing your data');
 
@@ -577,7 +585,7 @@ describe('Thread – AssistantMessage rendering', () => {
       await new Promise(r => setTimeout(r, 200));
     });
 
-    expect(document.querySelector('.progress-container.shimmer-progress')).not.toBeInTheDocument();
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
   });
 });
 
@@ -1013,7 +1021,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     expect(checkIcon).toBeInTheDocument();
 
     // Thinking indicator must be gone (no longer has old class — inline working progress hides when complete)
-    expect(document.querySelector('.progress-container.shimmer-progress')).not.toBeInTheDocument();
+    expect(document.querySelector('.inline-working-progress')).not.toBeInTheDocument();
   });
 });
 

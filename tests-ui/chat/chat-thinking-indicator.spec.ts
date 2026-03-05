@@ -22,11 +22,11 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
     // Capture all thinking indicator text values via MutationObserver
-    // Now the indicator is .progress-container.shimmer-progress inside the assistant message
+    // Now the indicator is .inline-working-progress inside the assistant message
     await page.evaluate(() => {
       (window as unknown as Record<string, string[]>).__thinkingTexts = [];
       const observer = new MutationObserver(() => {
-        const el = document.querySelector('.progress-container.shimmer-progress .progress-step');
+        const el = document.querySelector('.inline-working-progress .progress-step');
         if (el?.textContent) {
           const texts = (window as unknown as Record<string, string[]>).__thinkingTexts;
           const last = texts[texts.length - 1];
@@ -110,7 +110,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await composer.press('Enter');
 
     // Wait for the shimmer progress indicator to appear inside the assistant message
-    const indicator = page.locator('.progress-container.shimmer-progress');
+    const indicator = page.locator('.inline-working-progress');
     await expect(indicator).toBeVisible({ timeout: AI_TIMEOUT });
 
     // The indicator must NOT be a descendant of the viewport footer
@@ -131,7 +131,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
 
     // Geometric guard: indicator must render above the composer area
     const isAboveComposer = await page.evaluate(() => {
-      const indicatorEl = document.querySelector('.progress-container.shimmer-progress');
+      const indicatorEl = document.querySelector('.inline-working-progress');
       const composerEl = document.querySelector('.aui-composer-root');
       if (!indicatorEl || !composerEl) return false;
       const indicatorRect = indicatorEl.getBoundingClientRect();
@@ -143,7 +143,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     // The indicator must appear BELOW the last user message in DOM order
     const isAfterMessages = await page.evaluate(() => {
       const messages = document.querySelector('[data-role="user"]');
-      const ind = document.querySelector('.progress-container.shimmer-progress');
+      const ind = document.querySelector('.inline-working-progress');
       if (!messages || !ind) return false;
       return !!(messages.compareDocumentPosition(ind) & Node.DOCUMENT_POSITION_FOLLOWING);
     });

@@ -188,16 +188,20 @@ const MessageError: FC = () => {
 const InlineWorkingProgress: FC = () => {
   const thinkingText = useThinkingText();
   const isRunning = useAuiState(s => s.thread.isRunning);
-  const hasTextContent = useAuiState(s => {
+  const hasContent = useAuiState(s => {
     const parts = s.message.parts;
-    return parts.some(p => p.type === 'text' && p.text.trim().length > 0);
+    return parts.some(
+      p =>
+        (p.type === 'text' && p.text.trim().length > 0) ||
+        p.type === 'tool-call'
+    );
   });
 
-  // Hide when: no thinking text, message has text content, or not running
-  if (!thinkingText || hasTextContent || !isRunning) return null;
+  // Hide when: no thinking text, message has any content (text or tools), or not running
+  if (!thinkingText || hasContent || !isRunning) return null;
 
   return (
-    <div className="progress-container shimmer-progress" style={{ order: -2 }}>
+    <div className="inline-working-progress progress-container shimmer-progress" style={{ order: -2 }}>
       <Codicon name="circle-filled" className="progress-status-icon shrink-0" />
       <span className="progress-step">{thinkingText}</span>
     </div>
