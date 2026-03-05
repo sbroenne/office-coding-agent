@@ -632,8 +632,8 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       expect(screen.getByText('Got it.')).toBeInTheDocument();
     });
 
-    // Tool card must be inside a .chat-tool-single wrapper (single tool, no Working box)
-    const toolGroup = document.querySelector('.chat-tool-single');
+    // Tool card must be inside a .chat-thinking-box wrapper (Working box (all tools use it now))
+    const toolGroup = document.querySelector('.chat-thinking-box');
     expect(toolGroup).toBeInTheDocument();
     expect(toolGroup!.querySelector('[data-slot="tool-fallback-root"]')).toBeInTheDocument();
 
@@ -702,7 +702,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
 
     // Verify both text and tool wrapper exist inside message content
     const content = document.querySelector('.aui-assistant-message-content');
-    const toolGroup = content!.querySelector('.chat-tool-single');
+    const toolGroup = content!.querySelector('.chat-thinking-box');
     const toolCard = toolGroup!.querySelector('[data-slot="tool-fallback-root"]');
     expect(toolGroup).toBeInTheDocument();
     expect(toolCard).toBeInTheDocument();
@@ -1010,7 +1010,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     });
 
     // Tool cards must still be visible after completion
-    const toolGroup = document.querySelector('.chat-tool-single');
+    const toolGroup = document.querySelector('.chat-thinking-box');
     expect(toolGroup).toBeInTheDocument();
 
     const toolCard = toolGroup!.querySelector('[data-slot="tool-fallback-root"]');

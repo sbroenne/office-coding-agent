@@ -222,6 +222,18 @@ const InlineWorkingProgress: FC = () => {
   const thinkingText = useThinkingText();
   const isRunning = useAuiState(s => s.thread.isRunning);
 
+  // Only show on the LAST assistant message (the one being streamed)
+  const isLastMessage = useAuiState(s => {
+    const messages = s.thread.messages;
+    const currentId = s.message.id;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        return messages[i].id === currentId;
+      }
+    }
+    return false;
+  });
+
   const hasTextContent = useAuiState(s =>
     s.message.parts.some(p => p.type === 'text' && p.text.trim().length > 0)
   );
@@ -230,11 +242,8 @@ const InlineWorkingProgress: FC = () => {
     s.message.parts.some(p => p.type === 'tool-call' && p.status?.type === 'running')
   );
 
-  // Show when: thinking text is set, thread is running, no text content yet,
-  // and no tool is currently executing (tools have their own shimmer).
-  // This covers: initial "Thinking…", AND the gap between tool completion
-  // and the next action where the model is deciding what to do.
-  if (!thinkingText || !isRunning || hasTextContent || hasRunningTool) return null;
+  // Show only on the last assistant message, when thinking, no text yet, no running tool
+  if (!thinkingText || !isRunning || !isLastMessage || hasTextContent || hasRunningTool) return null;
 
   return (
     <div className="inline-working-progress progress-container shimmer-progress" style={{ order: -2 }}>
@@ -339,15 +348,9 @@ const ToolGroup: FC<{ startIndex: number; endIndex: number; children?: ReactNode
     return false;
   });
 
-  // Single tool — bare progress line, no Working box
-  if (toolCount <= 1) {
-    return (
-      <div className="chat-tool-single" style={{ order: -1 }}>
-        {children}
-      </div>
-    );
-  }
-
+  // All tool groups (even single tool) use the Working box so that
+  // completed responses show a persistent collapsed summary in history
+  // (matching VS Code where every response keeps its "Worked" header).
   return (
     <WorkingCollapsible isRunning={isRunning} toolCount={toolCount}>
       {children}
