@@ -146,35 +146,7 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
   }
 }
 
-function loadBundledSkills(): AgentSkill[] {
-  const bundledRawSkills = [
-    excelSkillRaw,
-    powerpointSkillRaw,
-    powerpointChartsSkillRaw,
-    powerpointSpeakerNotesSkillRaw,
-    powerpointDeckBuilderSkillRaw,
-    powerpointDeckArchetypesSkillRaw,
-    powerpointDesignSkillRaw,
-    powerpointFormattingSkillRaw,
-    powerpointRedesignSkillRaw,
-    wordSkillRaw,
-    wordDocumentBuilderSkillRaw,
-    wordFormattingSkillRaw,
-    wordTablesSkillRaw,
-    outlookSkillRaw,
-    outlookCalendarSkillRaw,
-    outlookDraftingSkillRaw,
-    outlookEmailAnalysisSkillRaw,
-  ];
-
-  const loaded = bundledRawSkills.map(raw => {
-    const parsed = parseFrontmatter(raw);
-    return { metadata: parsed.metadata, content: parsed.content };
-  });
-
-  return loaded.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
-}
-
+/** NOTE: All bundled skills come from plugins */
 const bundledSkills: AgentSkill[] = [];
 let importedSkills: AgentSkill[] = [];
 
