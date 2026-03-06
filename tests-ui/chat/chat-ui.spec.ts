@@ -27,6 +27,16 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
+  test('Plugins button appears exactly once — no duplicate icon in input toolbar', async ({
+    configuredTaskpane: page,
+  }) => {
+    // There must be exactly ONE "Plugins" button (in the header).
+    // Previously a duplicate McpPill button in the input toolbar used the same
+    // extensions icon and also opened plugins — this test prevents regression.
+    const pluginsButtons = page.getByRole('button', { name: 'Plugins' });
+    await expect(pluginsButtons).toHaveCount(1);
+  });
+
   test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
     await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
   });
