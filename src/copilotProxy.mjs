@@ -321,14 +321,16 @@ async function handleConnection(ws) {
           host,
           model,
           sessionId,
-          systemMessage,
+          systemMessage: systemMessageParam,
           tools: toolDefs,
           mcpServers,
           availableTools,
           skills,
           disabledSkills,
           customAgents,
+          pluginConfigPath,
         } = params || {};
+        let systemMessage = systemMessageParam;
         console.log(
           `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
         );
@@ -385,7 +387,7 @@ async function handleConnection(ws) {
 
         // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
         try {
-          const pluginSkillDirs = await discoverPluginSkillDirs(host);
+          const pluginSkillDirs = await discoverPluginSkillDirs(host, pluginConfigPath);
           if (pluginSkillDirs.length > 0) {
             skillDirectories.push(...pluginSkillDirs);
             console.log(`[proxy] Added ${pluginSkillDirs.length} skill dir(s) from installed plugins`);
@@ -394,13 +396,29 @@ async function handleConnection(ws) {
           console.warn('[proxy] Plugin skill discovery failed:', err.message);
         }
 
-        // Discover agents from installed Copilot CLI plugins
+        // Discover agents from installed Copilot CLI plugins and merge into systemMessage.
+        // The SDK's customAgents are VS Code agent-picker entries, NOT auto-applied system
+        // prompts — they require explicit @mention. To guarantee plugin agent instructions
+        // reach the model, we append them to the systemMessage content instead.
         const allCustomAgents = [...(customAgents || [])];
         try {
-          const pluginAgents = await discoverPluginAgents(host);
+          const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
           if (pluginAgents.length > 0) {
-            allCustomAgents.push(...pluginAgents);
-            console.log(`[proxy] Added ${pluginAgents.length} agent(s) from installed plugins`);
+            console.log(`[proxy] Merging ${pluginAgents.length} plugin agent(s) into system message`);
+            // Pick the first plugin agent as the default; additional ones go into customAgents
+            // for agent-picker UI (future @mention support).
+            const [defaultPluginAgent, ...extraAgents] = pluginAgents;
+            if (defaultPluginAgent?.prompt) {
+              const existingContent = systemMessage?.content ?? '';
+              const merged = existingContent
+                ? `${existingContent}\n\n${defaultPluginAgent.prompt}`
+                : defaultPluginAgent.prompt;
+              systemMessage = {
+                mode: systemMessage?.mode ?? 'replace',
+                content: merged,
+              };
+            }
+            allCustomAgents.push(...extraAgents);
           }
         } catch (err) {
           console.warn('[proxy] Plugin agent discovery failed:', err.message);

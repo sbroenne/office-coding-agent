@@ -72,6 +72,12 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   disabledSkills?: string[];
   /** Custom agent configs passed natively to the SDK. */
   customAgents?: CustomAgentPayload[];
+  /**
+   * Override path to the Copilot CLI config file used for plugin discovery.
+   * Used in integration tests to inject a synthetic plugin config without
+   * touching the real ~/.copilot/config.json.
+   */
+  pluginConfigPath?: string;
 }
 
 /**
@@ -293,6 +299,7 @@ export class WebSocketCopilotClient {
       skills: config.skills,
       disabledSkills: config.disabledSkills,
       customAgents: config.customAgents,
+      pluginConfigPath: config.pluginConfigPath,
     });
 
     const sessionId = response.sessionId;
