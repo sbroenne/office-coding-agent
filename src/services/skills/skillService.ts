@@ -2,8 +2,24 @@ import type { AgentSkill, SkillMetadata } from '@/types/skill';
 import type { AgentHost } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 
-// NOTE: Bundled skills removed — all skills now come from plugins
-// installed via the Plugin Hub (sbroenne/office-coding-agent-plugins marketplace)
+// Bundled skill imports — one per host-specific skill directory
+import excelSkillRaw from '@/skills/excel/SKILL.md';
+import powerpointSkillRaw from '@/skills/powerpoint/SKILL.md';
+import powerpointChartsSkillRaw from '@/skills/powerpoint/CHARTS_SKILL.md';
+import powerpointSpeakerNotesSkillRaw from '@/skills/powerpoint/SPEAKER_NOTES_SKILL.md';
+import powerpointDeckBuilderSkillRaw from '@/skills/powerpoint-deck-builder/SKILL.md';
+import powerpointFormattingSkillRaw from '@/skills/powerpoint-formatting/SKILL.md';
+import powerpointDeckArchetypesSkillRaw from '@/skills/powerpoint/DECK_ARCHETYPES_SKILL.md';
+import powerpointDesignSkillRaw from '@/skills/powerpoint/DESIGN_SKILL.md';
+import powerpointRedesignSkillRaw from '@/skills/powerpoint-redesign/SKILL.md';
+import wordSkillRaw from '@/skills/word/SKILL.md';
+import wordDocumentBuilderSkillRaw from '@/skills/word-document-builder/SKILL.md';
+import wordFormattingSkillRaw from '@/skills/word-formatting/SKILL.md';
+import wordTablesSkillRaw from '@/skills/word-tables/SKILL.md';
+import outlookSkillRaw from '@/skills/outlook/SKILL.md';
+import outlookCalendarSkillRaw from '@/skills/outlook-calendar/SKILL.md';
+import outlookDraftingSkillRaw from '@/skills/outlook-drafting/SKILL.md';
+import outlookEmailAnalysisSkillRaw from '@/skills/outlook-email-analysis/SKILL.md';
 
 /**
  * Parse YAML frontmatter from a skill markdown file.
@@ -146,8 +162,36 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
   }
 }
 
-/** NOTE: All bundled skills come from plugins */
-const bundledSkills: AgentSkill[] = [];
+function loadBundledSkills(): AgentSkill[] {
+  const bundledRawSkills = [
+    excelSkillRaw,
+    powerpointSkillRaw,
+    powerpointChartsSkillRaw,
+    powerpointSpeakerNotesSkillRaw,
+    powerpointDeckBuilderSkillRaw,
+    powerpointDeckArchetypesSkillRaw,
+    powerpointDesignSkillRaw,
+    powerpointFormattingSkillRaw,
+    powerpointRedesignSkillRaw,
+    wordSkillRaw,
+    wordDocumentBuilderSkillRaw,
+    wordFormattingSkillRaw,
+    wordTablesSkillRaw,
+    outlookSkillRaw,
+    outlookCalendarSkillRaw,
+    outlookDraftingSkillRaw,
+    outlookEmailAnalysisSkillRaw,
+  ];
+
+  const loaded = bundledRawSkills.map(raw => {
+    const parsed = parseFrontmatter(raw);
+    return { metadata: parsed.metadata, content: parsed.content };
+  });
+
+  return loaded.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
+}
+
+const bundledSkills: AgentSkill[] = loadBundledSkills();
 let importedSkills: AgentSkill[] = [];
 
 export function getBundledSkills(): AgentSkill[] {

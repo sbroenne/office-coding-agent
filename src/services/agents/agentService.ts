@@ -1,8 +1,11 @@
 import type { AgentConfig, AgentHost, AgentMetadata } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 
-// NOTE: Bundled agents removed — all agents now come from plugins
-// installed via the Plugin Hub (sbroenne/office-coding-agent-plugins marketplace)
+// Import bundled agent files as raw strings (via Vite md-raw plugin)
+import excelAgentRaw from '@/agents/excel/AGENT.md';
+import powerpointAgentRaw from '@/agents/powerpoint/AGENT.md';
+import wordAgentRaw from '@/agents/word/AGENT.md';
+import outlookAgentRaw from '@/agents/outlook/AGENT.md';
 
 /**
  * Parse YAML frontmatter from an agent markdown file.
@@ -169,8 +172,13 @@ function setAgentArrayField(metadata: AgentMetadata, key: string, values: string
   }
 }
 
-/** All bundled agents — NOTE: Empty, all agents come from plugins */
-const bundledAgents: AgentConfig[] = [];
+/** All bundled agents, parsed at module load time. */
+const bundledAgents: AgentConfig[] = [
+  parseAgentFrontmatter(excelAgentRaw),
+  parseAgentFrontmatter(powerpointAgentRaw),
+  parseAgentFrontmatter(wordAgentRaw),
+  parseAgentFrontmatter(outlookAgentRaw),
+];
 let importedAgents: AgentConfig[] = [];
 
 export function getBundledAgents(): AgentConfig[] {
