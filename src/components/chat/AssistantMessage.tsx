@@ -58,11 +58,31 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
   const hasText = textParts.some(p => p.text.trim().length > 0);
   const hasTools = content.some(p => p.type === 'tool-call');
 
-  // Full message text for copy button
-  const fullText = textParts.map(p => p.text).join('');
-
   const isMessageRunning = status?.type === 'running';
   const isError = status?.type === 'incomplete' && status.reason === 'error';
+
+  // When the agent ends with task_complete (no text response follows), surface
+  // the summary as readable text — matching VS Code where the model always writes
+  // a text response after tool use.
+  const taskCompleteSummary = (() => {
+    if (hasText || isMessageRunning) return null;
+    const part = content.find(
+      (p): p is ToolCallPart => p.type === 'tool-call' && p.toolName === 'task_complete'
+    );
+    if (!part?.argsText) return null;
+    try {
+      const args = JSON.parse(part.argsText) as Record<string, unknown>;
+      const s = args.summary;
+      return typeof s === 'string' && s.trim() ? s.trim() : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Full message text for copy button (include task_complete summary when present)
+  const fullText = taskCompleteSummary
+    ? textParts.map(p => p.text).join('') || taskCompleteSummary
+    : textParts.map(p => p.text).join('');
 
   // Show inline "Thinking…" shimmer ONLY before any tools or text appear.
   // Once tools exist, the Working box takes over all thinking indication
@@ -105,6 +125,9 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
           if (!text && !(isLast && isRunning)) return null;
           return <MarkdownContent key={i} text={text} />;
         })}
+
+        {/* task_complete summary — shown when the agent ends with task_complete but no text */}
+        {taskCompleteSummary && <MarkdownContent text={taskCompleteSummary} />}
 
         {/* Error indicator */}
         {isError && status.error && (
