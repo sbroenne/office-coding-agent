@@ -1,32 +1,49 @@
 /**
  * VS Code-style MCP server tools picker.
  *
- * Mirrors the "Select tools" quick-pick in VS Code Copilot Chat: a button in
- * the input toolbar that opens a popover listing connected MCP servers with
- * inline enable/disable toggles. Separate from the Plugin Hub (which manages
- * installing/removing servers). This picker controls *which servers are active*
- * for the current conversation.
+ * Shows ALL available MCP servers (bundled + from installed plugins) with
+ * per-server enable/disable toggles. Mirrors the "Select tools" quick-pick
+ * in VS Code Copilot Chat.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
+import type { McpServerConfig } from '@/types/mcp';
 
 interface McpPickerProps {
   onOpenPanel?: (panel: string) => void;
 }
 
+async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
+  try {
+    const res = await fetch('/api/mcp-servers');
+    if (!res.ok) return [];
+    const data = (await res.json()) as { servers: McpServerConfig[] };
+    return data.servers ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export const McpPicker: React.FC<McpPickerProps> = ({ onOpenPanel }) => {
   const [open, setOpen] = useState(false);
-  const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
+  const [servers, setServers] = useState<McpServerConfig[]>([]);
   const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
   const isMcpServerEnabled = useSettingsStore(s => s.isMcpServerEnabled);
 
-  const enabledCount = importedMcpServers.filter(s => isMcpServerEnabled(s.name)).length;
-  const total = importedMcpServers.length;
+  useEffect(() => {
+    void fetchAllMcpServers().then(setServers);
+  }, []);
 
-  // Only show a badge when some (but not all) servers are disabled
+  // Re-fetch when popover opens so it reflects newly installed plugins
+  useEffect(() => {
+    if (open) void fetchAllMcpServers().then(setServers);
+  }, [open]);
+
+  const enabledCount = servers.filter(s => isMcpServerEnabled(s.name)).length;
+  const total = servers.length;
   const showBadge = total > 0 && enabledCount < total;
 
   return (
@@ -58,12 +75,12 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onOpenPanel }) => {
         >
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">MCP Servers</div>
 
-          {importedMcpServers.length === 0 ? (
+          {servers.length === 0 ? (
             <div className="px-2 py-2 text-xs text-muted-foreground">
-              No MCP servers configured. Add servers in the Plugin Hub.
+              No MCP servers available. Install a plugin to add MCP servers.
             </div>
           ) : (
-            importedMcpServers.map(server => {
+            servers.map(server => {
               const enabled = isMcpServerEnabled(server.name);
               return (
                 <button

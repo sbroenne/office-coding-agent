@@ -1,9 +1,7 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Codicon } from '@/components/Codicon';
-import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useMcpStatusStore } from '@/stores';
-import { BUNDLED_MCP_SERVERS } from '@/types';
 import type { McpServerConfig, McpServerStatus } from '@/types';
 import { McpLogViewer } from './McpLogViewer';
 
@@ -23,26 +21,29 @@ const STATUS_LABELS: Record<McpServerStatus | 'disabled', string> = {
   disabled: 'Disabled',
 };
 
-function isBundled(name: string): boolean {
-  return BUNDLED_MCP_SERVERS.some(s => s.name === name);
+async function fetchMcpServers(): Promise<McpServerConfig[]> {
+  try {
+    const res = await fetch('/api/mcp-servers');
+    if (!res.ok) return [];
+    const data = (await res.json()) as { servers: McpServerConfig[] };
+    return data.servers ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export const McpManagerPanel: React.FC = () => {
+  const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [logServer, setLogServer] = useState<string | null>(null);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const mcpServers = useMcpStatusStore(s => s.servers);
   const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
-  const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
-  const addImportedMcpServer = useSettingsStore(s => s.addImportedMcpServer);
-  const removeImportedMcpServer = useSettingsStore(s => s.removeImportedMcpServer);
 
-  const allServers: McpServerConfig[] = [...BUNDLED_MCP_SERVERS, ...importedMcpServers];
+  useEffect(() => {
+    void fetchMcpServers().then(setServers);
+  }, []);
 
   const getServerStatus = (name: string): McpServerStatus | 'disabled' => {
     if (disabledMcpServerNames.includes(name)) return 'disabled';
@@ -58,230 +59,112 @@ export const McpManagerPanel: React.FC = () => {
     });
   };
 
-  const handleImportJson = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      setImportStatus(null);
-      setImportError(null);
-      setIsImporting(true);
-
-      try {
-        const text = await file.text();
-        const parsed: unknown = JSON.parse(text);
-
-        // Accept either a single McpServerConfig or an array
-        const configs: McpServerConfig[] = Array.isArray(parsed)
-          ? (parsed as McpServerConfig[])
-          : [parsed as McpServerConfig];
-
-        if (configs.length === 0) throw new Error('JSON file contains no server entries.');
-
-        for (const cfg of configs) {
-          if (typeof cfg.name !== 'string' || !cfg.name)
-            throw new Error('Each server entry must have a "name" field.');
-          if (!cfg.transport)
-            throw new Error(`Server "${cfg.name}" is missing a "transport" field.`);
-          addImportedMcpServer(cfg);
-        }
-
-        setImportStatus(
-          `Imported ${configs.length.toString()} server${configs.length === 1 ? '' : 's'} from ${file.name}.`
-        );
-      } catch (error) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import MCP JSON.');
-      } finally {
-        setIsImporting(false);
-        event.target.value = '';
-      }
-    },
-    [addImportedMcpServer]
-  );
-
   return (
-    <div className="space-y-3 p-3">
-      {/* Header with upload button */}
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-xs font-medium text-muted-foreground">Servers ({allServers.length})</h4>
-        <div className="flex items-center gap-1">
-          <input
-            ref={jsonInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="hidden"
-            aria-label="Import MCP servers from JSON file"
-            onChange={event => void handleImportJson(event)}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => jsonInputRef.current?.click()}
-            disabled={isImporting}
-            aria-busy={isImporting}
-            title="Import MCP servers from JSON"
-          >
-            {isImporting ? (
-              <Codicon name="loading" className="text-sm codicon-modifier-spin" />
-            ) : (
-              <Codicon name="cloud-upload" className="text-sm" />
-            )}
-            JSON
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-1 p-3">
+      {servers.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No MCP servers available. Install a plugin to add MCP servers.
+        </p>
+      ) : (
+        servers.map(server => {
+          const status = getServerStatus(server.name);
+          const serverState = mcpServers[server.name];
+          const toolCount = serverState?.tools.length ?? 0;
+          const isExpanded = expandedTools.has(server.name);
 
-      {importStatus && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
-        >
-          {importStatus}
-        </div>
-      )}
-      {importError && (
-        <div
-          role="alert"
-          className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
-        >
-          {importError}
-        </div>
-      )}
-
-      {/* Server list */}
-      <div className="space-y-1">
-        {allServers.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No MCP servers configured.</p>
-        ) : (
-          allServers.map(server => {
-            const status = getServerStatus(server.name);
-            const serverState = mcpServers[server.name];
-            const toolCount = serverState?.tools.length ?? 0;
-            const isExpanded = expandedTools.has(server.name);
-            const bundled = isBundled(server.name);
-            const imported = !bundled;
-
-            return (
-              <div
-                key={`mcp-server-${server.name}`}
-                className={`rounded-md border border-border transition-opacity ${disabledMcpServerNames.includes(server.name) ? 'opacity-50' : ''}`}
-              >
-                {/* Server row */}
-                <div className="flex items-center justify-between px-2 py-1.5 gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {/* Status dot */}
-                    <span
-                      className={`size-2 shrink-0 rounded-full ${STATUS_COLORS[status]}`}
-                      title={STATUS_LABELS[status]}
-                    />
-                    {/* Name + badge */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-medium">{server.name}</span>
-                        {bundled && (
-                          <span className="shrink-0 rounded-full bg-[var(--vscode-textLink-foreground)]/15 px-1.5 py-0 text-[9px] font-medium text-[var(--vscode-textLink-foreground)]">
-                            Built-in
-                          </span>
-                        )}
-                      </div>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {server.description ??
-                          (server.transport === 'stdio'
-                            ? [server.command, ...(server.args ?? [])].join(' ')
-                            : server.url)}
-                      </p>
-                      {status === 'error' && serverState?.error && (
-                        <p className="truncate text-[10px] text-[var(--vscode-errorForeground)]">
-                          {serverState.error}
-                        </p>
-                      )}
+          return (
+            <div
+              key={`mcp-server-${server.name}`}
+              className={`rounded-md border border-border transition-opacity ${disabledMcpServerNames.includes(server.name) ? 'opacity-50' : ''}`}
+            >
+              {/* Server row */}
+              <div className="flex items-center justify-between px-2 py-1.5 gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span
+                    className={`size-2 shrink-0 rounded-full ${STATUS_COLORS[status]}`}
+                    title={STATUS_LABELS[status]}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-medium">{server.name}</span>
                     </div>
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    {/* Enable/disable toggle */}
-                    <button
-                      onClick={() => toggleMcpServer(server.name)}
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-accent ${disabledMcpServerNames.includes(server.name) ? 'text-muted-foreground/40' : 'text-[var(--vscode-textLink-foreground)]'}`}
-                      title={
-                        disabledMcpServerNames.includes(server.name)
-                          ? 'Enable server'
-                          : 'Disable server'
-                      }
-                      aria-pressed={!disabledMcpServerNames.includes(server.name)}
-                      aria-label={`Toggle ${server.name}`}
-                    >
-                      <Codicon
-                        name={
-                          disabledMcpServerNames.includes(server.name) ? 'circle-slash' : 'check'
-                        }
-                        className="text-xs"
-                      />
-                    </button>
-                    {/* Delete button (imported servers only) */}
-                    {imported && (
-                      <button
-                        onClick={() => removeImportedMcpServer(server.name)}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--vscode-errorForeground)]/70 transition-colors hover:bg-accent hover:text-[var(--vscode-errorForeground)]"
-                        title="Remove server"
-                        aria-label={`Remove ${server.name}`}
-                      >
-                        <Codicon name="trash" className="text-xs" />
-                      </button>
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {server.description ??
+                        (server.transport === 'stdio'
+                          ? [server.command, ...(server.args ?? [])].join(' ')
+                          : server.url)}
+                    </p>
+                    {status === 'error' && serverState?.error && (
+                      <p className="truncate text-[10px] text-[var(--vscode-errorForeground)]">
+                        {serverState.error}
+                      </p>
                     )}
-                    {/* Tools toggle */}
-                    {toolCount > 0 && (
-                      <button
-                        onClick={() => toggleTools(server.name)}
-                        className="inline-flex h-6 items-center gap-0.5 rounded px-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        title={`${toolCount} tool${toolCount === 1 ? '' : 's'}`}
-                      >
-                        {isExpanded ? (
-                          <Codicon name="chevron-down" className="text-xs" />
-                        ) : (
-                          <Codicon name="chevron-right" className="text-xs" />
-                        )}
-                        {toolCount}
-                      </button>
-                    )}
-                    {/* Show output */}
-                    <button
-                      onClick={() => setLogServer(logServer === server.name ? null : server.name)}
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground ${logServer === server.name ? 'bg-accent text-accent-foreground' : ''}`}
-                      title="Show Output"
-                    >
-                      <Codicon name="output" className="text-xs" />
-                    </button>
                   </div>
                 </div>
 
-                {/* Expanded tools list */}
-                {isExpanded && serverState && serverState.tools.length > 0 && (
-                  <div className="border-t border-border bg-muted/30 px-3 py-1.5">
-                    <p className="mb-1 text-[10px] font-medium text-muted-foreground">
-                      Tools ({serverState.tools.length})
-                    </p>
-                    <div className="space-y-0.5">
-                      {serverState.tools.map(tool => (
-                        <div key={tool.name} className="text-[10px]">
-                          <span className="font-medium">{tool.name}</span>
-                          {tool.description && (
-                            <span className="text-muted-foreground"> — {tool.description}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={() => toggleMcpServer(server.name)}
+                    className={`inline-flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-accent ${disabledMcpServerNames.includes(server.name) ? 'text-muted-foreground/40' : 'text-[var(--vscode-textLink-foreground)]'}`}
+                    title={
+                      disabledMcpServerNames.includes(server.name)
+                        ? 'Enable server'
+                        : 'Disable server'
+                    }
+                    aria-pressed={!disabledMcpServerNames.includes(server.name)}
+                    aria-label={`Toggle ${server.name}`}
+                  >
+                    <Codicon
+                      name={disabledMcpServerNames.includes(server.name) ? 'circle-slash' : 'check'}
+                      className="text-xs"
+                    />
+                  </button>
+                  {toolCount > 0 && (
+                    <button
+                      onClick={() => toggleTools(server.name)}
+                      className="inline-flex h-6 items-center gap-0.5 rounded px-1 text-[10px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      title={`${toolCount} tool${toolCount === 1 ? '' : 's'}`}
+                    >
+                      {isExpanded ? (
+                        <Codicon name="chevron-down" className="text-xs" />
+                      ) : (
+                        <Codicon name="chevron-right" className="text-xs" />
+                      )}
+                      {toolCount}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setLogServer(logServer === server.name ? null : server.name)}
+                    className={`inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground ${logServer === server.name ? 'bg-accent text-accent-foreground' : ''}`}
+                    title="Show Output"
+                  >
+                    <Codicon name="output" className="text-xs" />
+                  </button>
+                </div>
               </div>
-            );
-          })
-        )}
-      </div>
 
-      {/* Log viewer */}
+              {isExpanded && serverState && serverState.tools.length > 0 && (
+                <div className="border-t border-border bg-muted/30 px-3 py-1.5">
+                  <p className="mb-1 text-[10px] font-medium text-muted-foreground">
+                    Tools ({serverState.tools.length})
+                  </p>
+                  <div className="space-y-0.5">
+                    {serverState.tools.map(tool => (
+                      <div key={tool.name} className="text-[10px]">
+                        <span className="font-medium">{tool.name}</span>
+                        {tool.description && (
+                          <span className="text-muted-foreground"> — {tool.description}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+
       {logServer !== null && <McpLogViewer serverName={logServer} />}
     </div>
   );

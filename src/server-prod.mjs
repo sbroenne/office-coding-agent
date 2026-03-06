@@ -467,6 +467,41 @@ export async function createServer() {
     }
   });
 
+  // GET /api/mcp-servers — all available MCP server configs (bundled + from installed plugins)
+  apiRouter.get('/mcp-servers', (_req, res) => {
+    try {
+      const BUNDLED = [
+        { name: 'workiq', description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams', transport: 'stdio', command: 'npx', args: ['-y', '@microsoft/workiq', 'mcp'] },
+        { name: 'powerbi', description: 'Power BI — query semantic models, generate DAX, explore data', transport: 'http', url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi' },
+      ];
+
+      const pluginServers = [];
+      const config = readCopilotConfig();
+      const installedPlugins = config.installed_plugins || [];
+
+      for (const plugin of installedPlugins) {
+        if (!plugin.enabled) continue;
+        if (!plugin.cache_path || !fs.existsSync(plugin.cache_path)) continue;
+        const mcpJsonPath = path.join(plugin.cache_path, '.mcp.json');
+        if (!fs.existsSync(mcpJsonPath)) continue;
+        try {
+          const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+          const servers = mcpConfig.mcpServers || mcpConfig.servers || {};
+          for (const [name, cfg] of Object.entries(servers)) {
+            const server = { name, description: `From plugin: ${plugin.name}`, ...cfg };
+            if (cfg.command) server.transport = 'stdio';
+            else if (cfg.url) server.transport = 'http';
+            pluginServers.push(server);
+          }
+        } catch { /* skip malformed .mcp.json */ }
+      }
+
+      res.json({ servers: [...BUNDLED, ...pluginServers] });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   app.use('/api', apiRouter);
   app.get('/ping', (_req, res) => res.json({ ok: true }));
 
