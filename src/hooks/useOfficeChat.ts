@@ -5,7 +5,12 @@ import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { getImportedSkills, skillToMarkdown } from '@/services/skills';
-import { resolveActiveAgent, getAgents } from '@/services/agents';
+import {
+  resolveActiveAgent,
+  getAgents,
+  setImportedAgents,
+  SUPPORTED_AGENT_HOSTS,
+} from '@/services/agents';
 import { toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
@@ -226,6 +231,25 @@ export function useOfficeChat(host: OfficeHostApp) {
       });
       client.onMcpTools(payload => {
         useMcpStatusStore.getState().setTools(payload.server, payload.tools);
+      });
+
+      // Register plugin.agents notification handler so discovered plugin agents are
+      // reflected in the browser-side agentService (AgentPicker). Agents without hosts
+      // keep hosts:[] which getAgents() treats as "all hosts" (universal agent).
+      client.onPluginAgents(({ agents }) => {
+        const agentConfigs = agents.map(agent => ({
+          metadata: {
+            name: agent.name,
+            description: agent.description,
+            version: '0.0.0',
+            hosts: agent.hosts.filter((h): h is AgentHost =>
+              SUPPORTED_AGENT_HOSTS.includes(h as AgentHost)
+            ),
+            defaultForHosts: [] as AgentHost[],
+          },
+          instructions: agent.prompt,
+        }));
+        setImportedAgents(agentConfigs);
       });
 
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);

@@ -486,4 +486,78 @@ Named agent instructions.`;
     const result = await discoverPluginAgents(undefined, configPath);
     expect(result).toEqual([]);
   });
+
+  // ─── hosts extraction ───────────────────────────────────────────────────────
+
+  it('returns hosts:[] for an agent with no hosts field in frontmatter', async () => {
+    /**
+     * Regression test: discoverPluginAgents must return hosts:[] when the
+     * AGENT.md has no hosts field. The browser-side agentService then treats
+     * hosts:[] as "all hosts" so the agent is visible regardless of the
+     * current Office host.
+     */
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const agentContent = `---
+name: Universal Agent
+description: No hosts specified
+version: 1.0.0
+---
+Universal agent instructions.`;
+
+    const pluginDir = await makePluginWithAgent(dir, 'my-universal-plugin', 'AGENT.md', agentContent);
+    const configPath = await writeConfig(dir, [
+      { name: 'my-universal-plugin', enabled: true, cache_path: pluginDir },
+    ]);
+
+    const result = await discoverPluginAgents(undefined, configPath);
+    expect(result).toHaveLength(1);
+    expect(result[0].hosts).toEqual([]);
+  });
+
+  it('extracts hosts from AGENT.md frontmatter (inline array)', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const agentContent = `---
+name: Excel Only Agent
+description: Only for Excel
+version: 1.0.0
+hosts: [excel]
+---
+Excel instructions.`;
+
+    const pluginDir = await makePluginWithAgent(dir, 'office-excel', 'AGENT.md', agentContent);
+    const configPath = await writeConfig(dir, [
+      { name: 'office-excel', enabled: true, cache_path: pluginDir },
+    ]);
+
+    const result = await discoverPluginAgents(undefined, configPath);
+    expect(result).toHaveLength(1);
+    expect(result[0].hosts).toEqual(['excel']);
+  });
+
+  it('extracts multiple hosts from AGENT.md frontmatter', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const agentContent = `---
+name: Multi Host Agent
+description: For Excel and Word
+version: 1.0.0
+hosts: [excel, word]
+---
+Multi-host instructions.`;
+
+    const pluginDir = await makePluginWithAgent(dir, 'office-multi', 'AGENT.md', agentContent);
+    const configPath = await writeConfig(dir, [
+      { name: 'office-multi', enabled: true, cache_path: pluginDir },
+    ]);
+
+    const result = await discoverPluginAgents(undefined, configPath);
+    expect(result).toHaveLength(1);
+    expect(result[0].hosts).toContain('excel');
+    expect(result[0].hosts).toContain('word');
+  });
 });
