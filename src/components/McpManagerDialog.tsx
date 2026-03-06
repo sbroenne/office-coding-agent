@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Codicon } from '@/components/Codicon';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useMcpStatusStore } from '@/stores';
+import { getLocalApiBase } from '@/lib/api';
 import type { McpServerConfig, McpServerStatus } from '@/types';
 import { McpLogViewer } from './McpLogViewer';
 
@@ -23,7 +24,7 @@ const STATUS_LABELS: Record<McpServerStatus | 'disabled', string> = {
 
 async function fetchMcpServers(): Promise<McpServerConfig[]> {
   try {
-    const res = await fetch('/api/mcp-servers');
+    const res = await fetch(`${getLocalApiBase()}/api/mcp-servers`);
     if (!res.ok) return [];
     const data = (await res.json()) as { servers: McpServerConfig[] };
     return data.servers ?? [];

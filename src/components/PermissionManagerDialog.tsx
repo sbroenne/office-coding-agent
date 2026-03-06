@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Codicon } from '@/components/Codicon';
 import { usePermissionStore } from '@/stores';
+import { getLocalApiBase } from '@/lib/api';
 
 interface BrowseResponse {
   path: string;
@@ -33,7 +34,7 @@ export const PermissionManagerPanel: React.FC = () => {
     setBrowseLoading(true);
     try {
       const query = pathValue ? `?path=${encodeURIComponent(pathValue)}` : '';
-      const response = await fetch(`/api/browse${query}`);
+      const response = await fetch(`${getLocalApiBase()}/api/browse${query}`);
       const data = (await response.json()) as BrowseResponse;
       if (data.error) return;
       setBrowsePath(data.path);
@@ -54,7 +55,7 @@ export const PermissionManagerPanel: React.FC = () => {
     }
     void (async () => {
       try {
-        const response = await fetch('/api/env');
+        const response = await fetch(`${getLocalApiBase()}/api/env`);
         const data = (await response.json()) as { cwd?: string; home?: string };
         void loadDir(data.cwd ?? data.home);
       } catch {
