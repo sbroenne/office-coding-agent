@@ -106,11 +106,13 @@ export const ToolGroup: FC<ToolGroupProps> = ({
   // and we have thinking text to display. This is the inter-step "Thinking…" indicator.
   const showSpinner = isRunning && !hasRunningTool && !!thinkingText;
   const spinnerLabel = thinkingText ?? 'Thinking…';
+  // task_complete is a completion marker — exclude from the "N steps" count
+  const workStepCount = parts.filter(p => p.toolName !== 'task_complete').length;
 
   return (
     <WorkingCollapsible
       isRunning={isRunning}
-      toolCount={parts.length}
+      toolCount={workStepCount}
       showSpinner={showSpinner}
       spinnerLabel={spinnerLabel}
     >
