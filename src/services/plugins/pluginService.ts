@@ -99,8 +99,6 @@ export async function addMarketplace(spec: string): Promise<PluginActionResult> 
 }
 
 /** Remove a registered marketplace. */
-export async function removeMarketplace(name: string): Promise<PluginActionResult> {
-  return postJson<PluginActionResult>(`${API_BASE}/marketplace/remove`, {
-    name,
-  });
+export async function removeMarketplace(registeredKey: string): Promise<PluginActionResult> {
+  return postJson<PluginActionResult>(`${API_BASE}/marketplace/remove`, { registeredKey });
 }
