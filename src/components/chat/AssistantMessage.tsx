@@ -96,6 +96,25 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
       className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-2 duration-150"
       data-role="assistant"
     >
+      {/* VS Code-style message header: Copilot avatar + "Copilot" label */}
+      <div className="flex items-center gap-2 px-4 pb-1.5">
+        <div
+          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full"
+          style={{
+            background: 'var(--vscode-chat-avatarBackground)',
+            color: 'var(--vscode-chat-avatarForeground)',
+          }}
+        >
+          <Codicon name="copilot" className="text-[13px]" />
+        </div>
+        <span
+          className="text-[13px] font-semibold leading-none"
+          style={{ color: 'var(--vscode-foreground)' }}
+        >
+          Copilot
+        </span>
+      </div>
+
       <div className="aui-assistant-message-content flex flex-col wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
         {/* Inline working progress */}
         {showThinking && (
