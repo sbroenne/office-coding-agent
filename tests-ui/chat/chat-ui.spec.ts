@@ -44,6 +44,15 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'MCP servers' })).toBeVisible();
   });
 
+  test('MCP servers popover lists workiq and powerbi bundled servers', async ({
+    configuredTaskpane: page,
+  }) => {
+    await page.getByRole('button', { name: 'MCP servers' }).click();
+    // Both bundled MCP servers must appear in the popover
+    await expect(page.getByText('workiq')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('powerbi')).toBeVisible({ timeout: 5000 });
+  });
+
   test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
     await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
   });

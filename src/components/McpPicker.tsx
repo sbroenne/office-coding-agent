@@ -32,6 +32,8 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onOpenPanel }) => {
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
   const isMcpServerEnabled = useSettingsStore(s => s.isMcpServerEnabled);
+  // Subscribe to disabledMcpServerNames so the component re-renders when toggles change
+  useSettingsStore(s => s.disabledMcpServerNames);
 
   useEffect(() => {
     void fetchAllMcpServers().then(setServers);
@@ -91,6 +93,7 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onOpenPanel }) => {
                     !enabled && 'opacity-50'
                   )}
                   aria-pressed={enabled}
+                  aria-label={server.name}
                   title={enabled ? `Disable ${server.name}` : `Enable ${server.name}`}
                 >
                   <div
