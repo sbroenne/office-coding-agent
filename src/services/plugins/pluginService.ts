@@ -24,7 +24,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function postJson<T>(url: string, body: Record<string, string>): Promise<T> {
+function postJson<T>(url: string, body: Record<string, string | null | undefined>): Promise<T> {
   return fetchJson<T>(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -98,7 +98,13 @@ export async function addMarketplace(spec: string): Promise<PluginActionResult> 
   return postJson<PluginActionResult>(`${API_BASE}/marketplace/add`, { spec });
 }
 
-/** Remove a registered marketplace. */
-export async function removeMarketplace(registeredKey: string): Promise<PluginActionResult> {
-  return postJson<PluginActionResult>(`${API_BASE}/marketplace/remove`, { registeredKey });
+/** Remove a marketplace — registered (by CLI) or cache-only (by slug). */
+export async function removeMarketplace(
+  slug: string,
+  registeredKey?: string | null
+): Promise<PluginActionResult> {
+  return postJson<PluginActionResult>(`${API_BASE}/marketplace/remove`, {
+    slug,
+    registeredKey: registeredKey ?? null,
+  });
 }
