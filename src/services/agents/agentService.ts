@@ -169,13 +169,8 @@ function setAgentArrayField(metadata: AgentMetadata, key: string, values: string
   }
 }
 
-/** All bundled agents, parsed at module load time. */
-const bundledAgents: AgentConfig[] = [
-  parseAgentFrontmatter(excelAgentRaw),
-  parseAgentFrontmatter(powerpointAgentRaw),
-  parseAgentFrontmatter(wordAgentRaw),
-  parseAgentFrontmatter(outlookAgentRaw),
-];
+/** All bundled agents — NOTE: Empty, all agents come from plugins */
+const bundledAgents: AgentConfig[] = [];
 let importedAgents: AgentConfig[] = [];
 
 export function getBundledAgents(): AgentConfig[] {
