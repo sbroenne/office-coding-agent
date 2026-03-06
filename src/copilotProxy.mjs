@@ -10,14 +10,19 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {
+  slugify,
+  discoverPluginSkillDirs,
+  discoverPluginAgents,
+} from './pluginDiscovery.mjs';
 
 const execFileAsync = promisify(execFile);
 /** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
@@ -26,15 +31,6 @@ const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const NPM_EXEC_OPTS = process.platform === 'win32' ? { shell: true } : {};
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
-
-/** Convert a name to a safe lowercase directory slug. */
-function slugify(name) {
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return slug || 'skill';
-}
 
 /**
  * Scan a node_modules directory for skillpm-compatible skill directories.
@@ -185,9 +181,6 @@ async function handleConnection(ws) {
   /** @type {Map<string, string>} Temp skill directories keyed by sessionId for cleanup. */
   const sessionTempDirs = new Map();
 
-  /** @type {Map<string, string[]>} All npm temp dirs keyed by sessionId for cleanup. */
-  const sessionNpmTempDirs = new Map();
-
   /** @type {Map<string, string[]>} MCP server names keyed by sessionId for stop notifications. */
   const sessionMcpServerNames = new Map();
 
@@ -328,17 +321,18 @@ async function handleConnection(ws) {
           host,
           model,
           sessionId,
-          systemMessage,
+          systemMessage: systemMessageParam,
           tools: toolDefs,
           mcpServers,
           availableTools,
           skills,
           disabledSkills,
           customAgents,
-          npmSkillPackages,
+          pluginConfigPath,
         } = params || {};
+        let systemMessage = systemMessageParam;
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, npmSkillPackages=${(npmSkillPackages || []).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -391,47 +385,43 @@ async function handleConnection(ws) {
           skillDirectories.push(tempSkillDir);
         }
 
-        // Install skillpm skill packages and add their skill subdirs to skillDirectories.
-        // Uses skillpm (https://skillpm.dev) — the Agent Skills package manager built on npm.
-        // skillpm packages follow the spec: skills live in skills/<name>/SKILL.md inside the package.
-        // We run `npm install` directly (no global skillpm needed) and then scan for skill dirs.
-        const npmTempDirs = [];
-        if (npmSkillPackages && npmSkillPackages.length > 0) {
-          // Regex: allow scoped (@org/name) and plain package names, with optional @version suffix
-          const NPM_PKG_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(@[^\s/]+)?$/i;
-          for (const pkg of npmSkillPackages) {
-            if (typeof pkg !== 'string' || !NPM_PKG_RE.test(pkg.trim())) {
-              console.warn(`[proxy] Skipping invalid skillpm package name: "${pkg}"`);
-              continue;
-            }
-            const installDir = join(tmpdir(), `oca-skillpm-${randomUUID()}`);
-            await mkdir(installDir, { recursive: true });
-            npmTempDirs.push(installDir);
-            try {
-              // Run `npm install --prefix <dir> --no-save <pkg>` asynchronously
-              // so the Node.js event loop is never blocked.
-              await execFileAsync(
-                NPM_CMD,
-                ['install', '--prefix', installDir, '--no-save', pkg.trim()],
-                { ...NPM_EXEC_OPTS, timeout: 60_000 }
-              );
-
-              // Discover skill directories: skillpm packages put skills under
-              // node_modules/<pkgBaseName>/skills/<skillName>/SKILL.md
-              const skillDirs = await findSkillDirs(join(installDir, 'node_modules'));
-              for (const dir of skillDirs) {
-                skillDirectories.push(dir);
-                console.log(`[proxy] Added skillpm skill dir "${dir}" from package "${pkg}"`);
-              }
-              if (skillDirs.length === 0) {
-                console.warn(
-                  `[proxy] No skill dirs found in "${pkg}" — ensure it follows skillpm layout (skills/<name>/SKILL.md)`
-                );
-              }
-            } catch (err) {
-              console.warn(`[proxy] Failed to install skillpm package "${pkg}":`, err.message);
-            }
+        // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
+        try {
+          const pluginSkillDirs = await discoverPluginSkillDirs(host, pluginConfigPath);
+          if (pluginSkillDirs.length > 0) {
+            skillDirectories.push(...pluginSkillDirs);
+            console.log(`[proxy] Added ${pluginSkillDirs.length} skill dir(s) from installed plugins`);
           }
+        } catch (err) {
+          console.warn('[proxy] Plugin skill discovery failed:', err.message);
+        }
+
+        // Discover agents from installed Copilot CLI plugins and merge into systemMessage.
+        // The SDK's customAgents are VS Code agent-picker entries, NOT auto-applied system
+        // prompts — they require explicit @mention. To guarantee plugin agent instructions
+        // reach the model, we append them to the systemMessage content instead.
+        const allCustomAgents = [...(customAgents || [])];
+        try {
+          const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
+          if (pluginAgents.length > 0) {
+            console.log(`[proxy] Merging ${pluginAgents.length} plugin agent(s) into system message`);
+            // Pick the first plugin agent as the default; additional ones go into customAgents
+            // for agent-picker UI (future @mention support).
+            const [defaultPluginAgent, ...extraAgents] = pluginAgents;
+            if (defaultPluginAgent?.prompt) {
+              const existingContent = systemMessage?.content ?? '';
+              const merged = existingContent
+                ? `${existingContent}\n\n${defaultPluginAgent.prompt}`
+                : defaultPluginAgent.prompt;
+              systemMessage = {
+                mode: systemMessage?.mode ?? 'replace',
+                content: merged,
+              };
+            }
+            allCustomAgents.push(...extraAgents);
+          }
+        } catch (err) {
+          console.warn('[proxy] Plugin agent discovery failed:', err.message);
         }
 
         // Emit 'starting' status for each configured MCP server
@@ -459,7 +449,7 @@ async function handleConnection(ws) {
             availableTools,
             skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
-            customAgents: customAgents?.length > 0 ? customAgents : undefined,
+            customAgents: allCustomAgents.length > 0 ? allCustomAgents : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               // Auto-approve custom-tool permissions — these are tools explicitly
@@ -479,9 +469,6 @@ async function handleConnection(ws) {
           // Clean up temp directories on failure
           if (tempSkillDir) {
             void rm(tempSkillDir, { recursive: true, force: true }).catch(() => {});
-          }
-          for (const dir of npmTempDirs) {
-            void rm(dir, { recursive: true, force: true }).catch(() => {});
           }
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
@@ -519,10 +506,6 @@ async function handleConnection(ws) {
         }
         if (tempSkillDir) {
           sessionTempDirs.set(session.sessionId, tempSkillDir);
-        }
-        // Track ALL npm temp dirs for cleanup on session destroy
-        if (npmTempDirs.length > 0) {
-          sessionNpmTempDirs.set(session.sessionId, npmTempDirs);
         }
         markHealthy();
         console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
@@ -617,14 +600,6 @@ async function handleConnection(ws) {
             sessionTempDirs.delete(sessionId);
             void rm(tempDir, { recursive: true, force: true }).catch(() => {});
           }
-          // Clean up all npm skill temp directories
-          const npmDirs = sessionNpmTempDirs.get(sessionId);
-          if (npmDirs) {
-            sessionNpmTempDirs.delete(sessionId);
-            for (const dir of npmDirs) {
-              void rm(dir, { recursive: true, force: true }).catch(() => {});
-            }
-          }
         }
         sendResponse(id, {});
         break;
@@ -717,14 +692,6 @@ async function handleConnection(ws) {
       void rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
     sessionTempDirs.clear();
-
-    // Clean up all npm skill temp directories for this connection
-    for (const npmDirs of sessionNpmTempDirs.values()) {
-      for (const dir of npmDirs) {
-        void rm(dir, { recursive: true, force: true }).catch(() => {});
-      }
-    }
-    sessionNpmTempDirs.clear();
 
     // Clear MCP server tracking
     sessionMcpServerNames.clear();

@@ -3,6 +3,8 @@ import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
+import { useOfficeChat } from '@/hooks/useOfficeChat';
+import { detectOfficeHost } from '@/services/office/host';
 import type { CopilotModel, ModelProvider } from '@/types';
 
 const PROVIDER_ORDER: ModelProvider[] = ['Anthropic', 'OpenAI', 'Google', 'Other'];
@@ -17,11 +19,17 @@ function formatModelId(id: string): string {
 
 export const ModelPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const { activeModel, setActiveModel, availableModels } = useSettingsStore();
+  const host = detectOfficeHost();
+  const { switchModel, messages } = useOfficeChat(host);
 
   const models = availableModels ?? [];
   const currentModel = models.find(m => m.id === activeModel);
-  const displayLabel = currentModel?.name ?? formatModelId(activeModel);
+  const displayLabel = isSwitching
+    ? '(switching…)'
+    : (currentModel?.name ?? formatModelId(activeModel));
 
   const groupedModels = models.reduce((groups, model) => {
     const group = groups.get(model.provider) ?? [];
@@ -50,6 +58,11 @@ export const ModelPicker: React.FC = () => {
           sideOffset={4}
           align="start"
         >
+          {switchError && (
+            <div className="px-3 py-2 text-xs text-red-500 border-b border-border">
+              {switchError}
+            </div>
+          )}
           {models.length === 0 ? (
             <div className="px-3 py-4 text-center text-xs text-muted-foreground">
               Connecting to Copilot…
@@ -68,12 +81,36 @@ export const ModelPicker: React.FC = () => {
                       <button
                         key={model.id}
                         onClick={() => {
-                          setActiveModel(model.id);
-                          setOpen(false);
+                          void (async () => {
+                            setSwitchError(null);
+                            const hasActiveSession = messages.length > 0;
+
+                            if (hasActiveSession) {
+                              // Mid-session switch
+                              setIsSwitching(true);
+                              try {
+                                await switchModel(model.id);
+                                setOpen(false);
+                              } catch (err) {
+                                setSwitchError(
+                                  err instanceof Error ? err.message : 'Failed to switch model'
+                                );
+                                // Keep popover open to show error
+                              } finally {
+                                setIsSwitching(false);
+                              }
+                            } else {
+                              // No active session - just update store for next session
+                              setActiveModel(model.id);
+                              setOpen(false);
+                            }
+                          })();
                         }}
+                        disabled={isSwitching}
                         className={cn(
                           'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
-                          isActive && 'bg-accent/50'
+                          isActive && 'bg-accent/50',
+                          isSwitching && 'opacity-50 cursor-not-allowed'
                         )}
                       >
                         <Codicon

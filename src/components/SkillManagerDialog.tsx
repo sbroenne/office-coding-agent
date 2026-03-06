@@ -3,22 +3,20 @@ import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { getBundledSkills } from '@/services/skills';
 import { parseSkillsZipFile, parseSkillMarkdownFile } from '@/services/extensions/zipImportService';
-import { downloadSkill, downloadSkillsZip } from '@/services/extensions/zipExportService';
-import { useSettingsStore } from '@/stores';
+import { downloadSkill } from '@/services/extensions/zipExportService';
+import { useSettingsStore } from '@/stores/settingsStore';
 
-export const SkillManagerPanel: React.FC = () => {
+export const SkillManagerPanel: React.FC<{ hideBundled?: boolean }> = ({ hideBundled = false }) => {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const zipInputRef = useRef<HTMLInputElement>(null);
   const mdInputRef = useRef<HTMLInputElement>(null);
 
-  const importedSkills = useSettingsStore(s => s.importedSkills);
-  const importSkills = useSettingsStore(s => s.importSkills);
-  const removeImportedSkill = useSettingsStore(s => s.removeImportedSkill);
-
   const bundledSkills = getBundledSkills();
+  const importedSkills = useSettingsStore(s => s.importedSkills);
+  const addImportedSkill = useSettingsStore(s => s.addImportedSkill);
+  const removeImportedSkill = useSettingsStore(s => s.removeImportedSkill);
 
   const handleImportZip = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,9 +29,9 @@ export const SkillManagerPanel: React.FC = () => {
 
       try {
         const skills = await parseSkillsZipFile(file);
-        importSkills(skills);
+        skills.forEach(s => addImportedSkill(s));
         setImportStatus(
-          `Imported ${skills.length} skill${skills.length === 1 ? '' : 's'} from ${file.name}.`
+          `Imported ${skills.length.toString()} skill${skills.length === 1 ? '' : 's'} from ${file.name}.`
         );
       } catch (error) {
         setImportError(error instanceof Error ? error.message : 'Failed to import skills ZIP.');
@@ -42,7 +40,7 @@ export const SkillManagerPanel: React.FC = () => {
         event.target.value = '';
       }
     },
-    [importSkills]
+    [addImportedSkill]
   );
 
   const handleImportMd = useCallback(
@@ -56,7 +54,7 @@ export const SkillManagerPanel: React.FC = () => {
 
       try {
         const skill = await parseSkillMarkdownFile(file);
-        importSkills([skill]);
+        addImportedSkill(skill);
         setImportStatus(`Imported skill "${skill.metadata.name}" from ${file.name}.`);
       } catch (error) {
         setImportError(error instanceof Error ? error.message : 'Failed to import skill file.');
@@ -65,145 +63,119 @@ export const SkillManagerPanel: React.FC = () => {
         event.target.value = '';
       }
     },
-    [importSkills]
+    [addImportedSkill]
   );
-
-  const handleDownloadAll = useCallback(async () => {
-    if (importedSkills.length === 0) return;
-    setIsDownloadingAll(true);
-    try {
-      await downloadSkillsZip(importedSkills);
-    } finally {
-      setIsDownloadingAll(false);
-    }
-  }, [importedSkills]);
 
   return (
     <div className="space-y-3 p-3">
-      {/* Import toolbar */}
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-xs font-medium text-muted-foreground">Custom Skills</h4>
-        <div className="flex items-center gap-1">
-          <input
-            ref={zipInputRef}
-            type="file"
-            accept=".zip,application/zip"
-            className="hidden"
-            aria-label="Import skills ZIP file"
-            onChange={event => void handleImportZip(event)}
-          />
-          <input
-            ref={mdInputRef}
-            type="file"
-            accept=".md,text/markdown"
-            className="hidden"
-            aria-label="Import skill Markdown file"
-            onChange={event => void handleImportMd(event)}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => zipInputRef.current?.click()}
-            disabled={isImporting}
-            aria-busy={isImporting}
-            title="Import skills from ZIP"
-          >
-            {isImporting ? (
-              <Codicon name="loading" className="text-sm codicon-modifier-spin" />
-            ) : (
-              <Codicon name="cloud-upload" className="text-sm" />
-            )}
-            ZIP
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => mdInputRef.current?.click()}
-            disabled={isImporting}
-            aria-busy={isImporting}
-            title="Import a single skill .md file"
-          >
-            <Codicon name="cloud-upload" className="text-sm" />
-            .md
-          </Button>
-        </div>
-      </div>
-
-      {importStatus && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
-        >
-          {importStatus}
-        </div>
-      )}
-      {importError && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
-        >
-          {importError}
-        </div>
-      )}
-
       {/* Bundled skills */}
-      <div className="space-y-1">
-        <p className="text-[11px] font-medium text-muted-foreground">Bundled (read-only)</p>
-        {bundledSkills.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No bundled skills.</p>
-        ) : (
-          bundledSkills.map(skill => (
-            <div
-              key={`bundled-skill-${skill.metadata.name}`}
-              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{skill.metadata.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {skill.metadata.description}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 shrink-0"
-                onClick={() => downloadSkill(skill)}
-                aria-label={`Download ${skill.metadata.name} as template`}
-                title="Download as template"
+      {!hideBundled && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground">Bundled (read-only)</p>
+          {bundledSkills.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No bundled skills.</p>
+          ) : (
+            bundledSkills.map(skill => (
+              <div
+                key={`bundled-skill-${skill.metadata.name}`}
+                className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
               >
-                <Codicon name="cloud-download" className="text-sm" />
-              </Button>
-            </div>
-          ))
-        )}
-      </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{skill.metadata.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {skill.metadata.description}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0"
+                  onClick={() => downloadSkill(skill)}
+                  aria-label={`Download ${skill.metadata.name} as template`}
+                  title="Download as template"
+                >
+                  <Codicon name="cloud-download" className="text-sm" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Imported skills */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
-          {importedSkills.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            Uploaded ({importedSkills.length})
+          </p>
+          <div className="flex items-center gap-1">
+            <input
+              ref={zipInputRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              aria-label="Import skills ZIP file"
+              onChange={event => void handleImportZip(event)}
+            />
+            <input
+              ref={mdInputRef}
+              type="file"
+              accept=".md,text/markdown"
+              className="hidden"
+              aria-label="Import skill Markdown file"
+              onChange={event => void handleImportMd(event)}
+            />
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              className="h-6 gap-1 px-1.5 text-[11px]"
-              onClick={() => void handleDownloadAll()}
-              disabled={isDownloadingAll}
-              title="Download all custom skills as ZIP"
+              onClick={() => zipInputRef.current?.click()}
+              disabled={isImporting}
+              aria-busy={isImporting}
+              title="Import skills from ZIP"
             >
-              {isDownloadingAll ? (
-                <Codicon name="loading" className="text-xs codicon-modifier-spin" />
+              {isImporting ? (
+                <Codicon name="loading" className="text-sm codicon-modifier-spin" />
               ) : (
-                <Codicon name="cloud-download" className="text-xs" />
+                <Codicon name="cloud-upload" className="text-sm" />
               )}
-              Download all
+              ZIP
             </Button>
-          )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => mdInputRef.current?.click()}
+              disabled={isImporting}
+              aria-busy={isImporting}
+              title="Import a single skill .md file"
+            >
+              <Codicon name="cloud-upload" className="text-sm" />
+              .md
+            </Button>
+          </div>
         </div>
+
+        {importStatus && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
+          >
+            {importStatus}
+          </div>
+        )}
+        {importError && (
+          <div
+            role="alert"
+            className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
+          >
+            {importError}
+          </div>
+        )}
+
         {importedSkills.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No imported skills.</p>
+          <p className="text-xs text-muted-foreground">
+            No uploaded skills. Use the buttons above to import.
+          </p>
         ) : (
           importedSkills.map(skill => (
             <div
@@ -216,28 +188,16 @@ export const SkillManagerPanel: React.FC = () => {
                   {skill.metadata.description}
                 </p>
               </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => downloadSkill(skill)}
-                  aria-label={`Download ${skill.metadata.name}`}
-                  title="Download as .md"
-                >
-                  <Codicon name="cloud-download" className="text-sm" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-destructive hover:text-destructive"
-                  onClick={() => removeImportedSkill(skill.metadata.name)}
-                  aria-label={`Remove ${skill.metadata.name}`}
-                  title="Remove"
-                >
-                  <Codicon name="trash" className="text-sm" />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0 text-[var(--vscode-errorForeground)] hover:text-[var(--vscode-errorForeground)]"
+                onClick={() => removeImportedSkill(skill.metadata.name)}
+                aria-label={`Remove ${skill.metadata.name}`}
+                title="Remove"
+              >
+                <Codicon name="trash" className="text-sm" />
+              </Button>
             </div>
           ))
         )}

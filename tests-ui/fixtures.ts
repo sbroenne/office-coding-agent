@@ -41,12 +41,12 @@ function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
     state: {
       activeModel: 'claude-sonnet-4',
-      activeSkillNames: null,
+      disabledSkillNames: [],
       activeAgentId: 'Excel',
       importedSkills: [],
       importedAgents: [],
       importedMcpServers: [],
-      activeMcpServerNames: null,
+      disabledMcpServerNames: [],
       availableModels: [
         { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', provider: 'Anthropic' },
         { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
@@ -99,6 +99,13 @@ function makeLspError(id: number, code: number, message: string): string {
   return `Content-Length: ${byteLen}\r\n\r\n${json}`;
 }
 
+/** Wrap a JSON-RPC notification in an LSP-framed string. */
+function makeLspNotification(method: string, params: unknown): string {
+  const json = JSON.stringify({ jsonrpc: '2.0', method, params });
+  const byteLen = Buffer.byteLength(json, 'utf-8');
+  return `Content-Length: ${byteLen}\r\n\r\n${json}`;
+}
+
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 /**
  * Shared fixtures for UI tests.
@@ -112,12 +119,16 @@ function makeLspError(id: number, code: number, message: string): string {
  *    flow — models are genuinely fetched and applied to the UI.
  * - `disconnectedTaskpane`: WS connection is accepted then immediately closed.
  *    Tests that the app correctly surfaces session errors to the user.
+ * - `toolCardMockTaskpane`: deterministic mock that injects a synthetic
+ *    manage_skills tool call on every session.send, making tool card UI
+ *    tests fast and reliable without any live LLM calls.
  */
 export const test = base.extend<{
   taskpane: Page;
   configuredTaskpane: Page;
   mockServerTaskpane: Page;
   disconnectedTaskpane: Page;
+  toolCardMockTaskpane: Page;
 }>({
   /** Navigate to the task pane (default/fresh state). */
   taskpane: async ({ page }, use) => {
@@ -197,6 +208,128 @@ export const test = base.extend<{
         if (!msg || msg.id === undefined) return;
         // Reject every request with a server-side error
         ws.send(makeLspError(msg.id, -32001, 'Server is unavailable'));
+      });
+    });
+
+    await page.goto('/taskpane.html');
+    await page.waitForLoadState('domcontentloaded');
+    await use(page);
+  },
+
+  /**
+   * Deterministic mock for tool-card UI tests.
+   *
+   * On every session.send, injects a synthetic sequence of session events:
+   *   1. report_intent tool execution (should be filtered — no card created)
+   *   2. manage_skills tool execution start
+   *   3. manage_skills tool execution complete (with a canned result)
+   *   4. assistant.message_delta (short text reply)
+   *   5. session.idle (marks response as done)
+   *
+   * This lets tests verify tool-card rendering (CSS classes, structure,
+   * summary text, Input/Output headers) without any live LLM calls.
+   */
+  toolCardMockTaskpane: async ({ page }, use) => {
+    await page.addInitScript(officeRuntimePolyfill);
+    await page.addInitScript((json: string) => {
+      localStorage.setItem('office-coding-agent-settings', json);
+    }, makeSettingsJSON());
+
+    await page.routeWebSocket('wss://localhost:3000/api/copilot', ws => {
+      ws.onMessage(raw => {
+        const msg = parseLspMessage(raw);
+        if (!msg || msg.id === undefined) return;
+
+        if (msg.method === 'session.create') {
+          ws.send(makeLspResponse(msg.id, { sessionId: 'tool-card-session' }));
+        } else if (msg.method === 'models.list') {
+          ws.send(
+            makeLspResponse(msg.id, {
+              models: [{ id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }],
+            })
+          );
+        } else if (msg.method === 'session.send') {
+          const sessionId = 'tool-card-session';
+          // Acknowledge the send immediately
+          ws.send(makeLspResponse(msg.id, { messageId: 'mock-msg-1' }));
+
+          // Fire synthetic events with small delays so the UI renders each step
+          // 1. report_intent — must NOT produce a tool card
+          setTimeout(() => {
+            ws.send(
+              makeLspNotification('session.event', {
+                sessionId,
+                event: {
+                  type: 'tool.execution_start',
+                  data: {
+                    toolCallId: 'tc-intent',
+                    toolName: 'report_intent',
+                    arguments: { intent: 'Looking up the skill list…' },
+                  },
+                },
+              })
+            );
+          }, 30);
+
+          // 2. manage_skills start — creates the Working box + tool card
+          setTimeout(() => {
+            ws.send(
+              makeLspNotification('session.event', {
+                sessionId,
+                event: {
+                  type: 'tool.execution_start',
+                  data: {
+                    toolCallId: 'tc-skills',
+                    toolName: 'manage_skills',
+                    arguments: { action: 'list' },
+                  },
+                },
+              })
+            );
+          }, 80);
+
+          // 3. manage_skills complete — populates result + summary
+          setTimeout(() => {
+            ws.send(
+              makeLspNotification('session.event', {
+                sessionId,
+                event: {
+                  type: 'tool.execution_complete',
+                  data: {
+                    toolCallId: 'tc-skills',
+                    result: {
+                      content: 'Found 3 bundled skills: Excel Helper, Data Analyzer, Chart Builder.',
+                    },
+                  },
+                },
+              })
+            );
+          }, 130);
+
+          // 4. Text reply delta
+          setTimeout(() => {
+            ws.send(
+              makeLspNotification('session.event', {
+                sessionId,
+                event: {
+                  type: 'assistant.message_delta',
+                  data: { deltaContent: 'You have 3 bundled skills available.' },
+                },
+              })
+            );
+          }, 180);
+
+          // 5. session.idle — response complete
+          setTimeout(() => {
+            ws.send(
+              makeLspNotification('session.event', {
+                sessionId,
+                event: { type: 'session.idle', data: {} },
+              })
+            );
+          }, 230);
+        }
+        // Other methods (session.destroy, session.compact, etc.) are silently ignored
       });
     });
 

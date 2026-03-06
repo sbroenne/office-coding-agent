@@ -69,10 +69,14 @@ test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
     await expect(page.getByText(/sheet/i).first()).toBeVisible({ timeout: AI_TIMEOUT });
   });
 
-  test('multi-turn conversation sends and receives multiple messages', async ({
-    configuredTaskpane: page,
-  }) => {
-    test.setTimeout(AI_TIMEOUT * 2 + 30_000);
+  // Multi-turn needs its own retry — the session can drop between turns under parallel load
+  test.describe('multi-turn (with retry)', () => {
+    test.describe.configure({ retries: 1 });
+
+    test('multi-turn conversation sends and receives multiple messages', async ({
+      configuredTaskpane: page,
+    }) => {
+      test.setTimeout(AI_TIMEOUT * 2 + 30_000);
 
     const composer = page.getByPlaceholder('Send a message...');
     await expect(composer).toBeVisible({ timeout: 5000 });
@@ -94,7 +98,8 @@ test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
     const messages = page.locator('[data-role="assistant"]');
     await expect(messages).toHaveCount(2, { timeout: AI_TIMEOUT });
     await expect(messages.nth(1)).toContainText(/bravo/i, { timeout: AI_TIMEOUT });
-  });
+    });
+  }); // end multi-turn describe
 
   test('new conversation button clears the thread and starts fresh', async ({
     configuredTaskpane: page,

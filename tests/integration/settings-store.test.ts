@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { AgentConfig, AgentSkill, McpServerConfig, CopilotModel } from '@/types';
+import type { CopilotModel } from '@/types';
+import type { AgentSkill } from '@/types/skill';
+import type { AgentConfig } from '@/types/agent';
+import type { McpServerConfig } from '@/types/mcp';
 
 const TEST_MODELS: CopilotModel[] = [
   { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
@@ -43,92 +46,6 @@ describe('settingsStore — model', () => {
   });
 });
 
-// ─── Skill management ───
-
-describe('settingsStore — skills', () => {
-  it('starts with all skills enabled (null)', () => {
-    expect(useSettingsStore.getState().activeSkillNames).toBeNull();
-  });
-
-  it('toggleSkill on null materializes list minus toggled skill', () => {
-    useSettingsStore.getState().toggleSkill('xa2');
-    const names = useSettingsStore.getState().activeSkillNames;
-    expect(Array.isArray(names)).toBe(true);
-    expect(names).not.toContain('xa2');
-  });
-
-  it('toggleSkill adds a skill back after removal', () => {
-    useSettingsStore.getState().toggleSkill('xa2'); // remove
-    useSettingsStore.getState().toggleSkill('xa2'); // re-add
-    expect(useSettingsStore.getState().activeSkillNames).toContain('xa2');
-  });
-
-  it('toggleSkill handles multiple skills independently', () => {
-    useSettingsStore.getState().setActiveSkills(['xa2', 'another']);
-    useSettingsStore.getState().toggleSkill('xa2');
-    expect(useSettingsStore.getState().activeSkillNames).toEqual(['another']);
-  });
-
-  it('setActiveSkills replaces the full list', () => {
-    useSettingsStore.getState().setActiveSkills(['a', 'b']);
-    expect(useSettingsStore.getState().activeSkillNames).toEqual(['a', 'b']);
-  });
-
-  it('setActiveSkills(null) restores all-on default', () => {
-    useSettingsStore.getState().setActiveSkills(['a']);
-    useSettingsStore.getState().setActiveSkills(null);
-    expect(useSettingsStore.getState().activeSkillNames).toBeNull();
-  });
-
-  it('getActiveSkillNames returns null when all on', () => {
-    expect(useSettingsStore.getState().getActiveSkillNames()).toBeNull();
-  });
-
-  it('reset restores null (all skills on)', () => {
-    useSettingsStore.getState().setActiveSkills(['xa2']);
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().activeSkillNames).toBeNull();
-  });
-
-  it('importSkills stores imported skills', () => {
-    const skill: AgentSkill = {
-      metadata: {
-        name: 'Imported Skill',
-        description: 'Imported from zip.',
-        version: '1.0.0',
-        tags: [],
-        hosts: [],
-      },
-      content: 'Skill body',
-    };
-
-    useSettingsStore.getState().importSkills([skill]);
-
-    expect(useSettingsStore.getState().importedSkills).toHaveLength(1);
-    expect(useSettingsStore.getState().importedSkills[0].metadata.name).toBe('Imported Skill');
-  });
-
-  it('removeImportedSkill removes imported skill and prunes active list', () => {
-    const skill: AgentSkill = {
-      metadata: {
-        name: 'Imported Skill',
-        description: 'Imported from zip.',
-        version: '1.0.0',
-        tags: [],
-        hosts: [],
-      },
-      content: 'Skill body',
-    };
-
-    useSettingsStore.getState().importSkills([skill]);
-    useSettingsStore.getState().setActiveSkills(['Imported Skill']);
-    useSettingsStore.getState().removeImportedSkill('Imported Skill');
-
-    expect(useSettingsStore.getState().importedSkills).toEqual([]);
-    expect(useSettingsStore.getState().activeSkillNames).toEqual([]);
-  });
-});
-
 // ─── Agent management ───
 
 describe('settingsStore — agents', () => {
@@ -154,258 +71,200 @@ describe('settingsStore — agents', () => {
     useSettingsStore.getState().reset();
     expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
   });
+});
 
-  it('importAgents stores imported agents', () => {
-    const agent: AgentConfig = {
-      metadata: {
-        name: 'Imported Agent',
-        description: 'Imported from zip.',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: 'Do imported work.',
-    };
+// ─── Skill management ───
 
-    useSettingsStore.getState().importAgents([agent]);
-
-    expect(useSettingsStore.getState().importedAgents).toHaveLength(1);
-    expect(useSettingsStore.getState().importedAgents[0].metadata.name).toBe('Imported Agent');
+describe('settingsStore — skills', () => {
+  it('starts with no disabled skills', () => {
+    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
   });
 
-  it('removeImportedAgent resets active agent when removed agent was selected', () => {
-    const agent: AgentConfig = {
-      metadata: {
-        name: 'Imported Agent',
-        description: 'Imported from zip.',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: 'Do imported work.',
-    };
+  it('toggleSkill disables an enabled skill', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    expect(useSettingsStore.getState().disabledSkillNames).toContain('excel');
+  });
 
-    useSettingsStore.getState().importAgents([agent]);
-    useSettingsStore.getState().setActiveAgent('Imported Agent');
-    useSettingsStore.getState().removeImportedAgent('Imported Agent');
+  it('toggleSkill re-enables a disabled skill', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    useSettingsStore.getState().toggleSkill('excel');
+    expect(useSettingsStore.getState().disabledSkillNames).not.toContain('excel');
+  });
 
-    expect(useSettingsStore.getState().importedAgents).toEqual([]);
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
+  it('isSkillEnabled returns true for enabled skills', () => {
+    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(true);
+  });
+
+  it('isSkillEnabled returns false for disabled skills', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(false);
+  });
+
+  it('reset clears disabled skills', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
   });
 });
 
 // ─── MCP server management ───
 
-describe('settingsStore — MCP servers', () => {
-  const server1: McpServerConfig = { name: 'srv1', url: 'https://s1.com/mcp', transport: 'http' };
-  const server2: McpServerConfig = { name: 'srv2', url: 'https://s2.com/mcp', transport: 'sse' };
-
-  it('imports MCP servers', () => {
-    useSettingsStore.getState().importMcpServers([server1, server2]);
-    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(2);
+describe('settingsStore — mcp servers', () => {
+  it('starts with no disabled MCP servers', () => {
+    expect(useSettingsStore.getState().disabledMcpServerNames).toEqual([]);
   });
 
-  it('renames duplicate server names on import', () => {
-    useSettingsStore.getState().importMcpServers([server1]);
-    useSettingsStore.getState().importMcpServers([server1]);
-    const names = useSettingsStore.getState().importedMcpServers.map(s => s.name);
-    expect(names[0]).toBe('srv1');
-    expect(names[1]).toBe('srv1 (imported)');
-  });
-
-  it('removes a MCP server by name', () => {
-    useSettingsStore.getState().importMcpServers([server1, server2]);
-    useSettingsStore.getState().removeMcpServer('srv1');
-    expect(useSettingsStore.getState().importedMcpServers.map(s => s.name)).toEqual(['srv2']);
-  });
-
-  it('removes from activeMcpServerNames on server removal', () => {
-    useSettingsStore.getState().importMcpServers([server1, server2]);
-    useSettingsStore.setState({ activeMcpServerNames: ['srv1', 'srv2'] });
-    useSettingsStore.getState().removeMcpServer('srv1');
-    expect(useSettingsStore.getState().activeMcpServerNames).toEqual(['srv2']);
-  });
-
-  it('activeMcpServerNames is null (all on) by default', () => {
-    useSettingsStore.getState().importMcpServers([server1]);
-    expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
-  });
-
-  it('toggleMcpServer off materializes full list minus toggled server', () => {
-    useSettingsStore.getState().importMcpServers([server1, server2]);
-    useSettingsStore.getState().toggleMcpServer('srv1');
-    expect(useSettingsStore.getState().activeMcpServerNames).toEqual(['srv2']);
-  });
-
-  it('toggleMcpServer on adds server back to active list', () => {
-    useSettingsStore.getState().importMcpServers([server1, server2]);
-    useSettingsStore.setState({ activeMcpServerNames: ['srv2'] });
-    useSettingsStore.getState().toggleMcpServer('srv1');
-    expect(useSettingsStore.getState().activeMcpServerNames).toContain('srv1');
-  });
-
-  // Bug regression: toggling a bundled server from default state (null) should enable it
-  it('toggleMcpServer adds bundled server when activeMcpServerNames is null', () => {
-    // Default state: activeMcpServerNames === null (all imported ON, bundled OFF)
-    useSettingsStore.getState().importMcpServers([server1]);
-    expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
-    // Toggle a bundled server (e.g. 'workiq') that is NOT in importedMcpServers
+  it('toggleMcpServer disables an enabled server', () => {
     useSettingsStore.getState().toggleMcpServer('workiq');
-    const active = useSettingsStore.getState().activeMcpServerNames;
-    // Before fix: 'workiq' was silently dropped because allNames only contained imported servers
-    expect(active).toContain('workiq');
-    // Imported servers should also be present
-    expect(active).toContain('srv1');
+    expect(useSettingsStore.getState().disabledMcpServerNames).toContain('workiq');
   });
 
-  it('reset clears imported MCP servers', () => {
-    useSettingsStore.getState().importMcpServers([server1]);
+  it('toggleMcpServer re-enables a disabled server', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    expect(useSettingsStore.getState().disabledMcpServerNames).not.toContain('workiq');
+  });
+
+  it('isMcpServerEnabled returns true for enabled servers', () => {
+    expect(useSettingsStore.getState().isMcpServerEnabled('workiq')).toBe(true);
+  });
+
+  it('isMcpServerEnabled returns false for disabled servers', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    expect(useSettingsStore.getState().isMcpServerEnabled('workiq')).toBe(false);
+  });
+
+  it('reset clears disabled MCP servers', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
     useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().importedMcpServers).toEqual([]);
-    expect(useSettingsStore.getState().activeMcpServerNames).toBeNull();
-  });
-
-  it('updateMcpServer updates an existing imported server', () => {
-    useSettingsStore.getState().importMcpServers([server1]);
-    useSettingsStore.getState().updateMcpServer('srv1', { url: 'https://updated.com/mcp' });
-    expect(useSettingsStore.getState().importedMcpServers[0].url).toBe('https://updated.com/mcp');
-    expect(useSettingsStore.getState().importedMcpServers[0].name).toBe('srv1');
-  });
-
-  it('updateMcpServer preserves name even if config tries to change it', () => {
-    useSettingsStore.getState().importMcpServers([server1]);
-    useSettingsStore
-      .getState()
-      .updateMcpServer('srv1', { name: 'hacked', transport: 'sse' } as Partial<McpServerConfig>);
-    expect(useSettingsStore.getState().importedMcpServers[0].name).toBe('srv1');
-    expect(useSettingsStore.getState().importedMcpServers[0].transport).toBe('sse');
-  });
-
-  it('updateMcpServer is no-op for unknown server name', () => {
-    useSettingsStore.getState().importMcpServers([server1]);
-    useSettingsStore.getState().updateMcpServer('nonexistent', { url: 'https://x.com' });
-    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(1);
-    expect(useSettingsStore.getState().importedMcpServers[0].url).toBe('https://s1.com/mcp');
+    expect(useSettingsStore.getState().disabledMcpServerNames).toEqual([]);
   });
 });
 
-// ─── Deduplication / name collision ───
+// ─── Imported skills ───
 
-describe('settingsStore — name deduplication', () => {
-  it('importAgents renames an agent whose name collides with a bundled agent', () => {
-    // 'Excel' is the bundled Excel agent — importing it should get a unique name
-    const agent: AgentConfig = {
-      metadata: {
-        name: 'Excel',
-        description: 'duplicate of bundled',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: 'Custom override.',
-    };
+const SAMPLE_SKILL: AgentSkill = {
+  metadata: { name: 'test-skill', description: 'A test skill', version: '1.0.0', tags: [], hosts: [] },
+  content: 'Do something.',
+};
 
-    useSettingsStore.getState().importAgents([agent]);
-
-    const imported = useSettingsStore.getState().importedAgents;
-    expect(imported).toHaveLength(1);
-    expect(imported[0].metadata.name).toBe('Excel (imported)');
+describe('settingsStore — imported skills', () => {
+  it('starts with no imported skills', () => {
+    expect(useSettingsStore.getState().importedSkills).toEqual([]);
   });
 
-  it('importAgents renames second import of same name with incrementing suffix', () => {
-    const makeAgent = (name: string): AgentConfig => ({
-      metadata: {
-        name,
-        description: 'desc',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: '',
-    });
-
-    useSettingsStore.getState().importAgents([makeAgent('Custom'), makeAgent('Custom')]);
-
-    const names = useSettingsStore.getState().importedAgents.map(a => a.metadata.name);
-    expect(names[0]).toBe('Custom');
-    expect(names[1]).toBe('Custom (imported)');
+  it('addImportedSkill adds a skill', () => {
+    useSettingsStore.getState().addImportedSkill(SAMPLE_SKILL);
+    expect(useSettingsStore.getState().importedSkills).toHaveLength(1);
+    expect(useSettingsStore.getState().importedSkills[0].metadata.name).toBe('test-skill');
   });
 
-  it('importAgents applies incrementing index beyond "(imported)"', () => {
-    const makeAgent = (name: string): AgentConfig => ({
-      metadata: {
-        name,
-        description: 'desc',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: '',
-    });
-
-    useSettingsStore
-      .getState()
-      .importAgents([makeAgent('Dupe'), makeAgent('Dupe'), makeAgent('Dupe')]);
-
-    const names = useSettingsStore.getState().importedAgents.map(a => a.metadata.name);
-    expect(names[0]).toBe('Dupe');
-    expect(names[1]).toBe('Dupe (imported)');
-    expect(names[2]).toBe('Dupe (imported 2)');
+  it('addImportedSkill replaces an existing skill with the same name', () => {
+    useSettingsStore.getState().addImportedSkill(SAMPLE_SKILL);
+    useSettingsStore.getState().addImportedSkill({ ...SAMPLE_SKILL, content: 'Updated.' });
+    expect(useSettingsStore.getState().importedSkills).toHaveLength(1);
+    expect(useSettingsStore.getState().importedSkills[0].content).toBe('Updated.');
   });
 
-  it('importSkills renames a skill whose name collides with a bundled skill', () => {
-    // 'excel' is a bundled skill
-    const skill: AgentSkill = {
-      metadata: { name: 'excel', description: 'duplicate', version: '1.0.0', tags: [], hosts: [] },
-      content: 'Custom excel skill.',
-    };
-
-    useSettingsStore.getState().importSkills([skill]);
-
-    const imported = useSettingsStore.getState().importedSkills;
-    expect(imported).toHaveLength(1);
-    expect(imported[0].metadata.name).toBe('excel (imported)');
+  it('removeImportedSkill removes a skill by name', () => {
+    useSettingsStore.getState().addImportedSkill(SAMPLE_SKILL);
+    useSettingsStore.getState().removeImportedSkill('test-skill');
+    expect(useSettingsStore.getState().importedSkills).toHaveLength(0);
   });
 
-  it('importSkills renames second import of same name', () => {
-    const makeSkill = (name: string): AgentSkill => ({
-      metadata: { name, description: 'desc', version: '1.0.0', tags: [], hosts: [] },
-      content: 'content',
-    });
-
-    useSettingsStore.getState().importSkills([makeSkill('MySkill'), makeSkill('MySkill')]);
-
-    const names = useSettingsStore.getState().importedSkills.map(s => s.metadata.name);
-    expect(names[0]).toBe('MySkill');
-    expect(names[1]).toBe('MySkill (imported)');
+  it('removeImportedSkill is a no-op for unknown names', () => {
+    useSettingsStore.getState().addImportedSkill(SAMPLE_SKILL);
+    useSettingsStore.getState().removeImportedSkill('no-such-skill');
+    expect(useSettingsStore.getState().importedSkills).toHaveLength(1);
   });
 
-  it('importMcpServers renames duplicate server names on re-import', () => {
-    const server: McpServerConfig = { name: 'srv', url: 'https://srv.com/mcp', transport: 'http' };
+  it('reset clears imported skills', () => {
+    useSettingsStore.getState().addImportedSkill(SAMPLE_SKILL);
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().importedSkills).toEqual([]);
+  });
+});
 
-    useSettingsStore.getState().importMcpServers([server]);
-    useSettingsStore.getState().importMcpServers([server]);
+// ─── Imported agents ───
 
-    const names = useSettingsStore.getState().importedMcpServers.map(s => s.name);
-    expect(names[0]).toBe('srv');
-    expect(names[1]).toBe('srv (imported)');
+const SAMPLE_AGENT: AgentConfig = {
+  metadata: {
+    name: 'test-agent',
+    description: 'A test agent',
+    version: '1.0.0',
+    hosts: ['excel'],
+    defaultForHosts: [],
+  },
+  instructions: 'Do something.',
+};
+
+describe('settingsStore — imported agents', () => {
+  it('starts with no imported agents', () => {
+    expect(useSettingsStore.getState().importedAgents).toEqual([]);
   });
 
-  it('setActiveAgent accepts an imported agent after it is imported', () => {
-    const agent: AgentConfig = {
-      metadata: {
-        name: 'Custom Agent',
-        description: 'desc',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: '',
-    };
+  it('addImportedAgent adds an agent', () => {
+    useSettingsStore.getState().addImportedAgent(SAMPLE_AGENT);
+    expect(useSettingsStore.getState().importedAgents).toHaveLength(1);
+    expect(useSettingsStore.getState().importedAgents[0].metadata.name).toBe('test-agent');
+  });
 
-    useSettingsStore.getState().importAgents([agent]);
-    useSettingsStore.getState().setActiveAgent('Custom Agent');
+  it('addImportedAgent replaces an existing agent with the same name', () => {
+    useSettingsStore.getState().addImportedAgent(SAMPLE_AGENT);
+    useSettingsStore.getState().addImportedAgent({ ...SAMPLE_AGENT, instructions: 'Updated.' });
+    expect(useSettingsStore.getState().importedAgents).toHaveLength(1);
+    expect(useSettingsStore.getState().importedAgents[0].instructions).toBe('Updated.');
+  });
 
-    expect(useSettingsStore.getState().activeAgentId).toBe('Custom Agent');
+  it('removeImportedAgent removes an agent by name', () => {
+    useSettingsStore.getState().addImportedAgent(SAMPLE_AGENT);
+    useSettingsStore.getState().removeImportedAgent('test-agent');
+    expect(useSettingsStore.getState().importedAgents).toHaveLength(0);
+  });
+
+  it('reset clears imported agents', () => {
+    useSettingsStore.getState().addImportedAgent(SAMPLE_AGENT);
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().importedAgents).toEqual([]);
+  });
+});
+
+// ─── Imported MCP servers ───
+
+const SAMPLE_MCP: McpServerConfig = {
+  name: 'test-mcp',
+  description: 'A test server',
+  transport: 'http',
+  url: 'https://example.com/mcp',
+};
+
+describe('settingsStore — imported MCP servers', () => {
+  it('starts with no imported MCP servers', () => {
+    expect(useSettingsStore.getState().importedMcpServers).toEqual([]);
+  });
+
+  it('addImportedMcpServer adds a server', () => {
+    useSettingsStore.getState().addImportedMcpServer(SAMPLE_MCP);
+    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(1);
+    expect(useSettingsStore.getState().importedMcpServers[0].name).toBe('test-mcp');
+  });
+
+  it('addImportedMcpServer replaces an existing server with the same name', () => {
+    useSettingsStore.getState().addImportedMcpServer(SAMPLE_MCP);
+    useSettingsStore.getState().addImportedMcpServer({ ...SAMPLE_MCP, url: 'https://new.com/mcp' });
+    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(1);
+    expect(useSettingsStore.getState().importedMcpServers[0].url).toBe('https://new.com/mcp');
+  });
+
+  it('removeImportedMcpServer removes a server by name', () => {
+    useSettingsStore.getState().addImportedMcpServer(SAMPLE_MCP);
+    useSettingsStore.getState().removeImportedMcpServer('test-mcp');
+    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(0);
+  });
+
+  it('reset clears imported MCP servers', () => {
+    useSettingsStore.getState().addImportedMcpServer(SAMPLE_MCP);
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().importedMcpServers).toEqual([]);
   });
 });
