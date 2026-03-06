@@ -148,6 +148,52 @@ function runCopilotCommand(args) {
   }
 }
 
+// ─── Auto-Setup: register our marketplace and install host plugins ──────────
+
+const OCA_MARKETPLACE = 'sbroenne/office-coding-agent-plugins';
+const OCA_MARKETPLACE_NAME = 'office-coding-agent';
+const HOST_PLUGINS = ['office-excel', 'office-powerpoint', 'office-word', 'office-outlook'];
+
+function autoSetupPlugins() {
+  try {
+    const config = readCopilotConfig();
+    const marketplaces = config.marketplaces || {};
+    const installed = config.installed_plugins || [];
+
+    // 1. Register our marketplace if not already registered
+    const hasMarketplace = OCA_MARKETPLACE_NAME in marketplaces;
+    if (!hasMarketplace) {
+      console.log(`  [auto-setup] Registering marketplace: ${OCA_MARKETPLACE}`);
+      const result = runCopilotCommand(`marketplace add ${OCA_MARKETPLACE}`);
+      if (result.success) {
+        console.log(`  [auto-setup] ✓ Marketplace registered`);
+      } else {
+        console.warn(`  [auto-setup] ⚠ Marketplace registration failed: ${result.message}`);
+      }
+    }
+
+    // 2. Install host plugins if missing
+    for (const pluginName of HOST_PLUGINS) {
+      const isInstalled = Array.isArray(installed)
+        ? installed.some(p => p.name === pluginName)
+        : false;
+      if (!isInstalled) {
+        console.log(`  [auto-setup] Installing plugin: ${pluginName}`);
+        const result = runCopilotCommand(`install ${pluginName}@${OCA_MARKETPLACE_NAME}`);
+        if (result.success) {
+          console.log(`  [auto-setup] ✓ ${pluginName} installed`);
+        } else {
+          console.warn(`  [auto-setup] ⚠ ${pluginName} install failed: ${result.message}`);
+        }
+      }
+    }
+
+    console.log('  [auto-setup] Plugin setup complete');
+  } catch (err) {
+    console.warn(`  [auto-setup] Auto-setup failed (non-fatal): ${err.message}`);
+  }
+}
+
 /** Check that the port is available, exit early if it's in use. */
 async function checkPort(port) {
   return new Promise((resolve, reject) => {
@@ -549,6 +595,9 @@ async function createServer() {
   httpsServer.listen(PORT, () => {
     console.log(`\n  Copilot Office Add-in server running on https://localhost:${PORT}`);
     console.log(`  API: https://localhost:${PORT}/api\n`);
+
+    // Auto-setup plugins in background (non-blocking)
+    setTimeout(autoSetupPlugins, 500);
   });
 }
 

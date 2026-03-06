@@ -19,11 +19,11 @@ interface ChatPanelProps {
 const McpPill: React.FC<{ onOpenPanel?: (panel: string) => void }> = ({ onOpenPanel }) => {
   return (
     <button
-      onClick={() => onOpenPanel?.('mcp')}
+      onClick={() => onOpenPanel?.('plugins')}
       className="relative inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
       style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
-      aria-label="MCP Tools"
-      title="MCP Servers"
+      aria-label="Plugins"
+      title="Plugins"
     >
       <Codicon name="extensions" className="text-[12px]" />
     </button>

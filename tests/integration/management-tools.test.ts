@@ -1,14 +1,17 @@
 /**
- * Integration tests for management tools (manage_skills, manage_agents, manage_mcp_servers).
+ * Integration tests for management tools (manage_plugins, manage_memory).
  *
- * These exercise real Zustand store operations through the tool handlers — no mocks.
+ * manage_plugins calls pluginService REST endpoints — we mock global fetch.
+ * manage_memory exercises real Zustand store operations — no mocks.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import Ajv from 'ajv';
-import { useSettingsStore } from '@/stores';
-import { setImportedSkills } from '@/services/skills/skillService';
-import { manageSkillsTool, manageAgentsTool, manageMcpServersTool } from '@/tools/management';
+import {
+  managePluginsTool,
+  manageMemoryTool,
+  managementTools,
+} from '@/tools/management';
 
 const ajv = new Ajv({ allErrors: true });
 
@@ -16,434 +19,399 @@ function validate(schema: unknown, data: unknown): boolean {
   return !!ajv.compile(schema as object)(data);
 }
 
-/** Call a tool handler and parse the JSON result */
-function call(tool: { handler?: unknown }, args: Record<string, unknown>): unknown {
-  const handler = (tool as { handler: (a: unknown, i: unknown) => unknown }).handler;
+/** Call the async manage_plugins handler and parse JSON result */
+async function callAsync(
+  tool: { handler?: unknown },
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const handler = (tool as { handler: (a: unknown, i: unknown) => Promise<string> }).handler;
+  const raw = await handler(args, {});
+  return JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw));
+}
+
+/** Call the sync manage_memory handler and parse JSON result */
+function callSync(tool: { handler?: unknown }, args: Record<string, unknown>): unknown {
+  const handler = (tool as { handler: (a: unknown, i: unknown) => string }).handler;
   const raw = handler(args, {});
   return JSON.parse(raw as string);
 }
 
+// ─── Mock fetch for pluginService calls ─────────────────────────────────────
+
+let fetchMock: Mock;
+
 beforeEach(() => {
-  useSettingsStore.getState().reset();
-  setImportedSkills([]);
+  fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
 });
+
+/** Helper: make fetch return a successful JSON response */
+function mockFetchOk(body: unknown) {
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(body),
+  });
+}
+
+/** Helper: make fetch reject (network failure) */
+function mockFetchReject(message: string) {
+  fetchMock.mockRejectedValueOnce(new Error(message));
+}
 
 // ─── Schema validation ──────────────────────────────────────────────────────
 
 describe('management tool schemas', () => {
-  it('manage_skills accepts list action', () => {
-    expect(validate(manageSkillsTool.parameters, { action: 'list' })).toBe(true);
+  describe('manage_plugins', () => {
+    it('accepts list action', () => {
+      expect(validate(managePluginsTool.parameters, { action: 'list' })).toBe(true);
+    });
+
+    it('accepts install with spec param', () => {
+      expect(
+        validate(managePluginsTool.parameters, {
+          action: 'install',
+          spec: 'owner/repo',
+        }),
+      ).toBe(true);
+    });
+
+    it('accepts browse with marketplace param', () => {
+      expect(
+        validate(managePluginsTool.parameters, {
+          action: 'browse',
+          marketplace: 'awesome-copilot',
+        }),
+      ).toBe(true);
+    });
+
+    it('accepts uninstall with name param', () => {
+      expect(
+        validate(managePluginsTool.parameters, {
+          action: 'uninstall',
+          name: 'my-plugin',
+        }),
+      ).toBe(true);
+    });
+
+    it('accepts enable and disable', () => {
+      expect(validate(managePluginsTool.parameters, { action: 'enable', name: 'p' })).toBe(true);
+      expect(validate(managePluginsTool.parameters, { action: 'disable', name: 'p' })).toBe(true);
+    });
+
+    it('accepts update with name', () => {
+      expect(
+        validate(managePluginsTool.parameters, { action: 'update', name: 'my-plugin' }),
+      ).toBe(true);
+    });
+
+    it('accepts marketplace-management actions', () => {
+      expect(validate(managePluginsTool.parameters, { action: 'marketplaces' })).toBe(true);
+      expect(
+        validate(managePluginsTool.parameters, {
+          action: 'add_marketplace',
+          spec: 'https://example.com/marketplace.json',
+        }),
+      ).toBe(true);
+      expect(
+        validate(managePluginsTool.parameters, {
+          action: 'remove_marketplace',
+          name: 'custom-mp',
+        }),
+      ).toBe(true);
+    });
+
+    it('rejects missing action', () => {
+      expect(validate(managePluginsTool.parameters, { name: 'test' })).toBe(false);
+    });
+
+    it('has the expected action enum values', () => {
+      const actionProp = (managePluginsTool.parameters as { properties: { action: { enum: string[] } } })
+        .properties.action;
+      expect(actionProp.enum).toEqual([
+        'list',
+        'browse',
+        'install',
+        'uninstall',
+        'enable',
+        'disable',
+        'update',
+        'marketplaces',
+        'add_marketplace',
+        'remove_marketplace',
+      ]);
+    });
+
+    it('has name, spec, and marketplace optional parameters', () => {
+      const props = (managePluginsTool.parameters as { properties: Record<string, unknown> }).properties;
+      expect(props).toHaveProperty('name');
+      expect(props).toHaveProperty('spec');
+      expect(props).toHaveProperty('marketplace');
+    });
   });
 
-  it('manage_skills accepts install with all params', () => {
-    expect(
-      validate(manageSkillsTool.parameters, {
-        action: 'install',
-        name: 'test',
-        description: 'desc',
-        version: '1.0.0',
-        hosts: ['excel'],
-        tags: ['tag1'],
-        content: 'body',
-      })
-    ).toBe(true);
-  });
+  describe('manage_memory', () => {
+    it('accepts list action', () => {
+      expect(validate(manageMemoryTool.parameters, { action: 'list' })).toBe(true);
+    });
 
-  it('manage_skills rejects missing action', () => {
-    expect(validate(manageSkillsTool.parameters, { name: 'test' })).toBe(false);
-  });
+    it('accepts save with content', () => {
+      expect(
+        validate(manageMemoryTool.parameters, { action: 'save', content: 'User prefers dark mode' }),
+      ).toBe(true);
+    });
 
-  it('manage_agents accepts list action', () => {
-    expect(validate(manageAgentsTool.parameters, { action: 'list' })).toBe(true);
-  });
+    it('accepts search with query', () => {
+      expect(
+        validate(manageMemoryTool.parameters, { action: 'search', query: 'dark mode' }),
+      ).toBe(true);
+    });
 
-  it('manage_agents accepts install with structured params', () => {
-    expect(
-      validate(manageAgentsTool.parameters, {
-        action: 'install',
-        name: 'My Agent',
-        hosts: ['excel'],
-        instructions: 'Do something.',
-      })
-    ).toBe(true);
-  });
-
-  it('manage_mcp_servers accepts list action', () => {
-    expect(validate(manageMcpServersTool.parameters, { action: 'list' })).toBe(true);
-  });
-
-  it('manage_mcp_servers accepts install', () => {
-    expect(
-      validate(manageMcpServersTool.parameters, {
-        action: 'install',
-        name: 'my-server',
-        url: 'https://example.com/mcp',
-        transport: 'http',
-      })
-    ).toBe(true);
-  });
-
-  it('manage_mcp_servers rejects invalid transport', () => {
-    expect(
-      validate(manageMcpServersTool.parameters, {
-        action: 'install',
-        name: 'server',
-        url: 'https://example.com',
-        transport: 'grpc',
-      })
-    ).toBe(false);
+    it('rejects missing action', () => {
+      expect(validate(manageMemoryTool.parameters, { content: 'test' })).toBe(false);
+    });
   });
 });
 
-// ─── manage_skills handler ──────────────────────────────────────────────────
+// ─── managementTools array ──────────────────────────────────────────────────
 
-describe('manage_skills handler', () => {
-  it('list returns bundled skills', () => {
-    const result = call(manageSkillsTool, { action: 'list' }) as {
-      skills: { name: string; active: boolean }[];
+describe('managementTools array', () => {
+  it('contains exactly manage_plugins and manage_memory', () => {
+    const names = managementTools.map(t => t.name);
+    expect(names).toEqual(['manage_plugins', 'manage_memory']);
+  });
+
+  it('has length 2', () => {
+    expect(managementTools).toHaveLength(2);
+  });
+});
+
+// ─── manage_plugins handler ─────────────────────────────────────────────────
+
+describe('manage_plugins handler', () => {
+  it('list returns installed plugins', async () => {
+    mockFetchOk({ plugins: [
+      {
+        name: 'my-plugin',
+        version: '1.0.0',
+        enabled: true,
+        marketplace: 'awesome-copilot',
+        components: { agentCount: 1, skillCount: 2, mcpServerCount: 0 },
+      },
+    ] });
+
+    const result = (await callAsync(managePluginsTool, { action: 'list' })) as {
+      plugins: { name: string; enabled: boolean }[];
       count: number;
     };
-    expect(result.count).toBeGreaterThan(0);
-    expect(result.skills.some(s => s.name === 'excel')).toBe(true);
+    expect(result.count).toBe(1);
+    expect(result.plugins[0].name).toBe('my-plugin');
+    expect(result.plugins[0].enabled).toBe(true);
   });
 
-  it('install → list → remove roundtrip', () => {
-    // Install
-    const installed = call(manageSkillsTool, {
-      action: 'install',
-      name: 'New Skill',
-      content: '## Guide\nUse this for testing.',
-      hosts: ['excel'],
-    }) as { installed: boolean; name: string };
-    expect(installed.installed).toBe(true);
-    expect(installed.name).toBe('New Skill');
+  it('browse returns marketplace plugins', async () => {
+    mockFetchOk({ marketplace: 'my-mp', plugins: [
+      { name: 'cool-plugin', description: 'A cool plugin', version: '2.0.0', installed: false },
+    ] });
 
-    // List — should include the new skill
-    const listed = call(manageSkillsTool, { action: 'list' }) as {
-      skills: { name: string }[];
-    };
-    expect(listed.skills.some(s => s.name === 'New Skill')).toBe(true);
-
-    // Remove
-    const removed = call(manageSkillsTool, {
-      action: 'remove',
-      name: 'New Skill',
-    }) as { removed: boolean };
-    expect(removed.removed).toBe(true);
-
-    // List again — should be gone
-    const afterRemove = call(manageSkillsTool, { action: 'list' }) as {
-      skills: { name: string }[];
-    };
-    expect(afterRemove.skills.some(s => s.name === 'New Skill')).toBe(false);
+    const result = (await callAsync(managePluginsTool, {
+      action: 'browse',
+      marketplace: 'my-mp',
+    })) as { marketplace: string; plugins: { name: string }[]; count: number };
+    expect(result.marketplace).toBe('my-mp');
+    expect(result.count).toBe(1);
+    expect(result.plugins[0].name).toBe('cool-plugin');
   });
 
-  it('install requires name', () => {
-    const result = call(manageSkillsTool, {
+  it('browse defaults to awesome-copilot marketplace', async () => {
+    mockFetchOk({ marketplace: 'awesome-copilot', plugins: [] });
+    const result = (await callAsync(managePluginsTool, { action: 'browse' })) as {
+      marketplace: string;
+    };
+    expect(result.marketplace).toBe('awesome-copilot');
+  });
+
+  it('install requires spec', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'install' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('spec');
+  });
+
+  it('install calls pluginService with spec', async () => {
+    mockFetchOk({ installed: true, name: 'new-plugin' });
+    const result = (await callAsync(managePluginsTool, {
       action: 'install',
-      content: 'body',
-    }) as { error: string };
+      spec: 'owner/repo',
+    })) as { installed: boolean; name: string };
+    expect(result.installed).toBe(true);
+    expect(result.name).toBe('new-plugin');
+  });
+
+  it('uninstall requires name', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'uninstall' })) as {
+      error: string;
+    };
     expect(result.error).toContain('name');
   });
 
-  it('install requires content', () => {
-    const result = call(manageSkillsTool, {
-      action: 'install',
-      name: 'No Content',
-    }) as { error: string };
+  it('enable requires name', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'enable' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('name');
+  });
+
+  it('disable requires name', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'disable' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('name');
+  });
+
+  it('update requires name', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'update' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('name');
+  });
+
+  it('add_marketplace requires spec', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'add_marketplace' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('spec');
+  });
+
+  it('remove_marketplace requires name', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'remove_marketplace' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('name');
+  });
+
+  it('marketplaces returns registered marketplaces', async () => {
+    mockFetchOk({ marketplaces: [
+      { name: 'awesome-copilot', source: 'built-in', isBuiltIn: true, pluginCount: 42 },
+    ] });
+    const result = (await callAsync(managePluginsTool, { action: 'marketplaces' })) as {
+      marketplaces: { name: string; isBuiltIn: boolean }[];
+      count: number;
+    };
+    expect(result.count).toBe(1);
+    expect(result.marketplaces[0].name).toBe('awesome-copilot');
+    expect(result.marketplaces[0].isBuiltIn).toBe(true);
+  });
+
+  it('unknown action returns error', async () => {
+    const result = (await callAsync(managePluginsTool, { action: 'purge' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('Unknown action');
+  });
+
+  it('network failure returns error JSON', async () => {
+    mockFetchReject('fetch failed');
+    const result = (await callAsync(managePluginsTool, { action: 'list' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('fetch failed');
+  });
+
+  it('non-ok response returns error JSON', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('server error'),
+    });
+    const result = (await callAsync(managePluginsTool, { action: 'list' })) as {
+      error: string;
+    };
+    expect(result.error).toContain('500');
+  });
+});
+
+// ─── manage_memory handler ──────────────────────────────────────────────────
+
+describe('manage_memory handler', () => {
+  it('list returns empty initially', () => {
+    const result = callSync(manageMemoryTool, { action: 'list' }) as {
+      count: number;
+      memories: unknown[];
+    };
+    expect(result.count).toBe(0);
+    expect(result.memories).toEqual([]);
+  });
+
+  it('save → list → remove roundtrip', () => {
+    const saved = callSync(manageMemoryTool, {
+      action: 'save',
+      content: 'User prefers blue headers',
+      category: 'preference',
+    }) as { saved: boolean; id: string };
+    expect(saved.saved).toBe(true);
+    expect(saved.id).toBeTruthy();
+
+    const listed = callSync(manageMemoryTool, { action: 'list' }) as {
+      count: number;
+      memories: { id: string; content: string; category: string }[];
+    };
+    expect(listed.count).toBe(1);
+    expect(listed.memories[0].content).toBe('User prefers blue headers');
+    expect(listed.memories[0].category).toBe('preference');
+
+    const removed = callSync(manageMemoryTool, {
+      action: 'remove',
+      id: saved.id,
+    }) as { removed: boolean };
+    expect(removed.removed).toBe(true);
+
+    const afterRemove = callSync(manageMemoryTool, { action: 'list' }) as {
+      count: number;
+    };
+    expect(afterRemove.count).toBe(0);
+  });
+
+  it('save requires content', () => {
+    const result = callSync(manageMemoryTool, { action: 'save' }) as { error: string };
     expect(result.error).toContain('content');
   });
 
-  it('toggle changes active state', () => {
-    // Install → toggle OFF → check → toggle ON → check
-    call(manageSkillsTool, {
-      action: 'install',
-      name: 'ToggleSkill',
-      content: 'body',
-    });
-
-    const toggled = call(manageSkillsTool, {
-      action: 'toggle',
-      name: 'ToggleSkill',
-    }) as { toggled: boolean; name: string; active: boolean };
-    expect(toggled.toggled).toBe(true);
-    expect(toggled.name).toBe('ToggleSkill');
-    expect(toggled.active).toBe(false);
+  it('search requires query', () => {
+    const result = callSync(manageMemoryTool, { action: 'search' }) as { error: string };
+    expect(result.error).toContain('query');
   });
 
-  it('toggle requires name', () => {
-    const result = call(manageSkillsTool, { action: 'toggle' }) as { error: string };
-    expect(result.error).toContain('name');
+  it('search finds matching memories', () => {
+    callSync(manageMemoryTool, { action: 'save', content: 'Team name is Contoso' });
+    callSync(manageMemoryTool, { action: 'save', content: 'Prefers dark mode' });
+
+    const result = callSync(manageMemoryTool, {
+      action: 'search',
+      query: 'Contoso',
+    }) as { count: number; results: { content: string }[] };
+    expect(result.count).toBe(1);
+    expect(result.results[0].content).toContain('Contoso');
   });
 
-  it('remove requires name', () => {
-    const result = call(manageSkillsTool, { action: 'remove' }) as { error: string };
-    expect(result.error).toContain('name');
+  it('remove requires id', () => {
+    const result = callSync(manageMemoryTool, { action: 'remove' }) as { error: string };
+    expect(result.error).toContain('id');
   });
 
-  it('unknown action returns error', () => {
-    const result = call(manageSkillsTool, { action: 'delete' }) as { error: string };
-    expect(result.error).toContain('Unknown action');
-  });
+  it('clear deletes all memories', () => {
+    callSync(manageMemoryTool, { action: 'save', content: 'Fact 1' });
+    callSync(manageMemoryTool, { action: 'save', content: 'Fact 2' });
 
-  it('install_from_npm registers a package and appears in list', () => {
-    const result = call(manageSkillsTool, {
-      action: 'install_from_npm',
-      package: '@myorg/my-skills',
-    }) as { registered: boolean; package: string };
-    expect(result.registered).toBe(true);
-    expect(result.package).toBe('@myorg/my-skills');
+    const cleared = callSync(manageMemoryTool, { action: 'clear' }) as { cleared: boolean };
+    expect(cleared.cleared).toBe(true);
 
-    // Should appear in list
-    const listed = call(manageSkillsTool, { action: 'list' }) as {
-      npmSkillPackages: string[];
-    };
-    expect(listed.npmSkillPackages).toContain('@myorg/my-skills');
-  });
-
-  it('install_from_npm requires package', () => {
-    const result = call(manageSkillsTool, { action: 'install_from_npm' }) as { error: string };
-    expect(result.error).toContain('package');
-  });
-
-  it('remove_npm_package removes a registered package', () => {
-    // Register first
-    call(manageSkillsTool, { action: 'install_from_npm', package: 'my-skill-pkg' });
-    // Remove
-    const removed = call(manageSkillsTool, {
-      action: 'remove_npm_package',
-      package: 'my-skill-pkg',
-    }) as { removed: boolean; package: string };
-    expect(removed.removed).toBe(true);
-
-    // Should be gone from list
-    const listed = call(manageSkillsTool, { action: 'list' }) as {
-      npmSkillPackages: string[];
-    };
-    expect(listed.npmSkillPackages).not.toContain('my-skill-pkg');
-  });
-
-  it('remove_npm_package requires package', () => {
-    const result = call(manageSkillsTool, { action: 'remove_npm_package' }) as { error: string };
-    expect(result.error).toContain('package');
-  });
-});
-
-// ─── manage_agents handler ──────────────────────────────────────────────────
-
-describe('manage_agents handler', () => {
-  it('list returns bundled agents', () => {
-    const result = call(manageAgentsTool, { action: 'list' }) as {
-      agents: { name: string; active: boolean }[];
-      count: number;
-    };
-    expect(result.count).toBeGreaterThan(0);
-    expect(result.agents.some(a => a.name === 'Excel')).toBe(true);
-  });
-
-  it('install → list → remove roundtrip', () => {
-    const installed = call(manageAgentsTool, {
-      action: 'install',
-      name: 'Test Agent',
-      hosts: ['excel'],
-      instructions: 'Be helpful.',
-    }) as { installed: boolean; name: string };
-    expect(installed.installed).toBe(true);
-
-    const listed = call(manageAgentsTool, { action: 'list' }) as {
-      agents: { name: string }[];
-    };
-    expect(listed.agents.some(a => a.name === 'Test Agent')).toBe(true);
-
-    const removed = call(manageAgentsTool, {
-      action: 'remove',
-      name: 'Test Agent',
-    }) as { removed: boolean };
-    expect(removed.removed).toBe(true);
-
-    const afterRemove = call(manageAgentsTool, { action: 'list' }) as {
-      agents: { name: string }[];
-    };
-    expect(afterRemove.agents.some(a => a.name === 'Test Agent')).toBe(false);
-  });
-
-  it('install requires name', () => {
-    const result = call(manageAgentsTool, {
-      action: 'install',
-      hosts: ['excel'],
-      instructions: 'body',
-    }) as { error: string };
-    expect(result.error).toContain('name');
-  });
-
-  it('install requires hosts', () => {
-    const result = call(manageAgentsTool, {
-      action: 'install',
-      name: 'Agent',
-      instructions: 'body',
-    }) as { error: string };
-    expect(result.error).toContain('hosts');
-  });
-
-  it('install requires instructions', () => {
-    const result = call(manageAgentsTool, {
-      action: 'install',
-      name: 'Agent',
-      hosts: ['excel'],
-    }) as { error: string };
-    expect(result.error).toContain('instructions');
-  });
-
-  it('set_active changes active agent', () => {
-    // Install a new agent and set it active
-    call(manageAgentsTool, {
-      action: 'install',
-      name: 'Custom Agent',
-      hosts: ['excel'],
-      instructions: 'Be awesome.',
-    });
-
-    const result = call(manageAgentsTool, {
-      action: 'set_active',
-      name: 'Custom Agent',
-    }) as { activeAgentId: string; message: string };
-    expect(result.activeAgentId).toBe('Custom Agent');
-    expect(result.message).toContain('Custom Agent');
-  });
-
-  it('set_active requires name', () => {
-    const result = call(manageAgentsTool, { action: 'set_active' }) as { error: string };
-    expect(result.error).toContain('name');
-  });
-
-  it('remove requires name', () => {
-    const result = call(manageAgentsTool, { action: 'remove' }) as { error: string };
-    expect(result.error).toContain('name');
+    const listed = callSync(manageMemoryTool, { action: 'list' }) as { count: number };
+    expect(listed.count).toBe(0);
   });
 
   it('unknown action returns error', () => {
-    const result = call(manageAgentsTool, { action: 'update' }) as { error: string };
-    expect(result.error).toContain('Unknown action');
-  });
-});
-
-// ─── manage_mcp_servers handler ─────────────────────────────────────────────
-
-describe('manage_mcp_servers handler', () => {
-  it('list returns empty initially', () => {
-    const result = call(manageMcpServersTool, { action: 'list' }) as {
-      servers: unknown[];
-      count: number;
-    };
-    expect(result.count).toBe(0);
-    expect(result.servers).toEqual([]);
-  });
-
-  it('install → list → remove roundtrip', () => {
-    const installed = call(manageMcpServersTool, {
-      action: 'install',
-      name: 'my-server',
-      url: 'https://example.com/mcp',
-      transport: 'http',
-      description: 'Test MCP server',
-    }) as { installed: boolean; name: string };
-    expect(installed.installed).toBe(true);
-
-    const listed = call(manageMcpServersTool, { action: 'list' }) as {
-      servers: { name: string; url: string; transport: string }[];
-    };
-    expect(listed.servers).toHaveLength(1);
-    expect(listed.servers[0].name).toBe('my-server');
-    expect(listed.servers[0].url).toBe('https://example.com/mcp');
-
-    const removed = call(manageMcpServersTool, {
-      action: 'remove',
-      name: 'my-server',
-    }) as { removed: boolean };
-    expect(removed.removed).toBe(true);
-
-    const afterRemove = call(manageMcpServersTool, { action: 'list' }) as {
-      servers: unknown[];
-    };
-    expect(afterRemove.servers).toHaveLength(0);
-  });
-
-  it('install requires name', () => {
-    const result = call(manageMcpServersTool, {
-      action: 'install',
-      url: 'https://example.com',
-    }) as { error: string };
-    expect(result.error).toContain('name');
-  });
-
-  it('install http requires url', () => {
-    const result = call(manageMcpServersTool, {
-      action: 'install',
-      name: 'server',
-      transport: 'http',
-    }) as { error: string };
-    expect(result.error).toContain('url');
-  });
-
-  it('install stdio requires command', () => {
-    const result = call(manageMcpServersTool, {
-      action: 'install',
-      name: 'local-server',
-      transport: 'stdio',
-    }) as { error: string };
-    expect(result.error).toContain('command');
-  });
-
-  it('install stdio server roundtrip', () => {
-    const installed = call(manageMcpServersTool, {
-      action: 'install',
-      name: 'npx-server',
-      transport: 'stdio',
-      command: 'npx',
-      args: ['-y', '@some/mcp-server'],
-      description: 'A local npx MCP server',
-    }) as { installed: boolean; name: string };
-    expect(installed.installed).toBe(true);
-    expect(installed.name).toBe('npx-server');
-
-    const listed = call(manageMcpServersTool, { action: 'list' }) as {
-      servers: { name: string; transport: string; command: string; args: string[] }[];
-    };
-    expect(listed.servers[0]).toMatchObject({
-      name: 'npx-server',
-      transport: 'stdio',
-      command: 'npx',
-      args: ['-y', '@some/mcp-server'],
-    });
-  });
-
-  it('toggle changes active state', () => {
-    call(manageMcpServersTool, {
-      action: 'install',
-      name: 'toggle-server',
-      url: 'https://example.com/mcp',
-    });
-
-    const toggled = call(manageMcpServersTool, {
-      action: 'toggle',
-      name: 'toggle-server',
-    }) as { toggled: boolean; name: string; active: boolean };
-    expect(toggled.toggled).toBe(true);
-    expect(toggled.active).toBe(false);
-  });
-
-  it('toggle requires name', () => {
-    const result = call(manageMcpServersTool, { action: 'toggle' }) as { error: string };
-    expect(result.error).toContain('name');
-  });
-
-  it('remove requires name', () => {
-    const result = call(manageMcpServersTool, { action: 'remove' }) as { error: string };
-    expect(result.error).toContain('name');
-  });
-
-  it('unknown action returns error', () => {
-    const result = call(manageMcpServersTool, { action: 'purge' }) as { error: string };
+    const result = callSync(manageMemoryTool, { action: 'purge' }) as { error: string };
     expect(result.error).toContain('Unknown action');
   });
 });
@@ -455,26 +423,23 @@ describe('management tools wiring', () => {
     const { getToolsForHost } = await import('@/tools');
     const tools = getToolsForHost('excel');
     const names = tools.map(t => t.name);
-    expect(names).toContain('manage_skills');
-    expect(names).toContain('manage_agents');
-    expect(names).toContain('manage_mcp_servers');
+    expect(names).toContain('manage_plugins');
+    expect(names).toContain('manage_memory');
   });
 
   it('getToolsForHost("powerpoint") includes management tools', async () => {
     const { getToolsForHost } = await import('@/tools');
     const tools = getToolsForHost('powerpoint');
     const names = tools.map(t => t.name);
-    expect(names).toContain('manage_skills');
-    expect(names).toContain('manage_agents');
-    expect(names).toContain('manage_mcp_servers');
+    expect(names).toContain('manage_plugins');
+    expect(names).toContain('manage_memory');
   });
 
   it('getToolsForHost("word") includes management tools', async () => {
     const { getToolsForHost } = await import('@/tools');
     const tools = getToolsForHost('word');
     const names = tools.map(t => t.name);
-    expect(names).toContain('manage_skills');
-    expect(names).toContain('manage_agents');
-    expect(names).toContain('manage_mcp_servers');
+    expect(names).toContain('manage_plugins');
+    expect(names).toContain('manage_memory');
   });
 });
