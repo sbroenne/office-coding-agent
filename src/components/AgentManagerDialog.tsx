@@ -6,7 +6,7 @@ import { parseAgentsZipFile, parseAgentMarkdownFile } from '@/services/extension
 import { downloadAgent } from '@/services/extensions/zipExportService';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-export const AgentManagerPanel: React.FC = () => {
+export const AgentManagerPanel: React.FC<{ hideBundled?: boolean }> = ({ hideBundled = false }) => {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -69,36 +69,38 @@ export const AgentManagerPanel: React.FC = () => {
   return (
     <div className="space-y-3 p-3">
       {/* Bundled agents */}
-      <div className="space-y-1">
-        <p className="text-[11px] font-medium text-muted-foreground">Bundled (read-only)</p>
-        {bundledAgents.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No bundled agents.</p>
-        ) : (
-          bundledAgents.map(agent => (
-            <div
-              key={`bundled-agent-${agent.metadata.name}`}
-              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{agent.metadata.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {agent.metadata.description}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-7 shrink-0"
-                onClick={() => downloadAgent(agent)}
-                aria-label={`Download ${agent.metadata.name} as template`}
-                title="Download as template"
+      {!hideBundled && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground">Bundled (read-only)</p>
+          {bundledAgents.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No bundled agents.</p>
+          ) : (
+            bundledAgents.map(agent => (
+              <div
+                key={`bundled-agent-${agent.metadata.name}`}
+                className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
               >
-                <Codicon name="cloud-download" className="text-sm" />
-              </Button>
-            </div>
-          ))
-        )}
-      </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{agent.metadata.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {agent.metadata.description}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 shrink-0"
+                  onClick={() => downloadAgent(agent)}
+                  aria-label={`Download ${agent.metadata.name} as template`}
+                  title="Download as template"
+                >
+                  <Codicon name="cloud-download" className="text-sm" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Imported agents */}
       <div className="space-y-1">

@@ -489,9 +489,22 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
                 className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide"
                 style={{ color: 'var(--vscode-descriptionForeground)' }}
               >
+                MCP Servers
+              </div>
+              <McpManagerPanel />
+            </div>
+            <div
+              style={{
+                borderTop: '1px solid var(--vscode-panel-border, var(--vscode-widget-border))',
+              }}
+            >
+              <div
+                className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--vscode-descriptionForeground)' }}
+              >
                 Skills
               </div>
-              <SkillManagerPanel />
+              <SkillManagerPanel hideBundled />
             </div>
             <div
               style={{
@@ -504,20 +517,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
               >
                 Agents
               </div>
-              <AgentManagerPanel />
-            </div>
-            <div
-              style={{
-                borderTop: '1px solid var(--vscode-panel-border, var(--vscode-widget-border))',
-              }}
-            >
-              <div
-                className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide"
-                style={{ color: 'var(--vscode-descriptionForeground)' }}
-              >
-                MCP Servers
-              </div>
-              <McpManagerPanel />
+              <AgentManagerPanel hideBundled />
             </div>
           </div>
         )}
