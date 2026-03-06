@@ -47,15 +47,15 @@ describe('ChatPanel — integration', () => {
     useSettingsStore.getState().reset();
   });
 
-  it('renders MessageList with agent picker, model picker, and tools icon', () => {
+  it('renders MessageList with agent picker, model picker, and plugins icon', () => {
     renderWithProviders(<ChatPanel {...DEFAULT_PROPS} />);
     expect(screen.getByTestId('message-list')).toBeInTheDocument();
     // AgentPicker renders as an icon button in the left toolbar
     expect(screen.getByLabelText('Select agent')).toBeInTheDocument();
     // ModelPicker renders with its aria-label in the left toolbar
     expect(screen.getByLabelText('Select model')).toBeInTheDocument();
-    // McpPill renders as an icon button in the right toolbar
-    expect(screen.getByLabelText('MCP Tools')).toBeInTheDocument();
+    // Plugins pill renders as an icon button in the right toolbar
+    expect(screen.getByLabelText('Plugins')).toBeInTheDocument();
   });
 
   it('passes leftToolbar and rightToolbar slots to MessageList', () => {
@@ -64,9 +64,9 @@ describe('ChatPanel — integration', () => {
     const leftSlot = screen.getByTestId('left-toolbar');
     expect(leftSlot).toContainElement(screen.getByLabelText('Select agent'));
     expect(leftSlot).toContainElement(screen.getByLabelText('Select model'));
-    // Right slot contains the tools icon
+    // Right slot contains the plugins icon
     const rightSlot = screen.getByTestId('right-toolbar');
-    expect(rightSlot).toContainElement(screen.getByLabelText('MCP Tools'));
+    expect(rightSlot).toContainElement(screen.getByLabelText('Plugins'));
   });
 });
 
