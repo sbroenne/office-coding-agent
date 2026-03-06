@@ -5,6 +5,8 @@
 export function getToolIcon(toolId: string): string {
   const lower = toolId.toLowerCase();
 
+  if (lower === 'task_complete') return 'pass';
+
   if (
     lower.includes('search') ||
     lower.includes('grep') ||
