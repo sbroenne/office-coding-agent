@@ -1,8 +1,10 @@
 /**
  * Playwright tests for the tool-fallback card UX.
  *
- * Uses the REAL Copilot API through the dev server (no mocks).
- * Requires `npm run dev` to be running on https://localhost:3000.
+ * Uses a deterministic mock WebSocket server (toolCardMockTaskpane fixture)
+ * that injects synthetic tool call events on every message send. This makes
+ * the tests fast (~300 ms per scenario) and removes any dependence on live
+ * LLM calls or LLM non-determinism.
  *
  * Verifies:
  * - The trigger label shows only the humanized tool name (no "Used:", "Running:", "Cancelled:" prefixes)
@@ -13,48 +15,40 @@
 
 import { test, expect } from '../fixtures';
 
-const AI_TIMEOUT = 45_000;
-
 /**
- * Wait for at least one completed tool card to appear in the thread and return
- * the first one. Uses manage_skills (action: list) which doesn't require Excel
- * so it runs reliably in any Playwright environment.
+ * Send a message and wait for the mock server's synthetic manage_skills tool
+ * call to produce a completed tool card. Returns the first tool card found.
+ *
+ * The mock fires: report_intent → manage_skills start → manage_skills complete
+ * → text delta → session.idle, all within ~250 ms.
  */
 async function waitForCompletedToolCard(page: import('@playwright/test').Page) {
   const composer = page.getByPlaceholder('Send a message...');
   await expect(composer).toBeVisible({ timeout: 10_000 });
 
-  await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Connection failed')).not.toBeVisible();
-
-  await composer.fill(
-    'Use the manage_skills tool with action "list" and report back how many skills there are.'
-  );
+  await composer.fill('List available skills.');
   await composer.press('Enter');
 
-  // Wait for the response to finish
-  await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({
-    timeout: AI_TIMEOUT,
-  });
-
-  // The Working box auto-collapses after completion — expand it to access tool cards
+  // Working box appears as soon as manage_skills tool.execution_start fires (~80 ms)
   const workingBox = page.locator('.chat-thinking-box').first();
   await expect(workingBox).toBeVisible({ timeout: 5_000 });
-  const header = workingBox.locator('.chat-thinking-header');
-  await header.click();
 
-  // Now the tool card should be visible inside the expanded Working box
+  // Wait for the response to finish (Stop button disappears after session.idle)
+  await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({ timeout: 5_000 });
+
+  // The Working box auto-collapses after completion — expand it to access tool cards
+  await workingBox.locator('.chat-thinking-header').click();
+
+  // Tool card is now visible inside the expanded Working box
   const card = page.locator('[data-slot="tool-fallback-root"]').first();
   await expect(card).toBeVisible({ timeout: 3_000 });
   return card;
 }
 
-test.describe('Tool card UX (live Copilot)', () => {
+test.describe('Tool card UX (mock server)', () => {
   test('trigger label shows only the tool name — no "Used:" / "Running:" / "Cancelled:" prefix', async ({
-    configuredTaskpane: page,
+    toolCardMockTaskpane: page,
   }) => {
-    test.setTimeout(AI_TIMEOUT + 30_000);
-
     const card = await waitForCompletedToolCard(page);
     const trigger = card.locator('[data-slot="tool-fallback-trigger"]');
 
@@ -63,15 +57,13 @@ test.describe('Tool card UX (live Copilot)', () => {
     await expect(trigger).not.toContainText(/\bRunning:\s/i);
     await expect(trigger).not.toContainText(/\bCancelled:\s/i);
 
-    // Must contain a human-readable tool name (the manage_skills label)
+    // Must contain a human-readable tool name (manage_skills → "Manage skills")
     await expect(trigger).toContainText(/manage skills/i);
   });
 
   test('trigger shows a result summary after tool completes', async ({
-    configuredTaskpane: page,
+    toolCardMockTaskpane: page,
   }) => {
-    test.setTimeout(AI_TIMEOUT + 30_000);
-
     const card = await waitForCompletedToolCard(page);
     const trigger = card.locator('[data-slot="tool-fallback-trigger"]');
 
@@ -83,13 +75,11 @@ test.describe('Tool card UX (live Copilot)', () => {
   });
 
   test('expanded card shows "Input" header (not "Input:" or raw JSON unlabelled)', async ({
-    configuredTaskpane: page,
+    toolCardMockTaskpane: page,
   }) => {
-    test.setTimeout(AI_TIMEOUT + 30_000);
-
     const card = await waitForCompletedToolCard(page);
 
-    // Open the card by clicking the progress line
+    // Open the card by clicking the trigger
     await card.locator('[data-slot="tool-fallback-trigger"]').click();
 
     const details = card.locator('.tool-details-expanded');
@@ -100,10 +90,8 @@ test.describe('Tool card UX (live Copilot)', () => {
   });
 
   test('expanded card shows "Output" header (not "Result:" old label)', async ({
-    configuredTaskpane: page,
+    toolCardMockTaskpane: page,
   }) => {
-    test.setTimeout(AI_TIMEOUT + 30_000);
-
     const card = await waitForCompletedToolCard(page);
 
     // Open the card
@@ -119,24 +107,23 @@ test.describe('Tool card UX (live Copilot)', () => {
   });
 
   test('report_intent does not produce a tool card in the thread', async ({
-    configuredTaskpane: page,
+    toolCardMockTaskpane: page,
   }) => {
-    test.setTimeout(AI_TIMEOUT + 30_000);
-
     const composer = page.getByPlaceholder('Send a message...');
     await expect(composer).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
 
-    await composer.fill(
-      'Use the manage_skills tool with action "list" and report back how many skills there are.'
-    );
+    await composer.fill('List available skills.');
     await composer.press('Enter');
 
-    await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({
-      timeout: AI_TIMEOUT,
-    });
+    // Wait for the response to finish
+    await expect(page.getByRole('button', { name: 'Stop' })).not.toBeVisible({ timeout: 5_000 });
 
-    // No tool card should ever show "report_intent" as its label
+    // Expand the Working box (mock fires report_intent first)
+    const workingBox = page.locator('.chat-thinking-box').first();
+    await expect(workingBox).toBeVisible({ timeout: 3_000 });
+    await workingBox.locator('.chat-thinking-header').click();
+
+    // No tool card should show "report_intent" as its label
     const toolCards = page.locator('[data-slot="tool-fallback-root"]');
     const count = await toolCards.count();
     for (let i = 0; i < count; i++) {
@@ -144,3 +131,4 @@ test.describe('Tool card UX (live Copilot)', () => {
     }
   });
 });
+

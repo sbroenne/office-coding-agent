@@ -1,146 +1,105 @@
 /**
  * Integration test: McpManagerPanel component.
  *
- * Renders the real McpManagerPanel with the real Zustand store.
- * Tests import, toggle, and remove flows without a live MCP server.
+ * Renders the real McpManagerPanel. Servers are fetched from /api/mcp-servers.
+ * Each server has an enable/disable toggle. No JSON upload; no Remove buttons.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
 import { McpManagerPanel } from '@/components/McpManagerDialog';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-function makeJsonFile(content: unknown, name = 'mcp.json'): File {
-  return new File([JSON.stringify(content)], name, { type: 'application/json' });
-}
-
-const validMcpJson = {
-  mcpServers: {
-    'my-server': {
-      url: 'https://example.com/mcp/sse',
-      type: 'sse',
-      description: 'Example MCP server',
-    },
-    'another-server': {
-      url: 'https://example.com/mcp',
-      type: 'http',
-    },
-  },
-};
+const MOCK_SERVERS = [
+  { name: 'workiq', description: 'WorkIQ MCP server', transport: 'http' as const, url: 'http://localhost:3001' },
+  { name: 'powerbi', description: 'Power BI MCP server', transport: 'http' as const, url: 'http://localhost:3002' },
+];
 
 beforeEach(() => {
   useSettingsStore.getState().reset();
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ servers: MOCK_SERVERS }),
+  } as Response);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('Integration: McpManagerPanel', () => {
-  it('renders with bundled servers and import button', () => {
+  it('fetches and renders servers from /api/mcp-servers', async () => {
     renderWithProviders(<McpManagerPanel />);
-
-    expect(screen.getByText('workiq')).toBeInTheDocument();
-    expect(screen.getByText('powerbi')).toBeInTheDocument();
-    expect(screen.getAllByText('Built-in').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole('button', { name: /Import/i })).toBeInTheDocument();
-  });
-
-  it('imports servers from a valid mcp.json file', async () => {
-    renderWithProviders(<McpManagerPanel />);
-
-    const fileInput = screen.getByLabelText('Import mcp.json file');
-    await userEvent.upload(fileInput, makeJsonFile(validMcpJson));
 
     await waitFor(() => {
-      expect(screen.getByText('my-server')).toBeInTheDocument();
-    });
-
-    expect(screen.getByText('another-server')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Imported 2 servers from mcp.json');
-  });
-
-  it('shows the server description when available', async () => {
-    renderWithProviders(<McpManagerPanel />);
-
-    const fileInput = screen.getByLabelText('Import mcp.json file');
-    await userEvent.upload(fileInput, makeJsonFile(validMcpJson));
-
-    await waitFor(() => {
-      expect(screen.getByText('Example MCP server')).toBeInTheDocument();
+      expect(screen.getByText('workiq')).toBeInTheDocument();
+      expect(screen.getByText('powerbi')).toBeInTheDocument();
     });
   });
 
-  it('shows error for invalid JSON', async () => {
+  it('shows empty state when API returns no servers', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ servers: [] }),
+    } as Response);
+
     renderWithProviders(<McpManagerPanel />);
 
-    const file = new File(['not-json'], 'mcp.json', { type: 'application/json' });
-    const fileInput = screen.getByLabelText('Import mcp.json file');
-    await userEvent.upload(fileInput, file);
-
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/No MCP servers available/)).toBeInTheDocument();
     });
   });
 
-  it('imports stdio (npx) entries from mcp.json successfully', async () => {
+  it('each server has a toggle button', async () => {
     renderWithProviders(<McpManagerPanel />);
-
-    const stdioOnly = { mcpServers: { srv: { command: 'node', args: ['server.js'] } } };
-    const fileInput = screen.getByLabelText('Import mcp.json file');
-    await userEvent.upload(fileInput, makeJsonFile(stdioOnly));
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent('Imported 1 server from mcp.json.');
+      expect(screen.getByLabelText('Toggle workiq')).toBeInTheDocument();
+      expect(screen.getByLabelText('Toggle powerbi')).toBeInTheDocument();
     });
-    expect(screen.getByText('srv')).toBeInTheDocument();
-    expect(screen.getByText('node server.js')).toBeInTheDocument();
   });
 
-  it('imported servers show Remove button while bundled servers do not', async () => {
-    useSettingsStore.getState().importMcpServers([
-      { name: 'to-remove', url: 'https://example.com/mcp', transport: 'http' },
-      { name: 'keep', url: 'https://example.com/keep', transport: 'http' },
-    ]);
-
+  it('clicking toggle disables a server and updates the store', async () => {
     renderWithProviders(<McpManagerPanel />);
 
-    const removeButtons = screen.getAllByTitle('Remove');
-    expect(removeButtons.length).toBe(2);
+    const toggle = await screen.findByLabelText('Toggle workiq');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(toggle);
+
+    expect(useSettingsStore.getState().disabledMcpServerNames).toContain('workiq');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('Remove button removes a server from the list and store', async () => {
-    useSettingsStore.getState().importMcpServers([
-      { name: 'to-remove', url: 'https://example.com/mcp', transport: 'http' },
-      { name: 'keep', url: 'https://example.com/keep', transport: 'http' },
-    ]);
-
+  it('clicking toggle again re-enables a server', async () => {
     renderWithProviders(<McpManagerPanel />);
 
-    expect(screen.getByText('to-remove')).toBeInTheDocument();
+    const toggle = await screen.findByLabelText('Toggle workiq');
+    await userEvent.click(toggle);
+    await userEvent.click(toggle);
 
-    const removeButtons = screen.getAllByTitle('Remove');
-    await userEvent.click(removeButtons[0]);
+    expect(useSettingsStore.getState().disabledMcpServerNames).not.toContain('workiq');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('does not show a Remove button for any server', async () => {
+    renderWithProviders(<McpManagerPanel />);
 
     await waitFor(() => {
-      expect(screen.queryByText('to-remove')).not.toBeInTheDocument();
+      expect(screen.getByText('workiq')).toBeInTheDocument();
     });
-    expect(screen.getByText('keep')).toBeInTheDocument();
-    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(1);
+
+    expect(screen.queryByLabelText(/Remove/)).not.toBeInTheDocument();
   });
 
-  it('shows Add button that opens add server form', async () => {
+  it('does not show a JSON import button', async () => {
     renderWithProviders(<McpManagerPanel />);
 
-    const addButton = screen.getByRole('button', { name: /Add/i });
-    await userEvent.click(addButton);
+    await waitFor(() => {
+      expect(screen.getByText('workiq')).toBeInTheDocument();
+    });
 
-    expect(screen.getByText('Add Server', { selector: 'h4' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('my-server')).toBeInTheDocument();
-  });
-
-  it('bundled servers show Built-in badge', () => {
-    renderWithProviders(<McpManagerPanel />);
-
-    expect(screen.getAllByText('Built-in').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('workiq')).toBeInTheDocument();
-    expect(screen.getByText('powerbi')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Import MCP/)).not.toBeInTheDocument();
   });
 });

@@ -1,22 +1,122 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Codicon } from '@/components/Codicon';
 import type { InstalledPlugin, BrowsePlugin, RegisteredMarketplace } from '@/types/plugin';
 import * as pluginService from '@/services/plugins/pluginService';
 import PluginCard from './PluginCard';
 import PluginDetailPanel from './PluginDetailPanel';
+import { McpManagerPanel } from '@/components/McpManagerDialog';
 
 export interface PluginHubProps {
   open: boolean;
   onClose: () => void;
 }
 
-type TabId = 'installed' | 'browse' | 'marketplaces';
+type TabId = 'installed' | 'browse' | 'marketplaces' | 'mcp' | 'upload';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'installed', label: 'Installed' },
   { id: 'browse', label: 'Browse' },
+  { id: 'mcp', label: 'MCP Servers' },
+  { id: 'upload', label: 'Upload' },
   { id: 'marketplaces', label: 'Marketplaces' },
 ];
+
+/** Install a plugin from a local path or ZIP file. */
+const LocalPluginInstall: React.FC<{ onInstalled: () => void }> = ({ onInstalled }) => {
+  const [spec, setSpec] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const install = useCallback(
+    async (installSpec: string) => {
+      if (!installSpec.trim()) return;
+      setStatus(null);
+      setError(null);
+      setInstalling(true);
+      try {
+        const result = await pluginService.installPlugin(installSpec.trim());
+        if (result.success) {
+          setStatus(`Installed: ${installSpec.trim()}`);
+          setSpec('');
+          onInstalled();
+        } else {
+          setError(result.message || 'Install failed');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Install failed');
+      } finally {
+        setInstalling(false);
+      }
+    },
+    [onInstalled]
+  );
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-medium text-muted-foreground">Local path or ZIP file</p>
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          value={spec}
+          onChange={e => setSpec(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void install(spec);
+          }}
+          placeholder="/path/to/plugin or /path/to/plugin.zip"
+          className="flex-1 rounded-[var(--vscode-cornerRadius-small)] px-2 py-1 text-[12px] outline-none"
+          style={{
+            background: 'var(--vscode-input-background)',
+            color: 'var(--vscode-input-foreground)',
+            border: '1px solid var(--vscode-input-border, transparent)',
+          }}
+        />
+        <button
+          onClick={() => void install(spec)}
+          disabled={installing || !spec.trim()}
+          className="flex shrink-0 items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-2 py-1 text-[11px] font-medium disabled:opacity-50"
+          style={{
+            background: 'var(--vscode-button-background)',
+            color: 'var(--vscode-button-foreground)',
+          }}
+        >
+          {installing ? (
+            <Codicon name="loading" className="text-[11px] codicon-modifier-spin" />
+          ) : null}
+          {installing ? 'Installing…' : 'Install'}
+        </button>
+      </div>
+
+      {/* Browse for file */}
+      <div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".zip"
+          className="hidden"
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setSpec(file.name);
+              e.target.value = '';
+            }
+          }}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Codicon name="folder-opened" className="text-[11px]" />
+          Browse for ZIP…
+        </button>
+      </div>
+
+      {status && <p className="text-xs text-[var(--vscode-testing-iconPassed)]">{status}</p>}
+      {error && <p className="text-xs text-[var(--vscode-errorForeground)]">{error}</p>}
+    </div>
+  );
+};
 
 /** Collapsible section with a chevron toggle. */
 const CollapsibleSection: React.FC<{
@@ -29,7 +129,7 @@ const CollapsibleSection: React.FC<{
   return (
     <div>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(v => !v)}
         className="flex w-full items-center gap-1 px-1 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
       >
         <Codicon name={open ? 'chevron-down' : 'chevron-right'} className="text-[12px]" />
@@ -72,21 +172,18 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
     }
   }, []);
 
-  const fetchBrowse = useCallback(
-    async (marketplace: string) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await pluginService.browseMarketplace(marketplace);
-        setBrowsePlugins(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to browse marketplace');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
+  const fetchBrowse = useCallback(async (marketplace: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await pluginService.browseMarketplace(marketplace);
+      setBrowsePlugins(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to browse marketplace');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const refreshAll = useCallback(async () => {
     setLoading(true);
@@ -126,7 +223,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
         setLoading(false);
       }
     },
-    [fetchInstalled, fetchBrowse, activeTab, selectedMarketplace],
+    [fetchInstalled, fetchBrowse, activeTab, selectedMarketplace]
   );
 
   const handleUninstall = useCallback(
@@ -142,7 +239,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
         setLoading(false);
       }
     },
-    [fetchInstalled],
+    [fetchInstalled]
   );
 
   const handleEnable = useCallback(
@@ -154,7 +251,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
         setError(err instanceof Error ? err.message : 'Enable failed');
       }
     },
-    [fetchInstalled],
+    [fetchInstalled]
   );
 
   const handleDisable = useCallback(
@@ -166,7 +263,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
         setError(err instanceof Error ? err.message : 'Disable failed');
       }
     },
-    [fetchInstalled],
+    [fetchInstalled]
   );
 
   const handleInlineInstall = useCallback(
@@ -177,7 +274,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
       await handleInstall(spec);
       setInstallSpec('');
     },
-    [installSpec, handleInstall],
+    [installSpec, handleInstall]
   );
 
   const handleAddMarketplace = useCallback(
@@ -197,7 +294,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
         setLoading(false);
       }
     },
-    [installSpec, fetchMarketplaces],
+    [installSpec, fetchMarketplaces]
   );
 
   const handleRemoveMarketplace = useCallback(
@@ -213,29 +310,35 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
         setLoading(false);
       }
     },
-    [fetchMarketplaces],
+    [fetchMarketplaces]
   );
 
   // ─── Filtering ─────────────────────────────────────────────────
 
   const query = searchQuery.toLowerCase();
 
-  const filterPlugin = (p: { name: string; description?: string | null; manifest?: { description?: string } | null }) => {
+  const filterPlugin = (p: {
+    name: string;
+    description?: string | null;
+    manifest?: { description?: string } | null;
+  }) => {
     if (!query) return true;
     const name = p.name.toLowerCase();
     const desc = (
-      ('manifest' in p && p.manifest?.description) ||
-      ('description' in p && typeof p.description === 'string' && p.description) ||
-      ''
+      ('manifest' in p && p.manifest?.description
+        ? p.manifest.description
+        : 'description' in p && typeof p.description === 'string'
+          ? p.description
+          : '') ?? ''
     ).toLowerCase();
     return name.includes(query) || desc.includes(query);
   };
 
   const bundledPlugins = installedPlugins
-    .filter((p) => p.marketplace === 'office-coding-agent')
+    .filter(p => p.marketplace === 'office-coding-agent')
     .filter(filterPlugin);
   const userPlugins = installedPlugins
-    .filter((p) => p.marketplace !== 'office-coding-agent')
+    .filter(p => p.marketplace !== 'office-coding-agent')
     .filter(filterPlugin);
   const filteredBrowse = browsePlugins.filter(filterPlugin);
 
@@ -307,15 +410,11 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
             border: '1px solid var(--vscode-input-border, transparent)',
           }}
         >
-          <Codicon
-            name="search"
-            className="shrink-0 text-[13px]"
-            aria-hidden
-          />
+          <Codicon name="search" className="shrink-0 text-[13px]" aria-hidden />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search plugins…"
             className="flex-1 bg-transparent text-[12px] outline-none"
             style={{
@@ -341,7 +440,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
           borderBottom: '1px solid var(--vscode-panel-border, var(--vscode-widget-border))',
         }}
       >
-        {TABS.map((tab) => (
+        {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => {
@@ -393,40 +492,32 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
             )}
 
             {bundledPlugins.length > 0 && (
-              <CollapsibleSection
-                title="Bundled"
-                count={bundledPlugins.length}
-                defaultOpen
-              >
-                {bundledPlugins.map((p) => (
+              <CollapsibleSection title="Bundled" count={bundledPlugins.length} defaultOpen>
+                {bundledPlugins.map(p => (
                   <PluginCard
                     key={p.name}
                     plugin={p}
                     mode="installed"
-                    onEnable={(name) => void handleEnable(name)}
-                    onDisable={(name) => void handleDisable(name)}
-                    onUninstall={(name) => void handleUninstall(name)}
-                    onClick={(name) => setSelectedPlugin(name)}
+                    onEnable={name => void handleEnable(name)}
+                    onDisable={name => void handleDisable(name)}
+                    onUninstall={name => void handleUninstall(name)}
+                    onClick={name => setSelectedPlugin(name)}
                   />
                 ))}
               </CollapsibleSection>
             )}
 
             {userPlugins.length > 0 && (
-              <CollapsibleSection
-                title="Installed"
-                count={userPlugins.length}
-                defaultOpen
-              >
-                {userPlugins.map((p) => (
+              <CollapsibleSection title="Installed" count={userPlugins.length} defaultOpen>
+                {userPlugins.map(p => (
                   <PluginCard
                     key={p.name}
                     plugin={p}
                     mode="installed"
-                    onEnable={(name) => void handleEnable(name)}
-                    onDisable={(name) => void handleDisable(name)}
-                    onUninstall={(name) => void handleUninstall(name)}
-                    onClick={(name) => setSelectedPlugin(name)}
+                    onEnable={name => void handleEnable(name)}
+                    onDisable={name => void handleDisable(name)}
+                    onUninstall={name => void handleUninstall(name)}
+                    onClick={name => setSelectedPlugin(name)}
                   />
                 ))}
               </CollapsibleSection>
@@ -441,7 +532,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
             <div className="px-3 py-2">
               <select
                 value={selectedMarketplace}
-                onChange={(e) => setSelectedMarketplace(e.target.value)}
+                onChange={e => setSelectedMarketplace(e.target.value)}
                 className="w-full rounded-[var(--vscode-cornerRadius-small)] px-2 py-1 text-[12px] outline-none"
                 style={{
                   background: 'var(--vscode-input-background)',
@@ -449,7 +540,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
                   border: '1px solid var(--vscode-input-border, transparent)',
                 }}
               >
-                {marketplaces.map((m) => (
+                {marketplaces.map(m => (
                   <option key={m.name} value={m.name}>
                     {m.name}
                     {m.pluginCount != null ? ` (${m.pluginCount})` : ''}
@@ -474,15 +565,37 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
             )}
 
             {!loading &&
-              filteredBrowse.map((p) => (
+              filteredBrowse.map(p => (
                 <PluginCard
                   key={p.name}
                   plugin={p}
                   mode="browse"
-                  onInstall={(spec) => void handleInstall(spec)}
-                  onClick={(name) => setSelectedPlugin(name)}
+                  onInstall={spec => void handleInstall(spec)}
+                  onClick={name => setSelectedPlugin(name)}
                 />
               ))}
+          </div>
+        )}
+
+        {/* ── MCP Servers tab ────────────────────────────────── */}
+        {activeTab === 'mcp' && (
+          <div className="p-0">
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              Enable or disable MCP servers for your conversations. Add more servers by installing a
+              plugin.
+            </p>
+            <McpManagerPanel />
+          </div>
+        )}
+
+        {/* ── Upload tab ─────────────────────────────────────── */}
+        {activeTab === 'upload' && (
+          <div className="space-y-3 px-3 py-3">
+            <p className="text-xs text-muted-foreground">
+              Install a plugin from a local folder or ZIP file. Plugins can include agents, skills,
+              and MCP servers.
+            </p>
+            <LocalPluginInstall onInstalled={() => void refreshAll()} />
           </div>
         )}
 
@@ -495,7 +608,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
               </p>
             )}
 
-            {marketplaces.map((m) => (
+            {marketplaces.map(m => (
               <div
                 key={m.name}
                 className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
@@ -538,7 +651,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
       {/* ── Fixed footer ─────────────────────────────────────── */}
       {activeTab === 'installed' && (
         <form
-          onSubmit={(e) => void handleInlineInstall(e)}
+          onSubmit={e => void handleInlineInstall(e)}
           className="flex shrink-0 items-center gap-1.5 px-3 py-2"
           style={{
             borderTop: '1px solid var(--vscode-panel-border, var(--vscode-widget-border))',
@@ -555,7 +668,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
             <input
               type="text"
               value={installSpec}
-              onChange={(e) => setInstallSpec(e.target.value)}
+              onChange={e => setInstallSpec(e.target.value)}
               placeholder="owner/repo, name@marketplace, or local path"
               className="flex-1 bg-transparent text-[12px] outline-none"
               style={{ color: 'var(--vscode-input-foreground)' }}
@@ -569,13 +682,12 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
               background: 'var(--vscode-button-background)',
               color: 'var(--vscode-button-foreground)',
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={e => {
               (e.currentTarget as HTMLElement).style.background =
                 'var(--vscode-button-hoverBackground, var(--vscode-button-background))';
             }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background =
-                'var(--vscode-button-background)';
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--vscode-button-background)';
             }}
           >
             {loading ? (
@@ -589,7 +701,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
 
       {activeTab === 'marketplaces' && (
         <form
-          onSubmit={(e) => void handleAddMarketplace(e)}
+          onSubmit={e => void handleAddMarketplace(e)}
           className="flex shrink-0 items-center gap-1.5 px-3 py-2"
           style={{
             borderTop: '1px solid var(--vscode-panel-border, var(--vscode-widget-border))',
@@ -606,7 +718,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
             <input
               type="text"
               value={installSpec}
-              onChange={(e) => setInstallSpec(e.target.value)}
+              onChange={e => setInstallSpec(e.target.value)}
               placeholder="owner/repo or local path"
               className="flex-1 bg-transparent text-[12px] outline-none"
               style={{ color: 'var(--vscode-input-foreground)' }}
@@ -620,13 +732,12 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
               background: 'var(--vscode-button-background)',
               color: 'var(--vscode-button-foreground)',
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={e => {
               (e.currentTarget as HTMLElement).style.background =
                 'var(--vscode-button-hoverBackground, var(--vscode-button-background))';
             }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background =
-                'var(--vscode-button-background)';
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--vscode-button-background)';
             }}
           >
             {loading ? (

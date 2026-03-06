@@ -4,9 +4,9 @@ import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websoc
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { getSkills, getImportedSkills, skillToMarkdown } from '@/services/skills';
+import { getImportedSkills, skillToMarkdown } from '@/services/skills';
 import { resolveActiveAgent, getAgents } from '@/services/agents';
-import { toSdkMcpServers, getAllMcpServers } from '@/services/mcp';
+import { toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
@@ -76,11 +76,10 @@ function getWsUrl(): string {
 
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
-  const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
+  const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
+  const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
   const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
-  const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
-  const npmSkillPackages = useSettingsStore(s => s.npmSkillPackages);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
   const createSession = useSessionHistoryStore(s => s.createSession);
@@ -105,19 +104,17 @@ export function useOfficeChat(host: OfficeHostApp) {
   // tear down and restart the Copilot session, losing all conversation context.
   // Model changes take effect on the next new conversation (same as VS Code Copilot).
   const activeModelRef = useRef(activeModel);
-  const activeSkillNamesRef = useRef(activeSkillNames);
   const activeAgentIdRef = useRef(activeAgentId);
+  const disabledSkillNamesRef = useRef(disabledSkillNames);
+  const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
   const importedMcpServersRef = useRef(importedMcpServers);
-  const activeMcpServerNamesRef = useRef(activeMcpServerNames);
-  const npmSkillPackagesRef = useRef(npmSkillPackages);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
-  activeSkillNamesRef.current = activeSkillNames;
   activeAgentIdRef.current = activeAgentId;
+  disabledSkillNamesRef.current = disabledSkillNames;
+  disabledMcpServerNamesRef.current = disabledMcpServerNames;
   importedMcpServersRef.current = importedMcpServers;
-  activeMcpServerNamesRef.current = activeMcpServerNames;
-  npmSkillPackagesRef.current = npmSkillPackages;
   evaluatePermissionRef.current = evaluatePermission;
 
   // Switch model mid-session when the user picks a different model
@@ -256,15 +253,6 @@ export function useOfficeChat(host: OfficeHostApp) {
         content: skillToMarkdown(s),
       }));
 
-      // Compute disabled skill names from activeSkillNames
-      const allHostSkillNames = getSkills()
-        .filter(s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost))
-        .map(s => s.metadata.name);
-      const disabledSkills =
-        activeSkillNamesRef.current !== null
-          ? allHostSkillNames.filter(name => !activeSkillNamesRef.current!.includes(name))
-          : [];
-
       // Build custom agent configs for ALL agents in this host — this enables sub-agent
       // delegation where the active agent can invoke other agents as sub-agents.
       // Each agent carries its own tool allowlist so per-agent restrictions are enforced
@@ -281,21 +269,19 @@ export function useOfficeChat(host: OfficeHostApp) {
             }))
           : undefined;
 
-      // Resolve active MCP servers (bundled + imported), intersect with active agent allowlist.
-      // When activeMcpServerNames is null (default), ALL servers are active (bundled + imported).
-      const allServers = getAllMcpServers(BUNDLED_MCP_SERVERS, importedMcpServersRef.current);
-      let activeServers: typeof allServers;
-      if (activeMcpServerNamesRef.current === null) {
-        // null = all active (same convention as activeSkillNames)
-        activeServers = allServers;
-      } else {
-        activeServers = allServers.filter(s => activeMcpServerNamesRef.current!.includes(s.name));
-      }
+      // Resolve active MCP servers: bundled list + imported → agent allowlist filter → user disable filter.
+      let activeServers = [...BUNDLED_MCP_SERVERS, ...importedMcpServersRef.current];
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
         activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
       }
+      activeServers = activeServers.filter(
+        s => !disabledMcpServerNamesRef.current.includes(s.name)
+      );
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
+
+      const disabledSkills =
+        disabledSkillNamesRef.current.length > 0 ? disabledSkillNamesRef.current : undefined;
 
       const session = await withTimeout(
         client.createSession({
@@ -307,8 +293,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           skills,
           disabledSkills,
           customAgents,
-          npmSkillPackages:
-            npmSkillPackagesRef.current.length > 0 ? npmSkillPackagesRef.current : undefined,
         }),
         60_000,
         'session.create'
@@ -947,6 +931,35 @@ export function useOfficeChat(host: OfficeHostApp) {
     }
   }, []);
 
+  /**
+   * Switch to a different model mid-session without starting a new conversation.
+   * Requires an active session with the Copilot SDK v0.1.30+.
+   *
+   * @param modelId - The model ID to switch to
+   * @returns Promise that resolves when the model has been switched
+   * @throws Error if no active session exists or the switch fails
+   */
+  const switchModel = useCallback(
+    async (modelId: string) => {
+      const session = sessionRef.current;
+      if (!session) {
+        throw new Error('Cannot switch model: no active session');
+      }
+
+      try {
+        console.log(`[chat] Switching model from ${activeModel} to ${modelId}`);
+        await session.setModel(modelId);
+        // Update the store so the UI reflects the new model
+        useSettingsStore.getState().setActiveModel(modelId);
+        console.log(`[chat] Model switched successfully to ${modelId}`);
+      } catch (err) {
+        console.error('[chat] Failed to switch model:', err);
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    },
+    [activeModel]
+  );
+
   return {
     messages,
     isRunning,
@@ -965,6 +978,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     denyPermission,
     allowPermissionAlways,
     compactSession,
+    switchModel,
     enqueue,
     queuedPrompts,
     clearQueue,
