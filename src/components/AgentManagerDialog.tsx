@@ -3,80 +3,56 @@ import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { getBundledAgents } from '@/services/agents';
 import { parseAgentsZipFile, parseAgentMarkdownFile } from '@/services/extensions/zipImportService';
-import { downloadAgent, downloadAgentsZip } from '@/services/extensions/zipExportService';
-import { useSettingsStore } from '@/stores';
+import { downloadAgent } from '@/services/extensions/zipExportService';
 
 export const AgentManagerPanel: React.FC = () => {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const zipInputRef = useRef<HTMLInputElement>(null);
   const mdInputRef = useRef<HTMLInputElement>(null);
 
-  const importedAgents = useSettingsStore(s => s.importedAgents);
-  const importAgents = useSettingsStore(s => s.importAgents);
-  const removeImportedAgent = useSettingsStore(s => s.removeImportedAgent);
-
   const bundledAgents = getBundledAgents();
 
-  const handleImportZip = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+  const handleImportZip = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      setImportStatus(null);
-      setImportError(null);
-      setIsImporting(true);
+    setImportStatus(null);
+    setImportError(null);
+    setIsImporting(true);
 
-      try {
-        const agents = await parseAgentsZipFile(file);
-        importAgents(agents);
-        setImportStatus(
-          `Imported ${agents.length} agent${agents.length === 1 ? '' : 's'} from ${file.name}.`
-        );
-      } catch (error) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import agents ZIP.');
-      } finally {
-        setIsImporting(false);
-        event.target.value = '';
-      }
-    },
-    [importAgents]
-  );
-
-  const handleImportMd = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      setImportStatus(null);
-      setImportError(null);
-      setIsImporting(true);
-
-      try {
-        const agent = await parseAgentMarkdownFile(file);
-        importAgents([agent]);
-        setImportStatus(`Imported agent "${agent.metadata.name}" from ${file.name}.`);
-      } catch (error) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import agent file.');
-      } finally {
-        setIsImporting(false);
-        event.target.value = '';
-      }
-    },
-    [importAgents]
-  );
-
-  const handleDownloadAll = useCallback(async () => {
-    if (importedAgents.length === 0) return;
-    setIsDownloadingAll(true);
     try {
-      await downloadAgentsZip(importedAgents);
+      const agents = await parseAgentsZipFile(file);
+      setImportStatus(
+        `Imported ${agents.length} agent${agents.length === 1 ? '' : 's'} from ${file.name}.`
+      );
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import agents ZIP.');
     } finally {
-      setIsDownloadingAll(false);
+      setIsImporting(false);
+      event.target.value = '';
     }
-  }, [importedAgents]);
+  }, []);
+
+  const handleImportMd = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportStatus(null);
+    setImportError(null);
+    setIsImporting(true);
+
+    try {
+      const agent = await parseAgentMarkdownFile(file);
+      setImportStatus(`Imported agent "${agent.metadata.name}" from ${file.name}.`);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import agent file.');
+    } finally {
+      setIsImporting(false);
+      event.target.value = '';
+    }
+  }, []);
 
   return (
     <div className="space-y-3 p-3">
@@ -180,67 +156,10 @@ export const AgentManagerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Imported agents */}
+      {/* Imported agents — managed via Plugin Hub */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
-          {importedAgents.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-1.5 text-[11px]"
-              onClick={() => void handleDownloadAll()}
-              disabled={isDownloadingAll}
-              title="Download all custom agents as ZIP"
-            >
-              {isDownloadingAll ? (
-                <Codicon name="loading" className="text-xs codicon-modifier-spin" />
-              ) : (
-                <Codicon name="cloud-download" className="text-xs" />
-              )}
-              Download all
-            </Button>
-          )}
-        </div>
-        {importedAgents.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No imported agents.</p>
-        ) : (
-          importedAgents.map(agent => (
-            <div
-              key={`imported-agent-${agent.metadata.name}`}
-              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{agent.metadata.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {agent.metadata.description}
-                </p>
-              </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => downloadAgent(agent)}
-                  aria-label={`Download ${agent.metadata.name}`}
-                  title="Download as .md"
-                >
-                  <Codicon name="cloud-download" className="text-sm" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-destructive hover:text-destructive"
-                  onClick={() => removeImportedAgent(agent.metadata.name)}
-                  aria-label={`Remove ${agent.metadata.name}`}
-                  title="Remove"
-                >
-                  <Codicon name="trash" className="text-sm" />
-                </Button>
-              </div>
-            </div>
-          ))
-        )}
+        <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
+        <p className="text-xs text-muted-foreground">No imported agents.</p>
       </div>
     </div>
   );

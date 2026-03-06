@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { parseMcpJsonFile } from '@/services/mcp';
-import { useSettingsStore, useMcpStatusStore } from '@/stores';
+import { useMcpStatusStore } from '@/stores';
 import { BUNDLED_MCP_SERVERS } from '@/types';
 import type { McpServerConfig, McpServerStatus } from '@/types';
 import { McpAddServerForm } from './McpAddServerForm';
@@ -37,29 +37,14 @@ export const McpManagerPanel: React.FC = () => {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [logServer, setLogServer] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const restartTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
-  const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
-  const activeMcpServerNames = useSettingsStore(s => s.activeMcpServerNames);
-  const importMcpServers = useSettingsStore(s => s.importMcpServers);
-  const removeMcpServer = useSettingsStore(s => s.removeMcpServer);
-  const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
-  const updateMcpServer = useSettingsStore(s => s.updateMcpServer);
   const mcpServers = useMcpStatusStore(s => s.servers);
 
-  // Merge bundled + imported for display
-  const bundledNames = new Set(BUNDLED_MCP_SERVERS.map(s => s.name));
-  const allServers: McpServerConfig[] = [
-    ...BUNDLED_MCP_SERVERS,
-    ...importedMcpServers.filter(s => !bundledNames.has(s.name)),
-  ];
+  // Only bundled servers are shown — imported servers are managed via Plugin Hub
+  const allServers: McpServerConfig[] = [...BUNDLED_MCP_SERVERS];
   const allNames = new Set(allServers.map(s => s.name));
 
-  const isServerActive = (name: string) =>
-    activeMcpServerNames === null || activeMcpServerNames.includes(name);
-
   const getServerStatus = (name: string): McpServerStatus | 'disabled' => {
-    if (!isServerActive(name)) return 'disabled';
     return mcpServers[name]?.status ?? 'stopped';
   };
 
@@ -72,30 +57,26 @@ export const McpManagerPanel: React.FC = () => {
     });
   };
 
-  const handleImportJson = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+  const handleImportJson = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      setImportStatus(null);
-      setImportError(null);
-      setIsImporting(true);
+    setImportStatus(null);
+    setImportError(null);
+    setIsImporting(true);
 
-      try {
-        const servers = await parseMcpJsonFile(file);
-        importMcpServers(servers);
-        setImportStatus(
-          `Imported ${servers.length} server${servers.length === 1 ? '' : 's'} from ${file.name}.`
-        );
-      } catch (error) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import mcp.json.');
-      } finally {
-        setIsImporting(false);
-        event.target.value = '';
-      }
-    },
-    [importMcpServers]
-  );
+    try {
+      const servers = await parseMcpJsonFile(file);
+      setImportStatus(
+        `Imported ${servers.length} server${servers.length === 1 ? '' : 's'} from ${file.name}.`
+      );
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import mcp.json.');
+    } finally {
+      setIsImporting(false);
+      event.target.value = '';
+    }
+  }, []);
 
   const handleAddServer = (config: {
     name: string;
@@ -106,7 +87,7 @@ export const McpManagerPanel: React.FC = () => {
     url?: string;
     headers?: Record<string, string>;
   }) => {
-    importMcpServers([config as McpServerConfig]);
+    void config;
     setShowAddForm(false);
   };
 
@@ -119,7 +100,7 @@ export const McpManagerPanel: React.FC = () => {
     url?: string;
     headers?: Record<string, string>;
   }) => {
-    updateMcpServer(config.name, config as Partial<McpServerConfig>);
+    void config;
     setEditingServer(null);
   };
 
@@ -283,59 +264,6 @@ export const McpManagerPanel: React.FC = () => {
                     >
                       <Codicon name="output" className="text-xs" />
                     </button>
-                    {/* Restart (re-toggle) */}
-                    {isServerActive(server.name) && (
-                      <button
-                        onClick={() => {
-                          // Guard against double-click: skip if a restart is already pending
-                          if (restartTimerRef.current[server.name]) return;
-                          toggleMcpServer(server.name);
-                          restartTimerRef.current[server.name] = setTimeout(() => {
-                            toggleMcpServer(server.name);
-                            delete restartTimerRef.current[server.name];
-                          }, 200);
-                        }}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        title="Restart"
-                      >
-                        <Codicon name="refresh" className="text-xs" />
-                      </button>
-                    )}
-                    {/* Start/Stop */}
-                    <button
-                      onClick={() => toggleMcpServer(server.name)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      title={isServerActive(server.name) ? 'Stop' : 'Start'}
-                    >
-                      {isServerActive(server.name) ? (
-                        <Codicon name="primitive-square" className="text-xs" />
-                      ) : (
-                        <Codicon name="play" className="text-xs" />
-                      )}
-                    </button>
-                    {/* Edit (imported only) */}
-                    {!bundled && (
-                      <button
-                        onClick={() => {
-                          setEditingServer(server.name);
-                          setShowAddForm(false);
-                        }}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                        title="Edit"
-                      >
-                        <Codicon name="edit" className="text-xs" />
-                      </button>
-                    )}
-                    {/* Remove (imported only) */}
-                    {!bundled && (
-                      <button
-                        onClick={() => removeMcpServer(server.name)}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-accent"
-                        title="Remove"
-                      >
-                        <Codicon name="trash" className="text-xs" />
-                      </button>
-                    )}
                   </div>
                 </div>
 

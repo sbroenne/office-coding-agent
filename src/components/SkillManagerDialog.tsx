@@ -3,80 +3,56 @@ import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { getBundledSkills } from '@/services/skills';
 import { parseSkillsZipFile, parseSkillMarkdownFile } from '@/services/extensions/zipImportService';
-import { downloadSkill, downloadSkillsZip } from '@/services/extensions/zipExportService';
-import { useSettingsStore } from '@/stores';
+import { downloadSkill } from '@/services/extensions/zipExportService';
 
 export const SkillManagerPanel: React.FC = () => {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
-  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const zipInputRef = useRef<HTMLInputElement>(null);
   const mdInputRef = useRef<HTMLInputElement>(null);
 
-  const importedSkills = useSettingsStore(s => s.importedSkills);
-  const importSkills = useSettingsStore(s => s.importSkills);
-  const removeImportedSkill = useSettingsStore(s => s.removeImportedSkill);
-
   const bundledSkills = getBundledSkills();
 
-  const handleImportZip = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+  const handleImportZip = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      setImportStatus(null);
-      setImportError(null);
-      setIsImporting(true);
+    setImportStatus(null);
+    setImportError(null);
+    setIsImporting(true);
 
-      try {
-        const skills = await parseSkillsZipFile(file);
-        importSkills(skills);
-        setImportStatus(
-          `Imported ${skills.length} skill${skills.length === 1 ? '' : 's'} from ${file.name}.`
-        );
-      } catch (error) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import skills ZIP.');
-      } finally {
-        setIsImporting(false);
-        event.target.value = '';
-      }
-    },
-    [importSkills]
-  );
-
-  const handleImportMd = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      setImportStatus(null);
-      setImportError(null);
-      setIsImporting(true);
-
-      try {
-        const skill = await parseSkillMarkdownFile(file);
-        importSkills([skill]);
-        setImportStatus(`Imported skill "${skill.metadata.name}" from ${file.name}.`);
-      } catch (error) {
-        setImportError(error instanceof Error ? error.message : 'Failed to import skill file.');
-      } finally {
-        setIsImporting(false);
-        event.target.value = '';
-      }
-    },
-    [importSkills]
-  );
-
-  const handleDownloadAll = useCallback(async () => {
-    if (importedSkills.length === 0) return;
-    setIsDownloadingAll(true);
     try {
-      await downloadSkillsZip(importedSkills);
+      const skills = await parseSkillsZipFile(file);
+      setImportStatus(
+        `Imported ${skills.length} skill${skills.length === 1 ? '' : 's'} from ${file.name}.`
+      );
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import skills ZIP.');
     } finally {
-      setIsDownloadingAll(false);
+      setIsImporting(false);
+      event.target.value = '';
     }
-  }, [importedSkills]);
+  }, []);
+
+  const handleImportMd = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportStatus(null);
+    setImportError(null);
+    setIsImporting(true);
+
+    try {
+      const skill = await parseSkillMarkdownFile(file);
+      setImportStatus(`Imported skill "${skill.metadata.name}" from ${file.name}.`);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import skill file.');
+    } finally {
+      setIsImporting(false);
+      event.target.value = '';
+    }
+  }, []);
 
   return (
     <div className="space-y-3 p-3">
@@ -180,67 +156,10 @@ export const SkillManagerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Imported skills */}
+      {/* Imported skills — managed via Plugin Hub */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
-          {importedSkills.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-1.5 text-[11px]"
-              onClick={() => void handleDownloadAll()}
-              disabled={isDownloadingAll}
-              title="Download all custom skills as ZIP"
-            >
-              {isDownloadingAll ? (
-                <Codicon name="loading" className="text-xs codicon-modifier-spin" />
-              ) : (
-                <Codicon name="cloud-download" className="text-xs" />
-              )}
-              Download all
-            </Button>
-          )}
-        </div>
-        {importedSkills.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No imported skills.</p>
-        ) : (
-          importedSkills.map(skill => (
-            <div
-              key={`imported-skill-${skill.metadata.name}`}
-              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{skill.metadata.name}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {skill.metadata.description}
-                </p>
-              </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => downloadSkill(skill)}
-                  aria-label={`Download ${skill.metadata.name}`}
-                  title="Download as .md"
-                >
-                  <Codicon name="cloud-download" className="text-sm" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7 text-destructive hover:text-destructive"
-                  onClick={() => removeImportedSkill(skill.metadata.name)}
-                  aria-label={`Remove ${skill.metadata.name}`}
-                  title="Remove"
-                >
-                  <Codicon name="trash" className="text-sm" />
-                </Button>
-              </div>
-            </div>
-          ))
-        )}
+        <p className="text-[11px] font-medium text-muted-foreground">Imported</p>
+        <p className="text-xs text-muted-foreground">No imported skills.</p>
       </div>
     </div>
   );

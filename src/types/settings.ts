@@ -1,5 +1,3 @@
-import type { AgentConfig } from './agent';
-import type { AgentSkill } from './skill';
 import type { McpServerConfig } from './mcp';
 
 /** Provider labels for grouping models in the picker */
@@ -30,36 +28,14 @@ export function inferProvider(modelId: string): ModelProvider {
 export interface UserSettings {
   /** Currently selected Copilot model ID */
   activeModel: string;
-  /** Names of currently active agent skills. null = all skills enabled (default). */
-  activeSkillNames: string[] | null;
   /** ID of the currently selected agent (matches agent metadata name). */
   activeAgentId: string;
-  /** Imported skills loaded from local ZIP files. */
-  importedSkills: AgentSkill[];
-  /** Imported agents loaded from local ZIP files. */
-  importedAgents: AgentConfig[];
-  /** MCP servers imported from a mcp.json file. */
-  importedMcpServers: McpServerConfig[];
-  /** Names of currently active MCP servers. null = all servers enabled (default). */
-  activeMcpServerNames: string[] | null;
-  /**
-   * npm package names whose SKILL.md files are loaded at session start.
-   * The proxy installs each package at session creation time and adds
-   * its directory to the SDK's skillDirectories parameter.
-   */
-  npmSkillPackages: string[];
 }
 
 /** Default settings applied on first run */
 export const DEFAULT_SETTINGS: UserSettings = {
   activeModel: 'claude-sonnet-4.6',
-  activeSkillNames: null,
   activeAgentId: 'Excel',
-  importedSkills: [],
-  importedAgents: [],
-  importedMcpServers: [],
-  activeMcpServerNames: null,
-  npmSkillPackages: [],
 };
 
 /** Built-in MCP servers that ship with the add-in. Non-removable, but toggleable. */

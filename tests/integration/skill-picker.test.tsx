@@ -31,18 +31,18 @@ describe('Integration: SkillPicker', () => {
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
     expect(screen.getByText('Bundled')).toBeInTheDocument();
-    expect(screen.getByText('Manage skills…')).toBeInTheDocument();
+    expect(screen.getByText('Manage plugins…')).toBeInTheDocument();
   });
 
-  it('calls onOpenPanel when manage skills button is clicked', async () => {
+  it('calls onOpenPanel when manage plugins button is clicked', async () => {
     renderWithProviders(<SkillPicker onOpenPanel={mockOpenPanel} />);
 
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
-    const manageButton = screen.getByRole('button', { name: /manage skills/i });
+    const manageButton = screen.getByRole('button', { name: /manage plugins/i });
     manageButton.focus();
     await userEvent.keyboard('{Enter}');
 
-    expect(mockOpenPanel).toHaveBeenCalledWith('skills');
+    expect(mockOpenPanel).toHaveBeenCalledWith('plugins');
   });
 });

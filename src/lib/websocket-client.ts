@@ -72,12 +72,6 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   disabledSkills?: string[];
   /** Custom agent configs passed natively to the SDK. */
   customAgents?: CustomAgentPayload[];
-  /**
-   * npm package names to install server-side at session start.
-   * The proxy runs `npm install` for each package and adds the installed directory
-   * to the SDK's skillDirectories so SKILL.md files are loaded automatically.
-   */
-  npmSkillPackages?: string[];
 }
 
 /**
@@ -299,7 +293,6 @@ export class WebSocketCopilotClient {
       skills: config.skills,
       disabledSkills: config.disabledSkills,
       customAgents: config.customAgents,
-      npmSkillPackages: config.npmSkillPackages,
     });
 
     const sessionId = response.sessionId;

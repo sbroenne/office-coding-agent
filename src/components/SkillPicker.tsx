@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
-import { useSettingsStore } from '@/stores';
-import { getBundledSkills, getImportedSkills, getSkills } from '@/services/skills';
+import { getBundledSkills, getSkills } from '@/services/skills';
 import { detectOfficeHost } from '@/services/office/host';
 
 interface SkillPickerProps {
@@ -12,8 +11,6 @@ interface SkillPickerProps {
 
 export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
   const [open, setOpen] = useState(false);
-  const activeSkillNames = useSettingsStore(s => s.activeSkillNames);
-  const toggleSkill = useSettingsStore(s => s.toggleSkill);
 
   const host = detectOfficeHost();
   const allSkills = getSkills().filter(
@@ -22,45 +19,23 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
   const bundledSkills = getBundledSkills().filter(
     s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
   );
-  const importedSkills = getImportedSkills().filter(
-    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
-  );
-
-  // null = all on, explicit array = only those
-  const allNames = allSkills.map(s => s.metadata.name);
-  const effectiveActive: string[] = activeSkillNames ?? allNames;
-
-  const activeCount = effectiveActive.filter(n =>
-    allSkills.some(s => s.metadata.name === n)
-  ).length;
 
   const renderSkillOption = (skillName: string, skillDescription: string) => {
-    const isActive = effectiveActive.includes(skillName);
-
     return (
-      <button
+      <div
         key={skillName}
-        onClick={() => toggleSkill(skillName)}
-        className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+        className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm"
       >
         <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border border-border">
-          {isActive ? (
-            <Codicon name="check" className="text-xs text-primary" />
-          ) : (
-            <Codicon name="primitive-square" className="text-xs opacity-0" />
-          )}
+          <Codicon name="check" className="text-xs text-primary" />
         </div>
         <div className="min-w-0 flex-1">
-          <div
-            className={cn('font-medium', isActive ? 'text-foreground' : 'text-muted-foreground')}
-          >
-            {skillName}
-          </div>
+          <div className={cn('font-medium text-foreground')}>{skillName}</div>
           <div className="text-xs text-muted-foreground line-clamp-2">
             {skillDescription.split('.')[0]}
           </div>
         </div>
-      </button>
+      </div>
     );
   };
 
@@ -75,11 +50,6 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
             title="Agent skills"
           >
             <Codicon name="lightbulb-sparkle" className="text-[14px]" />
-            {activeCount > 0 && activeSkillNames !== null && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-medium tabular-nums text-primary-foreground">
-                {activeCount}
-              </span>
-            )}
           </button>
         </Popover.Trigger>
 
@@ -94,21 +64,9 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
               <>
                 <div className="flex items-center justify-between px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                   <span>Bundled</span>
-                  <span>Read-only category</span>
+                  <span>Read-only</span>
                 </div>
                 {bundledSkills.map(skill =>
-                  renderSkillOption(skill.metadata.name, skill.metadata.description)
-                )}
-              </>
-            )}
-
-            {importedSkills.length > 0 && (
-              <>
-                <div className="mt-1 flex items-center justify-between px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <span>Imported</span>
-                  <span>ZIP</span>
-                </div>
-                {importedSkills.map(skill =>
                   renderSkillOption(skill.metadata.name, skill.metadata.description)
                 )}
               </>
@@ -124,12 +82,11 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
               <button
                 onClick={() => {
                   setOpen(false);
-                  onOpenPanel?.('skills');
+                  onOpenPanel?.('plugins');
                 }}
                 className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
-                <span>Manage skills…</span>
-                <span>{importedSkills.length} imported</span>
+                <span>Manage plugins…</span>
               </button>
             </div>
           </Popover.Content>

@@ -4,12 +4,7 @@ import { Check } from 'lucide-react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
-import {
-  getAgents,
-  getBundledAgents,
-  getImportedAgents,
-  resolveActiveAgent,
-} from '@/services/agents';
+import { getAgents, getBundledAgents, resolveActiveAgent } from '@/services/agents';
 import { detectOfficeHost } from '@/services/office/host';
 
 interface AgentPickerProps {
@@ -29,9 +24,6 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
   const allAgents = getAgents(host);
   const bundledAgents = targetHost
     ? getBundledAgents().filter(agent => agent.metadata.hosts.includes(targetHost))
-    : [];
-  const importedAgents = targetHost
-    ? getImportedAgents().filter(agent => agent.metadata.hosts.includes(targetHost))
     : [];
 
   if (allAgents.length === 0) return null;
@@ -95,18 +87,6 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
                   <span>Read-only</span>
                 </div>
                 {bundledAgents.map(agent =>
-                  renderAgentOption(agent.metadata.name, agent.metadata.description)
-                )}
-              </>
-            )}
-
-            {importedAgents.length > 0 && (
-              <>
-                <div className="mt-1 flex items-center justify-between px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <span>Imported</span>
-                  <span>ZIP</span>
-                </div>
-                {importedAgents.map(agent =>
                   renderAgentOption(agent.metadata.name, agent.metadata.description)
                 )}
               </>
