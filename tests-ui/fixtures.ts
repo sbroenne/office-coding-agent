@@ -41,12 +41,12 @@ function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
     state: {
       activeModel: 'claude-sonnet-4',
-      activeSkillNames: null,
+      disabledSkillNames: [],
       activeAgentId: 'Excel',
       importedSkills: [],
       importedAgents: [],
       importedMcpServers: [],
-      activeMcpServerNames: null,
+      disabledMcpServerNames: [],
       availableModels: [
         { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', provider: 'Anthropic' },
         { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },

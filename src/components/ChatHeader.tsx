@@ -1,5 +1,6 @@
 import React from 'react';
 import { SessionHistoryPicker } from './SessionHistoryPicker';
+import { SkillPicker } from './SkillPicker';
 import { Codicon } from '@/components/Codicon';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 import type { OfficeHostApp } from '@/services/office/host';
@@ -38,6 +39,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-1">
+        <SkillPicker onOpenPanel={onOpenPanel} />
         <button
           onClick={() => onOpenPanel?.('plugins')}
           className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"

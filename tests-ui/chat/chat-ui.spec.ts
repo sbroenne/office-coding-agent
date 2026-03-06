@@ -49,86 +49,95 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('agent manager panel opens from manage button and closes with back', async ({
+  test('plugin hub opens from agent picker manage button and closes', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Select agent' }).click();
 
-    const manageAgents = page.getByRole('button', { name: 'Manage agents…' });
-    await manageAgents.focus();
+    const managePlugins = page.getByRole('button', { name: 'Manage plugins…' });
+    await managePlugins.focus();
     await page.keyboard.press('Enter');
 
-    await expect(page.getByRole('heading', { name: 'Manage Agents' })).toBeVisible();
-    await page.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('heading', { name: 'Manage Agents' })).not.toBeVisible();
+    await expect(page.getByText('Plugins').first()).toBeVisible();
+    await page.getByTitle('Close').click();
+    await expect(page.getByRole('button', { name: 'Select agent' })).toBeVisible();
   });
 
-  test('skill manager panel opens from manage button and closes with back', async ({
+  test('plugin hub opens from skill picker manage button and closes', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Agent skills' }).click();
 
-    const manageSkills = page.getByRole('button', { name: 'Manage skills…' });
-    await manageSkills.focus();
+    const managePlugins = page.getByRole('button', { name: 'Manage plugins…' });
+    await managePlugins.focus();
     await page.keyboard.press('Enter');
 
-    await expect(page.getByRole('heading', { name: 'Manage Skills' })).toBeVisible();
-    await page.getByRole('button', { name: 'Back' }).click();
-    await expect(page.getByRole('heading', { name: 'Manage Skills' })).not.toBeVisible();
+    await expect(page.getByText('Plugins').first()).toBeVisible();
+    await page.getByTitle('Close').click();
+    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({
     configuredTaskpane: page,
   }) => {
-    await page.evaluate(() => {
-      const messages: unknown[] = [];
-      for (let i = 0; i < 30; i++) {
-        messages.push({
-          id: `u-${i}`,
-          role: 'user',
-          content: [{ type: 'text', text: `User line ${i} ${'x'.repeat(60)}` }],
-          createdAt: new Date(Date.now() - (60 - i) * 1000).toISOString(),
-        });
-        messages.push({
-          id: `a-${i}`,
-          role: 'assistant',
-          content: [{ type: 'text', text: `Assistant line ${i} ${'y'.repeat(80)}` }],
-          createdAt: new Date(Date.now() - (59 - i) * 1000).toISOString(),
-        });
-      }
+    // Build 60-message session history (30 pairs of user+assistant)
+    const messages: unknown[] = [];
+    for (let i = 0; i < 30; i++) {
+      messages.push({
+        id: `u-${i}`,
+        role: 'user',
+        content: [{ type: 'text', text: `User line ${i} ${'x'.repeat(60)}` }],
+        createdAt: new Date(Date.now() - (60 - i) * 1000).toISOString(),
+      });
+      messages.push({
+        id: `a-${i}`,
+        role: 'assistant',
+        content: [{ type: 'text', text: `Assistant line ${i} ${'y'.repeat(80)}` }],
+        createdAt: new Date(Date.now() - (59 - i) * 1000).toISOString(),
+      });
+    }
 
-      localStorage.setItem(
-        'office-coding-agent-session-history',
-        JSON.stringify({
-          state: {
-            sessions: [
-              {
-                id: 'scroll-test-session',
-                title: 'Scroll test',
-                host: 'excel',
-                updatedAt: Date.now(),
-                messages,
-              },
-            ],
-            activeSessionId: 'scroll-test-session',
+    const historyJSON = JSON.stringify({
+      state: {
+        sessions: [
+          {
+            id: 'scroll-test-session',
+            title: 'Scroll test',
+            host: 'excel',
+            updatedAt: Date.now(),
+            messages,
           },
-          version: 0,
-        })
-      );
+        ],
+        activeSessionId: 'scroll-test-session',
+      },
+      version: 0,
     });
+
+    // Register an init script that seeds session history into localStorage
+    // BEFORE page code runs — addInitScript fires on every future navigation
+    // including the reload below, so Zustand hydrates with the full session
+    // on the very first render (no race condition).
+    await page.addInitScript((json: string) => {
+      localStorage.setItem('office-coding-agent-session-history', json);
+    }, historyJSON);
 
     await page.reload();
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
 
-    const pinnedToBottom = await page.evaluate(async () => {
-      // Wait for messages to render and scroll to settle
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const viewport = document.querySelector('.aui-thread-viewport') as HTMLElement | null;
-      if (!viewport) return false;
-      const delta = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-      return delta <= 8;
-    });
+    // Wait for at least one message element to be in the DOM, confirming that
+    // session history was restored (not the empty welcome screen).
+    await page.waitForSelector('[data-role="user"]', { timeout: 10_000 });
 
-    expect(pinnedToBottom).toBe(true);
+    // Wait (with retries) for the viewport to be scrolled to the bottom.
+    // The MessageList auto-scroll effect should have fired by now.
+    await page.waitForFunction(
+      () => {
+        const viewport = document.querySelector('.aui-thread-viewport') as HTMLElement | null;
+        if (!viewport) return false;
+        const delta = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+        return delta <= 8;
+      },
+      { timeout: 5_000 }
+    );
   });
 });
