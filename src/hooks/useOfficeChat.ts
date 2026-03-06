@@ -77,6 +77,8 @@ function getWsUrl(): string {
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
+  const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
+  const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
   const createSession = useSessionHistoryStore(s => s.createSession);
@@ -102,10 +104,14 @@ export function useOfficeChat(host: OfficeHostApp) {
   // Model changes take effect on the next new conversation (same as VS Code Copilot).
   const activeModelRef = useRef(activeModel);
   const activeAgentIdRef = useRef(activeAgentId);
+  const disabledSkillNamesRef = useRef(disabledSkillNames);
+  const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
   activeAgentIdRef.current = activeAgentId;
+  disabledSkillNamesRef.current = disabledSkillNames;
+  disabledMcpServerNamesRef.current = disabledMcpServerNames;
   evaluatePermissionRef.current = evaluatePermission;
 
   // Switch model mid-session when the user picks a different model
@@ -260,13 +266,19 @@ export function useOfficeChat(host: OfficeHostApp) {
             }))
           : undefined;
 
-      // Resolve active MCP servers from bundled list, intersect with active agent allowlist.
+      // Resolve active MCP servers: bundled list → agent allowlist filter → user disable filter.
       let activeServers = [...BUNDLED_MCP_SERVERS];
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
         activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
       }
+      activeServers = activeServers.filter(
+        s => !disabledMcpServerNamesRef.current.includes(s.name)
+      );
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
+
+      const disabledSkills =
+        disabledSkillNamesRef.current.length > 0 ? disabledSkillNamesRef.current : undefined;
 
       const session = await withTimeout(
         client.createSession({
@@ -276,6 +288,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           mcpServers,
           host,
           skills,
+          disabledSkills,
           customAgents,
         }),
         60_000,

@@ -69,3 +69,71 @@ describe('settingsStore — agents', () => {
     expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
   });
 });
+
+// ─── Skill management ───
+
+describe('settingsStore — skills', () => {
+  it('starts with no disabled skills', () => {
+    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
+  });
+
+  it('toggleSkill disables an enabled skill', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    expect(useSettingsStore.getState().disabledSkillNames).toContain('excel');
+  });
+
+  it('toggleSkill re-enables a disabled skill', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    useSettingsStore.getState().toggleSkill('excel');
+    expect(useSettingsStore.getState().disabledSkillNames).not.toContain('excel');
+  });
+
+  it('isSkillEnabled returns true for enabled skills', () => {
+    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(true);
+  });
+
+  it('isSkillEnabled returns false for disabled skills', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(false);
+  });
+
+  it('reset clears disabled skills', () => {
+    useSettingsStore.getState().toggleSkill('excel');
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
+  });
+});
+
+// ─── MCP server management ───
+
+describe('settingsStore — mcp servers', () => {
+  it('starts with no disabled MCP servers', () => {
+    expect(useSettingsStore.getState().disabledMcpServerNames).toEqual([]);
+  });
+
+  it('toggleMcpServer disables an enabled server', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    expect(useSettingsStore.getState().disabledMcpServerNames).toContain('workiq');
+  });
+
+  it('toggleMcpServer re-enables a disabled server', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    expect(useSettingsStore.getState().disabledMcpServerNames).not.toContain('workiq');
+  });
+
+  it('isMcpServerEnabled returns true for enabled servers', () => {
+    expect(useSettingsStore.getState().isMcpServerEnabled('workiq')).toBe(true);
+  });
+
+  it('isMcpServerEnabled returns false for disabled servers', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    expect(useSettingsStore.getState().isMcpServerEnabled('workiq')).toBe(false);
+  });
+
+  it('reset clears disabled MCP servers', () => {
+    useSettingsStore.getState().toggleMcpServer('workiq');
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().disabledMcpServerNames).toEqual([]);
+  });
+});

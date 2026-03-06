@@ -30,12 +30,18 @@ export interface UserSettings {
   activeModel: string;
   /** ID of the currently selected agent (matches agent metadata name). */
   activeAgentId: string;
+  /** Skill names explicitly disabled by the user. Empty = all enabled. */
+  disabledSkillNames: string[];
+  /** MCP server names explicitly disabled by the user. Empty = all enabled. */
+  disabledMcpServerNames: string[];
 }
 
 /** Default settings applied on first run */
 export const DEFAULT_SETTINGS: UserSettings = {
   activeModel: 'claude-sonnet-4.6',
   activeAgentId: 'Excel',
+  disabledSkillNames: [],
+  disabledMcpServerNames: [],
 };
 
 /** Built-in MCP servers that ship with the add-in. Non-removable, but toggleable. */

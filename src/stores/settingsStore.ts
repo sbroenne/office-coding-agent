@@ -16,6 +16,14 @@ interface SettingsState extends UserSettings {
   setActiveAgent: (agentId: string) => void;
   getActiveAgent: () => string;
 
+  // ─── Skill management ───
+  toggleSkill: (name: string) => void;
+  isSkillEnabled: (name: string) => boolean;
+
+  // ─── MCP server management ───
+  toggleMcpServer: (name: string) => void;
+  isMcpServerEnabled: (name: string) => boolean;
+
   // ─── Reset ───
   reset: () => void;
 }
@@ -52,6 +60,34 @@ export const useSettingsStore = create<SettingsState>()(
         return get().activeAgentId;
       },
 
+      // ─── Skill management ───
+      toggleSkill: name => {
+        const disabled = get().disabledSkillNames;
+        if (disabled.includes(name)) {
+          set({ disabledSkillNames: disabled.filter(n => n !== name) });
+        } else {
+          set({ disabledSkillNames: [...disabled, name] });
+        }
+      },
+
+      isSkillEnabled: name => {
+        return !get().disabledSkillNames.includes(name);
+      },
+
+      // ─── MCP server management ───
+      toggleMcpServer: name => {
+        const disabled = get().disabledMcpServerNames;
+        if (disabled.includes(name)) {
+          set({ disabledMcpServerNames: disabled.filter(n => n !== name) });
+        } else {
+          set({ disabledMcpServerNames: [...disabled, name] });
+        }
+      },
+
+      isMcpServerEnabled: name => {
+        return !get().disabledMcpServerNames.includes(name);
+      },
+
       // ─── Reset ───
       reset: () => {
         set(DEFAULT_SETTINGS);
@@ -63,8 +99,8 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: state => ({
         activeModel: state.activeModel,
         activeAgentId: state.activeAgentId,
-        // availableModels is NOT persisted — it's always fetched fresh from the
-        // Copilot CLI on connect, so a stale cached list never survives restarts.
+        disabledSkillNames: state.disabledSkillNames,
+        disabledMcpServerNames: state.disabledMcpServerNames,
       }),
     }
   )
