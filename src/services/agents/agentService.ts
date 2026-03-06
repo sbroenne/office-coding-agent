@@ -1,11 +1,8 @@
 import type { AgentConfig, AgentHost, AgentMetadata } from '@/types/agent';
 import type { OfficeHostApp } from '@/services/office/host';
 
-// Import bundled agent files as raw strings (via Vite md-raw plugin)
-import excelAgentRaw from '@/agents/excel/AGENT.md';
-import powerpointAgentRaw from '@/agents/powerpoint/AGENT.md';
-import wordAgentRaw from '@/agents/word/AGENT.md';
-import outlookAgentRaw from '@/agents/outlook/AGENT.md';
+// NOTE: Bundled agents removed — all agents now come from plugins
+// installed via the Plugin Hub (sbroenne/office-coding-agent-plugins marketplace)
 
 /**
  * Parse YAML frontmatter from an agent markdown file.
