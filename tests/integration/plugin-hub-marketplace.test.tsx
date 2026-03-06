@@ -2,11 +2,10 @@
  * Regression tests: PluginHub — Marketplace tab (delete & edit).
  *
  * These tests document the expected behaviour for the Marketplaces tab:
- * - Delete button is visible for custom marketplaces that have a registeredKey
+ * - Delete button is visible for custom marketplaces (all listed entries have a registeredKey)
  * - Delete button is hidden for the OCA marketplace (isOwn = true)
  * - Delete button is hidden for built-in marketplaces (isBuiltIn = true)
- * - Delete button is hidden when registeredKey is null (CLI mapping failure)
- * - Clicking delete calls removeMarketplace with the registeredKey (not slug)
+ * - Clicking delete calls removeMarketplace with the registeredKey
  * - Lock icon is shown for protected marketplaces
  * - After a successful removal the list is refreshed
  */
@@ -70,20 +69,6 @@ describe('Integration: PluginHub — Marketplaces tab', () => {
     expect(deleteBtn).toBeInTheDocument();
   });
 
-  it('delete button is HIDDEN when registeredKey is null (CLI slug mismatch bug)', async () => {
-    // Regression: when the server cannot map the cache dir to a config key, registeredKey is null.
-    // The delete button must not show (there is nothing safe to pass to the CLI).
-    const user = userEvent.setup();
-    vi.mocked(pluginService.getMarketplaces).mockResolvedValue([
-      makeMarketplace({ registeredKey: null, isOwn: false, isBuiltIn: false }),
-    ]);
-
-    renderWithProviders(<PluginHub open onClose={() => {}} />);
-    await openMarketplacesTab(user);
-
-    await screen.findByText('My Plugins');
-    expect(screen.queryByRole('button', { name: /remove marketplace/i })).toBeNull();
-  });
 
   it('delete button is HIDDEN for the OCA marketplace (isOwn = true)', async () => {
     const user = userEvent.setup();
