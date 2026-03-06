@@ -18,11 +18,135 @@ import fs from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
 const isDev = process.env.NODE_ENV !== 'production';
+
+// ─── Copilot Plugin Helpers ────────────────────────────────────────────────
+
+function getCopilotConfigPath() {
+  return path.join(os.homedir(), '.copilot', 'config.json');
+}
+
+function readCopilotConfig() {
+  const configPath = getCopilotConfigPath();
+  if (!fs.existsSync(configPath)) return { installed_plugins: [] };
+  try {
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch {
+    return { installed_plugins: [] };
+  }
+}
+
+function findPluginManifest(pluginDir) {
+  const candidates = [
+    path.join(pluginDir, 'plugin.json'),
+    path.join(pluginDir, '.github', 'plugin', 'plugin.json'),
+    path.join(pluginDir, '.claude-plugin', 'plugin.json'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf-8'));
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
+function findMarketplaceManifest(cacheDir) {
+  const candidates = [
+    path.join(cacheDir, '.github', 'plugin', 'marketplace.json'),
+    path.join(cacheDir, '.claude-plugin', 'marketplace.json'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf-8'));
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
+function countPluginComponents(pluginDir, manifest) {
+  const result = {
+    agentCount: 0, agentNames: [],
+    skillCount: 0, skillNames: [],
+    mcpServerCount: 0, mcpServerNames: [],
+    hookCount: 0, commandCount: 0,
+  };
+
+  // Count agents from agents/ directory (*.agent.md files)
+  const agentsDir = path.join(pluginDir, 'agents');
+  if (fs.existsSync(agentsDir)) {
+    try {
+      const entries = fs.readdirSync(agentsDir, { withFileTypes: true, recursive: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith('.agent.md')) {
+          result.agentCount++;
+          result.agentNames.push(entry.name.replace(/\.agent\.md$/, ''));
+        }
+      }
+    } catch { /* ignore unreadable dirs */ }
+  }
+
+  // Count skills from skills/ directory (SKILL.md files)
+  const skillsDir = path.join(pluginDir, 'skills');
+  if (fs.existsSync(skillsDir)) {
+    try {
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true, recursive: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name === 'SKILL.md') {
+          // Use parent directory name as skill name
+          const parentPath = entry.parentPath || entry.path || '';
+          result.skillCount++;
+          result.skillNames.push(path.basename(parentPath));
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Count MCP servers from .mcp.json
+  const mcpJsonPath = path.join(pluginDir, '.mcp.json');
+  if (fs.existsSync(mcpJsonPath)) {
+    try {
+      const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
+      const servers = mcpConfig.mcpServers || mcpConfig.servers || {};
+      const names = Object.keys(servers);
+      result.mcpServerCount = names.length;
+      result.mcpServerNames = names;
+    } catch { /* ignore */ }
+  }
+
+  // Count hooks and commands from manifest
+  if (manifest) {
+    if (Array.isArray(manifest.hooks)) result.hookCount = manifest.hooks.length;
+    if (Array.isArray(manifest.commands)) result.commandCount = manifest.commands.length;
+  }
+
+  return result;
+}
+
+function runCopilotCommand(args) {
+  try {
+    const output = execSync(`copilot plugin ${args}`, {
+      encoding: 'utf-8',
+      timeout: 60000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return { success: true, message: output.trim() };
+  } catch (err) {
+    return { success: false, message: err.stderr?.trim() || err.message };
+  }
+}
 
 /** Check that the port is available, exit early if it's in use. */
 async function checkPort(port) {
@@ -140,6 +264,235 @@ async function createServer() {
       const filepath = path.join(tempDir, filename);
       fs.writeFileSync(filepath, buffer);
       res.json({ path: filepath, name: filename });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // ─── Plugin Management Routes ──────────────────────────────────────────────
+
+  // GET /api/plugins/installed — list installed plugins with enriched metadata
+  apiRouter.get('/plugins/installed', (_req, res) => {
+    try {
+      const config = readCopilotConfig();
+      const plugins = (config.installed_plugins || []).map(plugin => {
+        let manifest = null;
+        let components = null;
+        if (plugin.cache_path && fs.existsSync(plugin.cache_path)) {
+          manifest = findPluginManifest(plugin.cache_path);
+          components = countPluginComponents(plugin.cache_path, manifest);
+        }
+        return { ...plugin, manifest, components };
+      });
+      res.json({ plugins });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/plugins/marketplaces — list available plugin marketplaces
+  apiRouter.get('/plugins/marketplaces', (_req, res) => {
+    try {
+      const builtInSlugs = ['copilot-plugins', 'awesome-copilot'];
+      const cacheDir = path.join(os.homedir(), '.copilot', 'marketplace-cache');
+      const marketplaces = [];
+
+      if (fs.existsSync(cacheDir)) {
+        const entries = fs.readdirSync(cacheDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const dirPath = path.join(cacheDir, entry.name);
+          const manifest = findMarketplaceManifest(dirPath);
+          const isBuiltIn = builtInSlugs.some(slug => entry.name.includes(slug));
+          marketplaces.push({
+            slug: entry.name,
+            name: manifest?.name || entry.name,
+            owner: manifest?.owner || null,
+            description: manifest?.description || null,
+            pluginCount: Array.isArray(manifest?.plugins) ? manifest.plugins.length : 0,
+            isBuiltIn,
+          });
+        }
+      }
+
+      res.json({ marketplaces });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/plugins/browse/:marketplace — browse plugins in a marketplace
+  apiRouter.get('/plugins/browse/:marketplace', (_req, res) => {
+    try {
+      const { marketplace } = _req.params;
+      const cacheDir = path.join(os.homedir(), '.copilot', 'marketplace-cache');
+
+      if (!fs.existsSync(cacheDir)) {
+        res.status(404).json({ error: 'Marketplace cache not found' });
+        return;
+      }
+
+      // Find the marketplace directory (exact match or contains the slug)
+      const entries = fs.readdirSync(cacheDir, { withFileTypes: true });
+      const marketDir = entries.find(
+        e => e.isDirectory() && (e.name === marketplace || e.name.includes(marketplace))
+      );
+      if (!marketDir) {
+        res.status(404).json({ error: `Marketplace "${marketplace}" not found` });
+        return;
+      }
+
+      const manifest = findMarketplaceManifest(path.join(cacheDir, marketDir.name));
+      if (!manifest || !Array.isArray(manifest.plugins)) {
+        res.status(404).json({ error: 'Marketplace manifest not found or has no plugins' });
+        return;
+      }
+
+      // Cross-reference with installed plugins
+      const config = readCopilotConfig();
+      const installedNames = new Set(
+        (config.installed_plugins || []).map(p => p.name)
+      );
+
+      const plugins = manifest.plugins.map(plugin => ({
+        ...plugin,
+        installed: installedNames.has(plugin.name),
+      }));
+
+      res.json({
+        marketplace: manifest.name || marketDir.name,
+        plugins,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/plugins/:name/details — full detail for a single installed plugin
+  apiRouter.get('/plugins/:name/details', (_req, res) => {
+    try {
+      const { name } = _req.params;
+      const config = readCopilotConfig();
+      const plugin = (config.installed_plugins || []).find(p => p.name === name);
+
+      if (!plugin) {
+        res.status(404).json({ error: `Plugin "${name}" is not installed` });
+        return;
+      }
+
+      let manifest = null;
+      let components = null;
+      if (plugin.cache_path && fs.existsSync(plugin.cache_path)) {
+        manifest = findPluginManifest(plugin.cache_path);
+        components = countPluginComponents(plugin.cache_path, manifest);
+      }
+
+      res.json({ ...plugin, manifest, components });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/install — install a plugin by spec
+  apiRouter.post('/plugins/install', (req, res) => {
+    try {
+      const { spec } = req.body;
+      if (!spec || typeof spec !== 'string') {
+        res.status(400).json({ error: 'Missing required field: spec' });
+        return;
+      }
+      const result = runCopilotCommand(`install ${spec}`);
+      res.status(result.success ? 200 : 500).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/uninstall — uninstall a plugin by name
+  apiRouter.post('/plugins/uninstall', (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Missing required field: name' });
+        return;
+      }
+      const result = runCopilotCommand(`uninstall ${name}`);
+      res.status(result.success ? 200 : 500).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/enable — enable a plugin by name
+  apiRouter.post('/plugins/enable', (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Missing required field: name' });
+        return;
+      }
+      const result = runCopilotCommand(`enable ${name}`);
+      res.status(result.success ? 200 : 500).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/disable — disable a plugin by name
+  apiRouter.post('/plugins/disable', (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Missing required field: name' });
+        return;
+      }
+      const result = runCopilotCommand(`disable ${name}`);
+      res.status(result.success ? 200 : 500).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/update — update a plugin by name
+  apiRouter.post('/plugins/update', (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Missing required field: name' });
+        return;
+      }
+      const result = runCopilotCommand(`update ${name}`);
+      res.status(result.success ? 200 : 500).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/marketplace/add — add a marketplace by spec
+  apiRouter.post('/plugins/marketplace/add', (req, res) => {
+    try {
+      const { spec } = req.body;
+      if (!spec || typeof spec !== 'string') {
+        res.status(400).json({ error: 'Missing required field: spec' });
+        return;
+      }
+      const result = runCopilotCommand(`marketplace add ${spec}`);
+      res.status(result.success ? 200 : 500).json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/plugins/marketplace/remove — remove a marketplace by name
+  apiRouter.post('/plugins/marketplace/remove', (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: 'Missing required field: name' });
+        return;
+      }
+      const result = runCopilotCommand(`marketplace remove ${name}`);
+      res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
