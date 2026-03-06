@@ -298,11 +298,11 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
   );
 
   const handleRemoveMarketplace = useCallback(
-    async (registeredKey: string) => {
+    async (slug: string, registeredKey: string | null) => {
       setLoading(true);
       setError(null);
       try {
-        await pluginService.removeMarketplace(registeredKey);
+        await pluginService.removeMarketplace(slug, registeredKey);
         await fetchMarketplaces();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to remove marketplace');
@@ -634,7 +634,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
                 </div>
                 {!m.isBuiltIn && !m.isOwn && (
                   <button
-                    onClick={() => void handleRemoveMarketplace(m.registeredKey!)}
+                    onClick={() => void handleRemoveMarketplace(m.slug ?? m.name, m.registeredKey)}
                     className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-[var(--vscode-errorForeground)]"
                     title="Remove marketplace"
                     disabled={loading}

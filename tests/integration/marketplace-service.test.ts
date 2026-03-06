@@ -1,12 +1,10 @@
 // @vitest-environment node
 /**
  * Real integration tests for marketplaceService.mjs.
- *
- * These tests create actual temp directories on disk — no mocking.
- * They verify the REAL logic for listing and removing marketplaces.
+ * Uses actual temp directories on disk — no mocking.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -15,7 +13,9 @@ import {
   removeMarketplace,
   repoCacheSlugs,
   OCA_MARKETPLACE_KEY,
+  OCA_MARKETPLACE_SLUG,
   BUILTIN_KEYS,
+  BUILTIN_SLUGS,
 } from '@/../src/marketplaceService.mjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ describe('repoCacheSlugs', () => {
 // ─── listMarketplaces ─────────────────────────────────────────────────────────
 
 describe('listMarketplaces', () => {
-  it('registered marketplace always has non-null registeredKey (simple owner/repo)', () => {
+  it('registered marketplace has non-null registeredKey', () => {
     const root = tempDir(); cleanups.push(root);
     const cacheDir = join(root, 'cache');
     const configPath = join(root, 'config.json');
@@ -106,17 +106,18 @@ describe('listMarketplaces', () => {
     expect(entry!.registeredKey).toBe('spt-iq');
   });
 
-  it('cache-only dirs (not in config) are NOT listed', () => {
+  it('cache-only dir (not in config) IS listed with registeredKey=null', () => {
     const root = tempDir(); cleanups.push(root);
     const cacheDir = join(root, 'cache');
     const configPath = join(root, 'config.json');
 
-    makeCacheDir(cacheDir, 'some-random-cache', null);
+    makeCacheDir(cacheDir, 'some-cache-only-marketplace', null);
     writeFileSync(configPath, makeConfig({}));
 
     const list = listMarketplaces(cacheDir, configPath);
-    expect(list.find(m => m.slug === 'some-random-cache')).toBeUndefined();
-    expect(list).toHaveLength(0);
+    const entry = list.find(m => m.slug === 'some-cache-only-marketplace');
+    expect(entry).toBeTruthy();
+    expect(entry!.registeredKey).toBeNull();
   });
 
   it('OCA marketplace entry has isOwn = true', () => {
@@ -124,7 +125,7 @@ describe('listMarketplaces', () => {
     const cacheDir = join(root, 'cache');
     const configPath = join(root, 'config.json');
 
-    makeCacheDir(cacheDir, 'sbroenne-office-coding-agent-plugins', 'office-coding-agent');
+    makeCacheDir(cacheDir, OCA_MARKETPLACE_SLUG, 'office-coding-agent');
     writeFileSync(configPath, makeConfig({
       [OCA_MARKETPLACE_KEY]: { source: { source: 'github', repo: 'sbroenne/office-coding-agent-plugins' } },
     }));
@@ -133,6 +134,21 @@ describe('listMarketplaces', () => {
     const entry = list.find(m => m.isOwn);
     expect(entry).toBeTruthy();
     expect(entry!.registeredKey).toBe(OCA_MARKETPLACE_KEY);
+  });
+
+  it('built-in cache-only dir is listed with isBuiltIn=true', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+    const configPath = join(root, 'config.json');
+
+    makeCacheDir(cacheDir, BUILTIN_SLUGS[0], null);
+    writeFileSync(configPath, makeConfig({}));
+
+    const list = listMarketplaces(cacheDir, configPath);
+    const entry = list.find(m => m.slug === BUILTIN_SLUGS[0]);
+    expect(entry).toBeTruthy();
+    expect(entry!.isBuiltIn).toBe(true);
+    expect(entry!.registeredKey).toBeNull();
   });
 
   it('returns manifest name when available, falls back to config key', () => {
@@ -174,22 +190,70 @@ describe('listMarketplaces', () => {
 // ─── removeMarketplace ────────────────────────────────────────────────────────
 
 describe('removeMarketplace', () => {
-  it('refuses to remove OCA marketplace', () => {
-    const result = removeMarketplace(OCA_MARKETPLACE_KEY);
-    expect(result.success).toBe(false);
-    expect(result.message).toMatch(/office-coding-agent/i);
+  it('removes cache directory for a cache-only marketplace', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+
+    makeCacheDir(cacheDir, 'my-cache-slug');
+    expect(existsSync(join(cacheDir, 'my-cache-slug'))).toBe(true);
+
+    const result = removeMarketplace(cacheDir, 'my-cache-slug', null);
+    expect(result.success).toBe(true);
+    expect(existsSync(join(cacheDir, 'my-cache-slug'))).toBe(false);
   });
 
-  it('refuses to remove built-in marketplace keys', () => {
+  it('does not throw when cache dir does not exist', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+    mkdirSync(cacheDir);
+
+    const result = removeMarketplace(cacheDir, 'nonexistent-slug', null);
+    expect(result.success).toBe(true);
+  });
+
+  it('refuses to remove OCA marketplace (by slug)', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+    makeCacheDir(cacheDir, OCA_MARKETPLACE_SLUG);
+
+    const result = removeMarketplace(cacheDir, OCA_MARKETPLACE_SLUG, null);
+    expect(result.success).toBe(false);
+    expect(result.message).toMatch(/office-coding-agent/i);
+    expect(existsSync(join(cacheDir, OCA_MARKETPLACE_SLUG))).toBe(true);
+  });
+
+  it('refuses to remove OCA marketplace (by registeredKey)', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+
+    const result = removeMarketplace(cacheDir, 'some-slug', OCA_MARKETPLACE_KEY);
+    expect(result.success).toBe(false);
+  });
+
+  it('refuses to remove built-in marketplace (by slug)', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+    makeCacheDir(cacheDir, BUILTIN_SLUGS[0]);
+
+    const result = removeMarketplace(cacheDir, BUILTIN_SLUGS[0], null);
+    expect(result.success).toBe(false);
+  });
+
+  it('refuses to remove built-in marketplace (by registeredKey)', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+
     for (const key of BUILTIN_KEYS) {
-      const result = removeMarketplace(key);
+      const result = removeMarketplace(cacheDir, 'some-slug', key);
       expect(result.success).toBe(false);
     }
   });
 
-  it('returns failure when CLI command fails (non-registered key)', () => {
-    // The CLI will fail because the key is not registered; we expect a failure result
-    const result = removeMarketplace('nonexistent-marketplace-key-zzz');
+  it('returns failure when CLI command fails for a registered key', () => {
+    const root = tempDir(); cleanups.push(root);
+    const cacheDir = join(root, 'cache');
+
+    const result = removeMarketplace(cacheDir, 'nonexistent-key-zzz', 'nonexistent-key-zzz');
     expect(result.success).toBe(false);
   });
 });
