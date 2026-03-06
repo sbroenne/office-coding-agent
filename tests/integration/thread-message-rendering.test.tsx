@@ -1813,3 +1813,172 @@ describe('Thread UI: Reload, BranchPicker, and Edit buttons', () => {
     });
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// task_complete summary rendering + multi-turn Working box isolation
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Multi-turn session: each call to query() yields events from the next turn.
+ * Ensures turn 2 tools never bleed into turn 1's message.
+ */
+function makeMultiTurnSession(turnEvents: SessionEvent[][]) {
+  let callCount = 0;
+  return {
+    sessionId: 'test-session-id',
+    async *query() {
+      const events = turnEvents[callCount] ?? turnEvents[turnEvents.length - 1];
+      callCount++;
+      for (const event of events) {
+        yield event;
+        if (event.type === 'session.idle') return;
+      }
+    },
+    on: vi.fn(),
+    onPermissionRequest: vi.fn(() => () => undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
+    send: vi.fn().mockResolvedValue('msg-id'),
+    registerTools: vi.fn(),
+    getToolHandler: vi.fn(),
+    respondPermission: vi.fn().mockResolvedValue(undefined),
+    _dispatchEvent: vi.fn() as EventEmitter,
+  };
+}
+
+describe('task_complete: summary rendering and multi-turn Working box isolation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSettingsStore.getState().reset();
+    useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+  });
+
+  it('surfaces task_complete summary as visible text when no text response follows', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[42]]' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'task_complete',
+        arguments: { summary: 'Read 1 cell with value 42.' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: 'Done' },
+      }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    // Summary text must be visible — no expanding required
+    await waitFor(() => {
+      expect(screen.getByText('Read 1 cell with value 42.')).toBeInTheDocument();
+    });
+
+    // task_complete excluded from step count → "Finished with 1 step" (only get_range_values)
+    const doneTitle = document.querySelector('.chat-thinking-title-done');
+    expect(doneTitle?.textContent).toBe('Finished with 1 step');
+  });
+
+  it('task_complete does NOT inflate step count — "Finished with N steps" counts only work steps', async () => {
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', { toolCallId: 'tc1', toolName: 'get_range_values', arguments: {} }),
+      makeEvent('tool.execution_complete', { toolCallId: 'tc1', success: true, result: { content: '[[1]]' } }),
+      makeEvent('tool.execution_start', { toolCallId: 'tc2', toolName: 'set_range_values', arguments: {} }),
+      makeEvent('tool.execution_complete', { toolCallId: 'tc2', success: true, result: { content: 'OK' } }),
+      makeEvent('tool.execution_start', { toolCallId: 'tc3', toolName: 'task_complete', arguments: { summary: 'Done.' } }),
+      makeEvent('tool.execution_complete', { toolCallId: 'tc3', success: true, result: { content: 'Done' } }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => { expect(screen.getByText('Done.')).toBeInTheDocument(); });
+
+    // 2 work steps, task_complete excluded
+    const doneTitle = document.querySelector('.chat-thinking-title-done');
+    expect(doneTitle?.textContent).toBe('Finished with 2 steps');
+  });
+
+  it('REGRESSION: turn 2 Working box appears in a new message, not inside turn 1 message', async () => {
+    const session = makeMultiTurnSession([
+      // Turn 1: one work step + task_complete
+      [
+        makeEvent('tool.execution_start', { toolCallId: 'tc1', toolName: 'get_range_values', arguments: {} }),
+        makeEvent('tool.execution_complete', { toolCallId: 'tc1', success: true, result: { content: '[[1]]' } }),
+        makeEvent('tool.execution_start', { toolCallId: 'tc2', toolName: 'task_complete', arguments: { summary: 'Turn 1 done.' } }),
+        makeEvent('tool.execution_complete', { toolCallId: 'tc2', success: true, result: { content: 'Done' } }),
+        IDLE_EVENT,
+      ],
+      // Turn 2: starts a new working session
+      [
+        makeEvent('tool.execution_start', { toolCallId: 'tc3', toolName: 'set_range_values', arguments: {} }),
+        makeEvent('tool.execution_complete', { toolCallId: 'tc3', success: true, result: { content: 'OK' } }),
+        IDLE_EVENT,
+      ],
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+
+    // Turn 1
+    await act(async () => {
+      void getHook().send('do task 1');
+      await new Promise(r => setTimeout(r, 300));
+    });
+    await waitFor(() => { expect(screen.getByText('Turn 1 done.')).toBeInTheDocument(); });
+
+    // Exactly 1 assistant message after turn 1
+    expect(document.querySelectorAll('[data-role="assistant"]')).toHaveLength(1);
+
+    // Turn 2
+    await act(async () => {
+      void getHook().send('do task 2');
+      await new Promise(r => setTimeout(r, 300));
+    });
+    await waitFor(() => {
+      expect(document.querySelectorAll('[data-role="assistant"]')).toHaveLength(2);
+    });
+
+    const assistantMsgs = document.querySelectorAll('[data-role="assistant"]');
+
+    // Each turn must have exactly ONE Working box — never shared
+    expect(assistantMsgs[0].querySelectorAll('.chat-thinking-box')).toHaveLength(1);
+    expect(assistantMsgs[1].querySelectorAll('.chat-thinking-box')).toHaveLength(1);
+
+    // Turn 1's box must be collapsed (auto-collapsed on completion)
+    expect(assistantMsgs[0].querySelector('.chat-thinking-collapsed')).toBeInTheDocument();
+
+    // Turn 1's summary text must still be visible in its own message
+    expect(assistantMsgs[0].textContent).toContain('Turn 1 done.');
+
+    // Turn 2's Working box must be in turn 2's message (not turn 1's)
+    expect(assistantMsgs[1].querySelector('.chat-thinking-box')).toBeInTheDocument();
+    expect(assistantMsgs[0].textContent).not.toContain('Set range values');
+  });
+});
