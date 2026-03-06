@@ -10,10 +10,10 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
@@ -108,6 +108,170 @@ async function findSkillDirsInPackage(pkgDir) {
 /** Root directory for bundled skills; each host has its own subdirectory. */
 const BUNDLED_SKILLS_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), 'skills');
 
+// ── Installed plugin discovery ──────────────────────────────────────────────
+
+/** Path to the Copilot CLI config file. */
+const COPILOT_CONFIG_PATH = join(homedir(), '.copilot', 'config.json');
+
+/**
+ * Read ~/.copilot/config.json and return its parsed contents.
+ * Returns a safe default if the file doesn't exist or is malformed.
+ * @returns {Promise<{installed_plugins?: Array<{name: string, marketplace: string, version: string, installed_at: string, enabled: boolean, cache_path: string}>}>}
+ */
+async function readCopilotConfig() {
+  try {
+    const raw = await readFile(COPILOT_CONFIG_PATH, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Find the plugin.json manifest in a plugin cache directory.
+ * Checks standard locations: plugin.json, .github/plugin/plugin.json.
+ * @param {string} pluginDir
+ * @returns {Promise<object|null>}
+ */
+async function readPluginManifest(pluginDir) {
+  const candidates = [
+    join(pluginDir, 'plugin.json'),
+    join(pluginDir, '.github', 'plugin', 'plugin.json'),
+  ];
+  for (const p of candidates) {
+    try {
+      const raw = await readFile(p, 'utf8');
+      return JSON.parse(raw);
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Discover skill directories from installed Copilot CLI plugins.
+ *
+ * Reads ~/.copilot/config.json → installed_plugins[], then for each enabled
+ * plugin with a cache_path, scans <cache_path>/skills/ for subdirectories
+ * containing SKILL.md files (same layout as bundled skills and skillpm packages).
+ *
+ * If `host` is provided, tries to filter by host relevance:
+ *  - plugin.json `skills` field may list host-targeted paths
+ *  - plugin name containing the host slug (e.g. "office-excel") is a match
+ *  - plugins with no host indicator are included (universal)
+ *
+ * @param {string} [host] - Office host slug (e.g. 'excel', 'powerpoint')
+ * @returns {Promise<string[]>} array of skill directory paths
+ */
+async function discoverPluginSkillDirs(host) {
+  const config = await readCopilotConfig();
+  const plugins = config.installed_plugins || [];
+  const skillDirs = [];
+
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path) continue;
+    if (!existsSync(plugin.cache_path)) continue;
+
+    // Host filtering: skip plugins clearly targeted at a different host
+    if (host) {
+      const hostSlug = slugify(host);
+      const pluginSlug = slugify(plugin.name);
+      // If the plugin name contains a host identifier (e.g. "office-excel")
+      // but doesn't match the current host, skip it
+      const hostPrefixes = ['excel', 'powerpoint', 'word', 'outlook'];
+      const pluginHostTarget = hostPrefixes.find(
+        h => pluginSlug.includes(h) || pluginSlug.includes(`office-${h}`)
+      );
+      if (pluginHostTarget && pluginHostTarget !== hostSlug) continue;
+    }
+
+    const skillsRoot = join(plugin.cache_path, 'skills');
+    let entries;
+    try {
+      entries = await readdir(skillsRoot, { withFileTypes: true });
+    } catch {
+      continue; // no skills/ directory
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const skillDir = join(skillsRoot, entry.name);
+        if (existsSync(join(skillDir, 'SKILL.md'))) {
+          skillDirs.push(skillDir);
+        }
+      }
+    }
+  }
+  return skillDirs;
+}
+
+/**
+ * Discover custom agent definitions from installed Copilot CLI plugins.
+ *
+ * For each enabled plugin with a cache_path, scans <cache_path>/agents/
+ * for *.agent.md files and reads their content. Returns an array of
+ * {name, description, prompt} objects compatible with the SDK's customAgents.
+ *
+ * @param {string} [host] - Office host slug for filtering
+ * @returns {Promise<Array<{name: string, description: string, prompt: string}>>}
+ */
+async function discoverPluginAgents(host) {
+  const config = await readCopilotConfig();
+  const plugins = config.installed_plugins || [];
+  const agents = [];
+
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path) continue;
+    if (!existsSync(plugin.cache_path)) continue;
+
+    // Same host filtering as skills
+    if (host) {
+      const hostSlug = slugify(host);
+      const pluginSlug = slugify(plugin.name);
+      const hostPrefixes = ['excel', 'powerpoint', 'word', 'outlook'];
+      const pluginHostTarget = hostPrefixes.find(
+        h => pluginSlug.includes(h) || pluginSlug.includes(`office-${h}`)
+      );
+      if (pluginHostTarget && pluginHostTarget !== hostSlug) continue;
+    }
+
+    const agentsDir = join(plugin.cache_path, 'agents');
+    let entries;
+    try {
+      entries = await readdir(agentsDir, { withFileTypes: true });
+    } catch {
+      continue; // no agents/ directory
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const isAgentMd = entry.name.endsWith('.agent.md') || entry.name === 'AGENT.md';
+      if (!isAgentMd) continue;
+
+      try {
+        const content = await readFile(join(agentsDir, entry.name), 'utf8');
+        const agentName = entry.name === 'AGENT.md'
+          ? plugin.name
+          : entry.name.replace(/\.agent\.md$/, '');
+
+        // Try to extract description from YAML frontmatter if present
+        let description = `Agent from plugin ${plugin.name}`;
+        const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+        if (fmMatch) {
+          const descMatch = fmMatch[1].match(/description:\s*(.+)/);
+          if (descMatch) description = descMatch[1].trim();
+        }
+
+        agents.push({ name: agentName, description, prompt: content });
+      } catch {
+        // skip unreadable agent files
+      }
+    }
+  }
+  return agents;
+}
+
 /** Wrap a JSON payload in an LSP Content-Length frame. */
 function lspFrame(obj) {
   const body = JSON.stringify(obj);
@@ -184,9 +348,6 @@ async function handleConnection(ws) {
 
   /** @type {Map<string, string>} Temp skill directories keyed by sessionId for cleanup. */
   const sessionTempDirs = new Map();
-
-  /** @type {Map<string, string[]>} All npm temp dirs keyed by sessionId for cleanup. */
-  const sessionNpmTempDirs = new Map();
 
   /** @type {Map<string, string[]>} MCP server names keyed by sessionId for stop notifications. */
   const sessionMcpServerNames = new Map();
@@ -335,10 +496,9 @@ async function handleConnection(ws) {
           skills,
           disabledSkills,
           customAgents,
-          npmSkillPackages,
         } = params || {};
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, npmSkillPackages=${(npmSkillPackages || []).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -391,47 +551,27 @@ async function handleConnection(ws) {
           skillDirectories.push(tempSkillDir);
         }
 
-        // Install skillpm skill packages and add their skill subdirs to skillDirectories.
-        // Uses skillpm (https://skillpm.dev) — the Agent Skills package manager built on npm.
-        // skillpm packages follow the spec: skills live in skills/<name>/SKILL.md inside the package.
-        // We run `npm install` directly (no global skillpm needed) and then scan for skill dirs.
-        const npmTempDirs = [];
-        if (npmSkillPackages && npmSkillPackages.length > 0) {
-          // Regex: allow scoped (@org/name) and plain package names, with optional @version suffix
-          const NPM_PKG_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*(@[^\s/]+)?$/i;
-          for (const pkg of npmSkillPackages) {
-            if (typeof pkg !== 'string' || !NPM_PKG_RE.test(pkg.trim())) {
-              console.warn(`[proxy] Skipping invalid skillpm package name: "${pkg}"`);
-              continue;
-            }
-            const installDir = join(tmpdir(), `oca-skillpm-${randomUUID()}`);
-            await mkdir(installDir, { recursive: true });
-            npmTempDirs.push(installDir);
-            try {
-              // Run `npm install --prefix <dir> --no-save <pkg>` asynchronously
-              // so the Node.js event loop is never blocked.
-              await execFileAsync(
-                NPM_CMD,
-                ['install', '--prefix', installDir, '--no-save', pkg.trim()],
-                { ...NPM_EXEC_OPTS, timeout: 60_000 }
-              );
-
-              // Discover skill directories: skillpm packages put skills under
-              // node_modules/<pkgBaseName>/skills/<skillName>/SKILL.md
-              const skillDirs = await findSkillDirs(join(installDir, 'node_modules'));
-              for (const dir of skillDirs) {
-                skillDirectories.push(dir);
-                console.log(`[proxy] Added skillpm skill dir "${dir}" from package "${pkg}"`);
-              }
-              if (skillDirs.length === 0) {
-                console.warn(
-                  `[proxy] No skill dirs found in "${pkg}" — ensure it follows skillpm layout (skills/<name>/SKILL.md)`
-                );
-              }
-            } catch (err) {
-              console.warn(`[proxy] Failed to install skillpm package "${pkg}":`, err.message);
-            }
+        // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
+        try {
+          const pluginSkillDirs = await discoverPluginSkillDirs(host);
+          if (pluginSkillDirs.length > 0) {
+            skillDirectories.push(...pluginSkillDirs);
+            console.log(`[proxy] Added ${pluginSkillDirs.length} skill dir(s) from installed plugins`);
           }
+        } catch (err) {
+          console.warn('[proxy] Plugin skill discovery failed:', err.message);
+        }
+
+        // Discover agents from installed Copilot CLI plugins
+        const allCustomAgents = [...(customAgents || [])];
+        try {
+          const pluginAgents = await discoverPluginAgents(host);
+          if (pluginAgents.length > 0) {
+            allCustomAgents.push(...pluginAgents);
+            console.log(`[proxy] Added ${pluginAgents.length} agent(s) from installed plugins`);
+          }
+        } catch (err) {
+          console.warn('[proxy] Plugin agent discovery failed:', err.message);
         }
 
         // Emit 'starting' status for each configured MCP server
@@ -459,7 +599,7 @@ async function handleConnection(ws) {
             availableTools,
             skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
-            customAgents: customAgents?.length > 0 ? customAgents : undefined,
+            customAgents: allCustomAgents.length > 0 ? allCustomAgents : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               // Auto-approve custom-tool permissions — these are tools explicitly
@@ -479,9 +619,6 @@ async function handleConnection(ws) {
           // Clean up temp directories on failure
           if (tempSkillDir) {
             void rm(tempSkillDir, { recursive: true, force: true }).catch(() => {});
-          }
-          for (const dir of npmTempDirs) {
-            void rm(dir, { recursive: true, force: true }).catch(() => {});
           }
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
@@ -519,10 +656,6 @@ async function handleConnection(ws) {
         }
         if (tempSkillDir) {
           sessionTempDirs.set(session.sessionId, tempSkillDir);
-        }
-        // Track ALL npm temp dirs for cleanup on session destroy
-        if (npmTempDirs.length > 0) {
-          sessionNpmTempDirs.set(session.sessionId, npmTempDirs);
         }
         markHealthy();
         console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
@@ -617,14 +750,6 @@ async function handleConnection(ws) {
             sessionTempDirs.delete(sessionId);
             void rm(tempDir, { recursive: true, force: true }).catch(() => {});
           }
-          // Clean up all npm skill temp directories
-          const npmDirs = sessionNpmTempDirs.get(sessionId);
-          if (npmDirs) {
-            sessionNpmTempDirs.delete(sessionId);
-            for (const dir of npmDirs) {
-              void rm(dir, { recursive: true, force: true }).catch(() => {});
-            }
-          }
         }
         sendResponse(id, {});
         break;
@@ -717,14 +842,6 @@ async function handleConnection(ws) {
       void rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
     sessionTempDirs.clear();
-
-    // Clean up all npm skill temp directories for this connection
-    for (const npmDirs of sessionNpmTempDirs.values()) {
-      for (const dir of npmDirs) {
-        void rm(dir, { recursive: true, force: true }).catch(() => {});
-      }
-    }
-    sessionNpmTempDirs.clear();
 
     // Clear MCP server tracking
     sessionMcpServerNames.clear();
