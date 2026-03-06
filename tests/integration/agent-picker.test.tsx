@@ -40,7 +40,7 @@ describe('Integration: AgentPicker', () => {
       expect(items.length).toBeGreaterThanOrEqual(1);
     }
 
-    expect(screen.getByText('Manage agents…')).toBeInTheDocument();
+    expect(screen.getByText('Manage plugins…')).toBeInTheDocument();
   });
 
   it('shows agent description as secondary content', async () => {
@@ -53,16 +53,16 @@ describe('Integration: AgentPicker', () => {
     expect(screen.getByText(firstSentence)).toBeInTheDocument();
   });
 
-  it('calls onOpenPanel when manage agents button is clicked', async () => {
+  it('calls onOpenPanel when manage plugins button is clicked', async () => {
     renderWithProviders(<AgentPicker onOpenPanel={mockOpenPanel} />);
 
     await userEvent.click(screen.getByLabelText('Select agent'));
 
-    const manageButton = screen.getByRole('button', { name: /manage agents/i });
+    const manageButton = screen.getByRole('button', { name: /manage plugins/i });
     manageButton.focus();
     await userEvent.keyboard('{Enter}');
 
-    expect(mockOpenPanel).toHaveBeenCalledWith('agents');
+    expect(mockOpenPanel).toHaveBeenCalledWith('plugins');
   });
 
   it('store reflects the default active agent', () => {

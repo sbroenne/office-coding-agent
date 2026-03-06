@@ -195,7 +195,7 @@ describe('Thread – AssistantMessage rendering', () => {
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
-        toolName: 'manage_skills',
+        toolName: 'manage_plugins',
         arguments: { action: 'list' },
       }),
       makeEvent('tool.execution_complete', {
@@ -1283,7 +1283,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
-        toolName: 'manage_skills',
+        toolName: 'manage_plugins',
         arguments: { action: 'list' },
       }),
       makeEvent('tool.execution_complete', {
@@ -1293,8 +1293,8 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       }),
       makeEvent('tool.execution_start', {
         toolCallId: 'tc2',
-        toolName: 'manage_agents',
-        arguments: { action: 'list' },
+        toolName: 'manage_plugins',
+        arguments: { action: 'browse' },
       }),
       makeEvent('tool.execution_complete', {
         toolCallId: 'tc2',

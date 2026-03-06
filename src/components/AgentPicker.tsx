@@ -116,12 +116,11 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
               <button
                 onClick={() => {
                   setOpen(false);
-                  onOpenPanel?.('agents');
+                  onOpenPanel?.('plugins');
                 }}
                 className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
-                <span>Manage agents…</span>
-                <span>{importedAgents.length} imported</span>
+                <span>Manage plugins…</span>
               </button>
             </div>
           </Popover.Content>

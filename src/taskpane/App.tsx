@@ -4,9 +4,7 @@ import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { SlidePanel } from '@/components/SlidePanel';
-import { McpManagerPanel } from '@/components/McpManagerDialog';
-import { AgentManagerPanel } from '@/components/AgentManagerDialog';
-import { SkillManagerPanel } from '@/components/SkillManagerDialog';
+import PluginHub from '@/components/plugins/PluginHub';
 import { SessionHistoryPanel } from '@/components/SessionHistoryDialog';
 import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
 import { useSettingsStore } from '@/stores';
@@ -80,9 +78,6 @@ const PermissionBanner: React.FC<{
 );
 
 const PANEL_TITLES: Record<string, { title: string; description?: string }> = {
-  mcp: { title: 'MCP Servers', description: 'Manage servers that provide additional AI tools' },
-  agents: { title: 'Manage Agents', description: 'Import and manage custom agents' },
-  skills: { title: 'Manage Skills', description: 'Import and manage custom skills' },
   history: { title: 'Session History' },
   permissions: { title: 'Permissions', description: 'Manage auto-approval and saved rules' },
 };
@@ -174,9 +169,6 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
             title={title}
             description={description}
           >
-            {key === 'mcp' && <McpManagerPanel />}
-            {key === 'agents' && <AgentManagerPanel />}
-            {key === 'skills' && <SkillManagerPanel />}
             {key === 'history' && (
               <SessionHistoryPanel
                 host={host}
@@ -189,6 +181,19 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
             {key === 'permissions' && <PermissionManagerPanel />}
           </SlidePanel>
         ))}
+
+        {/* Plugin Hub — has its own header/chrome, rendered as a direct overlay */}
+        <div
+          className={`absolute inset-0 z-50 will-change-transform transition-transform duration-300 ease-in-out ${
+            activePanel === 'plugins' ? 'translate-x-0' : 'translate-x-full'
+          }`}
+          aria-hidden={activePanel !== 'plugins'}
+        >
+          <PluginHub
+            open={activePanel === 'plugins'}
+            onClose={closePanel}
+          />
+        </div>
       </div>
     </ChatActionsContext.Provider>
   );
