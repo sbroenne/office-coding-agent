@@ -10,6 +10,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { getLocalApiBase } from '@/lib/api';
 import type { McpServerConfig } from '@/types/mcp';
 
 interface McpPickerProps {
@@ -18,7 +19,7 @@ interface McpPickerProps {
 
 async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
   try {
-    const res = await fetch('/api/mcp-servers');
+    const res = await fetch(`${getLocalApiBase()}/api/mcp-servers`);
     if (!res.ok) return [];
     const data = (await res.json()) as { servers: McpServerConfig[] };
     return data.servers ?? [];
