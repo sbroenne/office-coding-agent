@@ -514,12 +514,13 @@ async function createServer() {
   // POST /api/plugins/marketplace/remove — remove a marketplace (registered or cache-only)
   apiRouter.post('/plugins/marketplace/remove', (req, res) => {
     try {
-      const { registeredKey } = req.body;
-      if (!registeredKey || typeof registeredKey !== 'string') {
-        res.status(400).json({ error: 'Missing required field: registeredKey' });
+      const { slug, registeredKey } = req.body;
+      if (!slug || typeof slug !== 'string') {
+        res.status(400).json({ error: 'Missing required field: slug' });
         return;
       }
-      const result = removeMarketplaceSvc(registeredKey);
+      const cacheDir = path.join(os.homedir(), '.copilot', 'marketplace-cache');
+      const result = removeMarketplaceSvc(cacheDir, slug, registeredKey ?? null);
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });

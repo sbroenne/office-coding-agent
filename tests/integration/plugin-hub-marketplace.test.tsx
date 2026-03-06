@@ -69,6 +69,19 @@ describe('Integration: PluginHub — Marketplaces tab', () => {
     expect(deleteBtn).toBeInTheDocument();
   });
 
+  it('delete button is visible for a cache-only marketplace (registeredKey = null)', async () => {
+    // Regression: cache-only entries (browsed but never registered) must be deletable.
+    const user = userEvent.setup();
+    vi.mocked(pluginService.getMarketplaces).mockResolvedValue([
+      makeMarketplace({ registeredKey: null, isOwn: false, isBuiltIn: false }),
+    ]);
+
+    renderWithProviders(<PluginHub open onClose={() => {}} />);
+    await openMarketplacesTab(user);
+
+    const deleteBtn = await screen.findByRole('button', { name: /remove marketplace/i });
+    expect(deleteBtn).toBeInTheDocument();
+  });
 
   it('delete button is HIDDEN for the OCA marketplace (isOwn = true)', async () => {
     const user = userEvent.setup();
@@ -107,15 +120,16 @@ describe('Integration: PluginHub — Marketplaces tab', () => {
     expect(screen.queryByRole('button', { name: /remove marketplace/i })).toBeNull();
   });
 
-  it('clicking delete calls removeMarketplace with the registeredKey', async () => {
+  it('clicking delete calls removeMarketplace with slug and registeredKey', async () => {
     const user = userEvent.setup();
+    const SLUG = 'stbrnner-microsoft-spt-iq';
     const REGISTERED_KEY = 'stbrnner-microsoft/spt-iq';
 
     vi.mocked(pluginService.getMarketplaces)
       .mockResolvedValueOnce([
-        makeMarketplace({ slug: 'stbrnner-microsoft-spt-iq', registeredKey: REGISTERED_KEY }),
+        makeMarketplace({ slug: SLUG, registeredKey: REGISTERED_KEY }),
       ])
-      .mockResolvedValue([]); // after removal list is refreshed
+      .mockResolvedValue([]);
 
     renderWithProviders(<PluginHub open onClose={() => {}} />);
     await openMarketplacesTab(user);
@@ -124,7 +138,7 @@ describe('Integration: PluginHub — Marketplaces tab', () => {
     await user.click(deleteBtn);
 
     expect(pluginService.removeMarketplace).toHaveBeenCalledOnce();
-    expect(pluginService.removeMarketplace).toHaveBeenCalledWith(REGISTERED_KEY);
+    expect(pluginService.removeMarketplace).toHaveBeenCalledWith(SLUG, REGISTERED_KEY);
   });
 
   it('after successful removal the marketplace list is refreshed', async () => {
