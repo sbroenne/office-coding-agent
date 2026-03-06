@@ -82,9 +82,7 @@ export interface PluginComponents {
  * Plugin source in marketplace.json — can be a relative path string,
  * or an object with source type + repo + path for external repos.
  */
-export type PluginSource =
-  | string
-  | { source: string; repo?: string; path?: string };
+export type PluginSource = string | { source: string; repo?: string; path?: string };
 
 /**
  * Marketplace plugin entry — from marketplace.json → plugins[].
@@ -138,10 +136,15 @@ export interface PluginMarketplace {
  * Registered marketplace info (from CLI or config).
  */
 export interface RegisteredMarketplace {
+  slug: string; // cache directory name, e.g. "sbroenne-office-coding-agent-plugins"
   name: string;
   source: string; // e.g. "github/copilot-plugins" or local path
   isBuiltIn: boolean; // true for copilot-plugins and awesome-copilot
   pluginCount?: number;
+  /** The key in ~/.copilot/config.json marketplaces — required for removal. Null if not registered. */
+  registeredKey: string | null;
+  /** True if this is the office-coding-agent's own marketplace (cannot be removed). */
+  isOwn: boolean;
 }
 
 /**
