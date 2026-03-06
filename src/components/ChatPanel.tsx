@@ -11,7 +11,8 @@ interface ChatPanelProps {
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
   onEnqueue?: (text: string) => void;
-  queuedCount?: number;
+  queuedPrompts?: string[];
+  onDequeue?: (index: number) => void;
   onOpenPanel?: (panel: string) => void;
 }
 
@@ -21,7 +22,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onSend,
   onCancel,
   onEnqueue,
-  queuedCount,
+  queuedPrompts,
+  onDequeue,
   onOpenPanel,
 }) => {
   return (
@@ -32,7 +34,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         onSend={onSend}
         onCancel={onCancel}
         onEnqueue={onEnqueue}
-        queuedCount={queuedCount}
+        queuedPrompts={queuedPrompts}
+        onDequeue={onDequeue}
         onFeedback={() => {
           /* TODO */
         }}

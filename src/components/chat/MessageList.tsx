@@ -120,7 +120,10 @@ interface MessageListProps {
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
   onEnqueue?: (text: string) => void;
-  queuedCount?: number;
+  /** Full text of each queued prompt, in order (first = next to run). */
+  queuedPrompts?: string[];
+  /** Called when the user cancels a queued prompt by index. */
+  onDequeue?: (index: number) => void;
   onEdit?: (messageId: string, newText: string) => void;
   onRegenerate?: (messageId: string) => void;
   onFeedback?: (messageId: string, kind: 'positive' | 'negative') => void;
@@ -134,7 +137,8 @@ export const MessageList: FC<MessageListProps> = ({
   onSend,
   onCancel,
   onEnqueue,
-  queuedCount,
+  queuedPrompts = [],
+  onDequeue,
   onEdit,
   onRegenerate,
   onFeedback,
@@ -220,6 +224,42 @@ export const MessageList: FC<MessageListProps> = ({
           );
         })}
 
+        {/* Queued prompts — VS Code style: each shows as a pending user message */}
+        {queuedPrompts.map((text, idx) => (
+          <div
+            key={`queued-${idx}`}
+            data-queued="true"
+            data-testid="queued-prompt"
+            className="aui-user-message-root group/queued relative flex w-full px-4 py-2 opacity-60"
+            data-role="user"
+          >
+            <div className="aui-user-message-bubble wrap-break-word text-[13px] leading-[1.5em] text-foreground pr-8">
+              {text}
+            </div>
+            <div className="absolute right-2 top-2 flex items-center gap-1">
+              <span
+                className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px]"
+                style={{
+                  color: 'var(--vscode-badge-foreground)',
+                  background: 'var(--vscode-badge-background)',
+                }}
+              >
+                <Codicon name="clock" className="text-[9px]" aria-hidden />
+                Queued
+              </span>
+              <button
+                type="button"
+                onClick={() => onDequeue?.(idx)}
+                title="Remove from queue"
+                aria-label="Remove from queue"
+                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-muted-foreground"
+              >
+                <Codicon name="close" className="text-xs" aria-hidden />
+              </button>
+            </div>
+          </div>
+        ))}
+
         <div ref={bottomRef} style={{ height: 1 }} />
 
         {/* Sticky footer: scroll-to-bottom + composer */}
@@ -230,7 +270,7 @@ export const MessageList: FC<MessageListProps> = ({
             onCancel={onCancel}
             onEnqueue={onEnqueue}
             isRunning={isRunning}
-            queuedCount={queuedCount}
+            queuedCount={queuedPrompts.length}
             history={userHistory}
             leftToolbar={leftToolbar}
             rightToolbar={rightToolbar}
