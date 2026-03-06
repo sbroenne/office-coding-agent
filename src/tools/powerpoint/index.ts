@@ -429,7 +429,7 @@ PptxGenJS API reference:
       let W = 13.33;
       let H = 7.5;
       try {
-        /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
+        /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call */
         (context.presentation as any).load('slideWidth,slideHeight');
         await context.sync();
         const rawW = (context.presentation as any).slideWidth as number | undefined;

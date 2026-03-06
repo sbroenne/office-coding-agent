@@ -116,11 +116,15 @@ export async function discoverPluginSkillDirs(host, configPath = COPILOT_CONFIG_
  *
  * For each enabled plugin with a cache_path, scans <cache_path>/agents/ for
  * *.agent.md and AGENT.md files. Returns an array of
- * {name, description, prompt} objects compatible with the SDK's customAgents.
+ * {name, description, prompt, hosts} objects compatible with the SDK's customAgents.
+ *
+ * The `hosts` field is extracted from the AGENT.md frontmatter when present.
+ * An empty `hosts` array means "all hosts" — the caller (browser-side agentService)
+ * treats agents with no hosts as universal agents visible for every host.
  *
  * @param {string} [host] - Office host slug for filtering
  * @param {string} [configPath] - path to config.json (defaults to COPILOT_CONFIG_PATH)
- * @returns {Promise<Array<{name: string, description: string, prompt: string}>>}
+ * @returns {Promise<Array<{name: string, description: string, prompt: string, hosts: string[]}>>}
  */
 export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PATH) {
   const config = await readCopilotConfig(configPath);
@@ -154,13 +158,23 @@ export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PAT
             : entry.name.replace(/\.agent\.md$/, '');
 
         let description = `Agent from plugin ${plugin.name}`;
+        let hosts = [];
         const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
         if (fmMatch) {
           const descMatch = fmMatch[1].match(/description:\s*(.+)/);
           if (descMatch) description = descMatch[1].trim();
+
+          // Extract hosts from frontmatter inline array: hosts: [excel, word]
+          const hostsMatch = fmMatch[1].match(/hosts:\s*\[([^\]]*)\]/);
+          if (hostsMatch) {
+            hosts = hostsMatch[1]
+              .split(',')
+              .map(h => h.trim())
+              .filter(Boolean);
+          }
         }
 
-        agents.push({ name: agentName, description, prompt: content });
+        agents.push({ name: agentName, description, prompt: content, hosts });
       } catch {
         // skip unreadable agent files
       }

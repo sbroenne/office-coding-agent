@@ -241,6 +241,20 @@ export interface McpToolsPayload {
   tools: { name: string; description: string }[];
 }
 
+/** A single agent descriptor from a plugin, as sent in the plugin.agents notification. */
+export interface PluginAgentDescriptor {
+  name: string;
+  description: string;
+  prompt: string;
+  /** Empty array means the agent is universal (all hosts). */
+  hosts: string[];
+}
+
+/** Payload for the plugin.agents notification sent by the proxy after session.create. */
+export interface PluginAgentsPayload {
+  agents: PluginAgentDescriptor[];
+}
+
 /**
  * Browser-compatible Copilot client connected via WebSocket proxy.
  */
@@ -251,6 +265,7 @@ export class WebSocketCopilotClient {
   private mcpStatusHandlers = new Set<(payload: McpStatusPayload) => void>();
   private mcpLogHandlers = new Set<(payload: McpLogPayload) => void>();
   private mcpToolsHandlers = new Set<(payload: McpToolsPayload) => void>();
+  private pluginAgentsHandlers = new Set<(payload: PluginAgentsPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -341,6 +356,13 @@ export class WebSocketCopilotClient {
     };
   }
 
+  onPluginAgents(handler: (payload: PluginAgentsPayload) => void): () => void {
+    this.pluginAgentsHandlers.add(handler);
+    return () => {
+      this.pluginAgentsHandlers.delete(handler);
+    };
+  }
+
   async stop(): Promise<void> {
     for (const session of this.sessions.values()) {
       try {
@@ -403,6 +425,17 @@ export class WebSocketCopilotClient {
     this.connection.onNotification('mcp.tools', (notification: unknown) => {
       const payload = notification as McpToolsPayload;
       for (const handler of this.mcpToolsHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('plugin.agents', (notification: unknown) => {
+      const payload = notification as PluginAgentsPayload;
+      for (const handler of this.pluginAgentsHandlers) {
         try {
           handler(payload);
         } catch {

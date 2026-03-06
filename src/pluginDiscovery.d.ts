@@ -10,6 +10,6 @@ declare module '*/pluginDiscovery.mjs' {
   export function discoverPluginAgents(
     host?: string,
     configPath?: string
-  ): Promise<Array<{ name: string; description: string; prompt: string }>>;
+  ): Promise<Array<{ name: string; description: string; prompt: string; hosts: string[] }>>;
   export const COPILOT_CONFIG_PATH: string;
 }

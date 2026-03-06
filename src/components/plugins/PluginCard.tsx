@@ -45,9 +45,7 @@ const PluginCard: React.FC<PluginCardProps> = ({
   const installed = isInstalledPlugin(plugin);
   const name = plugin.name;
   const version = installed ? plugin.version : plugin.version;
-  const description = installed
-    ? plugin.manifest?.description ?? ''
-    : plugin.description ?? '';
+  const description = installed ? (plugin.manifest?.description ?? '') : (plugin.description ?? '');
   const source = getSourceLabel(plugin);
 
   const handleCardClick = useCallback(() => onClick?.(name), [onClick, name]);
@@ -64,7 +62,7 @@ const PluginCard: React.FC<PluginCardProps> = ({
         onEnable?.(name);
       }
     },
-    [mode, installed, plugin, name, onInstall, onDisable, onEnable],
+    [mode, installed, plugin, name, onInstall, onDisable, onEnable]
   );
 
   return (
@@ -76,25 +74,21 @@ const PluginCard: React.FC<PluginCardProps> = ({
         borderBottom: '1px solid var(--vscode-panel-border, var(--vscode-widget-border))',
       }}
       onClick={handleCardClick}
-      onKeyDown={(e) => {
+      onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleCardClick();
         }
       }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background =
-          'var(--vscode-list-hoverBackground)';
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.background = 'var(--vscode-list-hoverBackground)';
       }}
-      onMouseLeave={(e) => {
+      onMouseLeave={e => {
         (e.currentTarget as HTMLElement).style.background = 'transparent';
       }}
     >
       {/* Icon */}
-      <Codicon
-        name="package"
-        className="mt-0.5 shrink-0 text-[16px]"
-      />
+      <Codicon name="package" className="mt-0.5 shrink-0 text-[16px]" />
 
       {/* Body */}
       <div className="flex min-w-0 flex-1 flex-col gap-0">
@@ -130,7 +124,7 @@ const PluginCard: React.FC<PluginCardProps> = ({
             className="mt-0.5 text-[11px] leading-[14px]"
             style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.7 }}
           >
-            {getComponentSummary(plugin as InstalledPlugin)}
+            {getComponentSummary(plugin)}
           </span>
         )}
       </div>
@@ -144,13 +138,12 @@ const PluginCard: React.FC<PluginCardProps> = ({
             background: 'var(--vscode-button-background)',
             color: 'var(--vscode-button-foreground)',
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.background =
               'var(--vscode-button-hoverBackground, var(--vscode-button-background))';
           }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background =
-              'var(--vscode-button-background)';
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = 'var(--vscode-button-background)';
           }}
           onClick={handleAction}
         >

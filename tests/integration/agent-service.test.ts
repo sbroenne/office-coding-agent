@@ -288,3 +288,73 @@ describe('agentService — imported agents', () => {
     expect(resolved?.metadata.name).toBe('Excel'); // falls back to default Excel agent
   });
 });
+
+// ─── Universal agents (no hosts = all hosts) ─────────────────────────────────
+
+describe('agentService — universal agents (no hosts in frontmatter)', () => {
+  /**
+   * Regression test: agents without a `hosts` field in frontmatter
+   * (hosts: []) must be treated as "available for all hosts" so that
+   * plugin agents that don't know their target host are still visible.
+   */
+  const universalAgent: AgentConfig = {
+    metadata: {
+      name: 'Universal Plugin Agent',
+      description: 'A plugin agent with no hosts specified',
+      version: '1.0.0',
+      hosts: [],
+      defaultForHosts: [],
+    },
+    instructions: 'Universal plugin instructions.',
+  };
+
+  afterEach(() => {
+    setImportedAgents([]);
+  });
+
+  it('getAgents includes a universal (no-hosts) imported agent for excel', () => {
+    setImportedAgents([universalAgent]);
+    const excelAgents = getAgents('excel');
+    expect(excelAgents.some(a => a.metadata.name === 'Universal Plugin Agent')).toBe(true);
+  });
+
+  it('getAgents includes a universal (no-hosts) imported agent for powerpoint', () => {
+    setImportedAgents([universalAgent]);
+    const pptAgents = getAgents('powerpoint');
+    expect(pptAgents.some(a => a.metadata.name === 'Universal Plugin Agent')).toBe(true);
+  });
+
+  it('getAgents includes a universal (no-hosts) imported agent for word', () => {
+    setImportedAgents([universalAgent]);
+    const wordAgents = getAgents('word');
+    expect(wordAgents.some(a => a.metadata.name === 'Universal Plugin Agent')).toBe(true);
+  });
+
+  it('getAgents includes a universal (no-hosts) imported agent for outlook', () => {
+    setImportedAgents([universalAgent]);
+    const outlookAgents = getAgents('outlook');
+    expect(outlookAgents.some(a => a.metadata.name === 'Universal Plugin Agent')).toBe(true);
+  });
+
+  it('getAgent finds a universal (no-hosts) imported agent for any host', () => {
+    setImportedAgents([universalAgent]);
+    for (const host of ['excel', 'powerpoint', 'word', 'outlook'] as const) {
+      const found = getAgent('Universal Plugin Agent', host);
+      expect(found).toBeDefined();
+      expect(found?.metadata.name).toBe('Universal Plugin Agent');
+    }
+  });
+
+  it('parseAgentFrontmatter with no hosts field results in hosts:[]', () => {
+    // Documents current parsing behaviour: the hosts array is empty when
+    // no hosts field is present. getAgents() compensates by treating [] as all-hosts.
+    const md = `---
+name: No Hosts Agent
+description: Agent without hosts
+version: 1.0.0
+---
+Instructions.`;
+    const parsed = parseAgentFrontmatter(md);
+    expect(parsed.metadata.hosts).toEqual([]);
+  });
+});
