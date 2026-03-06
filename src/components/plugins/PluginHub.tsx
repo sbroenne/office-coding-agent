@@ -610,7 +610,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
 
             {marketplaces.map(m => (
               <div
-                key={m.name}
+                key={m.slug ?? m.name}
                 className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
                 style={{
                   borderColor: 'var(--vscode-panel-border, var(--vscode-widget-border))',
@@ -619,7 +619,7 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate text-[12px] font-medium">{m.name}</span>
-                    {m.isBuiltIn && (
+                    {(m.isBuiltIn || m.isOwn) && (
                       <Codicon
                         name="lock"
                         className="shrink-0 text-[11px] text-muted-foreground"
@@ -632,9 +632,9 @@ const PluginHub: React.FC<PluginHubProps> = ({ open, onClose }) => {
                     {m.pluginCount != null ? ` · ${m.pluginCount} plugins` : ''}
                   </p>
                 </div>
-                {!m.isBuiltIn && (
+                {!m.isBuiltIn && !m.isOwn && m.registeredKey && (
                   <button
-                    onClick={() => void handleRemoveMarketplace(m.name)}
+                    onClick={() => void handleRemoveMarketplace(m.registeredKey!)}
                     className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-[var(--vscode-errorForeground)]"
                     title="Remove marketplace"
                     disabled={loading}
