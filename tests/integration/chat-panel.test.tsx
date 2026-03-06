@@ -1,9 +1,10 @@
 /**
  * Integration test for the ChatPanel component.
  *
- * Renders ChatPanel with real AgentPicker, ModelPicker, and McpPill
+ * Renders ChatPanel with real AgentPicker, ModelPicker, and McpPicker
  * but mocks MessageList since it requires full chat state.
- * Tests verify AgentPicker, ModelPicker, and McpPill are rendered in their slots.
+ * Tests verify AgentPicker, ModelPicker in left toolbar and McpPicker
+ * (server icon) in right toolbar.
  *
  * Note: SkillPicker lives in ChatHeader, not here.
  */
@@ -15,7 +16,7 @@ import { renderWithProviders } from '../test-utils';
 import { ChatPanel } from '@/components/ChatPanel';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-// Mock MessageList — render the toolbar slots so AgentPicker, ModelPicker, McpPill are reachable.
+// Mock MessageList — render the toolbar slots so AgentPicker, ModelPicker, McpPicker are reachable.
 vi.mock('@/components/chat/MessageList', () => ({
   MessageList: ({
     leftToolbar,
@@ -47,26 +48,29 @@ describe('ChatPanel — integration', () => {
     useSettingsStore.getState().reset();
   });
 
-  it('renders MessageList with agent picker and model picker', () => {
+  it('renders MessageList with agent picker, model picker, and MCP server button', () => {
     renderWithProviders(<ChatPanel {...DEFAULT_PROPS} />);
     expect(screen.getByTestId('message-list')).toBeInTheDocument();
     // AgentPicker renders as an icon button in the left toolbar
     expect(screen.getByLabelText('Select agent')).toBeInTheDocument();
     // ModelPicker renders with its aria-label in the left toolbar
     expect(screen.getByLabelText('Select model')).toBeInTheDocument();
+    // McpPicker renders with server icon in the right toolbar (NOT the Plugins button)
+    expect(screen.getByLabelText('MCP servers')).toBeInTheDocument();
     // No duplicate Plugins button in the toolbar (it lives in the header only)
     expect(screen.queryByLabelText('Plugins')).not.toBeInTheDocument();
   });
 
-  it('passes leftToolbar slot to MessageList; right toolbar is empty', () => {
+  it('passes leftToolbar and rightToolbar slots to MessageList', () => {
     renderWithProviders(<ChatPanel {...DEFAULT_PROPS} />);
     // Left slot contains agent picker + model picker
     const leftSlot = screen.getByTestId('left-toolbar');
     expect(leftSlot).toContainElement(screen.getByLabelText('Select agent'));
     expect(leftSlot).toContainElement(screen.getByLabelText('Select model'));
-    // Right slot is empty — Plugins button belongs in the header, not the toolbar
+    // Right slot contains the MCP server picker button
     const rightSlot = screen.getByTestId('right-toolbar');
-    expect(rightSlot).toBeEmptyDOMElement();
+    expect(rightSlot).toContainElement(screen.getByLabelText('MCP servers'));
   });
 });
+
 

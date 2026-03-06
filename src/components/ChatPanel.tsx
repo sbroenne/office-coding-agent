@@ -2,6 +2,7 @@ import React from 'react';
 import { MessageList } from '@/components/chat/MessageList';
 import { AgentPicker } from './AgentPicker';
 import { ModelPicker } from './ModelPicker';
+import { McpPicker } from './McpPicker';
 import type { ChatMessage } from '@/types';
 
 interface ChatPanelProps {
@@ -44,7 +45,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <ModelPicker />
           </>
         }
-        rightToolbar={null}
+        rightToolbar={<McpPicker onOpenPanel={onOpenPanel} />}
       />
     </div>
   );

@@ -31,10 +31,17 @@ test.describe('Chat UI (configured state)', () => {
     configuredTaskpane: page,
   }) => {
     // There must be exactly ONE "Plugins" button (in the header).
-    // Previously a duplicate McpPill button in the input toolbar used the same
-    // extensions icon and also opened plugins — this test prevents regression.
+    // The toolbar uses a separate "MCP servers" button with a server icon.
     const pluginsButtons = page.getByRole('button', { name: 'Plugins' });
     await expect(pluginsButtons).toHaveCount(1);
+  });
+
+  test('MCP servers button is visible in the input toolbar', async ({
+    configuredTaskpane: page,
+  }) => {
+    // The VS Code-style MCP server tools picker lives in the input toolbar,
+    // using the server icon (not the extensions icon used by Plugins).
+    await expect(page.getByRole('button', { name: 'MCP servers' })).toBeVisible();
   });
 
   test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
