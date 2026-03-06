@@ -81,4 +81,30 @@ describe('Integration: McpPicker', () => {
       expect(screen.getByLabelText('1 of 2 MCP servers enabled')).toBeInTheDocument();
     });
   });
+
+  it('deduplicates: if API returns a plugin server with same name as bundled, only one appears', async () => {
+    // Simulate API already deduplicating (bundled takes priority, plugin duplicate stripped)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        servers: [
+          { name: 'workiq', description: 'WorkIQ MCP server (bundled)', transport: 'http' as const, url: 'http://localhost:3001' },
+          { name: 'powerbi', description: 'Power BI MCP server (bundled)', transport: 'http' as const, url: 'http://localhost:3002' },
+          { name: 'custom-plugin', description: 'From plugin: my-plugin', transport: 'http' as const, url: 'http://localhost:3003' },
+          // No duplicate 'workiq' — server already deduped
+        ],
+      }),
+    } as Response);
+
+    renderWithProviders(<McpPicker />);
+    await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('workiq')).toBeInTheDocument();
+      expect(screen.getByText('custom-plugin')).toBeInTheDocument();
+    });
+
+    // Exactly one 'workiq' entry
+    expect(screen.getAllByText('workiq')).toHaveLength(1);
+  });
 });

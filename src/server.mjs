@@ -574,7 +574,10 @@ async function createServer() {
         } catch { /* skip malformed .mcp.json */ }
       }
 
-      res.json({ servers: [...BUNDLED, ...pluginServers] });
+      // Bundled servers take priority — drop any plugin server with the same name
+      const bundledNames = new Set(BUNDLED.map(s => s.name));
+      const dedupedPluginServers = pluginServers.filter(s => !bundledNames.has(s.name));
+      res.json({ servers: [...BUNDLED, ...dedupedPluginServers] });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
