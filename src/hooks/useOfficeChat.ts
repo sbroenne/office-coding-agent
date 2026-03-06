@@ -801,6 +801,12 @@ export function useOfficeChat(host: OfficeHostApp) {
     setQueuedPrompts([...queueRef.current]);
   }, []);
 
+  /** Remove a single queued prompt by index. */
+  const dequeue = useCallback((index: number) => {
+    queueRef.current = queueRef.current.filter((_, i) => i !== index);
+    setQueuedPrompts([...queueRef.current]);
+  }, []);
+
   /** Clear all queued prompts. */
   const clearQueue = useCallback(() => {
     queueRef.current = [];
@@ -981,6 +987,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     switchModel,
     enqueue,
     queuedPrompts,
+    dequeue,
     clearQueue,
   };
 }

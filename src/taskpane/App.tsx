@@ -102,6 +102,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     allowPermissionAlways,
     enqueue,
     queuedPrompts,
+    dequeue,
   } = useOfficeChat(host);
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
@@ -154,7 +155,8 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               onSend={send}
               onCancel={cancel}
               onEnqueue={enqueue}
-              queuedCount={queuedPrompts.length}
+              queuedPrompts={queuedPrompts}
+              onDequeue={dequeue}
               onOpenPanel={setActivePanel}
             />
           </ChatErrorBoundary>
@@ -189,10 +191,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
           }`}
           aria-hidden={activePanel !== 'plugins'}
         >
-          <PluginHub
-            open={activePanel === 'plugins'}
-            onClose={closePanel}
-          />
+          <PluginHub open={activePanel === 'plugins'} onClose={closePanel} />
         </div>
       </div>
     </ChatActionsContext.Provider>
