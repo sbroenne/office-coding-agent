@@ -146,7 +146,7 @@ function parseInlineArray(value: string): string[] {
   return [trimmed];
 }
 
-const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint', 'word', 'outlook'];
+export const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint', 'word', 'outlook'];
 
 function isAgentHost(value: string): value is AgentHost {
   return SUPPORTED_AGENT_HOSTS.includes(value as AgentHost);
@@ -201,12 +201,14 @@ function toAgentHost(host: OfficeHostApp): AgentHost | undefined {
 
 /**
  * Get all loaded agents.
+ * Agents with an empty `hosts` array are treated as universal (all-hosts) agents
+ * so that plugin agents without host frontmatter are visible for every host.
  */
 export function getAgents(host: OfficeHostApp = 'excel'): AgentConfig[] {
   const targetHost = toAgentHost(host);
   if (!targetHost) return [];
-  return [...bundledAgents, ...importedAgents].filter(agent =>
-    agent.metadata.hosts.includes(targetHost)
+  return [...bundledAgents, ...importedAgents].filter(
+    agent => agent.metadata.hosts.length === 0 || agent.metadata.hosts.includes(targetHost)
   );
 }
 

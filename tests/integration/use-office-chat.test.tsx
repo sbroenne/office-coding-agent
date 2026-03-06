@@ -7,12 +7,13 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { SessionEvent } from '@github/copilot-sdk';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
+import { setImportedAgents, getImportedAgents } from '@/services/agents';
 
 // ─── Fake session builder ─────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ function makeFakeClient(
     onMcpStatus: vi.fn(() => () => undefined),
     onMcpLog: vi.fn(() => () => undefined),
     onMcpTools: vi.fn(() => () => undefined),
+    onPluginAgents: vi.fn(() => () => undefined),
   };
 }
 
@@ -93,6 +95,11 @@ describe('useOfficeChat', () => {
     vi.clearAllMocks();
     useSettingsStore.getState().reset();
     useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
+    setImportedAgents([]);
+  });
+
+  afterEach(() => {
+    setImportedAgents([]);
   });
 
   it('starts in idle state with no messages', async () => {
@@ -752,6 +759,54 @@ describe('useOfficeChat', () => {
     expect(sysMsg.content).not.toContain('Core Behavior');
     // Should contain the base prompt
     expect(sysMsg.content).toContain('Progress narration');
+  });
+
+  it('plugin.agents notification registers plugin agents as imported agents', async () => {
+    /**
+     * Regression test: when the proxy sends a plugin.agents notification,
+     * the hook must call setImportedAgents() so plugin agents appear in
+     * the AgentPicker and are included in the next session's customAgents.
+     */
+    const session = makeFakeSession([IDLE_EVENT]);
+    let capturedPluginAgentsHandler: ((payload: unknown) => void) | undefined;
+
+    const client = {
+      ...makeFakeClient(session),
+      onPluginAgents: vi.fn((handler: (payload: unknown) => void) => {
+        capturedPluginAgentsHandler = handler;
+        return () => undefined;
+      }),
+    };
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    // Simulate proxy sending plugin.agents notification
+    expect(capturedPluginAgentsHandler).toBeDefined();
+    await act(async () => {
+      capturedPluginAgentsHandler!({
+        agents: [
+          {
+            name: 'Plugin Agent',
+            description: 'From a plugin',
+            prompt: 'Plugin instructions.',
+            hosts: [],
+          },
+        ],
+      });
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    // The imported agents should now include the plugin agent
+    const imported = getImportedAgents();
+    expect(imported.some(a => a.metadata.name === 'Plugin Agent')).toBe(true);
+
+    // Cleanup
+    setImportedAgents([]);
   });
 
   it('does not include empty text parts in intermediate message content', async () => {

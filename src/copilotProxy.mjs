@@ -400,11 +400,27 @@ async function handleConnection(ws) {
         // The SDK's customAgents are VS Code agent-picker entries, NOT auto-applied system
         // prompts — they require explicit @mention. To guarantee plugin agent instructions
         // reach the model, we append them to the systemMessage content instead.
+        //
+        // We also send a plugin.agents notification so the browser-side agentService can
+        // register these agents in the AgentPicker without requiring a manual import.
         const allCustomAgents = [...(customAgents || [])];
         try {
           const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
           if (pluginAgents.length > 0) {
             console.log(`[proxy] Merging ${pluginAgents.length} plugin agent(s) into system message`);
+
+            // Notify the browser about discovered plugin agents so they can be shown
+            // in the AgentPicker. Send before the session.create response so the browser
+            // can update its agentService state promptly.
+            sendNotification('plugin.agents', {
+              agents: pluginAgents.map(a => ({
+                name: a.name,
+                description: a.description,
+                prompt: a.prompt,
+                hosts: a.hosts,
+              })),
+            });
+
             // Pick the first plugin agent as the default; additional ones go into customAgents
             // for agent-picker UI (future @mention support).
             const [defaultPluginAgent, ...extraAgents] = pluginAgents;
@@ -418,7 +434,11 @@ async function handleConnection(ws) {
                 content: merged,
               };
             }
-            allCustomAgents.push(...extraAgents);
+            // Deduplicate: only add extra agents that are not already in allCustomAgents
+            // (they may be present if the browser already registered them from a previous
+            // plugin.agents notification).
+            const existingNames = new Set(allCustomAgents.map(a => a.name));
+            allCustomAgents.push(...extraAgents.filter(a => !existingNames.has(a.name)));
           }
         } catch (err) {
           console.warn('[proxy] Plugin agent discovery failed:', err.message);
