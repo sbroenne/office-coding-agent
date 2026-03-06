@@ -1,11 +1,70 @@
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Codicon } from '@/components/Codicon';
 import { Button } from '@/components/ui/button';
 import { getBundledAgents } from '@/services/agents';
+import { parseAgentsZipFile, parseAgentMarkdownFile } from '@/services/extensions/zipImportService';
 import { downloadAgent } from '@/services/extensions/zipExportService';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export const AgentManagerPanel: React.FC = () => {
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const mdInputRef = useRef<HTMLInputElement>(null);
+
   const bundledAgents = getBundledAgents();
+  const importedAgents = useSettingsStore(s => s.importedAgents);
+  const addImportedAgent = useSettingsStore(s => s.addImportedAgent);
+  const removeImportedAgent = useSettingsStore(s => s.removeImportedAgent);
+
+  const handleImportZip = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setImportStatus(null);
+      setImportError(null);
+      setIsImporting(true);
+
+      try {
+        const agents = await parseAgentsZipFile(file);
+        agents.forEach(a => addImportedAgent(a));
+        setImportStatus(
+          `Imported ${agents.length.toString()} agent${agents.length === 1 ? '' : 's'} from ${file.name}.`
+        );
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Failed to import agents ZIP.');
+      } finally {
+        setIsImporting(false);
+        event.target.value = '';
+      }
+    },
+    [addImportedAgent]
+  );
+
+  const handleImportMd = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setImportStatus(null);
+      setImportError(null);
+      setIsImporting(true);
+
+      try {
+        const agent = await parseAgentMarkdownFile(file);
+        addImportedAgent(agent);
+        setImportStatus(`Imported agent "${agent.metadata.name}" from ${file.name}.`);
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Failed to import agent file.');
+      } finally {
+        setIsImporting(false);
+        event.target.value = '';
+      }
+    },
+    [addImportedAgent]
+  );
 
   return (
     <div className="space-y-3 p-3">
@@ -41,12 +100,105 @@ export const AgentManagerPanel: React.FC = () => {
         )}
       </div>
 
-      {/* Plugin agents */}
+      {/* Imported agents */}
       <div className="space-y-1">
-        <p className="text-[11px] font-medium text-muted-foreground">From plugins</p>
-        <p className="text-xs text-muted-foreground">
-          Custom agents are installed via the Copilot CLI Plugin Hub.
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            Uploaded ({importedAgents.length})
+          </p>
+          <div className="flex items-center gap-1">
+            <input
+              ref={zipInputRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              aria-label="Import agents ZIP file"
+              onChange={event => void handleImportZip(event)}
+            />
+            <input
+              ref={mdInputRef}
+              type="file"
+              accept=".md,text/markdown"
+              className="hidden"
+              aria-label="Import agent Markdown file"
+              onChange={event => void handleImportMd(event)}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => zipInputRef.current?.click()}
+              disabled={isImporting}
+              aria-busy={isImporting}
+              title="Import agents from ZIP"
+            >
+              {isImporting ? (
+                <Codicon name="loading" className="text-sm codicon-modifier-spin" />
+              ) : (
+                <Codicon name="cloud-upload" className="text-sm" />
+              )}
+              ZIP
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => mdInputRef.current?.click()}
+              disabled={isImporting}
+              aria-busy={isImporting}
+              title="Import a single agent .md file"
+            >
+              <Codicon name="cloud-upload" className="text-sm" />
+              .md
+            </Button>
+          </div>
+        </div>
+
+        {importStatus && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
+          >
+            {importStatus}
+          </div>
+        )}
+        {importError && (
+          <div
+            role="alert"
+            className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
+          >
+            {importError}
+          </div>
+        )}
+
+        {importedAgents.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No uploaded agents. Use the buttons above to import.
+          </p>
+        ) : (
+          importedAgents.map(agent => (
+            <div
+              key={`imported-agent-${agent.metadata.name}`}
+              className="flex items-center justify-between rounded-md border border-border px-2 py-1.5"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{agent.metadata.name}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {agent.metadata.description}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0 text-[var(--vscode-errorForeground)] hover:text-[var(--vscode-errorForeground)]"
+                onClick={() => removeImportedAgent(agent.metadata.name)}
+                aria-label={`Remove ${agent.metadata.name}`}
+                title="Remove"
+              >
+                <Codicon name="trash" className="text-sm" />
+              </Button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

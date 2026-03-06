@@ -2,7 +2,7 @@
  * Integration test: McpManagerPanel component.
  *
  * Renders the real McpManagerPanel. Bundled servers are shown with status
- * indicators and toggle buttons. Plugin servers are installed via the Copilot CLI Plugin Hub.
+ * indicators and toggle buttons. Users can upload custom servers via JSON.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
@@ -24,18 +24,10 @@ describe('Integration: McpManagerPanel', () => {
     expect(screen.getAllByText('Built-in').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows plugin servers note', () => {
+  it('shows the JSON upload button', () => {
     renderWithProviders(<McpManagerPanel />);
 
-    expect(screen.getByText(/Additional MCP servers are configured via plugins/i)).toBeInTheDocument();
-  });
-
-  it('does not show import or add buttons', () => {
-    renderWithProviders(<McpManagerPanel />);
-
-    expect(screen.queryByRole('button', { name: /Import/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Add/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Import mcp.json file')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Import MCP servers from JSON file')).toBeInTheDocument();
   });
 
   it('each server has a toggle button', () => {
@@ -66,5 +58,36 @@ describe('Integration: McpManagerPanel', () => {
 
     expect(useSettingsStore.getState().disabledMcpServerNames).not.toContain('workiq');
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows an imported server with a Remove button (no Built-in badge)', () => {
+    useSettingsStore.getState().addImportedMcpServer({
+      name: 'my-mcp',
+      description: 'Custom server',
+      transport: 'http',
+      url: 'https://example.com/mcp',
+    });
+
+    renderWithProviders(<McpManagerPanel />);
+
+    expect(screen.getByText('my-mcp')).toBeInTheDocument();
+    expect(screen.getByLabelText('Remove my-mcp')).toBeInTheDocument();
+    // Bundled servers still show Built-in; imported server does not
+    expect(screen.getAllByText('Built-in').length).toBe(2);
+  });
+
+  it('clicking Remove deletes an imported server from the store', async () => {
+    useSettingsStore.getState().addImportedMcpServer({
+      name: 'deletable-mcp',
+      transport: 'http',
+      url: 'https://example.com/mcp',
+    });
+
+    renderWithProviders(<McpManagerPanel />);
+
+    await userEvent.click(screen.getByLabelText('Remove deletable-mcp'));
+
+    expect(useSettingsStore.getState().importedMcpServers).toHaveLength(0);
+    expect(screen.queryByText('deletable-mcp')).not.toBeInTheDocument();
   });
 });

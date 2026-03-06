@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Codicon } from '@/components/Codicon';
+import { Button } from '@/components/ui/button';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useMcpStatusStore } from '@/stores';
 import { BUNDLED_MCP_SERVERS } from '@/types';
@@ -29,12 +30,19 @@ function isBundled(name: string): boolean {
 export const McpManagerPanel: React.FC = () => {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [logServer, setLogServer] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const mcpServers = useMcpStatusStore(s => s.servers);
   const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
+  const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
+  const addImportedMcpServer = useSettingsStore(s => s.addImportedMcpServer);
+  const removeImportedMcpServer = useSettingsStore(s => s.removeImportedMcpServer);
 
-  const allServers: McpServerConfig[] = [...BUNDLED_MCP_SERVERS];
+  const allServers: McpServerConfig[] = [...BUNDLED_MCP_SERVERS, ...importedMcpServers];
 
   const getServerStatus = (name: string): McpServerStatus | 'disabled' => {
     if (disabledMcpServerNames.includes(name)) return 'disabled';
@@ -50,12 +58,96 @@ export const McpManagerPanel: React.FC = () => {
     });
   };
 
+  const handleImportJson = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setImportStatus(null);
+      setImportError(null);
+      setIsImporting(true);
+
+      try {
+        const text = await file.text();
+        const parsed: unknown = JSON.parse(text);
+
+        // Accept either a single McpServerConfig or an array
+        const configs: McpServerConfig[] = Array.isArray(parsed)
+          ? (parsed as McpServerConfig[])
+          : [parsed as McpServerConfig];
+
+        if (configs.length === 0) throw new Error('JSON file contains no server entries.');
+
+        for (const cfg of configs) {
+          if (typeof cfg.name !== 'string' || !cfg.name)
+            throw new Error('Each server entry must have a "name" field.');
+          if (!cfg.transport)
+            throw new Error(`Server "${cfg.name}" is missing a "transport" field.`);
+          addImportedMcpServer(cfg);
+        }
+
+        setImportStatus(
+          `Imported ${configs.length.toString()} server${configs.length === 1 ? '' : 's'} from ${file.name}.`
+        );
+      } catch (error) {
+        setImportError(error instanceof Error ? error.message : 'Failed to import MCP JSON.');
+      } finally {
+        setIsImporting(false);
+        event.target.value = '';
+      }
+    },
+    [addImportedMcpServer]
+  );
+
   return (
     <div className="space-y-3 p-3">
-      {/* Header */}
+      {/* Header with upload button */}
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-xs font-medium text-muted-foreground">Servers ({allServers.length})</h4>
+        <div className="flex items-center gap-1">
+          <input
+            ref={jsonInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            aria-label="Import MCP servers from JSON file"
+            onChange={event => void handleImportJson(event)}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => jsonInputRef.current?.click()}
+            disabled={isImporting}
+            aria-busy={isImporting}
+            title="Import MCP servers from JSON"
+          >
+            {isImporting ? (
+              <Codicon name="loading" className="text-sm codicon-modifier-spin" />
+            ) : (
+              <Codicon name="cloud-upload" className="text-sm" />
+            )}
+            JSON
+          </Button>
+        </div>
       </div>
+
+      {importStatus && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-[var(--vscode-textLink-foreground)]/30 bg-[var(--vscode-textLink-foreground)]/10 px-3 py-2 text-xs text-[var(--vscode-textLink-foreground)]"
+        >
+          {importStatus}
+        </div>
+      )}
+      {importError && (
+        <div
+          role="alert"
+          className="rounded-md border border-[var(--vscode-errorForeground)]/30 bg-[var(--vscode-errorForeground)]/10 px-3 py-2 text-xs text-[var(--vscode-errorForeground)]"
+        >
+          {importError}
+        </div>
+      )}
 
       {/* Server list */}
       <div className="space-y-1">
@@ -68,6 +160,7 @@ export const McpManagerPanel: React.FC = () => {
             const toolCount = serverState?.tools.length ?? 0;
             const isExpanded = expandedTools.has(server.name);
             const bundled = isBundled(server.name);
+            const imported = !bundled;
 
             return (
               <div
@@ -127,6 +220,17 @@ export const McpManagerPanel: React.FC = () => {
                         className="text-xs"
                       />
                     </button>
+                    {/* Delete button (imported servers only) */}
+                    {imported && (
+                      <button
+                        onClick={() => removeImportedMcpServer(server.name)}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--vscode-errorForeground)]/70 transition-colors hover:bg-accent hover:text-[var(--vscode-errorForeground)]"
+                        title="Remove server"
+                        aria-label={`Remove ${server.name}`}
+                      >
+                        <Codicon name="trash" className="text-xs" />
+                      </button>
+                    )}
                     {/* Tools toggle */}
                     {toolCount > 0 && (
                       <button
@@ -176,11 +280,6 @@ export const McpManagerPanel: React.FC = () => {
           })
         )}
       </div>
-
-      {/* Plugin servers note */}
-      <p className="text-xs text-muted-foreground">
-        Additional MCP servers are configured via plugins.
-      </p>
 
       {/* Log viewer */}
       {logServer !== null && <McpLogViewer serverName={logServer} />}

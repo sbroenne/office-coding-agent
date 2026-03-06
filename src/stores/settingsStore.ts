@@ -2,7 +2,11 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CopilotModel, UserSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
-import { getAllAgents } from '@/services/agents';
+import { getAllAgents, setImportedAgents } from '@/services/agents';
+import { setImportedSkills } from '@/services/skills';
+import type { AgentSkill } from '@/types/skill';
+import type { AgentConfig } from '@/types/agent';
+import type { McpServerConfig } from '@/types/mcp';
 import { officeStorage } from './officeStorage';
 
 interface SettingsState extends UserSettings {
@@ -23,6 +27,18 @@ interface SettingsState extends UserSettings {
   // ─── MCP server management ───
   toggleMcpServer: (name: string) => void;
   isMcpServerEnabled: (name: string) => boolean;
+
+  // ─── Upload: imported skills ───
+  addImportedSkill: (skill: AgentSkill) => void;
+  removeImportedSkill: (name: string) => void;
+
+  // ─── Upload: imported agents ───
+  addImportedAgent: (agent: AgentConfig) => void;
+  removeImportedAgent: (name: string) => void;
+
+  // ─── Upload: imported MCP servers ───
+  addImportedMcpServer: (server: McpServerConfig) => void;
+  removeImportedMcpServer: (name: string) => void;
 
   // ─── Reset ───
   reset: () => void;
@@ -88,9 +104,49 @@ export const useSettingsStore = create<SettingsState>()(
         return !get().disabledMcpServerNames.includes(name);
       },
 
+      // ─── Upload: imported skills ───
+      addImportedSkill: skill => {
+        const existing = get().importedSkills.filter(s => s.metadata.name !== skill.metadata.name);
+        const updated = [...existing, skill];
+        set({ importedSkills: updated });
+        setImportedSkills(updated);
+      },
+
+      removeImportedSkill: name => {
+        const updated = get().importedSkills.filter(s => s.metadata.name !== name);
+        set({ importedSkills: updated });
+        setImportedSkills(updated);
+      },
+
+      // ─── Upload: imported agents ───
+      addImportedAgent: agent => {
+        const existing = get().importedAgents.filter(a => a.metadata.name !== agent.metadata.name);
+        const updated = [...existing, agent];
+        set({ importedAgents: updated });
+        setImportedAgents(updated);
+      },
+
+      removeImportedAgent: name => {
+        const updated = get().importedAgents.filter(a => a.metadata.name !== name);
+        set({ importedAgents: updated });
+        setImportedAgents(updated);
+      },
+
+      // ─── Upload: imported MCP servers ───
+      addImportedMcpServer: server => {
+        const existing = get().importedMcpServers.filter(s => s.name !== server.name);
+        set({ importedMcpServers: [...existing, server] });
+      },
+
+      removeImportedMcpServer: name => {
+        set({ importedMcpServers: get().importedMcpServers.filter(s => s.name !== name) });
+      },
+
       // ─── Reset ───
       reset: () => {
         set(DEFAULT_SETTINGS);
+        setImportedSkills([]);
+        setImportedAgents([]);
       },
     }),
     {
@@ -101,7 +157,16 @@ export const useSettingsStore = create<SettingsState>()(
         activeAgentId: state.activeAgentId,
         disabledSkillNames: state.disabledSkillNames,
         disabledMcpServerNames: state.disabledMcpServerNames,
+        importedSkills: state.importedSkills,
+        importedAgents: state.importedAgents,
+        importedMcpServers: state.importedMcpServers,
       }),
+      onRehydrateStorage: () => state => {
+        if (state) {
+          setImportedSkills(state.importedSkills ?? []);
+          setImportedAgents(state.importedAgents ?? []);
+        }
+      },
     }
   )
 );
