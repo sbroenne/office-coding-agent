@@ -496,9 +496,14 @@ export async function createServer() {
         } catch { /* skip malformed .mcp.json */ }
       }
 
-      // Bundled servers take priority — drop any plugin server with the same name
-      const bundledNames = new Set(BUNDLED.map(s => s.name));
-      const dedupedPluginServers = pluginServers.filter(s => !bundledNames.has(s.name));
+      // Bundled servers take priority — drop any plugin server pointing to the same
+      // endpoint (same command for stdio, same url for http/sse), regardless of name.
+      const bundledEndpoints = new Set(
+        BUNDLED.map(s => (s.transport === 'stdio' ? `stdio:${s.command}` : `url:${(s.url ?? '').replace(/\/$/, '')}`))
+      );
+      const endpointKey = s =>
+        s.transport === 'stdio' ? `stdio:${s.command}` : `url:${(s.url ?? '').replace(/\/$/, '')}`;
+      const dedupedPluginServers = pluginServers.filter(s => !bundledEndpoints.has(endpointKey(s)));
       res.json({ servers: [...BUNDLED, ...dedupedPluginServers] });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });

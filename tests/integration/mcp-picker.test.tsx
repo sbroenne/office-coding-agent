@@ -82,16 +82,19 @@ describe('Integration: McpPicker', () => {
     });
   });
 
-  it('deduplicates: if API returns a plugin server with same name as bundled, only one appears', async () => {
-    // Simulate API already deduplicating (bundled takes priority, plugin duplicate stripped)
+  it('deduplicates by endpoint: plugin server with same url as bundled is dropped', async () => {
+    // A plugin declares a server at the same URL as the bundled powerbi server
+    // but under a different name — the bundled one must win and only one entry appears.
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({
         servers: [
-          { name: 'workiq', description: 'WorkIQ MCP server (bundled)', transport: 'http' as const, url: 'http://localhost:3001' },
-          { name: 'powerbi', description: 'Power BI MCP server (bundled)', transport: 'http' as const, url: 'http://localhost:3002' },
+          // Bundled workiq (stdio) and powerbi (http) — kept
+          { name: 'workiq', description: 'WorkIQ (bundled)', transport: 'stdio' as const, command: 'npx', args: ['-y', '@microsoft/workiq', 'mcp'] },
+          { name: 'powerbi', description: 'Power BI (bundled)', transport: 'http' as const, url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi' },
+          // Plugin with different name but same URL as powerbi — server already dropped by dedup
+          // custom-plugin has a unique URL — kept
           { name: 'custom-plugin', description: 'From plugin: my-plugin', transport: 'http' as const, url: 'http://localhost:3003' },
-          // No duplicate 'workiq' — server already deduped
         ],
       }),
     } as Response);
@@ -101,10 +104,11 @@ describe('Integration: McpPicker', () => {
 
     await waitFor(() => {
       expect(screen.getByText('workiq')).toBeInTheDocument();
+      expect(screen.getByText('powerbi')).toBeInTheDocument();
       expect(screen.getByText('custom-plugin')).toBeInTheDocument();
     });
 
-    // Exactly one 'workiq' entry
-    expect(screen.getAllByText('workiq')).toHaveLength(1);
+    // Only one powerbi entry (the bundled one)
+    expect(screen.getAllByText('powerbi')).toHaveLength(1);
   });
 });
