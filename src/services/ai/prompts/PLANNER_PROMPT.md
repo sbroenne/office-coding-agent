@@ -26,5 +26,20 @@ Given the user's request, create a detailed plan for each slide. Consider:
 
 1. Analyze the user's request
 2. Plan each slide with: title, layout type, and content description
-3. Call the `submit_plan` tool with your plan
+3. **You MUST call the `submit_plan` tool** with your complete plan — this is the ONLY way to submit it
 4. Keep content descriptions concise but specific enough for a slide creator to execute
+5. Do NOT output the plan as text or JSON in your response — always use the `submit_plan` tool
+
+## Example
+
+For a request like "Create a 3-slide overview of cloud computing", you would call `submit_plan` with:
+
+```
+submit_plan({
+  "slides": [
+    { "index": 0, "title": "Cloud Computing", "layout": "title-dark", "content": "Title slide with subtitle: An Overview of Modern Cloud Infrastructure" },
+    { "index": 1, "title": "Key Benefits", "layout": "three-column-cards", "content": "Three cards: 1) Scalability — scale up/down on demand 2) Cost Efficiency — pay only for what you use 3) Reliability — built-in redundancy and failover" },
+    { "index": 2, "title": "Getting Started", "layout": "bullet-list", "content": "Steps: Choose a provider (AWS/Azure/GCP), Start with managed services, Migrate incrementally, Monitor and optimize costs" }
+  ]
+})
+```
