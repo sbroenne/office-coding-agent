@@ -18,6 +18,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {
+  slugify,
+  discoverPluginSkillDirs,
+  discoverPluginAgents,
+} from './pluginDiscovery.mjs';
 
 const execFileAsync = promisify(execFile);
 /** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
@@ -26,15 +31,6 @@ const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const NPM_EXEC_OPTS = process.platform === 'win32' ? { shell: true } : {};
 
 // ── LSP framing helpers ─────────────────────────────────────────────────────
-
-/** Convert a name to a safe lowercase directory slug. */
-function slugify(name) {
-  const slug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return slug || 'skill';
-}
 
 /**
  * Scan a node_modules directory for skillpm-compatible skill directories.
@@ -107,170 +103,6 @@ async function findSkillDirsInPackage(pkgDir) {
 
 /** Root directory for bundled skills; each host has its own subdirectory. */
 const BUNDLED_SKILLS_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), 'skills');
-
-// ── Installed plugin discovery ──────────────────────────────────────────────
-
-/** Path to the Copilot CLI config file. */
-const COPILOT_CONFIG_PATH = join(homedir(), '.copilot', 'config.json');
-
-/**
- * Read ~/.copilot/config.json and return its parsed contents.
- * Returns a safe default if the file doesn't exist or is malformed.
- * @returns {Promise<{installed_plugins?: Array<{name: string, marketplace: string, version: string, installed_at: string, enabled: boolean, cache_path: string}>}>}
- */
-async function readCopilotConfig() {
-  try {
-    const raw = await readFile(COPILOT_CONFIG_PATH, 'utf8');
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Find the plugin.json manifest in a plugin cache directory.
- * Checks standard locations: plugin.json, .github/plugin/plugin.json.
- * @param {string} pluginDir
- * @returns {Promise<object|null>}
- */
-async function readPluginManifest(pluginDir) {
-  const candidates = [
-    join(pluginDir, 'plugin.json'),
-    join(pluginDir, '.github', 'plugin', 'plugin.json'),
-  ];
-  for (const p of candidates) {
-    try {
-      const raw = await readFile(p, 'utf8');
-      return JSON.parse(raw);
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
-
-/**
- * Discover skill directories from installed Copilot CLI plugins.
- *
- * Reads ~/.copilot/config.json → installed_plugins[], then for each enabled
- * plugin with a cache_path, scans <cache_path>/skills/ for subdirectories
- * containing SKILL.md files (same layout as bundled skills and skillpm packages).
- *
- * If `host` is provided, tries to filter by host relevance:
- *  - plugin.json `skills` field may list host-targeted paths
- *  - plugin name containing the host slug (e.g. "office-excel") is a match
- *  - plugins with no host indicator are included (universal)
- *
- * @param {string} [host] - Office host slug (e.g. 'excel', 'powerpoint')
- * @returns {Promise<string[]>} array of skill directory paths
- */
-async function discoverPluginSkillDirs(host) {
-  const config = await readCopilotConfig();
-  const plugins = config.installed_plugins || [];
-  const skillDirs = [];
-
-  for (const plugin of plugins) {
-    if (!plugin.enabled || !plugin.cache_path) continue;
-    if (!existsSync(plugin.cache_path)) continue;
-
-    // Host filtering: skip plugins clearly targeted at a different host
-    if (host) {
-      const hostSlug = slugify(host);
-      const pluginSlug = slugify(plugin.name);
-      // If the plugin name contains a host identifier (e.g. "office-excel")
-      // but doesn't match the current host, skip it
-      const hostPrefixes = ['excel', 'powerpoint', 'word', 'outlook'];
-      const pluginHostTarget = hostPrefixes.find(
-        h => pluginSlug.includes(h) || pluginSlug.includes(`office-${h}`)
-      );
-      if (pluginHostTarget && pluginHostTarget !== hostSlug) continue;
-    }
-
-    const skillsRoot = join(plugin.cache_path, 'skills');
-    let entries;
-    try {
-      entries = await readdir(skillsRoot, { withFileTypes: true });
-    } catch {
-      continue; // no skills/ directory
-    }
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const skillDir = join(skillsRoot, entry.name);
-        if (existsSync(join(skillDir, 'SKILL.md'))) {
-          skillDirs.push(skillDir);
-        }
-      }
-    }
-  }
-  return skillDirs;
-}
-
-/**
- * Discover custom agent definitions from installed Copilot CLI plugins.
- *
- * For each enabled plugin with a cache_path, scans <cache_path>/agents/
- * for *.agent.md files and reads their content. Returns an array of
- * {name, description, prompt} objects compatible with the SDK's customAgents.
- *
- * @param {string} [host] - Office host slug for filtering
- * @returns {Promise<Array<{name: string, description: string, prompt: string}>>}
- */
-async function discoverPluginAgents(host) {
-  const config = await readCopilotConfig();
-  const plugins = config.installed_plugins || [];
-  const agents = [];
-
-  for (const plugin of plugins) {
-    if (!plugin.enabled || !plugin.cache_path) continue;
-    if (!existsSync(plugin.cache_path)) continue;
-
-    // Same host filtering as skills
-    if (host) {
-      const hostSlug = slugify(host);
-      const pluginSlug = slugify(plugin.name);
-      const hostPrefixes = ['excel', 'powerpoint', 'word', 'outlook'];
-      const pluginHostTarget = hostPrefixes.find(
-        h => pluginSlug.includes(h) || pluginSlug.includes(`office-${h}`)
-      );
-      if (pluginHostTarget && pluginHostTarget !== hostSlug) continue;
-    }
-
-    const agentsDir = join(plugin.cache_path, 'agents');
-    let entries;
-    try {
-      entries = await readdir(agentsDir, { withFileTypes: true });
-    } catch {
-      continue; // no agents/ directory
-    }
-
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const isAgentMd = entry.name.endsWith('.agent.md') || entry.name === 'AGENT.md';
-      if (!isAgentMd) continue;
-
-      try {
-        const content = await readFile(join(agentsDir, entry.name), 'utf8');
-        const agentName = entry.name === 'AGENT.md'
-          ? plugin.name
-          : entry.name.replace(/\.agent\.md$/, '');
-
-        // Try to extract description from YAML frontmatter if present
-        let description = `Agent from plugin ${plugin.name}`;
-        const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-        if (fmMatch) {
-          const descMatch = fmMatch[1].match(/description:\s*(.+)/);
-          if (descMatch) description = descMatch[1].trim();
-        }
-
-        agents.push({ name: agentName, description, prompt: content });
-      } catch {
-        // skip unreadable agent files
-      }
-    }
-  }
-  return agents;
-}
 
 /** Wrap a JSON payload in an LSP Content-Length frame. */
 function lspFrame(obj) {
