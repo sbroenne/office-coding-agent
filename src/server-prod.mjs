@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
+import { listMarketplaces, removeMarketplace as removeMarketplaceSvc } from './marketplaceService.mjs';
 
 // ─── Copilot Plugin Helpers ────────────────────────────────────────────────
 
@@ -300,43 +301,9 @@ export async function createServer() {
 
   apiRouter.get('/plugins/marketplaces', (_req, res) => {
     try {
-      const builtInSlugs = ['copilot-plugins', 'awesome-copilot'];
       const cacheDir = path.join(os.homedir(), '.copilot', 'marketplace-cache');
-      const config = readCopilotConfig();
-      const configMarketplaces = config.marketplaces || {};
-
-      const dirToKey = new Map();
-      for (const [key, value] of Object.entries(configMarketplaces)) {
-        const repo = value?.source?.repo;
-        if (!repo) continue;
-        dirToKey.set(repo.replace('/', '-'), key);
-        dirToKey.set(repo.replace('/', '--'), key);
-      }
-
-      const marketplaces = [];
-
-      if (fs.existsSync(cacheDir)) {
-        const entries = fs.readdirSync(cacheDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const dirPath = path.join(cacheDir, entry.name);
-          const manifest = findMarketplaceManifest(dirPath);
-          const isBuiltIn = builtInSlugs.some(slug => entry.name.includes(slug));
-          const registeredKey = dirToKey.get(entry.name) ?? null;
-          const isOwn = registeredKey === OCA_MARKETPLACE_NAME;
-          marketplaces.push({
-            slug: entry.name,
-            name: manifest?.name || entry.name,
-            owner: manifest?.owner || null,
-            description: manifest?.description || null,
-            pluginCount: Array.isArray(manifest?.plugins) ? manifest.plugins.length : 0,
-            isBuiltIn,
-            registeredKey,
-            isOwn,
-          });
-        }
-      }
-
+      const configPath = path.join(os.homedir(), '.copilot', 'config.json');
+      const marketplaces = listMarketplaces(cacheDir, configPath);
       res.json({ marketplaces });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -473,13 +440,12 @@ export async function createServer() {
 
   apiRouter.post('/plugins/marketplace/remove', (req, res) => {
     try {
-      const { name } = req.body;
-      if (!name || typeof name !== 'string') { res.status(400).json({ error: 'Missing required field: name' }); return; }
-      if (name === OCA_MARKETPLACE_NAME) {
-        res.status(403).json({ success: false, message: 'Cannot remove the office-coding-agent marketplace' });
+      const { registeredKey } = req.body;
+      if (!registeredKey || typeof registeredKey !== 'string') {
+        res.status(400).json({ error: 'Missing required field: registeredKey' });
         return;
       }
-      const result = runCopilotCommand(`marketplace remove ${name}`);
+      const result = removeMarketplaceSvc(registeredKey);
       res.status(result.success ? 200 : 500).json(result);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
