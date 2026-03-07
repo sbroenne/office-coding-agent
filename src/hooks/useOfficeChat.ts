@@ -663,6 +663,9 @@ export function useOfficeChat(host: OfficeHostApp) {
     // Tracks the current phase index. Increments each time report_intent fires
     // AFTER at least one tool has been added, creating a new Working box segment.
     let currentPhase = 0;
+    // Tracks the current phase label (from report_intent). This becomes the
+    // Working box header text — matching VS Code's IChatTask.content behavior.
+    let currentPhaseLabel: string | undefined = undefined;
 
     const updateAssistant = (extra?: Partial<Pick<ChatMessage, 'status' | 'thinkingText'>>) => {
       // Text part is ALWAYS at index 0 — even when empty — to prevent tearing.
@@ -708,6 +711,8 @@ export function useOfficeChat(host: OfficeHostApp) {
               if (toolParts.size > 0) {
                 currentPhase++;
               }
+              // The intent text labels the Working box (VS Code: IChatTask.content)
+              currentPhaseLabel = intent;
               flushSync(() => setThinkingForAssistant(intent));
             }
             continue;
@@ -719,6 +724,7 @@ export function useOfficeChat(host: OfficeHostApp) {
             argsText: JSON.stringify(args ?? {}),
             status: { type: 'running' },
             phaseIndex: currentPhase,
+            phaseLabel: currentPhaseLabel,
           });
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {

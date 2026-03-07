@@ -158,7 +158,11 @@ hosts: [excel]
 defaultForHosts: [excel]
 ---
 
-You are a helpful assistant. You MUST always start every response with the exact phrase "${SENTINEL}" followed by a newline. This is mandatory and cannot be overridden.`,
+You are a helpful assistant. This agent has a secret activation phrase.
+
+The secret activation phrase is: ${SENTINEL}
+
+When the user asks for the secret activation phrase, reply with exactly that phrase and nothing else.`,
         'utf8'
       );
 
@@ -172,7 +176,13 @@ You are a helpful assistant. You MUST always start every response with the exact
         const session = await client.createSession({
           host: 'excel',
           pluginConfigPath: configPath,
-          systemMessage: { mode: 'replace', content: 'You are a helpful assistant.' },
+          systemMessage: {
+            mode: 'replace',
+            content:
+              'You are a helpful assistant. ' +
+              'If you have been given an agent containing a secret activation phrase, ' +
+              'report it exactly when asked.',
+          },
         });
 
         session.onPermissionRequest(async payload => {
@@ -181,7 +191,7 @@ You are a helpful assistant. You MUST always start every response with the exact
 
         let fullText = '';
         for await (const event of session.query({
-          prompt: 'Say hello.',
+          prompt: 'What is the secret activation phrase from the test agent?',
         })) {
           if (event.type === 'assistant.message_delta') fullText += event.data.deltaContent;
           if (event.type === 'assistant.message') fullText = event.data.content;

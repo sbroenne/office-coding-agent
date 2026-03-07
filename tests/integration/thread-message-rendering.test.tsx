@@ -593,6 +593,102 @@ describe('Working box spinner between tool steps (thinking gap fix)', () => {
     useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
   });
 
+  it('[REGRESSION] report_intent text becomes the Working box header label (VS Code IChatTask.content)', async () => {
+    // VS Code: IChatTask.content = the task label, shown in BOTH running and done states.
+    // report_intent fires BEFORE tools → sets label for phase 0 Working box.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'ri1',
+        toolName: 'report_intent',
+        arguments: { intent: 'Reading your spreadsheet' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[42]]' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Value is 42.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => { expect(screen.getByText('Value is 42.')).toBeInTheDocument(); });
+
+    // The completed Working box header must show the report_intent text
+    const doneTitle = document.querySelector('.chat-thinking-title-done');
+    expect(doneTitle).toBeInTheDocument();
+    expect(doneTitle!.textContent).toBe('Reading your spreadsheet');
+  });
+
+  it('[REGRESSION] report_intent after tools sets label on the SECOND Working box', async () => {
+    // When report_intent fires AFTER the first tool, phase 0 box has no label ("Working"),
+    // and phase 1 box gets the intent text as its label.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1]]' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'ri1',
+        toolName: 'report_intent',
+        arguments: { intent: 'Writing result' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'set_range_values',
+        arguments: { address: 'B1', values: [[2]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+    await act(async () => { await new Promise(r => setTimeout(r, 100)); });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => { expect(screen.getByText('Done.')).toBeInTheDocument(); });
+
+    const boxes = document.querySelectorAll('.chat-thinking-box');
+    expect(boxes).toHaveLength(2);
+
+    // Phase 0 box: no label → "Working"
+    const box0Title = boxes[0]!.querySelector('.chat-thinking-title-done');
+    expect(box0Title!.textContent).toBe('Working');
+
+    // Phase 1 box: label = "Writing result"
+    const box1Title = boxes[1]!.querySelector('.chat-thinking-title-done');
+    expect(box1Title!.textContent).toBe('Writing result');
+  });
+
   it('shows spinner inside Working box after a tool completes (inter-step thinking)', async () => {
     // KEY regression test for the thinking gap bug.
     // After a tool completes and before the next tool/text starts,
@@ -930,10 +1026,11 @@ describe('Working box spinner between tool steps (thinking gap fix)', () => {
       expect(screen.getByText('Done.')).toBeInTheDocument();
     });
 
-    // After completion: Working box header shows "Finished with 2 steps"
+    // After completion: Working box header shows the phase label.
+    // No label was set (no report_intent) → falls back to "Working"
     const doneTitle = document.querySelector('.chat-thinking-title-done');
     expect(doneTitle).toBeInTheDocument();
-    expect(doneTitle!.textContent).toBe('Finished with 2 steps');
+    expect(doneTitle!.textContent).toBe('Working');
 
     // Working box should auto-collapse (collapsible content hidden)
     const collapsible = document.querySelector('.chat-thinking-collapsible');
@@ -2036,12 +2133,13 @@ describe('task_complete: summary rendering and multi-turn Working box isolation'
       expect(screen.getByText('Read 1 cell with value 42.')).toBeInTheDocument();
     });
 
-    // task_complete excluded from step count → "Finished with 1 step" (only get_range_values)
+    // VS Code: completed box shows the phase label (IChatTask.content).
+    // No report_intent in this test → falls back to "Working"
     const doneTitle = document.querySelector('.chat-thinking-title-done');
-    expect(doneTitle?.textContent).toBe('Finished with 1 step');
+    expect(doneTitle?.textContent).toBe('Working');
   });
 
-  it('task_complete does NOT inflate step count — "Finished with N steps" counts only work steps', async () => {
+  it('task_complete does NOT create an extra Working box — only real work tools shown', async () => {
     const session = makeFakeSession([
       makeEvent('tool.execution_start', { toolCallId: 'tc1', toolName: 'get_range_values', arguments: {} }),
       makeEvent('tool.execution_complete', { toolCallId: 'tc1', success: true, result: { content: '[[1]]' } }),
@@ -2063,9 +2161,9 @@ describe('task_complete: summary rendering and multi-turn Working box isolation'
 
     await waitFor(() => { expect(screen.getByText('Done.')).toBeInTheDocument(); });
 
-    // 2 work steps, task_complete excluded
+    // VS Code: completed box shows phase label — no label here → "Working"
     const doneTitle = document.querySelector('.chat-thinking-title-done');
-    expect(doneTitle?.textContent).toBe('Finished with 2 steps');
+    expect(doneTitle?.textContent).toBe('Working');
   });
 
   it('REGRESSION: turn 2 Working box appears in a new message, not inside turn 1 message', async () => {
