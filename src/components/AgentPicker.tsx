@@ -15,6 +15,8 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
   const [open, setOpen] = useState(false);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const setActiveAgent = useSettingsStore(s => s.setActiveAgent);
+  // Subscribe to pluginAgents so the picker re-renders when the proxy sends plugin.agents
+  useSettingsStore(s => s.pluginAgents);
 
   const host = detectOfficeHost();
   const targetHost =
@@ -25,7 +27,10 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
   const bundledAgents = targetHost
     ? getBundledAgents().filter(agent => agent.metadata.hosts.includes(targetHost))
     : [];
-  const customAgents = allAgents.filter(a => !bundledAgents.includes(a));
+  // Use name-based deduplication: a plugin agent with the same name as a bundled agent
+  // should NOT appear as a separate Custom entry.
+  const bundledAgentNames = new Set(bundledAgents.map(a => a.metadata.name));
+  const customAgents = allAgents.filter(a => !bundledAgentNames.has(a.metadata.name));
 
   if (allAgents.length === 0) return null;
 

@@ -13,7 +13,7 @@ import type { SessionEvent } from '@github/copilot-sdk';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
-import { setImportedAgents, getImportedAgents } from '@/services/agents';
+import { setImportedAgents } from '@/services/agents';
 
 // ─── Fake session builder ─────────────────────────────────────────────────────
 
@@ -801,12 +801,12 @@ describe('useOfficeChat', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // The imported agents should now include the plugin agent
-    const imported = getImportedAgents();
-    expect(imported.some(a => a.metadata.name === 'Plugin Agent')).toBe(true);
+    // The plugin agents should now be in the store's pluginAgents
+    const pluginAgents = useSettingsStore.getState().pluginAgents;
+    expect(pluginAgents.some(a => a.metadata.name === 'Plugin Agent')).toBe(true);
 
     // Cleanup
-    setImportedAgents([]);
+    useSettingsStore.getState().setPluginAgents([]);
   });
 
   it('does not include empty text parts in intermediate message content', async () => {
