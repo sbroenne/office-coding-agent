@@ -660,6 +660,9 @@ export function useOfficeChat(host: OfficeHostApp) {
 
     const toolParts = new Map<string, ToolCallPart>();
     let streamText = '';
+    // Tracks the current phase index. Increments each time report_intent fires
+    // AFTER at least one tool has been added, creating a new Working box segment.
+    let currentPhase = 0;
 
     const updateAssistant = (extra?: Partial<Pick<ChatMessage, 'status' | 'thinkingText'>>) => {
       // Text part is ALWAYS at index 0 — even when empty — to prevent tearing.
@@ -701,19 +704,21 @@ export function useOfficeChat(host: OfficeHostApp) {
           if (toolName === 'report_intent') {
             const intent = (args as Record<string, unknown> | undefined)?.intent;
             if (typeof intent === 'string' && intent) {
+              // If tools have already been added, this intent starts a NEW phase
+              if (toolParts.size > 0) {
+                currentPhase++;
+              }
               flushSync(() => setThinkingForAssistant(intent));
             }
             continue;
           }
-          // Don't change thinkingText to tool name — it flashes too fast.
-          // The tool card itself shows the tool name with shimmer while running.
-          // Keep "Thinking…" as a stable anchor.
           toolParts.set(toolCallId, {
             type: 'tool-call',
             toolCallId,
             toolName,
             argsText: JSON.stringify(args ?? {}),
             status: { type: 'running' },
+            phaseIndex: currentPhase,
           });
           updateAssistant();
         } else if (event.type === 'tool.execution_complete') {

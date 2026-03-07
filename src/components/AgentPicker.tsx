@@ -25,6 +25,7 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
   const bundledAgents = targetHost
     ? getBundledAgents().filter(agent => agent.metadata.hosts.includes(targetHost))
     : [];
+  const customAgents = allAgents.filter(a => !bundledAgents.includes(a));
 
   if (allAgents.length === 0) return null;
 
@@ -87,6 +88,18 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
                   <span>Read-only</span>
                 </div>
                 {bundledAgents.map(agent =>
+                  renderAgentOption(agent.metadata.name, agent.metadata.description)
+                )}
+              </>
+            )}
+
+            {customAgents.length > 0 && (
+              <>
+                <div className="mt-1 border-t border-border" />
+                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Custom
+                </div>
+                {customAgents.map(agent =>
                   renderAgentOption(agent.metadata.name, agent.metadata.description)
                 )}
               </>

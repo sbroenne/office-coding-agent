@@ -1330,6 +1330,150 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     expect(toolCards.length).toBe(2);
   });
 
+  it('[REGRESSION] report_intent after first tool creates a NEW Working box (per-phase split)', async () => {
+    // VS Code creates a new IChatTask (Working box) per intent phase.
+    // When report_intent fires AFTER at least one tool, the next tools go into a new box.
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1]]' },
+      }),
+      // report_intent after a tool → should start phase 2 → new Working box
+      makeEvent('tool.execution_start', {
+        toolCallId: 'ri1',
+        toolName: 'report_intent',
+        arguments: { intent: 'Writing result' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'set_range_values',
+        arguments: { address: 'B1', values: [[2]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done in 2 phases.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Done in 2 phases.')).toBeInTheDocument();
+    });
+
+    // After a report_intent following a completed tool → TWO Working boxes
+    const workingBoxes = document.querySelectorAll('.chat-thinking-box');
+    expect(workingBoxes).toHaveLength(2);
+
+    // Phase 1 box: has tc1 tool card
+    const box1Cards = workingBoxes[0]!.querySelectorAll('[data-slot="tool-fallback-root"]');
+    expect(box1Cards).toHaveLength(1);
+
+    // Phase 2 box: has tc2 tool card
+    const box2Cards = workingBoxes[1]!.querySelectorAll('[data-slot="tool-fallback-root"]');
+    expect(box2Cards).toHaveLength(1);
+  });
+
+  it('[REGRESSION] without report_intent between tools, only ONE Working box is created', async () => {
+    // Tools without a phase break → all in one box
+    const session = makeFakeSession([
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc1',
+        toolName: 'get_range_values',
+        arguments: { address: 'A1' },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc1',
+        success: true,
+        result: { content: '[[1]]' },
+      }),
+      makeEvent('tool.execution_start', {
+        toolCallId: 'tc2',
+        toolName: 'set_range_values',
+        arguments: { address: 'B1', values: [[2]] },
+      }),
+      makeEvent('tool.execution_complete', {
+        toolCallId: 'tc2',
+        success: true,
+        result: { content: 'OK' },
+      }),
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Done.' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 300));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Done.')).toBeInTheDocument();
+    });
+
+    // No phase break → exactly ONE Working box
+    const workingBoxes = document.querySelectorAll('.chat-thinking-box');
+    expect(workingBoxes).toHaveLength(1);
+  });
+
+  it('[REGRESSION] Copilot avatar/name header is NOT rendered in assistant messages', async () => {
+    // VS Code hides the avatar+name for GitHub Copilot (the default assistant).
+    // Our AssistantMessage must NOT render the "Copilot" label header.
+    // The header contains a .codicon-copilot icon — checking for that is the
+    // most reliable signal since the header is the only place it appears in a message.
+    const session = makeFakeSession([
+      makeEvent('assistant.message', { messageId: 'msg1', content: 'Hello!' }),
+      IDLE_EVENT,
+    ]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { getHook } = renderThreadWithHook();
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+    await act(async () => {
+      void getHook().send('test');
+      await new Promise(r => setTimeout(r, 200));
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-role="assistant"]')).toBeInTheDocument();
+    });
+
+    // The Copilot avatar icon must NOT be inside the assistant message
+    // (VS Code hides avatar+name for the default Copilot assistant)
+    const assistantMsg = document.querySelector('[data-role="assistant"]');
+    const copilotIcon = assistantMsg?.querySelector('.codicon-copilot');
+    expect(copilotIcon).toBeNull();
+  });
+
   it('after completion, tool cards remain visible inside ToolGroup above text', async () => {
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
