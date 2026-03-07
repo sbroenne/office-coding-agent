@@ -19,6 +19,13 @@ interface SettingsState extends UserSettings {
   // ─── Agent management ───
   setActiveAgent: (agentId: string) => void;
   getActiveAgent: () => string;
+  /**
+   * Plugin agents discovered from the Copilot CLI config at session start.
+   * Ephemeral — NOT persisted. Populated by the plugin.agents notification.
+   */
+  pluginAgents: AgentConfig[];
+  /** Replace the current plugin agent list (called on each session.create). */
+  setPluginAgents: (agents: AgentConfig[]) => void;
 
   // ─── Skill management ───
   toggleSkill: (name: string) => void;
@@ -50,6 +57,7 @@ export const useSettingsStore = create<SettingsState>()(
       // ─── Initial state ───
       ...DEFAULT_SETTINGS,
       availableModels: null,
+      pluginAgents: [],
 
       // ─── Model management ───
       setAvailableModels: models => {
@@ -74,6 +82,12 @@ export const useSettingsStore = create<SettingsState>()(
 
       getActiveAgent: () => {
         return get().activeAgentId;
+      },
+
+      setPluginAgents: agents => {
+        set({ pluginAgents: agents });
+        // Sync agentService: plugin agents override same-named user-imported agents
+        setImportedAgents([...agents, ...get().importedAgents]);
       },
 
       // ─── Skill management ───
@@ -123,13 +137,13 @@ export const useSettingsStore = create<SettingsState>()(
         const existing = get().importedAgents.filter(a => a.metadata.name !== agent.metadata.name);
         const updated = [...existing, agent];
         set({ importedAgents: updated });
-        setImportedAgents(updated);
+        setImportedAgents([...get().pluginAgents, ...updated]);
       },
 
       removeImportedAgent: name => {
         const updated = get().importedAgents.filter(a => a.metadata.name !== name);
         set({ importedAgents: updated });
-        setImportedAgents(updated);
+        setImportedAgents([...get().pluginAgents, ...updated]);
       },
 
       // ─── Upload: imported MCP servers ───

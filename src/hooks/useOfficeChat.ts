@@ -5,12 +5,7 @@ import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { getImportedSkills, skillToMarkdown } from '@/services/skills';
-import {
-  resolveActiveAgent,
-  getAgents,
-  setImportedAgents,
-  SUPPORTED_AGENT_HOSTS,
-} from '@/services/agents';
+import { resolveActiveAgent, getAgents, SUPPORTED_AGENT_HOSTS } from '@/services/agents';
 import { toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
@@ -249,7 +244,8 @@ export function useOfficeChat(host: OfficeHostApp) {
           },
           instructions: agent.prompt,
         }));
-        setImportedAgents(agentConfigs);
+        // Update the store — this syncs agentService AND triggers AgentPicker re-render
+        useSettingsStore.getState().setPluginAgents(agentConfigs);
       });
 
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
