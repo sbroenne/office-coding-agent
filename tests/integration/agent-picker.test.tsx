@@ -97,6 +97,59 @@ describe('Integration: AgentPicker', () => {
   // Bug regression: checkmark should appear on the resolved (fallback) agent,
   // not just when activeAgentId literally matches. If the stored agent was deleted,
   // the host-default should still show a checkmark in the dropdown.
+  it('[REGRESSION] imported/custom agents are visible in the dropdown', async () => {
+    // Bug: AgentPicker only rendered bundledAgents; imported agents were never shown
+    const { setImportedAgents } = await import('@/services/agents');
+    const { parseAgentFrontmatter } = await import('@/services/agents');
+
+    const customAgent = parseAgentFrontmatter(`---
+name: MyCustomAgent
+description: A custom agent for testing
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+---
+Custom instructions.`);
+
+    setImportedAgents([customAgent]);
+
+    renderWithProviders(<AgentPicker />);
+
+    await userEvent.click(screen.getByLabelText('Select agent'));
+
+    // Custom agent must appear in the dropdown
+    expect(screen.getByText('MyCustomAgent')).toBeInTheDocument();
+
+    // Clean up
+    setImportedAgents([]);
+  });
+
+  it('[REGRESSION] clicking a custom agent updates the store', async () => {
+    const { setImportedAgents, parseAgentFrontmatter } = await import('@/services/agents');
+
+    const customAgent = parseAgentFrontmatter(`---
+name: MySelectableAgent
+description: Custom selectable agent
+version: 1.0.0
+hosts: [excel]
+defaultForHosts: []
+---
+Instructions.`);
+
+    setImportedAgents([customAgent]);
+
+    renderWithProviders(<AgentPicker />);
+
+    await userEvent.click(screen.getByLabelText('Select agent'));
+    await userEvent.click(screen.getByText('MySelectableAgent'));
+
+    expect(useSettingsStore.getState().activeAgentId).toBe('MySelectableAgent');
+
+    // Clean up
+    setImportedAgents([]);
+    useSettingsStore.getState().reset();
+  });
+
   it('checkmark appears on the resolved default agent, not only matching activeAgentId', async () => {
     // Set activeAgentId to a non-existent agent — resolveActiveAgent falls back to host default
     useSettingsStore.getState().setActiveAgent('Deleted-Agent-That-Does-Not-Exist');

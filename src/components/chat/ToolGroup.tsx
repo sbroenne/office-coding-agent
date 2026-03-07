@@ -6,7 +6,8 @@ import type { ToolCallPart } from '@/types';
 
 interface WorkingCollapsibleProps {
   isRunning: boolean;
-  toolCount: number;
+  /** Phase label from report_intent — the Working box header text (VS Code: IChatTask.content). */
+  phaseLabel?: string;
   /** Show the inter-step spinner when true (no tool actively executing). */
   showSpinner: boolean;
   /** Label for the inter-step spinner — the actual thinking/intent text. */
@@ -16,7 +17,7 @@ interface WorkingCollapsibleProps {
 
 const WorkingCollapsible: FC<WorkingCollapsibleProps> = ({
   isRunning,
-  toolCount,
+  phaseLabel,
   showSpinner,
   spinnerLabel,
   children,
@@ -33,7 +34,9 @@ const WorkingCollapsible: FC<WorkingCollapsibleProps> = ({
 
   const toggle = useCallback(() => setIsExpanded(prev => !prev), []);
 
-  const completionTitle = `Finished with ${toolCount} step${toolCount !== 1 ? 's' : ''}`;
+  // VS Code: IChatTask shows task.content in BOTH running and done states.
+  // Use the phase label if available; fall back to "Working".
+  const headerLabel = phaseLabel ?? 'Working';
 
   return (
     <div
@@ -57,7 +60,7 @@ const WorkingCollapsible: FC<WorkingCollapsibleProps> = ({
         <span
           className={cn(isRunning ? 'chat-thinking-title-shimmer' : 'chat-thinking-title-done')}
         >
-          {isRunning ? 'Working' : completionTitle}
+          {headerLabel}
         </span>
         <Codicon
           name={isExpanded ? 'chevron-down' : 'chevron-right'}
@@ -106,13 +109,13 @@ export const ToolGroup: FC<ToolGroupProps> = ({
   // and we have thinking text to display. This is the inter-step "Thinking…" indicator.
   const showSpinner = isRunning && !hasRunningTool && !!thinkingText;
   const spinnerLabel = thinkingText ?? 'Thinking…';
-  // task_complete is a completion marker — exclude from the "N steps" count
-  const workStepCount = parts.filter(p => p.toolName !== 'task_complete').length;
+  // Phase label: use the first part's phaseLabel (all parts in a group share the same phase)
+  const phaseLabel = parts[0]?.phaseLabel;
 
   return (
     <WorkingCollapsible
       isRunning={isRunning}
-      toolCount={workStepCount}
+      phaseLabel={phaseLabel}
       showSpinner={showSpinner}
       spinnerLabel={spinnerLabel}
     >

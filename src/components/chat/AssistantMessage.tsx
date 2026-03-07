@@ -15,22 +15,37 @@ interface AssistantMessageProps {
 
 /**
  * Groups consecutive tool-call parts together, interspersed with text parts.
+ * Tool parts are split into separate groups whenever phaseIndex changes,
+ * producing one Working box per intent phase (matching VS Code's IChatTask behavior).
  * Returns an array of "segments": either a single text part or a group of tool-call parts.
  */
 function segmentParts(
   content: ChatMessage['content']
-): ({ type: 'text'; part: TextPart } | { type: 'tools'; parts: ToolCallPart[] })[] {
-  const segments: ({ type: 'text'; part: TextPart } | { type: 'tools'; parts: ToolCallPart[] })[] =
-    [];
+): (
+  | { type: 'text'; part: TextPart }
+  | { type: 'tools'; parts: ToolCallPart[]; phaseIndex: number }
+)[] {
+  const segments: (
+    | { type: 'text'; part: TextPart }
+    | { type: 'tools'; parts: ToolCallPart[]; phaseIndex: number }
+  )[] = [];
 
   let currentTools: ToolCallPart[] = [];
+  let currentPhase = -1;
 
   for (const part of content) {
     if (part.type === 'tool-call') {
+      const phase = part.phaseIndex ?? 0;
+      if (currentTools.length > 0 && phase !== currentPhase) {
+        // Phase boundary → flush current tool group and start a new one
+        segments.push({ type: 'tools', parts: currentTools, phaseIndex: currentPhase });
+        currentTools = [];
+      }
+      currentPhase = phase;
       currentTools.push(part);
     } else if (part.type === 'text') {
       if (currentTools.length > 0) {
-        segments.push({ type: 'tools', parts: currentTools });
+        segments.push({ type: 'tools', parts: currentTools, phaseIndex: currentPhase });
         currentTools = [];
       }
       segments.push({ type: 'text', part });
@@ -38,7 +53,7 @@ function segmentParts(
   }
 
   if (currentTools.length > 0) {
-    segments.push({ type: 'tools', parts: currentTools });
+    segments.push({ type: 'tools', parts: currentTools, phaseIndex: currentPhase });
   }
 
   return segments;
@@ -96,25 +111,6 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
       className="aui-assistant-message-root group/message fade-in slide-in-from-bottom-1 relative w-full animate-in py-2 duration-150"
       data-role="assistant"
     >
-      {/* VS Code-style message header: Copilot avatar + "Copilot" label */}
-      <div className="flex items-center gap-2 px-4 pb-1.5">
-        <div
-          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full"
-          style={{
-            background: 'var(--vscode-chat-avatarBackground)',
-            color: 'var(--vscode-chat-avatarForeground)',
-          }}
-        >
-          <Codicon name="copilot" className="text-[13px]" />
-        </div>
-        <span
-          className="text-[13px] font-semibold leading-none"
-          style={{ color: 'var(--vscode-foreground)' }}
-        >
-          Copilot
-        </span>
-      </div>
-
       <div className="aui-assistant-message-content flex flex-col wrap-break-word px-4 text-foreground text-[13px] leading-[1.5em]">
         {/* Inline working progress */}
         {showThinking && (
@@ -130,19 +126,21 @@ export const AssistantMessage: FC<AssistantMessageProps> = ({
         {/* Tool groups and text */}
         {segments.map((seg, i) => {
           if (seg.type === 'tools') {
+            // Only the LAST tool segment in a running message shows the live spinner/running state
+            const isLastToolSegment = segments.slice(i + 1).every(s => s.type !== 'tools');
             return (
               <ToolGroup
-                key={i}
+                key={`tools-${seg.phaseIndex}-${i}`}
                 parts={seg.parts}
-                isMessageRunning={isLast && isRunning && isMessageRunning}
-                thinkingText={thinkingText}
+                isMessageRunning={isLast && isRunning && isMessageRunning && isLastToolSegment}
+                thinkingText={isLastToolSegment ? thinkingText : null}
               />
             );
           }
           // Only render non-empty text parts (or last part while streaming)
           const text = seg.part.text;
           if (!text && !(isLast && isRunning)) return null;
-          return <MarkdownContent key={i} text={text} />;
+          return <MarkdownContent key={`text-${i}`} text={text} />;
         })}
 
         {/* task_complete summary — shown when the agent ends with task_complete but no text */}

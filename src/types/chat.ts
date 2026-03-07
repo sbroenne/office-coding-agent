@@ -13,6 +13,10 @@ export interface ToolCallPart {
   argsText: string;
   result?: string;
   status?: ToolCallStatus;
+  /** Phase index (0-based). Increments each time report_intent fires after at least one tool. */
+  phaseIndex: number;
+  /** Phase label from report_intent — shown as the Working box header text. */
+  phaseLabel?: string;
 }
 
 /** A text part within a chat message */
