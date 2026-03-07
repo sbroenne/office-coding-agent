@@ -55,6 +55,8 @@ function makeFakeClient(
     onMcpLog: vi.fn(() => () => undefined),
     onMcpTools: vi.fn(() => () => undefined),
     onPluginAgents: vi.fn(() => () => undefined),
+    onPluginSkills: vi.fn(() => () => undefined),
+    onPluginPrompts: vi.fn(() => () => undefined),
   };
 }
 
@@ -807,6 +809,91 @@ describe('useOfficeChat', () => {
 
     // Cleanup
     useSettingsStore.getState().setPluginAgents([]);
+  });
+
+  it('plugin.skills notification populates store.pluginSkills', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    let capturedPluginSkillsHandler: ((payload: unknown) => void) | undefined;
+
+    const client = {
+      ...makeFakeClient(session),
+      onPluginSkills: vi.fn((handler: (payload: unknown) => void) => {
+        capturedPluginSkillsHandler = handler;
+        return () => undefined;
+      }),
+    };
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    expect(capturedPluginSkillsHandler).toBeDefined();
+    await act(async () => {
+      capturedPluginSkillsHandler!({
+        skills: [
+          {
+            name: 'SPT IQ Preflight',
+            description: 'Preflight skill',
+            version: '1.0.0',
+            hosts: [],
+            content: 'Skill body content',
+          },
+        ],
+      });
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    const pluginSkills = useSettingsStore.getState().pluginSkills;
+    expect(pluginSkills.some(s => s.metadata.name === 'SPT IQ Preflight')).toBe(true);
+
+    // Cleanup
+    useSettingsStore.getState().setPluginSkills([]);
+  });
+
+  it('plugin.prompts notification populates store.pluginPrompts', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    let capturedPluginPromptsHandler: ((payload: unknown) => void) | undefined;
+
+    const client = {
+      ...makeFakeClient(session),
+      onPluginPrompts: vi.fn((handler: (payload: unknown) => void) => {
+        capturedPluginPromptsHandler = handler;
+        return () => undefined;
+      }),
+    };
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    expect(capturedPluginPromptsHandler).toBeDefined();
+    await act(async () => {
+      capturedPluginPromptsHandler!({
+        prompts: [
+          {
+            name: 'preflight',
+            description: 'Run preflight assessment',
+            agent: 'SPT IQ Preflight',
+            argumentHint: 'TPID',
+            body: 'Run preflight for ${input:tpid}',
+          },
+        ],
+      });
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    const pluginPrompts = useSettingsStore.getState().pluginPrompts;
+    expect(pluginPrompts.some(p => p.name === 'preflight')).toBe(true);
+    expect(pluginPrompts[0].agent).toBe('SPT IQ Preflight');
+
+    // Cleanup
+    useSettingsStore.getState().setPluginPrompts([]);
   });
 
   it('does not include empty text parts in intermediate message content', async () => {

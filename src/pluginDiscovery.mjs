@@ -11,7 +11,7 @@
 
 import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 
 /** Path to the Copilot CLI config file. */
@@ -181,6 +181,132 @@ export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PAT
     }
   }
   return agents;
+}
+
+/**
+ * Discover plugin skills as parsed objects (name, description, hosts, content).
+ * Reads SKILL.md from each skill directory found via discoverPluginSkillDirs.
+ *
+ * @param {string} [host]
+ * @param {string} [configPath]
+ * @returns {Promise<Array<{name: string, description: string, version: string, hosts: string[], content: string}>>}
+ */
+export async function discoverPluginSkillObjects(host, configPath = COPILOT_CONFIG_PATH) {
+  const skillDirs = await discoverPluginSkillDirs(host, configPath);
+  const skills = [];
+
+  for (const skillDir of skillDirs) {
+    try {
+      const raw = await readFile(join(skillDir, 'SKILL.md'), 'utf8');
+      const trimmed = raw.trimStart();
+
+      let name = basename(skillDir);
+      let description = '';
+      let version = '0.0.0';
+      let hosts = [];
+      let content = trimmed;
+
+      if (trimmed.startsWith('---')) {
+        const endIdx = trimmed.indexOf('---', 3);
+        if (endIdx !== -1) {
+          const yamlBlock = trimmed.slice(3, endIdx).trim();
+          content = trimmed.slice(endIdx + 3).trim();
+
+          for (const line of yamlBlock.split('\n')) {
+            const colonIdx = line.indexOf(':');
+            if (colonIdx === -1) continue;
+            const key = line.slice(0, colonIdx).trim();
+            const value = line.slice(colonIdx + 1).trim();
+            if (key === 'name') name = value;
+            else if (key === 'description')
+              description = value.replace(/^['"]|['"]$/g, '');
+            else if (key === 'version') version = value;
+            else if (key === 'hosts' && value.startsWith('[') && value.endsWith(']')) {
+              hosts = value
+                .slice(1, -1)
+                .split(',')
+                .map(h => h.trim())
+                .filter(Boolean);
+            }
+          }
+        }
+      }
+
+      skills.push({ name, description, version, hosts, content });
+    } catch {
+      // skip unreadable skill files
+    }
+  }
+
+  return skills;
+}
+
+/**
+ * Discover prompt templates from installed plugin prompts/ directories.
+ * Each .prompt.md file becomes a slash command in the ChatComposer.
+ *
+ * @param {string} [host]
+ * @param {string} [configPath]
+ * @returns {Promise<Array<{name: string, description: string, agent: string, argumentHint: string, body: string}>>}
+ */
+export async function discoverPluginPrompts(host, configPath = COPILOT_CONFIG_PATH) {
+  const config = await readCopilotConfig(configPath);
+  const plugins = config.installed_plugins || [];
+  const prompts = [];
+
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path) continue;
+    if (!existsSync(plugin.cache_path)) continue;
+    if (host && !isPluginForHost(plugin.name, host)) continue;
+
+    const promptsDir = join(plugin.cache_path, 'prompts');
+    let entries;
+    try {
+      entries = await readdir(promptsDir, { withFileTypes: true });
+    } catch {
+      continue; // no prompts dir — that's fine
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.prompt.md')) continue;
+
+      try {
+        const raw = await readFile(join(promptsDir, entry.name), 'utf8');
+        const trimmed = raw.trimStart();
+
+        let name = entry.name.replace(/\.prompt\.md$/, '');
+        let description = '';
+        let agent = '';
+        let argumentHint = '';
+        let body = trimmed;
+
+        if (trimmed.startsWith('---')) {
+          const endIdx = trimmed.indexOf('---', 3);
+          if (endIdx !== -1) {
+            const yamlBlock = trimmed.slice(3, endIdx).trim();
+            body = trimmed.slice(endIdx + 3).trim();
+
+            for (const line of yamlBlock.split('\n')) {
+              const colonIdx = line.indexOf(':');
+              if (colonIdx === -1) continue;
+              const key = line.slice(0, colonIdx).trim();
+              const value = line.slice(colonIdx + 1).trim().replace(/^['"]|['"]$/g, '');
+              if (key === 'name') name = value;
+              else if (key === 'description') description = value;
+              else if (key === 'agent') agent = value;
+              else if (key === 'argument-hint') argumentHint = value;
+            }
+          }
+        }
+
+        prompts.push({ name, description, agent, argumentHint, body });
+      } catch {
+        // skip unreadable files
+      }
+    }
+  }
+
+  return prompts;
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────

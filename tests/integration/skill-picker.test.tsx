@@ -28,7 +28,8 @@ describe('Integration: SkillPicker', () => {
   it('shows skills and manage action in popover', async () => {
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
-    expect(screen.getByText('Skills')).toBeInTheDocument();
+    // Section header is now "Built-in" (renamed from "Skills" to support plugin sections)
+    expect(screen.getByText('Built-in')).toBeInTheDocument();
     expect(screen.getByText('Manage plugins…')).toBeInTheDocument();
   });
 
@@ -76,5 +77,79 @@ describe('Integration: SkillPicker', () => {
     await userEvent.keyboard('{Enter}');
 
     expect(mockOpenPanel).toHaveBeenCalledWith('plugins');
+  });
+
+  it('shows "Plugin" section when plugin skills are added to store', async () => {
+    const store = useSettingsStore.getState();
+    store.setPluginSkills([
+      {
+        metadata: {
+          name: 'SPT IQ Preflight',
+          description: 'Preflight account assessment skill.',
+          version: '1.0.0',
+          tags: [],
+          hosts: [],
+        },
+        content: 'Skill body content here.',
+      },
+    ]);
+
+    renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+
+    expect(screen.getByText('Plugin')).toBeInTheDocument();
+    expect(screen.getByText('SPT IQ Preflight')).toBeInTheDocument();
+  });
+
+  it('plugin skill is enabled by default and can be toggled', async () => {
+    const store = useSettingsStore.getState();
+    store.setPluginSkills([
+      {
+        metadata: {
+          name: 'Test Plugin Skill',
+          description: 'A test plugin skill.',
+          version: '1.0.0',
+          tags: [],
+          hosts: [],
+        },
+        content: 'Content.',
+      },
+    ]);
+
+    renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+
+    // Find the plugin skill by its visible label text
+    const skillLabel = screen.getByText('Test Plugin Skill');
+    const skillBtn = skillLabel.closest('button')!;
+    expect(skillBtn).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.click(skillBtn);
+
+    expect(useSettingsStore.getState().disabledSkillNames).toContain('Test Plugin Skill');
+  });
+
+  it('re-renders when store.setPluginSkills() is called after initial render', async () => {
+    const { rerender } = renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+    expect(screen.queryByText('Plugin')).not.toBeInTheDocument();
+
+    // Simulate plugin.skills notification arriving after session start
+    useSettingsStore.getState().setPluginSkills([
+      {
+        metadata: {
+          name: 'Dynamic Plugin Skill',
+          description: 'Arrives via notification.',
+          version: '1.0.0',
+          tags: [],
+          hosts: [],
+        },
+        content: 'Content.',
+      },
+    ]);
+    rerender(<SkillPicker />);
+
+    expect(screen.getByText('Plugin')).toBeInTheDocument();
+    expect(screen.getByText('Dynamic Plugin Skill')).toBeInTheDocument();
   });
 });

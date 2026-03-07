@@ -15,6 +15,7 @@ import { buildSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
 import type { AgentHost } from '@/types/agent';
+import type { AgentSkill } from '@/types/skill';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
 
@@ -246,6 +247,30 @@ export function useOfficeChat(host: OfficeHostApp) {
         }));
         // Update the store — this syncs agentService AND triggers AgentPicker re-render
         useSettingsStore.getState().setPluginAgents(agentConfigs);
+      });
+
+      // Register plugin.skills notification — adds plugin skills to SkillPicker and
+      // the skill context injected into the system prompt.
+      client.onPluginSkills(({ skills }) => {
+        const skillObjects: AgentSkill[] = skills.map(s => ({
+          metadata: {
+            name: s.name,
+            description: s.description,
+            version: s.version,
+            tags: [],
+            hosts: s.hosts.filter((h): h is AgentHost =>
+              SUPPORTED_AGENT_HOSTS.includes(h as AgentHost)
+            ),
+          },
+          content: s.content,
+        }));
+        useSettingsStore.getState().setPluginSkills(skillObjects);
+      });
+
+      // Register plugin.prompts notification — populates the slash command menu
+      // in ChatComposer.
+      client.onPluginPrompts(({ prompts }) => {
+        useSettingsStore.getState().setPluginPrompts(prompts);
       });
 
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);

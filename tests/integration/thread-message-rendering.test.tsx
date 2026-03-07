@@ -55,6 +55,8 @@ function makeFakeClient(session: ReturnType<typeof makeFakeSession>) {
     onMcpLog: vi.fn(() => () => undefined),
     onMcpTools: vi.fn(() => () => undefined),
     onPluginAgents: vi.fn(() => () => undefined),
+    onPluginSkills: vi.fn(() => () => undefined),
+    onPluginPrompts: vi.fn(() => () => undefined),
   };
 }
 
