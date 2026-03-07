@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Check } from 'lucide-react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
@@ -54,7 +53,10 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
           isActive && 'bg-accent/50'
         )}
       >
-        <Check className={cn('mt-0.5 size-3.5 shrink-0', isActive ? 'opacity-100' : 'opacity-0')} />
+        <Codicon
+          name="check"
+          className={cn('mt-0.5 text-[12px] shrink-0', isActive ? 'opacity-100' : 'opacity-0')}
+        />
         <div className="min-w-0 flex-1">
           <div className="font-medium text-foreground">{agentName}</div>
           <div className="text-xs text-muted-foreground line-clamp-2">

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { getBundledSkills } from '@/services/skills';
 import { detectOfficeHost } from '@/services/office/host';
 import { useSettingsStore } from '@/stores/settingsStore';
+import type { AgentSkill } from '@/types/skill';
 
 interface SkillPickerProps {
   onOpenPanel?: (panel: string) => void;
@@ -14,15 +15,54 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
   const [open, setOpen] = useState(false);
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
   const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
+  const pluginSkills = useSettingsStore(s => s.pluginSkills);
 
   const host = detectOfficeHost();
   const bundledSkills = getBundledSkills().filter(
     s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
   );
 
-  const enabledCount = bundledSkills.filter(
-    s => !disabledSkillNames.includes(s.metadata.name)
-  ).length;
+  const visiblePluginSkills = pluginSkills.filter(
+    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
+  );
+
+  const allSkills = [...bundledSkills, ...visiblePluginSkills];
+  const enabledCount = allSkills.filter(s => !disabledSkillNames.includes(s.metadata.name)).length;
+
+  const renderSkillRow = (skill: AgentSkill) => {
+    const enabled = !disabledSkillNames.includes(skill.metadata.name);
+    return (
+      <button
+        key={skill.metadata.name}
+        onClick={() => toggleSkill(skill.metadata.name)}
+        className={cn(
+          'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
+          !enabled && 'opacity-50'
+        )}
+        aria-pressed={enabled}
+        title={enabled ? `Disable ${skill.metadata.name}` : `Enable ${skill.metadata.name}`}
+      >
+        <div
+          className={cn(
+            'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border',
+            enabled
+              ? 'border-[var(--vscode-textLink-foreground)] bg-[var(--vscode-textLink-foreground)]/10'
+              : 'border-border'
+          )}
+        >
+          {enabled && (
+            <Codicon name="check" className="text-xs text-[var(--vscode-textLink-foreground)]" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-foreground">{skill.metadata.name}</div>
+          <div className="text-xs text-muted-foreground line-clamp-2">
+            {skill.metadata.description.split('.')[0]}
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <>
@@ -35,10 +75,10 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
             title="Agent skills"
           >
             <Codicon name="lightbulb-sparkle" className="text-[14px]" />
-            {enabledCount < bundledSkills.length && bundledSkills.length > 0 && (
+            {enabledCount < allSkills.length && allSkills.length > 0 && (
               <span
                 className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--vscode-badge-background)] px-0.5 text-[8px] font-bold leading-none text-[var(--vscode-badge-foreground)]"
-                aria-label={`${enabledCount} of ${bundledSkills.length} skills enabled`}
+                aria-label={`${enabledCount} of ${allSkills.length} skills enabled`}
               >
                 {enabledCount}
               </span>
@@ -52,52 +92,35 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
             sideOffset={4}
             align="start"
           >
-            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Skills</div>
-
-            {bundledSkills.length === 0 ? (
+            {bundledSkills.length === 0 && visiblePluginSkills.length === 0 ? (
               <div className="px-2 py-2 text-xs text-muted-foreground">
                 No skills available yet.
               </div>
             ) : (
-              bundledSkills.map(skill => {
-                const enabled = !disabledSkillNames.includes(skill.metadata.name);
-                return (
-                  <button
-                    key={skill.metadata.name}
-                    onClick={() => toggleSkill(skill.metadata.name)}
-                    className={cn(
-                      'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
-                      !enabled && 'opacity-50'
-                    )}
-                    aria-pressed={enabled}
-                    title={
-                      enabled ? `Disable ${skill.metadata.name}` : `Enable ${skill.metadata.name}`
-                    }
-                  >
+              <>
+                {bundledSkills.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Built-in
+                    </div>
+                    {bundledSkills.map(renderSkillRow)}
+                  </>
+                )}
+
+                {visiblePluginSkills.length > 0 && (
+                  <>
                     <div
                       className={cn(
-                        'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border',
-                        enabled
-                          ? 'border-[var(--vscode-textLink-foreground)] bg-[var(--vscode-textLink-foreground)]/10'
-                          : 'border-border'
+                        'px-2 py-1.5 text-xs font-medium text-muted-foreground',
+                        bundledSkills.length > 0 && 'mt-1 border-t border-border pt-1'
                       )}
                     >
-                      {enabled && (
-                        <Codicon
-                          name="check"
-                          className="text-xs text-[var(--vscode-textLink-foreground)]"
-                        />
-                      )}
+                      Plugin
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-foreground">{skill.metadata.name}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-2">
-                        {skill.metadata.description.split('.')[0]}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+                    {visiblePluginSkills.map(renderSkillRow)}
+                  </>
+                )}
+              </>
             )}
 
             <div className="mt-1 border-t border-border pt-1">
