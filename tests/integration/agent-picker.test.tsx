@@ -98,8 +98,8 @@ describe('Integration: AgentPicker', () => {
   // not just when activeAgentId literally matches. If the stored agent was deleted,
   // the host-default should still show a checkmark in the dropdown.
   it('[REGRESSION] imported/custom agents are visible in the dropdown', async () => {
-    // Bug: AgentPicker only rendered bundledAgents; imported agents were never shown
-    const { setImportedAgents } = await import('@/services/agents');
+    // Bug: AgentPicker only rendered bundledAgents; imported agents were never shown.
+    // Also regression: AgentPicker must react to plugin agents arriving via the store.
     const { parseAgentFrontmatter } = await import('@/services/agents');
 
     const customAgent = parseAgentFrontmatter(`---
@@ -111,7 +111,8 @@ defaultForHosts: []
 ---
 Custom instructions.`);
 
-    setImportedAgents([customAgent]);
+    // Use store action (not module-level setImportedAgents) so the picker re-renders
+    useSettingsStore.getState().setPluginAgents([customAgent]);
 
     renderWithProviders(<AgentPicker />);
 
@@ -121,11 +122,11 @@ Custom instructions.`);
     expect(screen.getByText('MyCustomAgent')).toBeInTheDocument();
 
     // Clean up
-    setImportedAgents([]);
+    useSettingsStore.getState().setPluginAgents([]);
   });
 
   it('[REGRESSION] clicking a custom agent updates the store', async () => {
-    const { setImportedAgents, parseAgentFrontmatter } = await import('@/services/agents');
+    const { parseAgentFrontmatter } = await import('@/services/agents');
 
     const customAgent = parseAgentFrontmatter(`---
 name: MySelectableAgent
@@ -136,7 +137,7 @@ defaultForHosts: []
 ---
 Instructions.`);
 
-    setImportedAgents([customAgent]);
+    useSettingsStore.getState().setPluginAgents([customAgent]);
 
     renderWithProviders(<AgentPicker />);
 
@@ -146,7 +147,7 @@ Instructions.`);
     expect(useSettingsStore.getState().activeAgentId).toBe('MySelectableAgent');
 
     // Clean up
-    setImportedAgents([]);
+    useSettingsStore.getState().setPluginAgents([]);
     useSettingsStore.getState().reset();
   });
 
