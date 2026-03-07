@@ -7,6 +7,23 @@
  * - ~/.copilot/marketplace-cache/<slug>/.github/plugin/marketplace.json
  */
 
+/**
+ * A parsed prompt template from a plugin's prompts/*.prompt.md file.
+ * Slash commands in the ChatComposer are built from these.
+ */
+export interface PluginPrompt {
+  /** Slash command name (filename without .prompt.md) */
+  name: string;
+  /** One-line description shown in the slash menu */
+  description: string;
+  /** The agent to activate when this prompt is selected (from "agent:" frontmatter) */
+  agent: string;
+  /** Placeholder text for the variable, e.g. "TPID (e.g. 12345678)" */
+  argumentHint: string;
+  /** Markdown body — injected into composer input on selection */
+  body: string;
+}
+
 /** Author metadata in plugin.json and marketplace.json */
 export interface PluginAuthor {
   name: string;

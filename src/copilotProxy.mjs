@@ -21,7 +21,9 @@ import { promisify } from 'node:util';
 import {
   slugify,
   discoverPluginSkillDirs,
+  discoverPluginSkillObjects,
   discoverPluginAgents,
+  discoverPluginPrompts,
 } from './pluginDiscovery.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -442,6 +444,28 @@ async function handleConnection(ws) {
           }
         } catch (err) {
           console.warn('[proxy] Plugin agent discovery failed:', err.message);
+        }
+
+        // Discover plugin skills and notify the browser so SkillPicker can show them.
+        try {
+          const pluginSkills = await discoverPluginSkillObjects(host, pluginConfigPath);
+          if (pluginSkills.length > 0) {
+            console.log(`[proxy] Sending ${pluginSkills.length} plugin skill(s) to browser`);
+            sendNotification('plugin.skills', { skills: pluginSkills });
+          }
+        } catch (err) {
+          console.warn('[proxy] Plugin skill discovery failed:', err.message);
+        }
+
+        // Discover plugin prompts (slash commands) and notify the browser.
+        try {
+          const pluginPrompts = await discoverPluginPrompts(host, pluginConfigPath);
+          if (pluginPrompts.length > 0) {
+            console.log(`[proxy] Sending ${pluginPrompts.length} plugin prompt(s) to browser`);
+            sendNotification('plugin.prompts', { prompts: pluginPrompts });
+          }
+        } catch (err) {
+          console.warn('[proxy] Plugin prompt discovery failed:', err.message);
         }
 
         // Emit 'starting' status for each configured MCP server

@@ -255,6 +255,34 @@ export interface PluginAgentsPayload {
   agents: PluginAgentDescriptor[];
 }
 
+/** A single skill descriptor from a plugin, as sent in the plugin.skills notification. */
+export interface PluginSkillDescriptor {
+  name: string;
+  description: string;
+  version: string;
+  hosts: string[];
+  content: string;
+}
+
+/** Payload for the plugin.skills notification. */
+export interface PluginSkillsPayload {
+  skills: PluginSkillDescriptor[];
+}
+
+/** A single prompt/slash-command descriptor from a plugin's prompts/*.prompt.md. */
+export interface PluginPromptDescriptor {
+  name: string;
+  description: string;
+  agent: string;
+  argumentHint: string;
+  body: string;
+}
+
+/** Payload for the plugin.prompts notification. */
+export interface PluginPromptsPayload {
+  prompts: PluginPromptDescriptor[];
+}
+
 /**
  * Browser-compatible Copilot client connected via WebSocket proxy.
  */
@@ -266,6 +294,8 @@ export class WebSocketCopilotClient {
   private mcpLogHandlers = new Set<(payload: McpLogPayload) => void>();
   private mcpToolsHandlers = new Set<(payload: McpToolsPayload) => void>();
   private pluginAgentsHandlers = new Set<(payload: PluginAgentsPayload) => void>();
+  private pluginSkillsHandlers = new Set<(payload: PluginSkillsPayload) => void>();
+  private pluginPromptsHandlers = new Set<(payload: PluginPromptsPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -363,6 +393,20 @@ export class WebSocketCopilotClient {
     };
   }
 
+  onPluginSkills(handler: (payload: PluginSkillsPayload) => void): () => void {
+    this.pluginSkillsHandlers.add(handler);
+    return () => {
+      this.pluginSkillsHandlers.delete(handler);
+    };
+  }
+
+  onPluginPrompts(handler: (payload: PluginPromptsPayload) => void): () => void {
+    this.pluginPromptsHandlers.add(handler);
+    return () => {
+      this.pluginPromptsHandlers.delete(handler);
+    };
+  }
+
   async stop(): Promise<void> {
     for (const session of this.sessions.values()) {
       try {
@@ -436,6 +480,28 @@ export class WebSocketCopilotClient {
     this.connection.onNotification('plugin.agents', (notification: unknown) => {
       const payload = notification as PluginAgentsPayload;
       for (const handler of this.pluginAgentsHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('plugin.skills', (notification: unknown) => {
+      const payload = notification as PluginSkillsPayload;
+      for (const handler of this.pluginSkillsHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('plugin.prompts', (notification: unknown) => {
+      const payload = notification as PluginPromptsPayload;
+      for (const handler of this.pluginPromptsHandlers) {
         try {
           handler(payload);
         } catch {

@@ -7,6 +7,7 @@ import { setImportedSkills } from '@/services/skills';
 import type { AgentSkill } from '@/types/skill';
 import type { AgentConfig } from '@/types/agent';
 import type { McpServerConfig } from '@/types/mcp';
+import type { PluginPrompt } from '@/types/plugin';
 import { officeStorage } from './officeStorage';
 
 interface SettingsState extends UserSettings {
@@ -26,6 +27,22 @@ interface SettingsState extends UserSettings {
   pluginAgents: AgentConfig[];
   /** Replace the current plugin agent list (called on each session.create). */
   setPluginAgents: (agents: AgentConfig[]) => void;
+
+  /**
+   * Plugin skills discovered from the Copilot CLI config at session start.
+   * Ephemeral — NOT persisted. Populated by the plugin.skills notification.
+   */
+  pluginSkills: AgentSkill[];
+  /** Replace the current plugin skill list (called on each session.create). */
+  setPluginSkills: (skills: AgentSkill[]) => void;
+
+  /**
+   * Plugin prompts (slash commands) discovered from plugin prompts/ directories.
+   * Ephemeral — NOT persisted. Populated by the plugin.prompts notification.
+   */
+  pluginPrompts: PluginPrompt[];
+  /** Replace the current plugin prompt list (called on each session.create). */
+  setPluginPrompts: (prompts: PluginPrompt[]) => void;
 
   // ─── Skill management ───
   toggleSkill: (name: string) => void;
@@ -58,6 +75,8 @@ export const useSettingsStore = create<SettingsState>()(
       ...DEFAULT_SETTINGS,
       availableModels: null,
       pluginAgents: [],
+      pluginSkills: [],
+      pluginPrompts: [],
 
       // ─── Model management ───
       setAvailableModels: models => {
@@ -88,6 +107,16 @@ export const useSettingsStore = create<SettingsState>()(
         set({ pluginAgents: agents });
         // Sync agentService: plugin agents override same-named user-imported agents
         setImportedAgents([...agents, ...get().importedAgents]);
+      },
+
+      setPluginSkills: skills => {
+        set({ pluginSkills: skills });
+        // Sync skillService so the prompt context includes plugin skill content
+        setImportedSkills([...skills, ...get().importedSkills]);
+      },
+
+      setPluginPrompts: prompts => {
+        set({ pluginPrompts: prompts });
       },
 
       // ─── Skill management ───
@@ -123,13 +152,13 @@ export const useSettingsStore = create<SettingsState>()(
         const existing = get().importedSkills.filter(s => s.metadata.name !== skill.metadata.name);
         const updated = [...existing, skill];
         set({ importedSkills: updated });
-        setImportedSkills(updated);
+        setImportedSkills([...get().pluginSkills, ...updated]);
       },
 
       removeImportedSkill: name => {
         const updated = get().importedSkills.filter(s => s.metadata.name !== name);
         set({ importedSkills: updated });
-        setImportedSkills(updated);
+        setImportedSkills([...get().pluginSkills, ...updated]);
       },
 
       // ─── Upload: imported agents ───
@@ -158,7 +187,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       // ─── Reset ───
       reset: () => {
-        set(DEFAULT_SETTINGS);
+        set({ ...DEFAULT_SETTINGS, pluginAgents: [], pluginSkills: [], pluginPrompts: [] });
         setImportedSkills([]);
         setImportedAgents([]);
       },
