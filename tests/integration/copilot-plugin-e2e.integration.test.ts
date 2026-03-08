@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createWebSocketClient } from '@/lib/websocket-client';
+import type { PluginSkillsPayload, PluginPromptsPayload } from '@/lib/websocket-client';
 
 const SERVER_URL = 'wss://localhost:3000/api/copilot';
 const TIMEOUT_MS = 45_000;
@@ -317,6 +318,155 @@ The secret phrase is: ${SENTINEL}`,
         }
 
         expect(fullText).not.toContain(SENTINEL);
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    'proxy sends plugin.skills notification with correct skill metadata',
+    async () => {
+      const skillName = `e2e-skill-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      const skillDescription = 'E2E integration test skill description';
+
+      const pluginDir = await makePluginDir();
+      const skillDir = join(pluginDir, 'skills', skillName);
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(
+        join(skillDir, 'SKILL.md'),
+        `---
+name: ${skillName}
+description: ${skillDescription}
+version: 2.1.0
+hosts: [excel]
+---
+
+# ${skillName}
+
+Skill body content for E2E test.`,
+        'utf8'
+      );
+
+      const configDir = await makePluginDir();
+      const configPath = await makeConfigFile(configDir, [
+        { name: 'office-excel', enabled: true, cache_path: pluginDir },
+      ]);
+
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        // Capture the plugin.skills notification that the proxy sends DURING session.create
+        // (before the session.create response arrives). Race the notification against
+        // the full session creation so we don't miss it if event-loop scheduling delays
+        // the callback slightly past when createSession() returns.
+        let receivedSkillsPayload: PluginSkillsPayload | undefined;
+        const skillsReceived = new Promise<void>(resolve => {
+          client.onPluginSkills(payload => {
+            receivedSkillsPayload = payload;
+            resolve();
+          });
+        });
+
+        // Run createSession and the notification race concurrently.
+        // The notification is sent before the session.create response so it typically
+        // arrives while createSession() is still awaiting — but we race with 30s to
+        // be resilient to any Node.js event-loop scheduling variances.
+        const NOTIF_TIMEOUT = 30_000;
+        await Promise.all([
+          client.createSession({
+            host: 'excel',
+            pluginConfigPath: configPath,
+          }),
+          Promise.race([
+            skillsReceived,
+            new Promise<void>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('plugin.skills notification timed out')),
+                NOTIF_TIMEOUT
+              )
+            ),
+          ]),
+        ]);
+
+        expect(receivedSkillsPayload).toBeDefined();
+        const skill = receivedSkillsPayload!.skills.find(s => s.name === skillName);
+        expect(skill).toBeDefined();
+        expect(skill!.description).toBe(skillDescription);
+        expect(skill!.version).toBe('2.1.0');
+        expect(skill!.hosts).toContain('excel');
+        expect(skill!.content).toContain(`# ${skillName}`);
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    'proxy sends plugin.prompts notification with correct prompt metadata',
+    async () => {
+      const promptName = `e2e-prompt-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      const promptDescription = 'E2E test prompt description';
+      const agentName = 'E2E Test Agent';
+      const argumentHint = 'Account ID';
+      const promptBody = 'Please analyse account ${input:accountId} in detail.';
+
+      const pluginDir = await makePluginDir();
+      const promptsDir = join(pluginDir, 'prompts');
+      await mkdir(promptsDir, { recursive: true });
+      await writeFile(
+        join(promptsDir, `${promptName}.prompt.md`),
+        `---
+name: ${promptName}
+description: '${promptDescription}'
+agent: "${agentName}"
+argument-hint: '${argumentHint}'
+---
+
+${promptBody}`,
+        'utf8'
+      );
+
+      const configDir = await makePluginDir();
+      const configPath = await makeConfigFile(configDir, [
+        { name: 'office-excel', enabled: true, cache_path: pluginDir },
+      ]);
+
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        let receivedPromptsPayload: PluginPromptsPayload | undefined;
+        const promptsReceived = new Promise<void>(resolve => {
+          client.onPluginPrompts(payload => {
+            receivedPromptsPayload = payload;
+            resolve();
+          });
+        });
+
+        const NOTIF_TIMEOUT = 30_000;
+        await Promise.all([
+          client.createSession({
+            host: 'excel',
+            pluginConfigPath: configPath,
+          }),
+          Promise.race([
+            promptsReceived,
+            new Promise<void>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('plugin.prompts notification timed out')),
+                NOTIF_TIMEOUT
+              )
+            ),
+          ]),
+        ]);
+
+        expect(receivedPromptsPayload).toBeDefined();
+        const prompt = receivedPromptsPayload!.prompts.find(p => p.name === promptName);
+        expect(prompt).toBeDefined();
+        expect(prompt!.description).toBe(promptDescription);
+        expect(prompt!.agent).toBe(agentName);
+        expect(prompt!.argumentHint).toBe(argumentHint);
+        expect(prompt!.body).toContain('${input:accountId}');
       } finally {
         await client.stop();
       }
