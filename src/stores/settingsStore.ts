@@ -44,6 +44,14 @@ interface SettingsState extends UserSettings {
   /** Replace the current plugin prompt list (called on each session.create). */
   setPluginPrompts: (prompts: PluginPrompt[]) => void;
 
+  /**
+   * MCP servers discovered from plugin mcp.json files.
+   * Ephemeral — NOT persisted. Populated by the plugin.mcp notification.
+   */
+  pluginMcpServers: McpServerConfig[];
+  /** Replace the current plugin MCP server list (called on each session.create). */
+  setPluginMcpServers: (servers: McpServerConfig[]) => void;
+
   // ─── Skill management ───
   toggleSkill: (name: string) => void;
   isSkillEnabled: (name: string) => boolean;
@@ -77,6 +85,7 @@ export const useSettingsStore = create<SettingsState>()(
       pluginAgents: [],
       pluginSkills: [],
       pluginPrompts: [],
+      pluginMcpServers: [],
 
       // ─── Model management ───
       setAvailableModels: models => {
@@ -117,6 +126,10 @@ export const useSettingsStore = create<SettingsState>()(
 
       setPluginPrompts: prompts => {
         set({ pluginPrompts: prompts });
+      },
+
+      setPluginMcpServers: servers => {
+        set({ pluginMcpServers: servers });
       },
 
       // ─── Skill management ───
@@ -187,7 +200,13 @@ export const useSettingsStore = create<SettingsState>()(
 
       // ─── Reset ───
       reset: () => {
-        set({ ...DEFAULT_SETTINGS, pluginAgents: [], pluginSkills: [], pluginPrompts: [] });
+        set({
+          ...DEFAULT_SETTINGS,
+          pluginAgents: [],
+          pluginSkills: [],
+          pluginPrompts: [],
+          pluginMcpServers: [],
+        });
         setImportedSkills([]);
         setImportedAgents([]);
       },

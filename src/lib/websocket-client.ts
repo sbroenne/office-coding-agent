@@ -283,6 +283,23 @@ export interface PluginPromptsPayload {
   prompts: PluginPromptDescriptor[];
 }
 
+/** A single MCP server descriptor from a plugin's mcp.json. */
+export interface PluginMcpDescriptor {
+  name: string;
+  description?: string;
+  transport: 'http' | 'sse' | 'stdio';
+  url?: string;
+  headers?: Record<string, string>;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+/** Payload for the plugin.mcp notification. */
+export interface PluginMcpPayload {
+  servers: PluginMcpDescriptor[];
+}
+
 /**
  * Browser-compatible Copilot client connected via WebSocket proxy.
  */
@@ -296,6 +313,7 @@ export class WebSocketCopilotClient {
   private pluginAgentsHandlers = new Set<(payload: PluginAgentsPayload) => void>();
   private pluginSkillsHandlers = new Set<(payload: PluginSkillsPayload) => void>();
   private pluginPromptsHandlers = new Set<(payload: PluginPromptsPayload) => void>();
+  private pluginMcpHandlers = new Set<(payload: PluginMcpPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -407,6 +425,13 @@ export class WebSocketCopilotClient {
     };
   }
 
+  onPluginMcp(handler: (payload: PluginMcpPayload) => void): () => void {
+    this.pluginMcpHandlers.add(handler);
+    return () => {
+      this.pluginMcpHandlers.delete(handler);
+    };
+  }
+
   async stop(): Promise<void> {
     for (const session of this.sessions.values()) {
       try {
@@ -502,6 +527,17 @@ export class WebSocketCopilotClient {
     this.connection.onNotification('plugin.prompts', (notification: unknown) => {
       const payload = notification as PluginPromptsPayload;
       for (const handler of this.pluginPromptsHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('plugin.mcp', (notification: unknown) => {
+      const payload = notification as PluginMcpPayload;
+      for (const handler of this.pluginMcpHandlers) {
         try {
           handler(payload);
         } catch {

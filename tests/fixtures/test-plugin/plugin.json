@@ -1,0 +1,6 @@
+{
+  "name": "office-excel-test-plugin",
+  "description": "Regression test plugin — verifies agents, skills, prompts, and MCP servers are discovered and surfaced in the add-in UI.",
+  "version": "1.0.0",
+  "author": "test"
+}

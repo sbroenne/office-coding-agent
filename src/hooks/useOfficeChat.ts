@@ -273,6 +273,11 @@ export function useOfficeChat(host: OfficeHostApp) {
         useSettingsStore.getState().setPluginPrompts(prompts);
       });
 
+      // Register plugin.mcp notification — populates the plugin MCP server list.
+      client.onPluginMcp(({ servers }) => {
+        useSettingsStore.getState().setPluginMcpServers(servers);
+      });
+
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
 
       // System prompt: base + app prompt + user memories

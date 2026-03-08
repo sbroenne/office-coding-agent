@@ -309,6 +309,74 @@ export async function discoverPluginPrompts(host, configPath = COPILOT_CONFIG_PA
   return prompts;
 }
 
+/**
+ * Discover MCP server configurations from installed plugin directories.
+ *
+ * For each enabled plugin with a cache_path, reads <cache_path>/mcp.json and
+ * parses it as either Claude Desktop format ({ mcpServers: {} }) or VS Code
+ * format ({ servers: {} }).  Entries are mapped to McpServerConfig objects
+ * compatible with the browser's importedMcpServers store field.
+ *
+ * @param {string} [host] - Office host slug for filtering
+ * @param {string} [configPath] - path to config.json (defaults to COPILOT_CONFIG_PATH)
+ * @returns {Promise<Array<{name: string, description?: string, transport: string, url?: string, command?: string, args?: string[], env?: Record<string,string>}>>}
+ */
+export async function discoverPluginMcpServers(host, configPath = COPILOT_CONFIG_PATH) {
+  const config = await readCopilotConfig(configPath);
+  const plugins = config.installed_plugins || [];
+  const servers = [];
+
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path) continue;
+    if (!existsSync(plugin.cache_path)) continue;
+    if (host && !isPluginForHost(plugin.name, host)) continue;
+
+    const mcpJsonPath = join(plugin.cache_path, 'mcp.json');
+    if (!existsSync(mcpJsonPath)) continue;
+
+    let raw;
+    try {
+      raw = JSON.parse(await readFile(mcpJsonPath, 'utf8'));
+    } catch {
+      continue; // malformed JSON — skip
+    }
+
+    // Support both Claude Desktop format { mcpServers: {} } and VS Code format { servers: {} }
+    const serversMap = raw.mcpServers ?? raw.servers ?? {};
+
+    for (const [name, entry] of Object.entries(serversMap)) {
+      if (!entry || typeof entry !== 'object') continue;
+
+      const description = entry.description ?? `MCP server '${name}' from plugin ${plugin.name}`;
+
+      if (entry.command) {
+        // stdio transport
+        servers.push({
+          name,
+          description,
+          transport: 'stdio',
+          command: entry.command,
+          args: Array.isArray(entry.args) ? entry.args : [],
+          env: entry.env && typeof entry.env === 'object' ? entry.env : undefined,
+        });
+      } else if (entry.url) {
+        // HTTP or SSE transport
+        const transport = entry.type === 'sse' || entry.transport === 'sse' ? 'sse' : 'http';
+        servers.push({
+          name,
+          description,
+          transport,
+          url: entry.url,
+          headers: entry.headers && typeof entry.headers === 'object' ? entry.headers : undefined,
+        });
+      }
+      // Entries with neither command nor url are skipped (invalid)
+    }
+  }
+
+  return servers;
+}
+
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 const HOST_PREFIXES = ['excel', 'powerpoint', 'word', 'outlook'];

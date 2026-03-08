@@ -24,6 +24,7 @@ import {
   discoverPluginSkillObjects,
   discoverPluginAgents,
   discoverPluginPrompts,
+  discoverPluginMcpServers,
 } from './pluginDiscovery.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -468,8 +469,33 @@ async function handleConnection(ws) {
           console.warn('[proxy] Plugin prompt discovery failed:', err.message);
         }
 
+        // Discover plugin MCP servers and notify the browser so it can surface
+        // them in the MCP manager. Also merge them into the session's mcpServers
+        // so the SDK can connect to them.
+        let mergedMcpServers = { ...(mcpServers || {}) };
+        try {
+          const pluginMcpServers = await discoverPluginMcpServers(host, pluginConfigPath);
+          if (pluginMcpServers.length > 0) {
+            console.log(`[proxy] Sending ${pluginMcpServers.length} plugin MCP server(s) to browser`);
+            sendNotification('plugin.mcp', { servers: pluginMcpServers });
+            // Merge into session mcpServers — plugin servers do NOT override explicitly
+            // configured ones (browser-provided ones take precedence by name).
+            for (const srv of pluginMcpServers) {
+              if (!(srv.name in mergedMcpServers)) {
+                if (srv.transport === 'stdio' && srv.command) {
+                  mergedMcpServers[srv.name] = { type: 'local', command: srv.command, args: srv.args ?? [], env: srv.env ?? {} };
+                } else if (srv.url) {
+                  mergedMcpServers[srv.name] = { type: 'remote', url: srv.url };
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[proxy] Plugin MCP server discovery failed:', err.message);
+        }
+
         // Emit 'starting' status for each configured MCP server
-        const mcpServerNames = Object.keys(mcpServers || {});
+        const mcpServerNames = Object.keys(mergedMcpServers);
         for (const name of mcpServerNames) {
           sendNotification('mcp.status', { server: name, status: 'starting' });
           sendNotification('mcp.log', {
@@ -489,7 +515,7 @@ async function handleConnection(ws) {
             sessionId,
             systemMessage,
             tools,
-            mcpServers,
+            mcpServers: mergedMcpServers,
             availableTools,
             skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,

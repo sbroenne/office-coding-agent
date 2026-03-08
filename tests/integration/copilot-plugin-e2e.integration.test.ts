@@ -18,7 +18,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createWebSocketClient } from '@/lib/websocket-client';
-import type { PluginSkillsPayload, PluginPromptsPayload } from '@/lib/websocket-client';
+import type {
+  PluginAgentsPayload,
+  PluginSkillsPayload,
+  PluginPromptsPayload,
+  PluginMcpPayload,
+} from '@/lib/websocket-client';
 
 const SERVER_URL = 'wss://localhost:3000/api/copilot';
 const TIMEOUT_MS = 45_000;
@@ -467,6 +472,139 @@ ${promptBody}`,
         expect(prompt!.agent).toBe(agentName);
         expect(prompt!.argumentHint).toBe(argumentHint);
         expect(prompt!.body).toContain('${input:accountId}');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    'proxy sends plugin.agents notification with correct agent metadata',
+    async () => {
+      const agentName = `E2E Agent ${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      const agentDescription = 'E2E integration test custom agent description';
+
+      const pluginDir = await makePluginDir();
+      const agentsDir = join(pluginDir, 'agents');
+      const agentFileName = `custom-agent-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      await mkdir(agentsDir, { recursive: true });
+      await writeFile(
+        join(agentsDir, `${agentFileName}.agent.md`),
+        `---
+name: ${agentName}
+description: ${agentDescription}
+version: 2.0.0
+hosts: [excel]
+defaultForHosts: []
+---
+
+You are a custom E2E test agent. Reply concisely.`,
+        'utf8'
+      );
+
+      const configDir = await makePluginDir();
+      const configPath = await makeConfigFile(configDir, [
+        { name: 'office-excel', enabled: true, cache_path: pluginDir },
+      ]);
+
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        let receivedAgentsPayload: PluginAgentsPayload | undefined;
+        const agentsReceived = new Promise<void>(resolve => {
+          client.onPluginAgents(payload => {
+            receivedAgentsPayload = payload;
+            resolve();
+          });
+        });
+
+        const NOTIF_TIMEOUT = 30_000;
+        await Promise.all([
+          client.createSession({
+            host: 'excel',
+            pluginConfigPath: configPath,
+          }),
+          Promise.race([
+            agentsReceived,
+            new Promise<void>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('plugin.agents notification timed out')),
+                NOTIF_TIMEOUT
+              )
+            ),
+          ]),
+        ]);
+
+        expect(receivedAgentsPayload).toBeDefined();
+        // The proxy uses the filename stem as the agent name; find by unique description
+        const agent = receivedAgentsPayload!.agents.find(a => a.description === agentDescription);
+        expect(agent).toBeDefined();
+        expect(agent!.hosts).toContain('excel');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    'proxy sends plugin.mcp notification with correct MCP server metadata',
+    async () => {
+      const serverName = `e2e-mcp-${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+
+      const pluginDir = await makePluginDir();
+      await writeFile(
+        join(pluginDir, 'mcp.json'),
+        JSON.stringify({
+          mcpServers: {
+            [serverName]: {
+              command: 'node',
+              args: ['--version'],
+              description: 'E2E regression test MCP server',
+            },
+          },
+        }),
+        'utf8'
+      );
+
+      const configDir = await makePluginDir();
+      const configPath = await makeConfigFile(configDir, [
+        { name: 'office-excel', enabled: true, cache_path: pluginDir },
+      ]);
+
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        let receivedMcpPayload: PluginMcpPayload | undefined;
+        const mcpReceived = new Promise<void>(resolve => {
+          client.onPluginMcp(payload => {
+            receivedMcpPayload = payload;
+            resolve();
+          });
+        });
+
+        const NOTIF_TIMEOUT = 30_000;
+        await Promise.all([
+          client.createSession({
+            host: 'excel',
+            pluginConfigPath: configPath,
+          }),
+          Promise.race([
+            mcpReceived,
+            new Promise<void>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('plugin.mcp notification timed out')),
+                NOTIF_TIMEOUT
+              )
+            ),
+          ]),
+        ]);
+
+        expect(receivedMcpPayload).toBeDefined();
+        const srv = receivedMcpPayload!.servers.find(s => s.name === serverName);
+        expect(srv).toBeDefined();
+        expect(srv!.transport).toBe('stdio');
+        expect(srv!.command).toBe('node');
+        expect(srv!.args).toEqual(['--version']);
       } finally {
         await client.stop();
       }

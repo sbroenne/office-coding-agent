@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "test-excel-mcp": {
+      "command": "node",
+      "args": ["--version"],
+      "description": "Regression-test MCP server (echo node version — not a real server)."
+    }
+  }
+}

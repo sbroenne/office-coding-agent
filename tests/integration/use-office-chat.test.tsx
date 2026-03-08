@@ -57,6 +57,7 @@ function makeFakeClient(
     onPluginAgents: vi.fn(() => () => undefined),
     onPluginSkills: vi.fn(() => () => undefined),
     onPluginPrompts: vi.fn(() => () => undefined),
+    onPluginMcp: vi.fn(() => () => undefined),
   };
 }
 
