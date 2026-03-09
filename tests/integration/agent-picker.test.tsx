@@ -1,11 +1,4 @@
-/**
- * Integration test: AgentPicker component.
- *
- * Renders the real AgentPicker with real Zustand store and real
- * bundled agents (loaded via rawMarkdownPlugin). Verifies selecting
- * agents updates the store and shows the current selection.
- */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
@@ -15,11 +8,8 @@ import { getAgents, getBundledAgents } from '@/services/agents';
 import type { OfficeHostApp } from '@/services/office/host';
 import type { AgentHost } from '@/types/agent';
 
-const mockOpenPanel = vi.fn();
-
 beforeEach(() => {
   useSettingsStore.getState().reset();
-  mockOpenPanel.mockClear();
 });
 
 describe('Integration: AgentPicker', () => {
@@ -39,8 +29,6 @@ describe('Integration: AgentPicker', () => {
       const items = screen.getAllByText(agent.metadata.name);
       expect(items.length).toBeGreaterThanOrEqual(1);
     }
-
-    expect(screen.getByText('Manage plugins…')).toBeInTheDocument();
   });
 
   it('shows agent description as secondary content', async () => {
@@ -51,18 +39,6 @@ describe('Integration: AgentPicker', () => {
     const agents = getAgents();
     const firstSentence = agents[0].metadata.description.split('.')[0];
     expect(screen.getByText(firstSentence)).toBeInTheDocument();
-  });
-
-  it('calls onOpenPanel when manage plugins button is clicked', async () => {
-    renderWithProviders(<AgentPicker onOpenPanel={mockOpenPanel} />);
-
-    await userEvent.click(screen.getByLabelText('Select agent'));
-
-    const manageButton = screen.getByRole('button', { name: /manage plugins/i });
-    manageButton.focus();
-    await userEvent.keyboard('{Enter}');
-
-    expect(mockOpenPanel).toHaveBeenCalledWith('plugins');
   });
 
   it('store reflects the default active agent', () => {

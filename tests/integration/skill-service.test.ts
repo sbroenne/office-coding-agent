@@ -1,193 +1,9 @@
 /**
- * Integration tests for buildSkillContext and related skill functions.
- *
- * These exercise the real `skillService` module which imports
- * bundled `.md` skill files via the rawMarkdownPlugin in vitest.config.ts.
+ * Integration tests for parseFrontmatter and skillToMarkdown.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { AgentSkill } from '@/types/skill';
-import {
-  buildSkillContext,
-  getSkills,
-  getSkill,
-  getBundledSkills,
-  parseFrontmatter,
-  setImportedSkills,
-} from '@/services/skills/skillService';
-
-beforeEach(() => {
-  setImportedSkills([]);
-});
-
-afterEach(() => {
-  setImportedSkills([]);
-});
-
-describe('buildSkillContext', () => {
-  it('includes bundled skills when available', () => {
-    const ctx = buildSkillContext();
-    expect(ctx).toContain('# Agent Skills');
-    expect(ctx).toContain('Agent Skill: excel');
-  });
-
-  it('returns empty string when activeNames do not match any skills', () => {
-    const ctx = buildSkillContext(['any-skill-that-does-not-exist']);
-    expect(ctx).toBe('');
-  });
-
-  it('returns empty string when activeNames is an empty array', () => {
-    const ctx = buildSkillContext([]);
-    expect(ctx).toBe('');
-  });
-
-  it('returns empty string when no names match', () => {
-    const ctx = buildSkillContext(['nonexistent-skill']);
-    expect(ctx).toBe('');
-  });
-
-  it('includes all skills when activeNames is undefined', () => {
-    const all = buildSkillContext();
-    const explicit = buildSkillContext(undefined);
-    expect(explicit).toBe(all);
-  });
-
-  it('keeps @references directives as plain content without expansion', () => {
-    const importedSkill: AgentSkill = {
-      metadata: {
-        name: 'Ref Tester',
-        description: 'Skill with plain @references text.',
-        version: '1.0.0',
-        tags: [],
-        hosts: [],
-      },
-      content: `Intro for references\n@references skill:excel, agent:Excel\nEnd of skill`,
-    };
-
-    setImportedSkills([importedSkill]);
-
-    const context = buildSkillContext(['Ref Tester']);
-    expect(context).toContain('@references skill:excel, agent:Excel');
-    expect(context).not.toContain('Reference: skill:excel');
-    expect(context).not.toContain('Reference: agent:Excel');
-  });
-});
-
-describe('getSkills', () => {
-  it('returns all 17 bundled skills', () => {
-    const skills = getSkills();
-    expect(skills.length).toBe(17);
-  });
-
-  it('includes the excel skill', () => {
-    expect(getSkills().some(skill => skill.metadata.name === 'excel')).toBe(true);
-  });
-
-  it('each skill has metadata with a name', () => {
-    for (const skill of getSkills()) {
-      expect(skill.metadata.name).toBeTruthy();
-    }
-  });
-
-  it('each skill has non-empty content', () => {
-    for (const skill of getSkills()) {
-      expect(skill.content.length).toBeGreaterThan(0);
-    }
-  });
-});
-
-describe('getSkill', () => {
-  it('returns undefined for an unknown skill', () => {
-    expect(getSkill('nonexistent-skill-xyz')).toBeUndefined();
-  });
-
-  it('returns bundled excel skill by name', () => {
-    const skill = getSkill('excel');
-    expect(skill).toBeDefined();
-    expect(skill?.metadata.name).toBe('excel');
-    expect(skill?.metadata.hosts).toEqual(['excel']);
-  });
-});
-
-// Regression: all 17 bundled skills must be loaded (not just excel)
-describe('bundled skill loading', () => {
-  const expectedSkills = [
-    { name: 'excel', host: 'excel' },
-    { name: 'powerpoint', host: 'powerpoint' },
-    { name: 'powerpoint-charts', host: 'powerpoint' },
-    { name: 'powerpoint-deck-archetypes', host: 'powerpoint' },
-    { name: 'powerpoint-deck-builder', host: 'powerpoint' },
-    { name: 'powerpoint-design', host: 'powerpoint' },
-    { name: 'powerpoint-formatting', host: 'powerpoint' },
-    { name: 'powerpoint-redesign', host: 'powerpoint' },
-    { name: 'powerpoint-speaker-notes', host: 'powerpoint' },
-    { name: 'Word Document Editing', host: 'word' },
-    { name: 'word-document-builder', host: 'word' },
-    { name: 'word-formatting', host: 'word' },
-    { name: 'word-tables', host: 'word' },
-    { name: 'outlook', host: 'outlook' },
-    { name: 'outlook-calendar', host: 'outlook' },
-    { name: 'outlook-drafting', host: 'outlook' },
-    { name: 'outlook-email-analysis', host: 'outlook' },
-  ];
-
-  it('loads exactly 17 bundled skills', () => {
-    expect(getBundledSkills()).toHaveLength(17);
-  });
-
-  it.each(expectedSkills)('loads $name skill targeting $host', ({ name, host }) => {
-    const skill = getSkill(name);
-    expect(skill).toBeDefined();
-    expect(skill!.metadata.hosts).toContain(host);
-    expect(skill!.content.length).toBeGreaterThan(0);
-  });
-
-  it('includes 1 excel skill', () => {
-    const excelSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('excel'));
-    expect(excelSkills).toHaveLength(1);
-  });
-
-  it('includes 8 powerpoint skills', () => {
-    const pptSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('powerpoint'));
-    expect(pptSkills).toHaveLength(8);
-  });
-
-  it('includes 4 word skills', () => {
-    const wordSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('word'));
-    expect(wordSkills).toHaveLength(4);
-  });
-
-  it('includes 4 outlook skills', () => {
-    const outlookSkills = getBundledSkills().filter(s => s.metadata.hosts.includes('outlook'));
-    expect(outlookSkills).toHaveLength(4);
-  });
-
-  it('buildSkillContext returns skills for powerpoint host', () => {
-    const ctx = buildSkillContext(undefined, 'powerpoint');
-    expect(ctx).toContain('Agent Skill: powerpoint');
-    expect(ctx).toContain('Agent Skill: powerpoint-deck-builder');
-  });
-
-  it('buildSkillContext returns skills for word host', () => {
-    const ctx = buildSkillContext(undefined, 'word');
-    expect(ctx).toContain('Agent Skill: Word Document Editing');
-    expect(ctx).toContain('Agent Skill: word-tables');
-  });
-
-  it('buildSkillContext returns skills for outlook host', () => {
-    const ctx = buildSkillContext(undefined, 'outlook');
-    expect(ctx).toContain('Agent Skill: outlook');
-    expect(ctx).toContain('Agent Skill: outlook-calendar');
-  });
-
-  it('buildSkillContext filters out non-matching host skills', () => {
-    const ctx = buildSkillContext(undefined, 'excel');
-    expect(ctx).toContain('Agent Skill: excel');
-    expect(ctx).not.toContain('Agent Skill: powerpoint');
-    expect(ctx).not.toContain('Agent Skill: word');
-    expect(ctx).not.toContain('Agent Skill: outlook');
-  });
-});
+import { describe, it, expect } from 'vitest';
+import { parseFrontmatter } from '@/services/skills/skillService';
 
 describe('parseFrontmatter edge cases', () => {
   it('returns defaults when no frontmatter delimiters', () => {
@@ -253,7 +69,6 @@ Content`;
     expect(metadata.hosts).toEqual(['excel', 'word']);
   });
 
-  // Bug regression: hosts should be normalized to lowercase
   it('normalizes capitalized host names to lowercase in inline array', () => {
     const raw = `---
 name: caps-host-skill
@@ -263,7 +78,6 @@ hosts: [Excel, PowerPoint]
 ---
 Content`;
     const { metadata } = parseFrontmatter(raw);
-    // Before fix: stored as 'Excel' which never matched lowercase 'excel' in filtering
     expect(metadata.hosts).toEqual(['excel', 'powerpoint']);
   });
 
@@ -293,3 +107,4 @@ Content`;
     expect(metadata.hosts).toEqual(['excel', 'word']);
   });
 });
+

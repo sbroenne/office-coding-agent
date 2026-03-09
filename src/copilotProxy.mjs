@@ -10,12 +10,11 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, rm, readdir, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { tmpdir, homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
@@ -103,9 +102,6 @@ async function findSkillDirsInPackage(pkgDir) {
   return result;
 }
 
-/** Root directory for bundled skills; each host has its own subdirectory. */
-const BUNDLED_SKILLS_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), 'skills');
-
 /** Wrap a JSON payload in an LSP Content-Length frame. */
 function lspFrame(obj) {
   const body = JSON.stringify(obj);
@@ -179,9 +175,6 @@ async function handleConnection(ws) {
 
   /** @type {Map<string, () => void>} */
   const eventUnsubs = new Map();
-
-  /** @type {Map<string, string>} Temp skill directories keyed by sessionId for cleanup. */
-  const sessionTempDirs = new Map();
 
   /** @type {Map<string, string[]>} MCP server names keyed by sessionId for stop notifications. */
   const sessionMcpServerNames = new Map();
@@ -327,14 +320,13 @@ async function handleConnection(ws) {
           tools: toolDefs,
           mcpServers,
           availableTools,
-          skills,
           disabledSkills,
           customAgents,
           pluginConfigPath,
         } = params || {};
         let systemMessage = systemMessageParam;
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, skills=${(skills || []).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, customAgents=${(customAgents || []).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
@@ -352,40 +344,7 @@ async function handleConnection(ws) {
           },
         }));
 
-        // Discover all bundled skill directories for the current host.
-        // Skill dirs use the naming convention: <host>/ and <host>-<specialization>/
-        // e.g. for host "powerpoint": powerpoint/, powerpoint-deck-builder/, powerpoint-formatting/
         const skillDirectories = [];
-        if (host && existsSync(BUNDLED_SKILLS_ROOT)) {
-          const hostSlug = slugify(host);
-          try {
-            const entries = await readdir(BUNDLED_SKILLS_ROOT, { withFileTypes: true });
-            for (const entry of entries) {
-              if (entry.isDirectory() && (entry.name === hostSlug || entry.name.startsWith(hostSlug + '-'))) {
-                skillDirectories.push(join(BUNDLED_SKILLS_ROOT, entry.name));
-              }
-            }
-          } catch {
-            // Fall back to single-directory approach if readdir fails
-            const hostSkillDir = join(BUNDLED_SKILLS_ROOT, hostSlug);
-            if (existsSync(hostSkillDir)) {
-              skillDirectories.push(hostSkillDir);
-            }
-          }
-        }
-
-        // Write imported skills to a temp directory so the SDK can load them
-        let tempSkillDir = null;
-        if (skills && skills.length > 0) {
-          tempSkillDir = join(tmpdir(), `oca-skills-${randomUUID()}`);
-          await mkdir(tempSkillDir, { recursive: true });
-          for (const skill of skills) {
-            const skillDir = join(tempSkillDir, slugify(skill.name));
-            await mkdir(skillDir, { recursive: true });
-            await writeFile(join(skillDir, 'SKILL.md'), skill.content, 'utf8');
-          }
-          skillDirectories.push(tempSkillDir);
-        }
 
         // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
         try {
@@ -510,10 +469,6 @@ async function handleConnection(ws) {
             },
           });
         } catch (err) {
-          // Clean up temp directories on failure
-          if (tempSkillDir) {
-            void rm(tempSkillDir, { recursive: true, force: true }).catch(() => {});
-          }
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
             sendNotification('mcp.status', {
@@ -547,9 +502,6 @@ async function handleConnection(ws) {
         sessions.set(session.sessionId, session);
         if (mcpServerNames.length > 0) {
           sessionMcpServerNames.set(session.sessionId, mcpServerNames);
-        }
-        if (tempSkillDir) {
-          sessionTempDirs.set(session.sessionId, tempSkillDir);
         }
         markHealthy();
         console.log(`[proxy] session.create succeeded (sessionId=${session.sessionId})`);
@@ -638,12 +590,6 @@ async function handleConnection(ws) {
             }
             sessionMcpServerNames.delete(sessionId);
           }
-          // Clean up temp skill directory
-          const tempDir = sessionTempDirs.get(sessionId);
-          if (tempDir) {
-            sessionTempDirs.delete(sessionId);
-            void rm(tempDir, { recursive: true, force: true }).catch(() => {});
-          }
         }
         sendResponse(id, {});
         break;
@@ -730,12 +676,6 @@ async function handleConnection(ws) {
       }
     }
     sessions.clear();
-
-    // Clean up all temp skill directories for this connection
-    for (const tempDir of sessionTempDirs.values()) {
-      void rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
-    sessionTempDirs.clear();
 
     // Clear MCP server tracking
     sessionMcpServerNames.clear();

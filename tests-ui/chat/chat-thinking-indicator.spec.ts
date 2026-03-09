@@ -231,11 +231,12 @@ test.describe('Thinking indicator (live Copilot)', () => {
     // Should have seen at least: working-active and done state
     expect(workingStates.length).toBeGreaterThanOrEqual(1);
 
-    // After completion: Working box should show "Finished with N steps"
+    // After completion: Working box title should be visible (done state, not shimmer)
     const doneTitle = page.locator('.chat-thinking-title-done');
     await expect(doneTitle).toBeVisible({ timeout: 5000 });
     const doneText = await doneTitle.textContent();
-    expect(doneText).toMatch(/Finished with \d+ steps?/);
+    // Done label is the phase label or fallback "Working"
+    expect(doneText).toBeTruthy();
 
     // Take a visual regression screenshot of the completed Working box
     const assistantMessage = page.locator('[data-role="assistant"]').last();

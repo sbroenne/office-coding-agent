@@ -4,7 +4,6 @@ import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websoc
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { getImportedSkills, skillToMarkdown } from '@/services/skills';
 import { resolveActiveAgent, getAgents, SUPPORTED_AGENT_HOSTS } from '@/services/agents';
 import { toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
@@ -80,7 +79,6 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
-  const importedMcpServers = useSettingsStore(s => s.importedMcpServers);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
   const createSession = useSessionHistoryStore(s => s.createSession);
@@ -108,14 +106,12 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeAgentIdRef = useRef(activeAgentId);
   const disabledSkillNamesRef = useRef(disabledSkillNames);
   const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
-  const importedMcpServersRef = useRef(importedMcpServers);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
   activeAgentIdRef.current = activeAgentId;
   disabledSkillNamesRef.current = disabledSkillNames;
   disabledMcpServerNamesRef.current = disabledMcpServerNames;
-  importedMcpServersRef.current = importedMcpServers;
   evaluatePermissionRef.current = evaluatePermission;
 
   // Switch model mid-session when the user picks a different model
@@ -289,15 +285,6 @@ export function useOfficeChat(host: OfficeHostApp) {
         // Memory store not available — continue without memories
       }
 
-      // Build imported skill payloads for the proxy to write to disk
-      const importedHostSkills = getImportedSkills().filter(
-        s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost)
-      );
-      const skills = importedHostSkills.map(s => ({
-        name: s.metadata.name,
-        content: skillToMarkdown(s),
-      }));
-
       // Build custom agent configs for ALL agents in this host — this enables sub-agent
       // delegation where the active agent can invoke other agents as sub-agents.
       // Each agent carries its own tool allowlist so per-agent restrictions are enforced
@@ -314,8 +301,8 @@ export function useOfficeChat(host: OfficeHostApp) {
             }))
           : undefined;
 
-      // Resolve active MCP servers: bundled list + imported → agent allowlist filter → user disable filter.
-      let activeServers = [...BUNDLED_MCP_SERVERS, ...importedMcpServersRef.current];
+      // Resolve active MCP servers: bundled list → agent allowlist filter → user disable filter.
+      let activeServers = [...BUNDLED_MCP_SERVERS];
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
         activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
@@ -335,7 +322,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           tools: getToolsForHost(host),
           mcpServers,
           host,
-          skills,
           disabledSkills,
           customAgents,
         }),

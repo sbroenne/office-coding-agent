@@ -6,11 +6,7 @@ import { useSettingsStore } from '@/stores';
 import { getAgents, getBundledAgents, resolveActiveAgent } from '@/services/agents';
 import { detectOfficeHost } from '@/services/office/host';
 
-interface AgentPickerProps {
-  onOpenPanel?: (panel: string) => void;
-}
-
-export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
+export const AgentPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const setActiveAgent = useSettingsStore(s => s.setActiveAgent);
@@ -111,18 +107,6 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onOpenPanel }) => {
                 )}
               </>
             )}
-
-            <div className="mt-1 border-t border-border pt-1">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onOpenPanel?.('plugins');
-                }}
-                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <span>Manage plugins…</span>
-              </button>
-            </div>
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
