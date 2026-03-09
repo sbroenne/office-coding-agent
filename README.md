@@ -28,7 +28,8 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 - **22 Outlook tools** — emails, calendar, contacts, folders, attachments, categories, search, flags, drafts
 - **Agent system** — host-targeted agents with YAML frontmatter (`hosts`, `defaultForHosts`)
 - **Skills system** — bundled skill files inject context into the system prompt, toggleable via SkillPicker
-- **Custom agents & skills** — import local ZIP files for custom agents and skills
+- **Copilot CLI plugin support** — install any Copilot CLI plugin (`copilot plugin add <name>`) and its agents, skills, prompts, and MCP servers automatically appear in the UI
+- **Plugin Hub** — browse, install, and manage Copilot CLI plugins directly from the task pane
 - **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
 - **Auto-scroll chat** — thread stays pinned to newest content so follow-up output remains visible
@@ -36,7 +37,7 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 
 ## Agent Skills Format
 
-A skill is a folder containing `SKILL.md`. Optional supporting docs live under `references/` inside that skill folder.
+A skill is a folder containing `SKILL.md`. Optional supporting docs live under `references/` inside that skill folder. Skills are distributed as [Copilot CLI plugins](https://docs.github.com/en/copilot/reference/cli-plugin-reference).
 
 ## Prerequisites
 
@@ -162,7 +163,7 @@ Integration tests run as part of the default `npm test` suite.
 
 ## E2E Testing
 
-The project includes end-to-end tests across all four Office hosts: ~187 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
+The project includes end-to-end tests across all four Office hosts: ~233 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
 
 ### How It Works
 
@@ -176,15 +177,15 @@ The project includes end-to-end tests across all four Office hosts: ~187 Excel t
 
 | Category             | Tests |
 | -------------------- | ----- |
-| Range Tools          | 52    |
-| Table Tools          | 15    |
-| Chart Tools          | 14    |
-| Sheet Tools          | 22    |
-| Workbook Tools       | 8     |
+| Range Tools          | 59    |
+| Table Tools          | 19    |
+| Chart Tools          | 19    |
+| Sheet Tools          | 25    |
+| Workbook Tools       | 18    |
 | Comment Tools        | 8     |
 | Conditional Format   | 27    |
 | Data Validation      | 21    |
-| Pivot Table          | 10    |
+| Pivot Table          | 28    |
 | Settings Persistence | 4     |
 | AI Round-Trip        | 5     |
 
@@ -254,81 +255,46 @@ The AI agent uses a **split system prompt** architecture:
 
 ### Skills and Agents
 
-- Bundled skills/agents are a separate immutable category (read-only in UI).
-- Custom skills/agents are imported locally from ZIP files via picker management dialogs.
-- Imported items are persisted in settings storage and can be removed from the same management dialogs.
+The add-in ships with bundled agents and skills for each Office host. Additional agents, skills, prompts, and MCP servers are distributed as **Copilot CLI plugins**.
 
-#### Skills ZIP format (folder inference)
+#### Copilot CLI Plugins
 
-Use a ZIP containing markdown files under `skills/`:
+Install any Copilot CLI plugin and its content automatically appears in the add-in UI:
 
-```text
-my-skills.zip
-└── skills/
-    ├── security-review.md
-    └── finance-helper.md
+```bash
+# Install a plugin
+copilot plugin add <plugin-name>
+
+# List installed plugins
+copilot plugin list
+
+# Update a plugin
+copilot plugin update <plugin-name>
+
+# Remove a plugin
+copilot plugin remove <plugin-name>
 ```
 
-Each skill markdown file must include frontmatter:
+Plugin file conventions (required by the Copilot CLI spec):
 
-```markdown
----
-name: Security Review
-description: Threat-model and security-review guidance.
-version: 1.0.0
-tags:
-  - security
-  - review
----
+| Content type | File pattern | Notes |
+|---|---|---|
+| Agent | `agents/<name>.agent.md` | YAML frontmatter with `hosts`, `defaultForHosts` |
+| Skill | `skills/<name>/SKILL.md` | YAML frontmatter with optional `hosts` |
+| Prompt (slash command) | `prompts/<name>.prompt.md` | Appears in `/` slash menu |
+| MCP server config | `mcp.json` | Servers discovered automatically |
+| Plugin-level agent | `AGENT.md` | Uses the plugin name as agent ID |
 
-Your skill instructions go here.
-```
+> **Note:** Files with the wrong extension (e.g. `agents/my-agent.md` instead of `agents/my-agent.agent.md`) are silently ignored by the Copilot CLI.
 
-#### Agents ZIP format (folder inference)
+Plugin agents and skills are automatically surfaced in the AgentPicker and SkillPicker alongside the bundled content. The **Plugin Hub** in the task pane lets you browse, install, and manage plugins without leaving Office.
 
-Use a ZIP containing markdown files under `agents/`:
+#### Bundled Agents and Skills
 
-```text
-my-agents.zip
-└── agents/
-    ├── excel-data-analyst.md
-    └── powerpoint-storyteller.md
-```
+Bundled agents and skills ship with the add-in and are immutable (read-only in the UI). They live in:
 
-Each agent markdown file must include frontmatter with supported hosts:
-
-```markdown
----
-name: Excel Data Analyst
-description: Focused Excel analysis assistant.
-version: 1.0.0
-hosts: [excel]
-defaultForHosts: []
----
-
-Your agent instructions go here.
-```
-
-Notes:
-
-- Skills ZIP and Agents ZIP are imported separately.
-- If an imported item name collides with an existing one, the add-in keeps both and auto-suffixes the imported name.
-- Use `npm run extensions:samples` to generate starter ZIP files under `samples/extensions/`.
-
-#### Import and Management UX
-
-In picker management dialogs:
-
-- Open **Skill picker → Manage skills…** for skill import/removal
-- Open **Agent picker → Manage agents…** for agent import/removal
-- Import custom entries via **Import Skills ZIP** / **Import Agents ZIP**
-- Remove imported entries directly from Imported lists
-- View bundled entries separately in read-only sections
-
-In chat pickers:
-
-- Agent and skill lists are grouped by source (**Bundled** vs **Imported**)
-- Bundled category remains immutable; only imported entries are removable via Settings
+- `src/agents/*/AGENT.md` — agent definitions with YAML frontmatter
+- `src/skills/*/SKILL.md` — skill definitions with optional `references/` subfolder
 
 ### Key Hooks and Components
 
@@ -353,7 +319,7 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 ## Tech Stack
 
 - **React 19** — UI framework
-- **assistant-ui + Radix UI + Tailwind CSS v4** — task pane UI components and styling
+- **Radix UI + Tailwind CSS v4** — task pane UI components and styling (VS Code design tokens via `--vscode-*` CSS custom properties)
 - **GitHub Copilot SDK** (`@github/copilot-sdk`) — session management, streaming events, tool registration
 - **WebSocket + JSON-RPC** (`vscode-jsonrpc`, `ws`) — browser-to-proxy transport
 - **Express + HTTPS** — local proxy server with Vite dev middleware
@@ -362,7 +328,7 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 - **TypeScript 5** — type safety
 - **Vitest** — integration testing
 - **Playwright** — browser UI testing for task pane flows
-- **Mocha** — E2E testing inside Excel Desktop (~187 tests)
+- **Mocha** — E2E testing inside Excel Desktop (~233 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
 - **ESLint + Prettier** — code quality
 
@@ -389,7 +355,6 @@ The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/
 
 - **[patniko/github-copilot-office](https://github.com/patniko/github-copilot-office)** — The proxy server architecture, Copilot SDK integration pattern, and WebSocket transport design used in this project were adopted from this repository by [Patrick Nikoletich](https://github.com/patniko) and [Steve Sanderson](https://github.com/SteveSandersonMS). Their work provided the foundation for the Phase 2 migration.
 - **[@trsdn (Torsten)](https://github.com/trsdn)** and **[@urosstojkic](https://github.com/urosstojkic)** — Contributed the Word document orchestrator (planner→worker pattern), 22 Outlook tools, expanded PowerPoint tooling (24 tools), WorkIQ MCP stdio integration, host-specific welcome prompts, improved auto-scroll, and new skills (Outlook email/calendar/drafting, Word formatting/tables/document-builder, PowerPoint content/layout/animation/presentation). Originally submitted as [PR #33](https://github.com/sbroenne/office-coding-agent/pull/33) and merged in [PR #45](https://github.com/sbroenne/office-coding-agent/pull/45).
-- **[assistant-ui](https://github.com/assistant-ui/assistant-ui)** — React chat UI components used for the task pane thread and composer.
 - **[Vercel AI SDK](https://ai-sdk.dev/)** — Original AI runtime used in Phase 1.
 
 ## Community & Security
