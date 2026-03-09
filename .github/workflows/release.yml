@@ -1,106 +1,150 @@
 # Release Pipeline
 #
-# Triggered by a version tag push (e.g. git tag v1.2.3 && git push origin v1.2.3).
-# Builds unsigned installers for Windows (NSIS .exe) and macOS (DMG) in parallel,
-# then publishes them as a GitHub Release with auto-generated release notes.
+# Triggered manually via workflow_dispatch.
+# Calculates the next version from the latest git tag, bumps package.json,
+# builds the production add-in, creates a git tag, and publishes a GitHub Release.
 
 name: Release
 
 on:
-    push:
-        tags:
-            - "v*"
+    workflow_dispatch:
+        inputs:
+            version_bump:
+                description: Version bump type
+                required: true
+                type: choice
+                default: patch
+                options:
+                    - patch
+                    - minor
+                    - major
+            custom_version:
+                description: "Optional: exact version to release (e.g. 1.2.3). Overrides version_bump."
+                required: false
+                type: string
 
 permissions:
     contents: write
 
 jobs:
-    # ─── Windows Installer ──────────────────────────────────────
-    build-windows:
-        name: Build Windows Installer
-        runs-on: windows-latest
+    # ─── Calculate Version ───────────────────────────────────────
+    version:
+        name: Calculate Version
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.calc.outputs.version }}
+            tag: ${{ steps.calc.outputs.tag }}
 
         steps:
             - name: Checkout
               uses: actions/checkout@v4
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
               with:
-                  node-version: 20
-                  cache: npm
+                  fetch-depth: 0
 
-            - name: Install dependencies
-              run: npm ci
+            - name: Calculate next version
+              id: calc
+              run: |
+                  if [ -n "${{ inputs.custom_version }}" ]; then
+                    VERSION="${{ inputs.custom_version }}"
+                  else
+                    LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+                    CURRENT="${LATEST#v}"
+                    MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+                    MINOR=$(echo "$CURRENT" | cut -d. -f2)
+                    PATCH=$(echo "$CURRENT" | cut -d. -f3)
+                    case "${{ inputs.version_bump }}" in
+                      major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+                      minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+                      patch) PATCH=$((PATCH+1)) ;;
+                    esac
+                    VERSION="$MAJOR.$MINOR.$PATCH"
+                  fi
+                  TAG="v$VERSION"
+                  if git rev-parse "$TAG" >/dev/null 2>&1; then
+                    echo "Tag $TAG already exists" && exit 1
+                  fi
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+                  echo "Releasing $TAG"
 
-            - name: Build (production)
-              run: npm run build
-
-            - name: Build Windows installer
-              run: npx electron-builder --win --publish never
-
-            - name: Upload Windows installer
-              uses: actions/upload-artifact@v4
-              with:
-                  name: installer-windows
-                  path: build/electron/*.exe
-                  retention-days: 7
-
-    # ─── macOS Installer ────────────────────────────────────────
-    build-macos:
-        name: Build macOS Installer
-        runs-on: macos-latest
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-                  cache: npm
-
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Build (production)
-              run: npm run build
-
-            - name: Build macOS installer
-              run: npx electron-builder --mac --publish never
-              env:
-                  # Skip ad-hoc/notarization signing (unsigned build)
-                  CSC_IDENTITY_AUTO_DISCOVERY: false
-
-            - name: Upload macOS installer
-              uses: actions/upload-artifact@v4
-              with:
-                  name: installer-macos
-                  path: build/electron/*.dmg
-                  retention-days: 7
-
-    # ─── GitHub Release ─────────────────────────────────────────
-    release:
-        name: Publish GitHub Release
-        needs: [build-windows, build-macos]
+    # ─── Build ───────────────────────────────────────────────────
+    build:
+        name: Build
+        needs: version
         runs-on: ubuntu-latest
 
         steps:
-            - name: Download Windows installer
-              uses: actions/download-artifact@v4
-              with:
-                  name: installer-windows
-                  path: installers/
+            - name: Checkout
+              uses: actions/checkout@v4
 
-            - name: Download macOS installer
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build (production)
+              run: npm run build
+
+            - name: Package dist + manifests
+              run: |
+                  zip -r office-coding-agent-${{ needs.version.outputs.version }}.zip dist/ manifests/ taskpane.html
+
+            - name: Upload build artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: release-build
+                  path: office-coding-agent-*.zip
+                  retention-days: 7
+
+    # ─── Tag & Version Bump ──────────────────────────────────────
+    create-tag:
+        name: Bump Version & Create Tag
+        needs: [version, build]
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Bump package.json version
+              run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version
+
+            - name: Commit version bump & create tag
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git add package.json package-lock.json
+                  git commit -m "chore: release ${{ needs.version.outputs.tag }}"
+                  git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
+                  git push origin HEAD:main --follow-tags
+
+    # ─── GitHub Release ─────────────────────────────────────────
+    create-release:
+        name: Publish GitHub Release
+        needs: [version, create-tag]
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Download build artifact
               uses: actions/download-artifact@v4
               with:
-                  name: installer-macos
-                  path: installers/
+                  name: release-build
+                  path: release/
 
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: installers/**
+                  tag_name: ${{ needs.version.outputs.tag }}
+                  name: ${{ needs.version.outputs.tag }}
+                  files: release/**
                   generate_release_notes: true
