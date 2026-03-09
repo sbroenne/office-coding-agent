@@ -100,9 +100,9 @@ jobs:
                   path: office-coding-agent-*.zip
                   retention-days: 7
 
-    # ─── Tag & Version Bump ──────────────────────────────────────
+    # ─── Create Tag ──────────────────────────────────────────────
     create-tag:
-        name: Bump Version & Create Tag
+        name: Create Tag
         needs: [version, build]
         runs-on: ubuntu-latest
 
@@ -110,23 +110,12 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-                  cache: npm
-
-            - name: Bump package.json version
-              run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version
-
-            - name: Commit version bump & create tag
+            - name: Create & push tag
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
-                  git add package.json package-lock.json
-                  git commit -m "chore: release ${{ needs.version.outputs.tag }}"
                   git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
-                  git push origin HEAD:main --follow-tags
+                  git push origin "${{ needs.version.outputs.tag }}"
 
     # ─── GitHub Release ─────────────────────────────────────────
     create-release:
