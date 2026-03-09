@@ -1,20 +1,42 @@
 /**
  * Integration test: SkillPicker component.
  *
- * Renders the real SkillPicker with real Zustand store and real
- * bundled skills. Verifies toggling skills on/off updates the store
- * and the badge reflects the enabled count.
+ * Renders the real SkillPicker with plugin skills from the Zustand store.
+ * Verifies toggling skills on/off, host filtering, badge count, and
+ * dynamic skill arrival via plugin.skills notifications.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
 import { SkillPicker } from '@/components/SkillPicker';
 import { useSettingsStore } from '@/stores/settingsStore';
 
+// detectOfficeHost is called by SkillPicker — mock it per test where needed
+vi.mock('@/services/office/host', () => ({
+  detectOfficeHost: vi.fn(() => 'excel'),
+}));
+
+import { detectOfficeHost } from '@/services/office/host';
+const mockDetectOfficeHost = vi.mocked(detectOfficeHost);
+
 beforeEach(() => {
   useSettingsStore.getState().reset();
+  mockDetectOfficeHost.mockReturnValue('excel');
 });
+
+const EXCEL_SKILL = {
+  metadata: { name: 'Excel Helper', description: 'Excel skill.', version: '1.0.0', tags: [], hosts: ['excel' as const] },
+  content: 'Excel skill content.',
+};
+const PPT_SKILL = {
+  metadata: { name: 'PPT Helper', description: 'PPT skill.', version: '1.0.0', tags: [], hosts: ['powerpoint' as const] },
+  content: 'PPT skill content.',
+};
+const UNIVERSAL_SKILL = {
+  metadata: { name: 'Universal', description: 'Works everywhere.', version: '1.0.0', tags: [], hosts: [] },
+  content: 'Universal content.',
+};
 
 describe('Integration: SkillPicker', () => {
   it('renders skill button', () => {
@@ -22,119 +44,104 @@ describe('Integration: SkillPicker', () => {
     expect(screen.getByLabelText('Agent skills')).toBeInTheDocument();
   });
 
-  it('shows skills in popover', async () => {
+  it('shows empty state when no plugin skills', async () => {
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
-    // Section header is now "Built-in" (renamed from "Skills" to support plugin sections)
-    expect(screen.getByText('Built-in')).toBeInTheDocument();
+    expect(screen.getByText('No skills available yet.')).toBeInTheDocument();
   });
 
-  it('skills are enabled (aria-pressed=true) by default', async () => {
+  it('shows skills section when plugin skills are added to store', async () => {
+    useSettingsStore.getState().setPluginSkills([EXCEL_SKILL]);
+
+    renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+
+    expect(screen.getByText('Skills')).toBeInTheDocument();
+    expect(screen.getByText('Excel Helper')).toBeInTheDocument();
+  });
+
+  it('filters out skills that do not match the current host', async () => {
+    useSettingsStore.getState().setPluginSkills([EXCEL_SKILL, PPT_SKILL, UNIVERSAL_SKILL]);
+    // host = excel — should see Excel Helper + Universal, NOT PPT Helper
+    renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+
+    expect(screen.getByText('Excel Helper')).toBeInTheDocument();
+    expect(screen.getByText('Universal')).toBeInTheDocument();
+    expect(screen.queryByText('PPT Helper')).not.toBeInTheDocument();
+  });
+
+  it('shows all skills with empty hosts on any host', async () => {
+    mockDetectOfficeHost.mockReturnValue('word');
+    useSettingsStore.getState().setPluginSkills([UNIVERSAL_SKILL, EXCEL_SKILL]);
+
+    renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+
+    expect(screen.getByText('Universal')).toBeInTheDocument();
+    expect(screen.queryByText('Excel Helper')).not.toBeInTheDocument();
+  });
+
+  it('all skills are enabled (aria-pressed=true) by default', async () => {
+    useSettingsStore.getState().setPluginSkills([EXCEL_SKILL, UNIVERSAL_SKILL]);
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
     const buttons = screen.getAllByRole('button', { pressed: true });
-    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('clicking a skill toggles it off and stores it as disabled', async () => {
+    useSettingsStore.getState().setPluginSkills([EXCEL_SKILL]);
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
-    const skillButtons = screen.getAllByRole('button', { pressed: true });
-    const firstSkill = skillButtons[0];
-    const skillName = firstSkill.querySelector('.font-medium')?.textContent ?? '';
+    const skillBtn = screen.getByText('Excel Helper').closest('button')!;
+    await userEvent.click(skillBtn);
 
-    await userEvent.click(firstSkill);
-
-    expect(useSettingsStore.getState().disabledSkillNames).toContain(skillName);
+    expect(useSettingsStore.getState().disabledSkillNames).toContain('Excel Helper');
+    expect(skillBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('clicking a disabled skill re-enables it', async () => {
+    useSettingsStore.getState().setPluginSkills([EXCEL_SKILL]);
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
 
-    const skillButtons = screen.getAllByRole('button', { pressed: true });
-    const firstSkill = skillButtons[0];
+    const skillBtn = screen.getByText('Excel Helper').closest('button')!;
+    await userEvent.click(skillBtn); // disable
+    await userEvent.click(skillBtn); // re-enable
 
-    // Disable then re-enable
-    await userEvent.click(firstSkill);
-    await userEvent.click(firstSkill);
-
-    expect(firstSkill).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('shows "Plugin" section when plugin skills are added to store', async () => {
-    const store = useSettingsStore.getState();
-    store.setPluginSkills([
-      {
-        metadata: {
-          name: 'SPT IQ Preflight',
-          description: 'Preflight account assessment skill.',
-          version: '1.0.0',
-          tags: [],
-          hosts: [],
-        },
-        content: 'Skill body content here.',
-      },
-    ]);
-
-    renderWithProviders(<SkillPicker />);
-    await userEvent.click(screen.getByLabelText('Agent skills'));
-
-    expect(screen.getByText('Plugin')).toBeInTheDocument();
-    expect(screen.getByText('SPT IQ Preflight')).toBeInTheDocument();
-  });
-
-  it('plugin skill is enabled by default and can be toggled', async () => {
-    const store = useSettingsStore.getState();
-    store.setPluginSkills([
-      {
-        metadata: {
-          name: 'Test Plugin Skill',
-          description: 'A test plugin skill.',
-          version: '1.0.0',
-          tags: [],
-          hosts: [],
-        },
-        content: 'Content.',
-      },
-    ]);
-
-    renderWithProviders(<SkillPicker />);
-    await userEvent.click(screen.getByLabelText('Agent skills'));
-
-    // Find the plugin skill by its visible label text
-    const skillLabel = screen.getByText('Test Plugin Skill');
-    const skillBtn = skillLabel.closest('button')!;
+    expect(useSettingsStore.getState().disabledSkillNames).not.toContain('Excel Helper');
     expect(skillBtn).toHaveAttribute('aria-pressed', 'true');
+  });
 
+  it('badge shows disabled count when a skill is toggled off', async () => {
+    useSettingsStore.getState().setPluginSkills([EXCEL_SKILL, UNIVERSAL_SKILL]);
+    renderWithProviders(<SkillPicker />);
+    await userEvent.click(screen.getByLabelText('Agent skills'));
+
+    // Disable one skill — badge should appear showing 1 of 2 enabled
+    const skillBtn = screen.getByText('Excel Helper').closest('button')!;
     await userEvent.click(skillBtn);
 
-    expect(useSettingsStore.getState().disabledSkillNames).toContain('Test Plugin Skill');
+    expect(screen.getByLabelText('1 of 2 skills enabled')).toBeInTheDocument();
   });
 
   it('re-renders when store.setPluginSkills() is called after initial render', async () => {
     const { rerender } = renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
-    expect(screen.queryByText('Plugin')).not.toBeInTheDocument();
+    expect(screen.queryByText('Skills')).not.toBeInTheDocument();
 
-    // Simulate plugin.skills notification arriving after session start
     useSettingsStore.getState().setPluginSkills([
       {
-        metadata: {
-          name: 'Dynamic Plugin Skill',
-          description: 'Arrives via notification.',
-          version: '1.0.0',
-          tags: [],
-          hosts: [],
-        },
+        metadata: { name: 'Dynamic Plugin Skill', description: 'Arrives via notification.', version: '1.0.0', tags: [], hosts: [] },
         content: 'Content.',
       },
     ]);
     rerender(<SkillPicker />);
 
-    expect(screen.getByText('Plugin')).toBeInTheDocument();
+    expect(screen.getByText('Skills')).toBeInTheDocument();
     expect(screen.getByText('Dynamic Plugin Skill')).toBeInTheDocument();
   });
 });

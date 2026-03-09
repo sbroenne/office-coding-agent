@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
-import { getBundledSkills } from '@/services/skills';
 import { detectOfficeHost } from '@/services/office/host';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { AgentSkill } from '@/types/skill';
@@ -14,15 +13,10 @@ export const SkillPicker: React.FC = () => {
   const pluginSkills = useSettingsStore(s => s.pluginSkills);
 
   const host = detectOfficeHost();
-  const bundledSkills = getBundledSkills().filter(
+
+  const allSkills = pluginSkills.filter(
     s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
   );
-
-  const visiblePluginSkills = pluginSkills.filter(
-    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
-  );
-
-  const allSkills = [...bundledSkills, ...visiblePluginSkills];
   const enabledCount = allSkills.filter(s => !disabledSkillNames.includes(s.metadata.name)).length;
 
   const renderSkillRow = (skill: AgentSkill) => {
@@ -88,34 +82,14 @@ export const SkillPicker: React.FC = () => {
             sideOffset={4}
             align="start"
           >
-            {bundledSkills.length === 0 && visiblePluginSkills.length === 0 ? (
+            {allSkills.length === 0 ? (
               <div className="px-2 py-2 text-xs text-muted-foreground">
                 No skills available yet.
               </div>
             ) : (
               <>
-                {bundledSkills.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                      Built-in
-                    </div>
-                    {bundledSkills.map(renderSkillRow)}
-                  </>
-                )}
-
-                {visiblePluginSkills.length > 0 && (
-                  <>
-                    <div
-                      className={cn(
-                        'px-2 py-1.5 text-xs font-medium text-muted-foreground',
-                        bundledSkills.length > 0 && 'mt-1 border-t border-border pt-1'
-                      )}
-                    >
-                      Plugin
-                    </div>
-                    {visiblePluginSkills.map(renderSkillRow)}
-                  </>
-                )}
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Skills</div>
+                {allSkills.map(renderSkillRow)}
               </>
             )}
           </Popover.Content>

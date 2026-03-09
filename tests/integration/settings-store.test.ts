@@ -102,6 +102,26 @@ describe('settingsStore — skills', () => {
     useSettingsStore.getState().reset();
     expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
   });
+
+  it('setPluginSkills populates pluginSkills', () => {
+    const skill = {
+      metadata: { name: 'test-skill', description: 'A skill', version: '1.0.0', tags: [], hosts: [] as import('@/types/agent').AgentHost[] },
+      content: 'content',
+    };
+    useSettingsStore.getState().setPluginSkills([skill]);
+    expect(useSettingsStore.getState().pluginSkills).toHaveLength(1);
+    expect(useSettingsStore.getState().pluginSkills[0].metadata.name).toBe('test-skill');
+  });
+
+  it('reset clears pluginSkills', () => {
+    const skill = {
+      metadata: { name: 'test-skill', description: 'A skill', version: '1.0.0', tags: [], hosts: [] as import('@/types/agent').AgentHost[] },
+      content: 'content',
+    };
+    useSettingsStore.getState().setPluginSkills([skill]);
+    useSettingsStore.getState().reset();
+    expect(useSettingsStore.getState().pluginSkills).toHaveLength(0);
+  });
 });
 
 // ─── MCP server management ───

@@ -1,25 +1,5 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
 import type { AgentHost } from '@/types/agent';
-import type { OfficeHostApp } from '@/services/office/host';
-
-// Bundled skill imports — one per host-specific skill directory
-import excelSkillRaw from '@/skills/excel/SKILL.md';
-import powerpointSkillRaw from '@/skills/powerpoint/SKILL.md';
-import powerpointChartsSkillRaw from '@/skills/powerpoint/CHARTS_SKILL.md';
-import powerpointSpeakerNotesSkillRaw from '@/skills/powerpoint/SPEAKER_NOTES_SKILL.md';
-import powerpointDeckBuilderSkillRaw from '@/skills/powerpoint-deck-builder/SKILL.md';
-import powerpointFormattingSkillRaw from '@/skills/powerpoint-formatting/SKILL.md';
-import powerpointDeckArchetypesSkillRaw from '@/skills/powerpoint/DECK_ARCHETYPES_SKILL.md';
-import powerpointDesignSkillRaw from '@/skills/powerpoint/DESIGN_SKILL.md';
-import powerpointRedesignSkillRaw from '@/skills/powerpoint-redesign/SKILL.md';
-import wordSkillRaw from '@/skills/word/SKILL.md';
-import wordDocumentBuilderSkillRaw from '@/skills/word-document-builder/SKILL.md';
-import wordFormattingSkillRaw from '@/skills/word-formatting/SKILL.md';
-import wordTablesSkillRaw from '@/skills/word-tables/SKILL.md';
-import outlookSkillRaw from '@/skills/outlook/SKILL.md';
-import outlookCalendarSkillRaw from '@/skills/outlook-calendar/SKILL.md';
-import outlookDraftingSkillRaw from '@/skills/outlook-drafting/SKILL.md';
-import outlookEmailAnalysisSkillRaw from '@/skills/outlook-email-analysis/SKILL.md';
 
 /**
  * Parse YAML frontmatter from a skill markdown file.
@@ -160,97 +140,6 @@ function setMetadataField(metadata: SkillMetadata, key: string, value: string): 
       metadata.documentation = value;
       break;
   }
-}
-
-function loadBundledSkills(): AgentSkill[] {
-  const bundledRawSkills = [
-    excelSkillRaw,
-    powerpointSkillRaw,
-    powerpointChartsSkillRaw,
-    powerpointSpeakerNotesSkillRaw,
-    powerpointDeckBuilderSkillRaw,
-    powerpointDeckArchetypesSkillRaw,
-    powerpointDesignSkillRaw,
-    powerpointFormattingSkillRaw,
-    powerpointRedesignSkillRaw,
-    wordSkillRaw,
-    wordDocumentBuilderSkillRaw,
-    wordFormattingSkillRaw,
-    wordTablesSkillRaw,
-    outlookSkillRaw,
-    outlookCalendarSkillRaw,
-    outlookDraftingSkillRaw,
-    outlookEmailAnalysisSkillRaw,
-  ];
-
-  const loaded = bundledRawSkills.map(raw => {
-    const parsed = parseFrontmatter(raw);
-    return { metadata: parsed.metadata, content: parsed.content };
-  });
-
-  return loaded.sort((left, right) => left.metadata.name.localeCompare(right.metadata.name));
-}
-
-const bundledSkills: AgentSkill[] = loadBundledSkills();
-let importedSkills: AgentSkill[] = [];
-
-export function getBundledSkills(): AgentSkill[] {
-  return bundledSkills;
-}
-
-export function getImportedSkills(): AgentSkill[] {
-  return importedSkills;
-}
-
-export function setImportedSkills(skills: AgentSkill[]): void {
-  importedSkills = skills;
-}
-
-/**
- * Get all loaded agent skills.
- */
-export function getSkills(): AgentSkill[] {
-  return [...bundledSkills, ...importedSkills];
-}
-
-/**
- * Get a single skill by name.
- */
-export function getSkill(name: string): AgentSkill | undefined {
-  return getSkills().find(s => s.metadata.name === name);
-}
-
-/**
- * Build the combined skill context string for injection into the system prompt.
- * @param activeNames — if provided, only include skills whose names are in this list.
- *                       If omitted or empty, all bundled skills are included.
- * @param host — if provided, only include skills compatible with this host.
- *               Skills with empty hosts array are included for all hosts.
- * Returns an empty string if no skills match.
- */
-export function buildSkillContext(activeNames?: string[], host?: OfficeHostApp): string {
-  let skills = getSkills();
-
-  // Filter to active names if provided (empty array = none active)
-  if (activeNames !== undefined) {
-    skills = skills.filter(s => activeNames.includes(s.metadata.name));
-  }
-
-  // Filter by host if provided (empty hosts = available to all hosts)
-  if (host) {
-    skills = skills.filter(
-      s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost)
-    );
-  }
-
-  if (skills.length === 0) return '';
-
-  const sections = skills.map(
-    skill =>
-      `\n\n---\n## Agent Skill: ${skill.metadata.name}\n${skill.metadata.description}\n\n${skill.content}`
-  );
-
-  return `\n\n# Agent Skills\nThe following agent skills provide domain-specific knowledge. Use them to help the user with specialized tasks.${sections.join('')}`;
 }
 
 /** Serialize a skill to its YAML-frontmatter markdown format. */

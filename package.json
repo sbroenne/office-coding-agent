@@ -162,7 +162,6 @@
       "src/tray/**/*",
       "src/server-prod.mjs",
       "src/copilotProxy.mjs",
-      "src/skills/**/*",
       "assets/**/*",
       "package.json"
     ],

@@ -4,7 +4,6 @@ import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websoc
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { getImportedSkills, skillToMarkdown } from '@/services/skills';
 import { resolveActiveAgent, getAgents, SUPPORTED_AGENT_HOSTS } from '@/services/agents';
 import { toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
@@ -286,15 +285,6 @@ export function useOfficeChat(host: OfficeHostApp) {
         // Memory store not available — continue without memories
       }
 
-      // Build imported skill payloads for the proxy to write to disk
-      const importedHostSkills = getImportedSkills().filter(
-        s => s.metadata.hosts.length === 0 || s.metadata.hosts.includes(host as AgentHost)
-      );
-      const skills = importedHostSkills.map(s => ({
-        name: s.metadata.name,
-        content: skillToMarkdown(s),
-      }));
-
       // Build custom agent configs for ALL agents in this host — this enables sub-agent
       // delegation where the active agent can invoke other agents as sub-agents.
       // Each agent carries its own tool allowlist so per-agent restrictions are enforced
@@ -332,7 +322,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           tools: getToolsForHost(host),
           mcpServers,
           host,
-          skills,
           disabledSkills,
           customAgents,
         }),

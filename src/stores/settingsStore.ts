@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CopilotModel, UserSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
 import { getAllAgents, setImportedAgents } from '@/services/agents';
-import { setImportedSkills } from '@/services/skills';
 import type { AgentSkill } from '@/types/skill';
 import type { AgentConfig } from '@/types/agent';
 import type { PluginPrompt } from '@/types/plugin';
@@ -97,7 +96,6 @@ export const useSettingsStore = create<SettingsState>()(
 
       setPluginSkills: skills => {
         set({ pluginSkills: skills });
-        setImportedSkills(skills);
       },
 
       setPluginPrompts: prompts => {
@@ -135,7 +133,6 @@ export const useSettingsStore = create<SettingsState>()(
       // ─── Reset ───
       reset: () => {
         set({ ...DEFAULT_SETTINGS, pluginAgents: [], pluginSkills: [], pluginPrompts: [] });
-        setImportedSkills([]);
         setImportedAgents([]);
       },
     }),

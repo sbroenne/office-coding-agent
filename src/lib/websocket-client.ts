@@ -46,12 +46,6 @@ export interface PermissionRequestPayload {
   };
 }
 
-/** Skill data sent from browser to proxy for writing to disk. */
-export interface SkillPayload {
-  name: string;
-  content: string;
-}
-
 /** Custom agent config sent from browser to proxy. */
 export interface CustomAgentPayload {
   name: string;
@@ -66,8 +60,6 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   tools?: Tool[];
   /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
   host?: string;
-  /** Imported skill files for the proxy to write to disk and pass as skillDirectories. */
-  skills?: SkillPayload[];
   /** Skill names to disable (SDK disabledSkills). */
   disabledSkills?: string[];
   /** Custom agent configs passed natively to the SDK. */
@@ -341,7 +333,6 @@ export class WebSocketCopilotClient {
       mcpServers: config.mcpServers,
       availableTools: config.availableTools,
       host: config.host,
-      skills: config.skills,
       disabledSkills: config.disabledSkills,
       customAgents: config.customAgents,
       pluginConfigPath: config.pluginConfigPath,
