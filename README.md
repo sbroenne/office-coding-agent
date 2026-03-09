@@ -1,6 +1,8 @@
 # Office Coding Agent
 
-An Office add-in that embeds GitHub Copilot as an AI assistant in Excel, PowerPoint, Word, and Outlook. Built with React, Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). The Copilot SDK integration architecture is based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office). Requires an active GitHub Copilot subscription — no API keys or endpoint configuration needed.
+An Office add-in that brings GitHub Copilot directly into Excel, PowerPoint, Word, and Outlook — with full support for **[Copilot CLI plugins](https://docs.github.com/en/copilot/reference/cli-plugin-reference)**. Install any plugin and its agents, skills, prompts, and MCP servers instantly appear in the task pane. No API keys, no configuration — just sign in with your GitHub account.
+
+Built with React, Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). Architecture based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office).
 
 > **Research Project Disclaimer**
 >
@@ -20,24 +22,37 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 
 ## Features
 
+### 🔌 Copilot CLI Plugin Support
+
+The add-in is a first-class **Copilot CLI plugin host**. Install any plugin and its content surfaces automatically in the UI — no restart, no configuration:
+
+```bash
+copilot plugin add <plugin-name>
+```
+
+- **Agents** from plugins appear in the **Agent picker**
+- **Skills** from plugins appear in the **Skill picker** and are injected as context
+- **Prompts** from plugins appear in the **`/` slash command menu**
+- **MCP servers** from plugins are connected automatically
+- **Plugin Hub** — browse, install, update, and remove plugins directly from the task pane
+
+### 🤖 AI Chat in Office
+
 - **GitHub Copilot authentication** — sign in once with your GitHub account; no API keys or endpoint config
-- **Host-routed tools** — Excel, PowerPoint, Word, and Outlook toolsets selected by current Office host
+- **VS Code–style chat UI** — identical look and feel to GitHub Copilot in VS Code (design tokens, codicons, shimmer thinking indicator, per-phase Working boxes)
+- **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
+- **Agent picker** — switch between host-targeted agents (bundled + from plugins)
+- **Skill picker** — toggle context skills on/off (bundled + from plugins)
+- **Streaming responses** — real-time token streaming with Copilot-style progress indicators
+
+### 📊 Office Host Tools
+
 - **10 Excel tool groups** — range, table, chart, sheet, workbook, comment, conditional format, data validation, pivot table, range format — covering ~83 actions
 - **24 PowerPoint tools** — slides, shapes, text, images, tables, charts, notes, layouts; includes visual QA with `get_slide_image` region cropping for overflow detection
 - **35 Word tools** — documents, paragraphs, tables, images, headers/footers, styles, comments, sections, fields, content controls
 - **22 Outlook tools** — emails, calendar, contacts, folders, attachments, categories, search, flags, drafts
-- **Agent system** — host-targeted agents with YAML frontmatter (`hosts`, `defaultForHosts`)
-- **Skills system** — bundled skill files inject context into the system prompt, toggleable via SkillPicker
-- **Copilot CLI plugin support** — install any Copilot CLI plugin (`copilot plugin add <name>`) and its agents, skills, prompts, and MCP servers automatically appear in the UI
-- **Plugin Hub** — browse, install, and manage Copilot CLI plugins directly from the task pane
-- **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
-- **Streaming responses** — real-time token streaming with Copilot-style progress indicators
-- **Auto-scroll chat** — thread stays pinned to newest content so follow-up output remains visible
+- **Host-routed tools** — the correct toolset is selected automatically based on the current Office host
 - **Web fetch tool** — proxied through the local server to avoid CORS restrictions
-
-## Agent Skills Format
-
-A skill is a folder containing `SKILL.md`. Optional supporting docs live under `references/` inside that skill folder. Skills are distributed as [Copilot CLI plugins](https://docs.github.com/en/copilot/reference/cli-plugin-reference).
 
 ## Prerequisites
 
