@@ -7,11 +7,7 @@ import { detectOfficeHost } from '@/services/office/host';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { AgentSkill } from '@/types/skill';
 
-interface SkillPickerProps {
-  onOpenPanel?: (panel: string) => void;
-}
-
-export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
+export const SkillPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
   const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
@@ -122,18 +118,6 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({ onOpenPanel }) => {
                 )}
               </>
             )}
-
-            <div className="mt-1 border-t border-border pt-1">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  onOpenPanel?.('plugins');
-                }}
-                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <span>Manage plugins…</span>
-              </button>
-            </div>
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>

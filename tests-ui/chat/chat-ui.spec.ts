@@ -27,13 +27,12 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
-  test('Plugins button appears exactly once — no duplicate icon in input toolbar', async ({
+  test('Plugins button is NOT present — plugin management is done via CLI', async ({
     configuredTaskpane: page,
   }) => {
-    // There must be exactly ONE "Plugins" button (in the header).
-    // The toolbar uses a separate "MCP servers" button with a server icon.
+    // Plugin Hub was removed — users manage plugins via `copilot plugin add/update/remove`
     const pluginsButtons = page.getByRole('button', { name: 'Plugins' });
-    await expect(pluginsButtons).toHaveCount(1);
+    await expect(pluginsButtons).toHaveCount(0);
   });
 
   test('MCP servers button is visible in the input toolbar', async ({
@@ -49,8 +48,8 @@ test.describe('Chat UI (configured state)', () => {
   }) => {
     await page.getByRole('button', { name: 'MCP servers' }).click();
     // Both bundled MCP servers must appear in the popover
-    await expect(page.getByText('workiq')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('powerbi')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: 'workiq' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: 'powerbi' })).toBeVisible({ timeout: 5000 });
   });
 
   test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
@@ -75,32 +74,22 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('plugin hub opens from agent picker manage button and closes', async ({
+  test('agent picker has no manage plugins button — plugin management is via CLI', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Select agent' }).click();
-
-    const managePlugins = page.getByRole('button', { name: 'Manage plugins…' });
-    await managePlugins.focus();
-    await page.keyboard.press('Enter');
-
-    await expect(page.getByText('Plugins').first()).toBeVisible();
-    await page.getByTitle('Close').click();
-    await expect(page.getByRole('button', { name: 'Select agent' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Manage plugins…' })).toHaveCount(0);
+    // Close the picker
+    await page.keyboard.press('Escape');
   });
 
-  test('plugin hub opens from skill picker manage button and closes', async ({
+  test('skill picker has no manage plugins button — plugin management is via CLI', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Agent skills' }).click();
-
-    const managePlugins = page.getByRole('button', { name: 'Manage plugins…' });
-    await managePlugins.focus();
-    await page.keyboard.press('Enter');
-
-    await expect(page.getByText('Plugins').first()).toBeVisible();
-    await page.getByTitle('Close').click();
-    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Manage plugins…' })).toHaveCount(0);
+    // Close the picker
+    await page.keyboard.press('Escape');
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({

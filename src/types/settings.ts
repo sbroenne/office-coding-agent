@@ -1,6 +1,4 @@
 import type { McpServerConfig } from './mcp';
-import type { AgentSkill } from './skill';
-import type { AgentConfig } from './agent';
 
 /** Provider labels for grouping models in the picker */
 export type ModelProvider = 'Anthropic' | 'OpenAI' | 'Google' | 'Other';
@@ -36,12 +34,6 @@ export interface UserSettings {
   disabledSkillNames: string[];
   /** MCP server names explicitly disabled by the user. Empty = all enabled. */
   disabledMcpServerNames: string[];
-  /** Skills uploaded by the user (persisted, written to disk on session create). */
-  importedSkills: AgentSkill[];
-  /** Agents uploaded by the user (persisted, merged into session agent list). */
-  importedAgents: AgentConfig[];
-  /** MCP servers uploaded by the user via JSON file (persisted, merged on session create). */
-  importedMcpServers: McpServerConfig[];
 }
 
 /** Default settings applied on first run */
@@ -50,9 +42,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   activeAgentId: 'Excel',
   disabledSkillNames: [],
   disabledMcpServerNames: [],
-  importedSkills: [],
-  importedAgents: [],
-  importedMcpServers: [],
 };
 
 /** Built-in MCP servers that ship with the add-in. Non-removable, but toggleable. */

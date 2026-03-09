@@ -14,7 +14,6 @@ interface ChatPanelProps {
   onEnqueue?: (text: string) => void;
   queuedPrompts?: string[];
   onDequeue?: (index: number) => void;
-  onOpenPanel?: (panel: string) => void;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -25,7 +24,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onEnqueue,
   queuedPrompts,
   onDequeue,
-  onOpenPanel,
 }) => {
   const pluginPrompts = useSettingsStore(s => s.pluginPrompts);
   const setActiveAgent = useSettingsStore(s => s.setActiveAgent);
@@ -50,11 +48,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         onAgentSelect={setActiveAgent}
         leftToolbar={
           <>
-            <AgentPicker onOpenPanel={onOpenPanel} />
+            <AgentPicker />
             <ModelPicker />
           </>
         }
-        rightToolbar={<McpPicker onOpenPanel={onOpenPanel} />}
+        rightToolbar={<McpPicker />}
       />
     </div>
   );

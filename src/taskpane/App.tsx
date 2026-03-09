@@ -4,7 +4,6 @@ import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { SlidePanel } from '@/components/SlidePanel';
-import PluginHub from '@/components/plugins/PluginHub';
 import { SessionHistoryPanel } from '@/components/SessionHistoryDialog';
 import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
 import { useSettingsStore } from '@/stores';
@@ -157,7 +156,6 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               onEnqueue={enqueue}
               queuedPrompts={queuedPrompts}
               onDequeue={dequeue}
-              onOpenPanel={setActivePanel}
             />
           </ChatErrorBoundary>
         </div>
@@ -183,16 +181,6 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
             {key === 'permissions' && <PermissionManagerPanel />}
           </SlidePanel>
         ))}
-
-        {/* Plugin Hub — has its own header/chrome, rendered as a direct overlay */}
-        <div
-          className={`absolute inset-0 z-50 will-change-transform transition-transform duration-300 ease-in-out ${
-            activePanel === 'plugins' ? 'translate-x-0' : 'translate-x-full'
-          }`}
-          aria-hidden={activePanel !== 'plugins'}
-        >
-          <PluginHub open={activePanel === 'plugins'} onClose={closePanel} />
-        </div>
       </div>
     </ChatActionsContext.Provider>
   );

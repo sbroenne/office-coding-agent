@@ -5,18 +5,15 @@
  * bundled skills. Verifies toggling skills on/off updates the store
  * and the badge reflects the enabled count.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
 import { SkillPicker } from '@/components/SkillPicker';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-const mockOpenPanel = vi.fn();
-
 beforeEach(() => {
   useSettingsStore.getState().reset();
-  mockOpenPanel.mockClear();
 });
 
 describe('Integration: SkillPicker', () => {
@@ -25,12 +22,11 @@ describe('Integration: SkillPicker', () => {
     expect(screen.getByLabelText('Agent skills')).toBeInTheDocument();
   });
 
-  it('shows skills and manage action in popover', async () => {
+  it('shows skills in popover', async () => {
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
     // Section header is now "Built-in" (renamed from "Skills" to support plugin sections)
     expect(screen.getByText('Built-in')).toBeInTheDocument();
-    expect(screen.getByText('Manage plugins…')).toBeInTheDocument();
   });
 
   it('skills are enabled (aria-pressed=true) by default', async () => {
@@ -66,17 +62,6 @@ describe('Integration: SkillPicker', () => {
     await userEvent.click(firstSkill);
 
     expect(firstSkill).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('calls onOpenPanel when manage plugins button is clicked', async () => {
-    renderWithProviders(<SkillPicker onOpenPanel={mockOpenPanel} />);
-    await userEvent.click(screen.getByLabelText('Agent skills'));
-
-    const manageButton = screen.getByRole('button', { name: /manage plugins/i });
-    manageButton.focus();
-    await userEvent.keyboard('{Enter}');
-
-    expect(mockOpenPanel).toHaveBeenCalledWith('plugins');
   });
 
   it('shows "Plugin" section when plugin skills are added to store', async () => {

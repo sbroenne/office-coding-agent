@@ -13,10 +13,6 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { getLocalApiBase } from '@/lib/api';
 import type { McpServerConfig } from '@/types/mcp';
 
-interface McpPickerProps {
-  onOpenPanel?: (panel: string) => void;
-}
-
 async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
   try {
     const res = await fetch(`${getLocalApiBase()}/api/mcp-servers`);
@@ -28,7 +24,7 @@ async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
   }
 }
 
-export const McpPicker: React.FC<McpPickerProps> = ({ onOpenPanel }) => {
+export const McpPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
@@ -127,19 +123,6 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onOpenPanel }) => {
               );
             })
           )}
-
-          <div className="mt-1 border-t border-border pt-1">
-            <button
-              onClick={() => {
-                setOpen(false);
-                onOpenPanel?.('plugins');
-              }}
-              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              <Codicon name="settings-gear" className="text-[11px]" />
-              <span>Manage MCP servers…</span>
-            </button>
-          </div>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
