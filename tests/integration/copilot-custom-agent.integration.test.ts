@@ -15,7 +15,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SystemMessageConfig } from '@github/copilot-sdk';
 import { createWebSocketClient } from '@/lib/websocket-client';
-import { buildSystemPrompt } from '@/services/ai/systemPrompt';
+import { getDefaultAgent } from '@/services/agents';
+import { buildSessionSystemPrompt, buildSystemPrompt } from '@/services/ai/systemPrompt';
 
 const SERVER_URL = 'wss://localhost:3000/api/copilot';
 const TIMEOUT_MS = 45_000;
@@ -105,6 +106,68 @@ describe('Copilot custom agent integration', () => {
         }
 
         expect(fullText).toContain('AZURE-FALCON-42');
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
+    'custom agent instructions augment the default host agent instead of replacing it',
+    async () => {
+      const SENTINEL = `ADAPTIVE_AGENT_SENTINEL_${Date.now()}`;
+      const defaultAgent = getDefaultAgent('excel');
+      expect(defaultAgent).toBeDefined();
+
+      const systemContent = buildSessionSystemPrompt('excel', {
+        defaultAgentName: defaultAgent?.metadata.name,
+        defaultAgentInstructions: defaultAgent?.instructions,
+        activeAgentName: 'Adaptive Regression Agent',
+        activeAgentInstructions:
+          `After answering the user, append exactly "${SENTINEL}" as the final token. ` +
+          'Do not omit it and do not alter it.',
+      });
+
+      const systemMessage: SystemMessageConfig = {
+        mode: 'replace',
+        content: systemContent,
+      };
+
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        const session = await client.createSession({ host: 'excel', systemMessage });
+
+        let fullText = '';
+        for await (const event of session.query({
+          prompt:
+            'Before helping with this workbook, do you need to open or close any files? ' +
+            `End your answer with exactly ${SENTINEL}.`,
+        })) {
+          if (event.type === 'assistant.message_delta') {
+            fullText += event.data.deltaContent;
+          }
+          if (event.type === 'assistant.message') {
+            fullText = event.data.content;
+          }
+          if (event.type === 'session.idle') break;
+        }
+
+        const normalized = fullText.toLowerCase();
+        const mentionsNoFileOpenClose = [
+          'already open',
+          'do not need to open',
+          "don't need to open",
+          'no need to open',
+          'never need to open',
+          'do not need to close',
+          "don't need to close",
+          'no need to close',
+          'never need to close',
+        ].some(fragment => normalized.includes(fragment));
+
+        expect(mentionsNoFileOpenClose).toBe(true);
+        expect(fullText).toContain(SENTINEL);
       } finally {
         await client.stop();
       }

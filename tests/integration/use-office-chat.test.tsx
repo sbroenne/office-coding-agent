@@ -14,6 +14,7 @@ import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
 import { setImportedAgents } from '@/services/agents';
+import type { AgentConfig } from '@/types/agent';
 
 // ─── Fake session builder ─────────────────────────────────────────────────────
 
@@ -743,7 +744,7 @@ describe('useOfficeChat', () => {
     expect(agents[0].prompt).toContain('AI assistant');
   });
 
-  it('systemMessage contains only base + app prompt, not agent instructions', async () => {
+  it('systemMessage includes host default agent instructions', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -756,11 +757,43 @@ describe('useOfficeChat', () => {
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
     const sysMsg = config.systemMessage as { content: string };
-    // Should NOT contain agent-specific instructions (those are in customAgents)
-    expect(sysMsg.content).not.toContain('The workbook is already open');
-    expect(sysMsg.content).not.toContain('Core Behavior');
-    // Should contain the base prompt
+    expect(sysMsg.content).toContain('## Host Agent Instructions');
+    expect(sysMsg.content).toContain('The workbook is already open');
     expect(sysMsg.content).toContain('Progress narration');
+  });
+
+  it('systemMessage layers custom agent instructions on top of the host default agent', async () => {
+    const importedAgent: AgentConfig = {
+      metadata: {
+        name: 'Adaptive Excel Coach',
+        description: 'Adds presentation coaching on top of Excel behavior',
+        version: '1.0.0',
+        hosts: ['excel'],
+        defaultForHosts: [],
+      },
+      instructions: 'Always explain insights with an executive-summary tone.',
+    };
+
+    setImportedAgents([importedAgent]);
+    useSettingsStore.getState().setActiveAgent('Adaptive Excel Coach');
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const sysMsg = config.systemMessage as { content: string };
+
+    expect(sysMsg.content).toContain('## Host Agent Instructions');
+    expect(sysMsg.content).toContain('The workbook is already open');
+    expect(sysMsg.content).toContain('## Adaptive Agent Instructions (Adaptive Excel Coach)');
+    expect(sysMsg.content).toContain('Always explain insights with an executive-summary tone.');
   });
 
   it('plugin.agents notification registers plugin agents as imported agents', async () => {
