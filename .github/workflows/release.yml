@@ -1,150 +1,220 @@
 # Release Pipeline
 #
 # Triggered manually via workflow_dispatch.
-# Calculates the next version from the latest git tag, bumps package.json,
-# builds the production add-in, creates a git tag, and publishes a GitHub Release.
+# Phase 1 ("prepare") creates a release PR with the version bump so branch
+# protection is respected.
+# Phase 2 ("publish"), after that PR is merged, builds from main, creates the
+# git tag, and publishes the GitHub Release.
 
 name: Release
 
 on:
-    workflow_dispatch:
-        inputs:
-            version_bump:
-                description: Version bump type
-                required: true
-                type: choice
-                default: patch
-                options:
-                    - patch
-                    - minor
-                    - major
-            custom_version:
-                description: "Optional: exact version to release (e.g. 1.2.3). Overrides version_bump."
-                required: false
-                type: string
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Release phase
+        required: true
+        type: choice
+        default: prepare
+        options:
+          - prepare
+          - publish
+      version_bump:
+        description: Version bump type
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      custom_version:
+        description: 'Optional: exact version to release (e.g. 1.2.3). Overrides version_bump.'
+        required: false
+        type: string
 
 permissions:
-    contents: write
+  contents: write
+  pull-requests: write
 
 jobs:
-    # ─── Calculate Version ───────────────────────────────────────
-    version:
-        name: Calculate Version
-        runs-on: ubuntu-latest
-        outputs:
-            version: ${{ steps.calc.outputs.version }}
-            tag: ${{ steps.calc.outputs.tag }}
+  # ─── Calculate Version ───────────────────────────────────────
+  version:
+    name: Calculate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.calc.outputs.version }}
+      tag: ${{ steps.calc.outputs.tag }}
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            - name: Calculate next version
-              id: calc
-              run: |
-                  if [ -n "${{ inputs.custom_version }}" ]; then
-                    VERSION="${{ inputs.custom_version }}"
-                  else
-                    LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-                    CURRENT="${LATEST#v}"
-                    MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-                    MINOR=$(echo "$CURRENT" | cut -d. -f2)
-                    PATCH=$(echo "$CURRENT" | cut -d. -f3)
-                    case "${{ inputs.version_bump }}" in
-                      major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-                      minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-                      patch) PATCH=$((PATCH+1)) ;;
-                    esac
-                    VERSION="$MAJOR.$MINOR.$PATCH"
-                  fi
-                  TAG="v$VERSION"
-                  if git rev-parse "$TAG" >/dev/null 2>&1; then
-                    echo "Tag $TAG already exists" && exit 1
-                  fi
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-                  echo "Releasing $TAG"
+      - name: Calculate next version
+        id: calc
+        run: |
+          if [ -n "${{ inputs.custom_version }}" ]; then
+            VERSION="${{ inputs.custom_version }}"
+          else
+            LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            CURRENT="${LATEST#v}"
+            MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+            MINOR=$(echo "$CURRENT" | cut -d. -f2)
+            PATCH=$(echo "$CURRENT" | cut -d. -f3)
+            case "${{ inputs.version_bump }}" in
+              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH+1)) ;;
+            esac
+            VERSION="$MAJOR.$MINOR.$PATCH"
+          fi
+          TAG="v$VERSION"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists" && exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG"
 
-    # ─── Build ───────────────────────────────────────────────────
-    build:
-        name: Build
-        needs: version
-        runs-on: ubuntu-latest
+  # ─── Build ───────────────────────────────────────────────────
+  build:
+    name: Build
+    needs: version
+    if: ${{ inputs.phase == 'publish' }}
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-                  cache: npm
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
-            - name: Install dependencies
-              run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-            - name: Build (production)
-              run: npm run build
+      - name: Build (production)
+        run: npm run build
 
-            - name: Package dist + manifests
-              run: |
-                  zip -r office-coding-agent-${{ needs.version.outputs.version }}.zip dist/ manifests/ taskpane.html
+      - name: Package dist + manifests
+        run: |
+          zip -r office-coding-agent-${{ needs.version.outputs.version }}.zip dist/ manifests/ taskpane.html
 
-            - name: Upload build artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: release-build
-                  path: office-coding-agent-*.zip
-                  retention-days: 7
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: office-coding-agent-*.zip
+          retention-days: 7
 
-    # ─── Tag & Version Bump ──────────────────────────────────────
-    create-tag:
-        name: Bump Version & Create Tag
-        needs: [version, build]
-        runs-on: ubuntu-latest
+  # ─── Prepare Release PR ──────────────────────────────────────
+  prepare-release-pr:
+    name: Prepare Release PR
+    needs: version
+    if: ${{ inputs.phase == 'prepare' }}
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-                  cache: npm
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
-            - name: Bump package.json version
-              run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version
+      - name: Bump package.json version
+        run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version
 
-            - name: Commit version bump & create tag
-              run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
-                  git add package.json package-lock.json
-                  git commit -m "chore: release ${{ needs.version.outputs.tag }}"
-                  git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
-                  git push origin HEAD:main --follow-tags
+      - name: Create release PR
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: release/${{ needs.version.outputs.tag }}
+          delete-branch: true
+          commit-message: 'chore: release ${{ needs.version.outputs.tag }}'
+          title: 'chore: release ${{ needs.version.outputs.tag }}'
+          body: |
+            ## Summary
+            - bump `package.json` and `package-lock.json` to `${{ needs.version.outputs.version }}`
+            - prepare the repository for release `${{ needs.version.outputs.tag }}`
 
-    # ─── GitHub Release ─────────────────────────────────────────
-    create-release:
-        name: Publish GitHub Release
-        needs: [version, create-tag]
-        runs-on: ubuntu-latest
+            ## Next steps
+            1. Review and **Squash and merge** this PR.
+            2. Re-run the `Release` workflow with:
+               - `phase: publish`
+               - `custom_version: ${{ needs.version.outputs.version }}`
 
-        steps:
-            - name: Download build artifact
-              uses: actions/download-artifact@v4
-              with:
-                  name: release-build
-                  path: release/
+      - name: Write summary
+        run: |
+          {
+            echo "## Release PR created"
+            echo ""
+            echo "- Version: \`${{ needs.version.outputs.version }}\`"
+            echo "- Tag: \`${{ needs.version.outputs.tag }}\`"
+            echo "- PR: ${{ steps.create-pr.outputs.pull-request-url }}"
+            echo ""
+            echo "After merging the PR with **Squash and merge**, run this workflow again with \`phase=publish\` and \`custom_version=${{ needs.version.outputs.version }}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-            - name: Create GitHub Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  tag_name: ${{ needs.version.outputs.tag }}
-                  name: ${{ needs.version.outputs.tag }}
-                  files: release/**
-                  generate_release_notes: true
+  # ─── Create Tag ──────────────────────────────────────────────
+  create-tag:
+    name: Create Tag
+    needs: [version, build]
+    if: ${{ inputs.phase == 'publish' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify package.json version matches release version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PACKAGE_VERSION" != "${{ needs.version.outputs.version }}" ]; then
+            echo "package.json version ($PACKAGE_VERSION) does not match requested release version (${{ needs.version.outputs.version }})." >&2
+            echo "Merge the release PR first, then re-run this workflow with phase=publish and custom_version=${{ needs.version.outputs.version }}." >&2
+            exit 1
+          fi
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
+          git push origin "${{ needs.version.outputs.tag }}"
+
+  # ─── GitHub Release ─────────────────────────────────────────
+  create-release:
+    name: Publish GitHub Release
+    needs: [version, create-tag]
+    if: ${{ inputs.phase == 'publish' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+          path: release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
+          files: release/**
+          generate_release_notes: true
