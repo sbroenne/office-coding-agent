@@ -4,13 +4,18 @@ import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websoc
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { resolveActiveAgent, getAgents, SUPPORTED_AGENT_HOSTS } from '@/services/agents';
+import {
+  resolveActiveAgent,
+  getDefaultAgent,
+  getAgents,
+  SUPPORTED_AGENT_HOSTS,
+} from '@/services/agents';
 import { toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
-import { buildSystemPrompt } from '@/services/ai/systemPrompt';
+import { buildSessionSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
 import type { AgentHost } from '@/types/agent';
@@ -270,20 +275,24 @@ export function useOfficeChat(host: OfficeHostApp) {
       });
 
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
-
-      // System prompt: base + app prompt + user memories
-      let systemContent = buildSystemPrompt(host);
+      const defaultAgent = getDefaultAgent(host);
+      let memoryContext = '';
 
       // Inject persistent user memories if any exist
       try {
         const { useMemoryStore } = await import('@/stores/memoryStore');
-        const memoryContext = useMemoryStore.getState().buildMemoryContext();
-        if (memoryContext) {
-          systemContent += `\n\n${memoryContext}`;
-        }
+        memoryContext = useMemoryStore.getState().buildMemoryContext().trim();
       } catch {
         // Memory store not available — continue without memories
       }
+
+      const systemContent = buildSessionSystemPrompt(host, {
+        defaultAgentName: defaultAgent?.metadata.name,
+        defaultAgentInstructions: defaultAgent?.instructions,
+        activeAgentName: resolvedAgent?.metadata.name,
+        activeAgentInstructions: resolvedAgent?.instructions,
+        memoryContext,
+      });
 
       // Build custom agent configs for ALL agents in this host — this enables sub-agent
       // delegation where the active agent can invoke other agents as sub-agents.

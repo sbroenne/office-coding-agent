@@ -7,6 +7,14 @@ import type { OfficeHostApp } from '@/services/office/host';
 
 export { BASE_PROMPT };
 
+interface SessionSystemPromptOptions {
+  defaultAgentName?: string;
+  defaultAgentInstructions?: string;
+  activeAgentName?: string;
+  activeAgentInstructions?: string;
+  memoryContext?: string;
+}
+
 export function getAppPromptForHost(host: OfficeHostApp): string {
   switch (host) {
     case 'excel':
@@ -24,4 +32,34 @@ export function getAppPromptForHost(host: OfficeHostApp): string {
 
 export function buildSystemPrompt(host: OfficeHostApp): string {
   return `${BASE_PROMPT}\n\n${getAppPromptForHost(host)}`;
+}
+
+export function buildSessionSystemPrompt(
+  host: OfficeHostApp,
+  options: SessionSystemPromptOptions = {}
+): string {
+  const sections = [buildSystemPrompt(host)];
+  const defaultInstructions = options.defaultAgentInstructions?.trim();
+  const activeInstructions = options.activeAgentInstructions?.trim();
+  const memoryContext = options.memoryContext?.trim();
+
+  if (defaultInstructions) {
+    sections.push(`## Host Agent Instructions\n\n${defaultInstructions}`);
+  }
+
+  if (
+    activeInstructions &&
+    options.activeAgentName &&
+    options.activeAgentName !== options.defaultAgentName
+  ) {
+    sections.push(
+      `## Adaptive Agent Instructions (${options.activeAgentName})\n\n${activeInstructions}`
+    );
+  }
+
+  if (memoryContext) {
+    sections.push(memoryContext);
+  }
+
+  return sections.join('\n\n');
 }

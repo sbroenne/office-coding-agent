@@ -1,1 +1,6 @@
-export { BASE_PROMPT, getAppPromptForHost, buildSystemPrompt } from './systemPrompt';
+export {
+  BASE_PROMPT,
+  getAppPromptForHost,
+  buildSystemPrompt,
+  buildSessionSystemPrompt,
+} from './systemPrompt';

@@ -5,7 +5,12 @@
  * src/services/ai/systemPrompt.ts.
  */
 import { describe, it, expect } from 'vitest';
-import { getAppPromptForHost, buildSystemPrompt, BASE_PROMPT } from '@/services/ai/systemPrompt';
+import {
+  getAppPromptForHost,
+  buildSessionSystemPrompt,
+  buildSystemPrompt,
+  BASE_PROMPT,
+} from '@/services/ai/systemPrompt';
 
 describe('Integration: systemPrompt', () => {
   describe('getAppPromptForHost', () => {
@@ -81,6 +86,54 @@ describe('Integration: systemPrompt', () => {
         const prompt = buildSystemPrompt(host);
         expect(prompt.length).toBeGreaterThan(BASE_PROMPT.length);
       }
+    });
+  });
+
+  describe('buildSessionSystemPrompt', () => {
+    it('includes host default agent instructions', () => {
+      const prompt = buildSessionSystemPrompt('powerpoint', {
+        defaultAgentName: 'PowerPoint',
+        defaultAgentInstructions: 'Always verify each slide before continuing.',
+      });
+
+      expect(prompt).toContain('## Host Agent Instructions');
+      expect(prompt).toContain('Always verify each slide before continuing.');
+    });
+
+    it('adds adaptive agent instructions when the active agent differs from the default', () => {
+      const prompt = buildSessionSystemPrompt('powerpoint', {
+        defaultAgentName: 'PowerPoint',
+        defaultAgentInstructions: 'Always verify each slide before continuing.',
+        activeAgentName: 'Storytelling Coach',
+        activeAgentInstructions: 'Prefer a narrative structure with one idea per slide.',
+      });
+
+      expect(prompt).toContain('## Host Agent Instructions');
+      expect(prompt).toContain('## Adaptive Agent Instructions (Storytelling Coach)');
+      expect(prompt).toContain('Prefer a narrative structure with one idea per slide.');
+    });
+
+    it('does not duplicate instructions when the active agent is the host default', () => {
+      const prompt = buildSessionSystemPrompt('powerpoint', {
+        defaultAgentName: 'PowerPoint',
+        defaultAgentInstructions: 'Always verify each slide before continuing.',
+        activeAgentName: 'PowerPoint',
+        activeAgentInstructions: 'Always verify each slide before continuing.',
+      });
+
+      expect(prompt).toContain('## Host Agent Instructions');
+      expect(prompt).not.toContain('## Adaptive Agent Instructions');
+    });
+
+    it('appends memory context after agent instructions', () => {
+      const prompt = buildSessionSystemPrompt('excel', {
+        defaultAgentName: 'Excel',
+        defaultAgentInstructions: 'Always inspect the workbook first.',
+        memoryContext: 'Remember: prefer concise summaries.',
+      });
+
+      expect(prompt).toContain('Remember: prefer concise summaries.');
+      expect(prompt.trim().endsWith('Remember: prefer concise summaries.')).toBe(true);
     });
   });
 });
