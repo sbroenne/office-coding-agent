@@ -34,7 +34,7 @@ copilot plugin add <plugin-name>
 - **Skills** from plugins appear in the **Skill picker** and are injected as context
 - **Prompts** from plugins appear in the **`/` slash command menu**
 - **MCP servers** from plugins are connected automatically
-- **Plugin Hub** — browse, install, update, and remove plugins directly from the task pane
+- **Plugin content auto-discovery** — installed plugin agents, skills, prompts, and MCP servers appear automatically in the task pane
 
 ### 🤖 AI Chat in Office
 
@@ -178,7 +178,7 @@ Integration tests run as part of the default `npm test` suite.
 
 ## E2E Testing
 
-The project includes end-to-end tests across all four Office hosts: ~233 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
+The project includes end-to-end tests across all four Office hosts: ~233 Excel tests, ~15 PowerPoint tests, ~14 Word tests, and ~8 Outlook tests (requiring Exchange sideloading approval).
 
 ### How It Works
 
@@ -302,7 +302,7 @@ Plugin file conventions (required by the Copilot CLI spec):
 
 > **Note:** Files with the wrong extension (e.g. `agents/my-agent.md` instead of `agents/my-agent.agent.md`) are silently ignored by the Copilot CLI.
 
-Plugin agents are automatically surfaced in the AgentPicker alongside bundled agents, and plugin skills appear in the SkillPicker. The **Plugin Hub** in the task pane lets you browse, install, and manage plugins without leaving Office.
+Plugin agents are automatically surfaced in the AgentPicker alongside bundled agents, and plugin skills appear in the SkillPicker. Manage plugins with the `copilot plugin` CLI commands shown above.
 
 #### Bundled Agents
 
