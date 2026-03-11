@@ -178,7 +178,7 @@ Integration tests run as part of the default `npm test` suite.
 
 ## E2E Testing
 
-The project includes end-to-end tests across all four Office hosts: ~232 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
+The project includes end-to-end tests across all four Office hosts: ~233 Excel tests (tools, settings persistence, AI round-trips), ~13 PowerPoint tests, ~12 Word tests, and Outlook tests (requiring Exchange sideloading approval).
 
 ### How It Works
 
@@ -298,7 +298,7 @@ Plugin file conventions (required by the Copilot CLI spec):
 | Skill | `skills/<name>/SKILL.md` | YAML frontmatter with optional `hosts` |
 | Prompt (slash command) | `prompts/<name>.prompt.md` | Appears in `/` slash menu |
 | MCP server config | `mcp.json` | Servers discovered automatically |
-| Plugin-level agent | `AGENT.md` | Uses the plugin name as agent ID |
+| Plugin-level agent | `agents/AGENT.md` | Uses the plugin name as agent ID |
 
 > **Note:** Files with the wrong extension (e.g. `agents/my-agent.md` instead of `agents/my-agent.agent.md`) are silently ignored by the Copilot CLI.
 
@@ -342,7 +342,7 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 - **TypeScript 5** — type safety
 - **Vitest** — integration testing
 - **Playwright** — browser UI testing for task pane flows
-- **Mocha** — E2E testing inside Excel Desktop (~232 tests)
+- **Mocha** — E2E testing inside Excel Desktop (~233 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
 - **ESLint + Prettier** — code quality
 
@@ -379,3 +379,4 @@ The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/
 ## License
 
 MIT
+
