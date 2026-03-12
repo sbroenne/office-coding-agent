@@ -106,9 +106,10 @@ This opens the Office application and injects the add-in. The task pane will app
 
 The task pane opens with an AI chat interface. Type a message to get started.
 
-- Use the **Agent picker** (bottom of the input bar) to switch agents.
+- Use the **Agent picker** (bottom of the input bar) to switch agents — includes agents from any installed Copilot CLI plugins.
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
-- Use the **Skill picker** (header icon) to toggle context skills on/off.
+- Use the **Skill picker** (header icon) to toggle context skills on/off — includes skills from installed plugins.
+- Use the `copilot plugin` CLI commands to install, update, or remove Copilot CLI plugins.
 - Use the **New Conversation** button (header) to reset the chat.
 
 ---

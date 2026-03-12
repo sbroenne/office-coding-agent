@@ -110,10 +110,10 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 | Host       | Directory            | Tests |
 | ---------- | -------------------- | ----- |
-| Excel      | `tests-e2e/`         | ~187  |
-| PowerPoint | `tests-e2e-ppt/`     | ~13   |
-| Word       | `tests-e2e-word/`    | ~12   |
-| Outlook    | `tests-e2e-outlook/` | ~9    |
+| Excel      | `tests-e2e/`         | ~233  |
+| PowerPoint | `tests-e2e-ppt/`     | ~15   |
+| Word       | `tests-e2e-word/`    | ~14   |
+| Outlook    | `tests-e2e-outlook/` | ~8    |
 
 **Real Office.js APIs, real host runtime.**
 
@@ -141,12 +141,13 @@ npm run test:integration
 npm run test:ui
 
 # E2E — requires Office host to be open
-npm run test:e2e          # Excel Desktop (~187 tests)
-npm run test:e2e:ppt      # PowerPoint Desktop (~13 tests)
-npm run test:e2e:word     # Word Desktop (~12 tests)
-npm run test:e2e:outlook  # Outlook Desktop (~9 tests; requires Exchange sideloading approval)
+npm run test:e2e          # Excel Desktop (~233 tests)
+npm run test:e2e:ppt      # PowerPoint Desktop (~15 tests)
+npm run test:e2e:word     # Word Desktop (~14 tests)
+npm run test:e2e:outlook  # Outlook Desktop (~8 tests; requires Exchange sideloading approval)
 npm run test:e2e:all      # All four suites in sequence
 
 # Validate manifest
 npm run validate
 ```
+
