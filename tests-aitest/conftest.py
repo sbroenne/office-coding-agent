@@ -33,7 +33,7 @@ if os.environ.get("AZURE_OPENAI_ENDPOINT") and not os.environ.get("AZURE_API_BAS
 DEFAULT_MODEL = "gpt-5-mini"
 DEFAULT_RPM = 10
 DEFAULT_TPM = 10000
-DEFAULT_MAX_TURNS = 5
+DEFAULT_MAX_TURNS = 10
 
 _PROJECT_ROOT = Path(__file__).parent.parent
 AITEST_MANIFEST_DIR = _PROJECT_ROOT / "tests-aitest" / "manifests"

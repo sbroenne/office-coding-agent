@@ -3,9 +3,10 @@
 Registers individual decomposed tools (e.g. ``get_range_values``,
 ``set_range_values``) backed by an in-memory :class:`ExcelSimulator`.
 
-The aggregate manifest (10 config-group tools) is loaded only for
-reference descriptions.  Tool schemas are derived from the simulator
-method signatures + the routing table's camelCase ↔ snake_case map.
+The aggregate manifest (10 config-group tools) is loaded at startup to
+provide rich tool and parameter descriptions. Tool schemas are still
+derived from the simulator method signatures + the routing table's
+camelCase ↔ snake_case map.
 
 Run as::
 
@@ -17,6 +18,7 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Annotated, Any, get_args, get_origin
@@ -144,6 +146,341 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
 # Params that the dispatch layer synthesises — exclude from the MCP schema.
 _DISPATCH_ONLY_PARAMS = {"rule_type", "validation_type"}
 
+# Individual tool name → (manifest tool, aggregate action, param aliases, fixed type)
+_TOOL_MANIFEST_ROUTE_MAP: dict[str, tuple[str, str | None, dict[str, str], str | None]] = {}
+
+
+def _add_manifest_routes(
+    manifest_tool: str,
+    route_actions: dict[str, str],
+    *,
+    param_aliases: dict[str, dict[str, str]] | None = None,
+    fixed_variants: dict[str, str] | None = None,
+) -> None:
+    """Register manifest metadata for decomposed MCP tools."""
+    alias_lookup = param_aliases or {}
+    variant_lookup = fixed_variants or {}
+    for tool_name, action in route_actions.items():
+        _TOOL_MANIFEST_ROUTE_MAP[tool_name] = (
+            manifest_tool,
+            action,
+            dict(alias_lookup.get(tool_name, {})),
+            variant_lookup.get(tool_name),
+        )
+
+
+_add_manifest_routes(
+    "range",
+    {
+        "get_range_values": "get_values",
+        "set_range_values": "set_values",
+        "get_used_range": "get_used",
+        "clear_range": "clear",
+        "set_range_formulas": "set_formulas",
+        "get_range_formulas": "get_formulas",
+        "sort_range": "sort",
+        "copy_range": "copy",
+        "find_values": "find",
+        "insert_range": "insert",
+        "delete_range": "delete",
+        "merge_cells": "merge",
+        "unmerge_cells": "unmerge",
+        "replace_values": "replace",
+        "remove_duplicates": "remove_duplicates",
+        "group_rows_columns": "group",
+        "ungroup_rows_columns": "ungroup",
+    },
+    param_aliases={
+        "copy_range": {
+            "sourceSheetName": "sourceSheet",
+            "destinationSheetName": "destinationSheet",
+        },
+        "find_values": {"searchValue": "searchText"},
+    },
+)
+
+_add_manifest_routes(
+    "range_format",
+    {
+        "format_range": "format",
+        "set_number_format": "set_number_format",
+        "auto_fit_columns": "auto_fit",
+        "auto_fit_rows": "auto_fit",
+        "set_hyperlink": "set_hyperlink",
+        "toggle_row_column_visibility": "toggle_visibility",
+        "set_cell_borders": "set_borders",
+    },
+    param_aliases={"set_number_format": {"formatCode": "format"}},
+)
+
+_add_manifest_routes(
+    "sheet",
+    {
+        "list_sheets": "list",
+        "create_sheet": "create",
+        "rename_sheet": "rename",
+        "delete_sheet": "delete",
+        "activate_sheet": "activate",
+        "freeze_panes": "freeze",
+        "protect_sheet": "protect",
+        "unprotect_sheet": "unprotect",
+        "set_sheet_visibility": "set_visibility",
+        "copy_sheet": "copy",
+        "move_sheet": "move",
+        "set_page_layout": "set_page_layout",
+    },
+)
+
+_add_manifest_routes(
+    "table",
+    {
+        "list_tables": "list",
+        "create_table": "create",
+        "add_table_rows": "add_rows",
+        "get_table_data": "get_data",
+        "delete_table": "delete",
+        "sort_table": "sort",
+        "filter_table": "filter",
+        "add_table_column": "add_column",
+        "delete_table_column": "delete_column",
+        "convert_table_to_range": "convert_to_range",
+        "clear_table_filters": "clear_filters",
+    },
+    param_aliases={"filter_table": {"values": "filterValues"}},
+)
+
+_add_manifest_routes(
+    "chart",
+    {
+        "list_charts": "list",
+        "create_chart": "create",
+        "delete_chart": "delete",
+        "set_chart_title": "configure",
+        "set_chart_type": "configure",
+        "set_chart_data_source": "configure",
+    },
+)
+
+_add_manifest_routes(
+    "workbook",
+    {
+        "get_workbook_info": "get_info",
+        "recalculate_workbook": "recalculate",
+        "get_selected_range": "get_selected_range",
+        "define_named_range": "define_named_range",
+        "list_named_ranges": "list_named_ranges",
+    },
+)
+
+_add_manifest_routes(
+    "comment",
+    {
+        "add_comment": "add",
+        "list_comments": "list",
+        "edit_comment": "edit",
+        "delete_comment": "delete",
+    },
+    param_aliases={"edit_comment": {"newText": "text"}},
+)
+
+_add_manifest_routes(
+    "conditional_format",
+    {
+        "add_color_scale": "add",
+        "add_data_bar": "add",
+        "add_cell_value_format": "add",
+        "add_top_bottom_format": "add",
+        "add_contains_text_format": "add",
+        "add_custom_format": "add",
+        "list_conditional_formats": "list",
+        "clear_conditional_formats": "clear",
+    },
+    fixed_variants={
+        "add_color_scale": "colorScale",
+        "add_data_bar": "dataBar",
+        "add_cell_value_format": "cellValue",
+        "add_top_bottom_format": "topBottom",
+        "add_contains_text_format": "containsText",
+        "add_custom_format": "custom",
+    },
+)
+
+_add_manifest_routes(
+    "data_validation",
+    {
+        "set_list_validation": "set",
+        "set_number_validation": "set",
+        "set_date_validation": "set",
+        "set_text_length_validation": "set",
+        "set_custom_validation": "set",
+        "get_data_validation": "get",
+        "clear_data_validation": "clear",
+    },
+    fixed_variants={
+        "set_list_validation": "list",
+        "set_number_validation": "number",
+        "set_date_validation": "date",
+        "set_text_length_validation": "textLength",
+        "set_custom_validation": "custom",
+    },
+)
+
+_add_manifest_routes(
+    "pivot",
+    {
+        "list_pivot_tables": "list",
+        "refresh_pivot_table": "refresh",
+        "delete_pivot_table": "delete",
+        "create_pivot_table": "create",
+        "add_pivot_field": "add_field",
+        "remove_pivot_field": "remove_field",
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# Manifest description helpers
+# ---------------------------------------------------------------------------
+
+
+def _normalize_manifest_name(name: str) -> str:
+    """Normalize manifest tool names for lookup."""
+    return re.sub(r"[_\s]+", "", name).lower()
+
+
+def _extract_manifest_params(tool: dict[str, Any]) -> dict[str, Any]:
+    """Return the parameter schema mapping from a manifest tool entry."""
+    params = tool.get("params")
+    if isinstance(params, dict):
+        return params
+
+    input_schema = tool.get("inputSchema")
+    if isinstance(input_schema, dict):
+        properties = input_schema.get("properties")
+        if isinstance(properties, dict):
+            return properties
+
+    return {}
+
+
+def _load_manifest_lookup(manifest_path: Path) -> dict[str, dict[str, Any]]:
+    """Load the aggregate manifest into a normalized lookup table."""
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lookup: dict[str, dict[str, Any]] = {}
+    for tool in manifest.get("tools", []):
+        name = str(tool.get("name", "")).strip()
+        if not name:
+            continue
+
+        params = _extract_manifest_params(tool)
+        lookup[_normalize_manifest_name(name)] = {
+            "name": name,
+            "description": str(tool.get("description", "")).strip(),
+            "params": {
+                param_name: str(param_schema.get("description", "")).strip()
+                for param_name, param_schema in params.items()
+                if isinstance(param_schema, dict)
+            },
+        }
+    return lookup
+
+
+def _description_prefix(description: str) -> str:
+    """Return the shared prefix before action-specific manifest details."""
+    first_quote = description.find('"')
+    if first_quote == -1:
+        return description.strip()
+
+    prefix = description[:first_quote].strip()
+    prefix = re.sub(r"(?:Actions?:|Use action)\s*$", "", prefix, flags=re.IGNORECASE).strip()
+    return prefix
+
+
+def _extract_action_detail(description: str, action: str | None) -> str | None:
+    """Extract the action-specific detail text from an aggregate description."""
+    if not action:
+        return None
+
+    matches = list(re.finditer(r'"([^"]+)"', description))
+    for index, match in enumerate(matches):
+        if match.group(1) != action:
+            continue
+
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(description)
+        detail = description[match.end():end].strip()
+        detail = re.sub(r"^[,;:\s]+", "", detail)
+        detail = re.sub(r"^or\s+", "", detail, flags=re.IGNORECASE)
+
+        if detail.startswith("("):
+            close = detail.find(")")
+            if close != -1:
+                detail = detail[1:close].strip()
+            else:
+                detail = detail.strip("() ")
+        else:
+            detail = re.sub(r"^to\s+", "", detail, flags=re.IGNORECASE)
+            detail = re.sub(r"\s+(?:or|and)$", "", detail, flags=re.IGNORECASE)
+            detail = detail.rstrip(" ,.;")
+
+        return detail or None
+
+    return None
+
+
+def _build_tool_description(
+    tool_name: str,
+    manifest_tool: str,
+    manifest_description: str,
+    action: str | None,
+    fixed_variant: str | None,
+) -> str:
+    """Build a per-tool description from the aggregate manifest metadata."""
+    if not manifest_description:
+        return _humanize(tool_name)
+
+    prefix = _description_prefix(manifest_description)
+    detail = _extract_action_detail(manifest_description, action)
+    parts: list[str] = []
+
+    if prefix:
+        parts.append(prefix.rstrip("."))
+
+    if action:
+        if detail:
+            parts.append(f'Action "{action}": {detail.rstrip(".")}')
+        else:
+            parts.append(f'Action "{action}"')
+
+    if fixed_variant:
+        if manifest_tool == "conditional_format":
+            parts.append(f'Rule type is fixed to "{fixed_variant}"')
+        elif manifest_tool == "data_validation":
+            parts.append(f'Validation type is fixed to "{fixed_variant}"')
+
+    if not parts:
+        return manifest_description
+
+    return ". ".join(part.rstrip(".") for part in parts if part).strip() + "."
+
+
+def _resolve_manifest_param_description(
+    manifest_entry: dict[str, Any] | None,
+    param_name: str,
+    param_aliases: dict[str, str],
+) -> str | None:
+    """Resolve a parameter description from the manifest, honoring aliases."""
+    if not manifest_entry:
+        return None
+
+    manifest_param_name = param_aliases.get(param_name, param_name)
+    return manifest_entry.get("params", {}).get(manifest_param_name)
+
+
+def _humanize_param(name: str) -> str:
+    """Convert parameter names like ``sheetName`` into readable words."""
+    spaced = re.sub(r"(?<!^)(?=[A-Z])", " ", name).replace("_", " ")
+    return spaced.lower()
+
 
 # ---------------------------------------------------------------------------
 # camelCase ↔ snake_case helpers
@@ -269,16 +606,34 @@ def _humanize(name: str) -> str:
     return name.replace("_", " ").capitalize()
 
 
-def register_tools_from_routes() -> None:
+def register_tools_from_routes(manifest_path: Path) -> None:
     """Register individual tools from the routing table.
 
     Schemas are derived by inspecting the simulator method signatures and
-    reversing the camelCase→snake_case remap in each routing entry.
+    enriched with descriptions loaded from the aggregate tool manifest.
     """
+    manifest_lookup = _load_manifest_lookup(manifest_path)
+
     for tool_name, (method_name, remap) in _TOOL_ROUTES.items():
         method = getattr(_sim, method_name, None)
         if method is None:
             continue
+
+        manifest_entry: dict[str, Any] | None = None
+        manifest_param_aliases: dict[str, str] = {}
+        tool_description = _humanize(tool_name)
+        manifest_route = _TOOL_MANIFEST_ROUTE_MAP.get(tool_name)
+        if manifest_route:
+            manifest_tool, action, manifest_param_aliases, fixed_variant = manifest_route
+            manifest_entry = manifest_lookup.get(_normalize_manifest_name(manifest_tool))
+            if manifest_entry:
+                tool_description = _build_tool_description(
+                    tool_name,
+                    manifest_tool,
+                    manifest_entry.get("description", ""),
+                    action,
+                    fixed_variant,
+                )
 
         # Reverse remap: snake_case → camelCase
         reverse: dict[str, str] = {}
@@ -300,7 +655,9 @@ def register_tools_from_routes() -> None:
             ann = param.annotation if param.annotation is not inspect.Parameter.empty else str
             schema = _annotation_to_schema(ann)
             base_type = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list}.get(schema["type"], str)
-            desc = f"The {pname.replace('_', ' ')}"
+            desc = _resolve_manifest_param_description(manifest_entry, camel_name, manifest_param_aliases)
+            if not desc:
+                desc = f"The {_humanize_param(camel_name)}"
             extra = {"items": schema["items"]} if "items" in schema else None
 
             if param.default is not inspect.Parameter.empty:
@@ -322,11 +679,11 @@ def register_tools_from_routes() -> None:
         optional_params = [p for p in sig_params if p.default is not inspect.Parameter.empty]
 
         # Build handler closure
-        def make_handler(tn: str = tool_name) -> Any:
+        def make_handler(tn: str = tool_name, doc: str = tool_description) -> Any:
             def handler(**kwargs: Any) -> str:
                 return _dispatch(tn, kwargs)
             handler.__name__ = tn
-            handler.__doc__ = _humanize(tn)
+            handler.__doc__ = doc
             handler.__signature__ = inspect.Signature(required_params + optional_params, return_annotation=str)
             handler.__annotations__ = dict(annotations)
             return handler
@@ -346,7 +703,7 @@ def main() -> None:
         "--manifest",
         type=Path,
         default=Path(__file__).parent / "manifests" / "excel-tools-manifest.json",
-        help="Path to Excel aggregate manifest (kept for reference; tools are registered from routing table).",
+        help="Path to the Excel aggregate manifest used for tool and parameter descriptions.",
     )
     parser.add_argument(
         "--transport",
@@ -357,8 +714,8 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
 
-    # Register individual decomposed tools from routing table
-    register_tools_from_routes()
+    # Register individual decomposed tools from routing table + manifest descriptions
+    register_tools_from_routes(args.manifest)
     print(f"Registered {len(mcp._tool_manager._tools)} tools", file=sys.stderr)
 
     mcp.settings.host = args.host
