@@ -1,0 +1,421 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-15T13:30:20.690Z",
+  "host": "outlook",
+  "tools": [
+    {
+      "name": "get_mail_item",
+      "description": "Get an overview of the current mail item: subject, sender, recipients (to/cc/bcc), date, and item type (read or compose).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get_mail_body",
+      "description": "Get the full body content of the current mail item as HTML or plain text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "text"
+            ],
+            "description": "Body format to retrieve. Defaults to \"text\"."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_mail_attachments",
+      "description": "List all attachments on the current mail item with name, size, and content type. Does not download attachment content.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get_attachment_content",
+      "description": "Get the content of a specific attachment by index. Returns base64-encoded data for file attachments or item details for item attachments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "description": "Zero-based index of the attachment to retrieve."
+          }
+        },
+        "required": [
+          "index"
+        ]
+      }
+    },
+    {
+      "name": "set_mail_body",
+      "description": "Set or replace the body content of the current mail item. Only works in compose mode. Supports HTML or plain text.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The body content to set."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "html",
+              "text"
+            ],
+            "description": "Content format. Defaults to \"html\"."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "set_mail_subject",
+      "description": "Set the subject of the current mail item. Only works in compose mode.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "description": "The subject text to set."
+          }
+        },
+        "required": [
+          "subject"
+        ]
+      }
+    },
+    {
+      "name": "add_mail_recipient",
+      "description": "Add one or more recipients to the current mail item. Only works in compose mode. Specify the field (to, cc, or bcc).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "to",
+              "cc",
+              "bcc"
+            ],
+            "description": "Recipient field to add to."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "displayName": {
+                  "type": "string",
+                  "description": "Display name of the recipient."
+                },
+                "emailAddress": {
+                  "type": "string",
+                  "description": "Email address of the recipient."
+                }
+              },
+              "required": [
+                "emailAddress"
+              ]
+            },
+            "description": "Array of recipients to add."
+          }
+        },
+        "required": [
+          "field",
+          "recipients"
+        ]
+      }
+    },
+    {
+      "name": "reply_to_mail",
+      "description": "Create a reply to the current mail item with the given HTML content. Only works in read mode. Use replyAll to reply to all recipients.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "htmlBody": {
+            "type": "string",
+            "description": "HTML content for the reply body."
+          },
+          "replyAll": {
+            "type": "boolean",
+            "description": "If true, reply to all recipients. Defaults to false."
+          }
+        },
+        "required": [
+          "htmlBody"
+        ]
+      }
+    },
+    {
+      "name": "forward_mail",
+      "description": "Open a forward form for the current mail item with optional HTML content pre-filled. Only works in read mode.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "htmlBody": {
+            "type": "string",
+            "description": "Optional HTML content to prepend to the forwarded message."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_user_profile",
+      "description": "Get the current mailbox user profile information (name, email, time zone).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "add_file_attachment",
+      "description": "Add a file attachment to the current mail item by URL. Only works in compose mode. The file is downloaded from the URL by Outlook.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "uri": {
+            "type": "string",
+            "description": "The URL of the file to attach."
+          },
+          "attachmentName": {
+            "type": "string",
+            "description": "Display name for the attachment."
+          }
+        },
+        "required": [
+          "uri",
+          "attachmentName"
+        ]
+      }
+    },
+    {
+      "name": "remove_attachment",
+      "description": "Remove an attachment from the current mail item by its attachment ID. Only works in compose mode.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "attachmentId": {
+            "type": "string",
+            "description": "The ID of the attachment to remove."
+          }
+        },
+        "required": [
+          "attachmentId"
+        ]
+      }
+    },
+    {
+      "name": "get_mail_categories",
+      "description": "Get the categories (color labels) assigned to the current mail item.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "set_mail_categories",
+      "description": "Add categories (color labels) to the current mail item. Categories must be in the master category list.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of category names to add."
+          }
+        },
+        "required": [
+          "categories"
+        ]
+      }
+    },
+    {
+      "name": "remove_mail_categories",
+      "description": "Remove categories from the current mail item.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of category names to remove."
+          }
+        },
+        "required": [
+          "categories"
+        ]
+      }
+    },
+    {
+      "name": "add_notification",
+      "description": "Show an informational notification banner on the current mail item. The notification appears at the top of the reading pane or compose form.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Unique key to identify this notification (for later removal)."
+          },
+          "message": {
+            "type": "string",
+            "description": "Notification message text."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "informationalMessage",
+              "errorMessage",
+              "insightMessage"
+            ],
+            "description": "Notification type. Defaults to \"informationalMessage\"."
+          },
+          "persistent": {
+            "type": "boolean",
+            "description": "If true, notification persists until removed. Defaults to false."
+          }
+        },
+        "required": [
+          "key",
+          "message"
+        ]
+      }
+    },
+    {
+      "name": "remove_notification",
+      "description": "Remove a previously shown notification banner by its key.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key of the notification to remove."
+          }
+        },
+        "required": [
+          "key"
+        ]
+      }
+    },
+    {
+      "name": "save_draft",
+      "description": "Save the current compose item as a draft. Only works in compose mode.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get_mail_headers",
+      "description": "Get internet message headers of the current mail item including Message-ID, conversation ID, and item ID.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "display_new_message",
+      "description": "Open a new message compose form with optional pre-filled fields (to, cc, subject, body).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "toRecipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of email addresses for the To field."
+          },
+          "ccRecipients": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of email addresses for the CC field."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject line for the new message."
+          },
+          "htmlBody": {
+            "type": "string",
+            "description": "HTML body content for the new message."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "display_new_appointment",
+      "description": "Open a new appointment/meeting form with optional pre-filled fields (attendees, subject, body, start/end times, location).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "requiredAttendees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of email addresses for required attendees."
+          },
+          "optionalAttendees": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of email addresses for optional attendees."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject/title for the appointment."
+          },
+          "htmlBody": {
+            "type": "string",
+            "description": "HTML body/description for the appointment."
+          },
+          "location": {
+            "type": "string",
+            "description": "Location of the appointment."
+          },
+          "start": {
+            "type": "string",
+            "description": "Start date/time as ISO 8601 string."
+          },
+          "end": {
+            "type": "string",
+            "description": "End date/time as ISO 8601 string."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_diagnostics",
+      "description": "Get diagnostic information about the Outlook host (host name, version, platform).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  ]
+}

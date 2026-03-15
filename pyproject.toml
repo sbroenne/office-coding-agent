@@ -1,14 +1,21 @@
 [project]
-name = "excel-ai-addin-aitests"
+name = "office-coding-agent-skill-evals"
 version = "0.0.0"
-description = "AI agent integration tests for the Excel add-in"
+description = "Skill engineering evals for Office Coding Agent host tool suites"
 requires-python = ">=3.11"
 dependencies = [
-    "pytest-aitest>=0.2.0",
+    "pytest-skill-engineering>=0.1.0",
     "pytest-asyncio>=1.0.0",
-    "pytest-llm-assert>=0.2.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests-aitest"]
 asyncio_mode = "auto"
+markers = [
+    "integration: live LLM integration test",
+    "excel: Excel host AI test",
+    "powerpoint: PowerPoint host AI test",
+    "word: Word host AI test",
+    "outlook: Outlook host AI test",
+    "token_efficiency: token efficiency experiment",
+]

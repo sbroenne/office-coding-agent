@@ -66,6 +66,7 @@
     "audit:tools:bootstrap": "npx tsx scripts/bootstrap-tool-coverage-map.ts",
     "audit:tools": "npx tsx scripts/check-tool-coverage.ts",
     "audit:tools:strict": "npx tsx scripts/check-tool-coverage.ts --strict",
+    "manifest": "npx tsx scripts/generate-manifest.ts",
     "runtime-logging-enable": "office-addin-dev-settings runtime-log --enable",
     "runtime-logging-disable": "office-addin-dev-settings runtime-log --disable",
     "runtime-logging-show": "office-addin-dev-settings runtime-log",

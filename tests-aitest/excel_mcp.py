@@ -1,10 +1,15 @@
-"""Excel MCP server for integration testing with pytest-aitest.
+"""Excel MCP server for integration testing with pytest-skill-engineering.
 
-Reads tools-manifest.json to dynamically register MCP tools backed
-by an in-memory ExcelSimulator. This lets pytest-aitest tests exercise
-the same tool schemas the real Excel add-in exposes.
+Registers individual decomposed tools (e.g. ``get_range_values``,
+``set_range_values``) backed by an in-memory :class:`ExcelSimulator`.
 
-Run as: python tests-aitest/excel_mcp.py --manifest src/tools/tools-manifest.json
+The aggregate manifest (10 config-group tools) is loaded only for
+reference descriptions.  Tool schemas are derived from the simulator
+method signatures + the routing table's camelCase ↔ snake_case map.
+
+Run as::
+
+    python tests-aitest/excel_mcp.py --manifest tests-aitest/manifests/excel-tools-manifest.json
 """
 
 from __future__ import annotations
@@ -14,12 +19,13 @@ import inspect
 import json
 import sys
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, get_args, get_origin
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from excel_sim import ExcelSimulator
+from tool_result import ToolResult
 
 # ---------------------------------------------------------------------------
 # Server & simulator
@@ -29,11 +35,9 @@ mcp = FastMCP("excel-ai-addin-test-server")
 _sim = ExcelSimulator()
 
 # ---------------------------------------------------------------------------
-# Tool routing — maps manifest tool names to simulator methods
+# Tool routing — individual tool name → (simulator_method, camelCase→snake remap)
 # ---------------------------------------------------------------------------
 
-# Mapping from manifest tool name → (simulator_method_name, param_remapping)
-# Most tools map 1:1. Decomposed tools merge back into generic methods.
 _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     # Range
     "get_range_values": ("get_range_values", {"sheetName": "sheet_name", "maxRows": "max_rows", "maxColumns": "max_columns", "startRow": "start_row", "startColumn": "start_column"}),
@@ -104,7 +108,7 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     "list_comments": ("list_comments", {"sheetName": "sheet_name"}),
     "edit_comment": ("edit_comment", {"cellAddress": "cell_address", "newText": "new_text", "sheetName": "sheet_name"}),
     "delete_comment": ("delete_comment", {"cellAddress": "cell_address", "sheetName": "sheet_name"}),
-    # Conditional Format (decomposed → generic)
+    # Conditional Format (decomposed → generic add_conditional_format)
     "add_color_scale": ("add_conditional_format", None),
     "add_data_bar": ("add_conditional_format", None),
     "add_cell_value_format": ("add_conditional_format", None),
@@ -113,7 +117,7 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     "add_custom_format": ("add_conditional_format", None),
     "list_conditional_formats": ("list_conditional_formats", None),
     "clear_conditional_formats": ("clear_conditional_formats", None),
-    # Data Validation (decomposed → generic)
+    # Data Validation (decomposed → generic set_data_validation)
     "set_list_validation": ("set_data_validation", None),
     "set_number_validation": ("set_data_validation", None),
     "set_date_validation": ("set_data_validation", None),
@@ -137,16 +141,22 @@ _TOOL_ROUTES: dict[str, tuple[str, dict[str, str] | None]] = {
     "remove_pivot_field": ("remove_pivot_field", {"pivotTableName": "pivot_table_name", "fieldName": "field_name", "fieldType": "field_type"}),
 }
 
+# Params that the dispatch layer synthesises — exclude from the MCP schema.
+_DISPATCH_ONLY_PARAMS = {"rule_type", "validation_type"}
+
+
+# ---------------------------------------------------------------------------
+# camelCase ↔ snake_case helpers
+# ---------------------------------------------------------------------------
+
 
 def _remap_params(params: dict[str, Any], remap: dict[str, str] | None) -> dict[str, Any]:
-    """Remap camelCase param names from manifest to snake_case for Python methods."""
+    """Remap camelCase param names to snake_case for the simulator."""
     if not remap:
-        # Default: convert common camelCase patterns
         result = {}
         for k, v in params.items():
             if v is None:
                 continue
-            # Convert camelCase to snake_case
             snake = ""
             for i, c in enumerate(k):
                 if c.isupper() and i > 0:
@@ -159,9 +169,13 @@ def _remap_params(params: dict[str, Any], remap: dict[str, str] | None) -> dict[
     for k, v in params.items():
         if v is None:
             continue
-        key = remap.get(k, k)
-        result[key] = v
+        result[remap.get(k, k)] = v
     return result
+
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
 
 
 def _dispatch(tool_name: str, params: dict[str, Any]) -> str:
@@ -175,13 +189,14 @@ def _dispatch(tool_name: str, params: dict[str, Any]) -> str:
     if not method:
         return json.dumps({"error": f"Simulator has no method: {method_name}"})
 
-    # Special handling for decomposed conditional format tools
+    # Decomposed conditional-format tools → synthesise rule_type
     if tool_name.startswith("add_") and method_name == "add_conditional_format":
         rule_type = tool_name.replace("add_", "")
         py_params = _remap_params(params, remap)
         address = py_params.pop("address", "")
         sheet_name = py_params.pop("sheet_name", None)
         result = method(rule_type=rule_type, address=address, sheet_name=sheet_name, **py_params)
+    # Decomposed data-validation tools → synthesise validation_type
     elif tool_name.startswith("set_") and method_name == "set_data_validation":
         validation_type = tool_name.replace("set_", "").replace("_validation", "")
         py_params = _remap_params(params, remap)
@@ -192,111 +207,131 @@ def _dispatch(tool_name: str, params: dict[str, Any]) -> str:
         py_params = _remap_params(params, remap)
         result = method(**py_params)
 
-    if result.success:
-        return json.dumps(result.value, default=str)
-    return json.dumps({"error": result.error})
+    if isinstance(result, ToolResult):
+        if result.success:
+            return json.dumps(result.value, default=str)
+        return json.dumps({"error": result.error})
+    return json.dumps(result, default=str)
 
 
-def _load_manifest(manifest_path: Path) -> list[dict[str, Any]]:
-    """Load and return tools from the manifest file."""
-    with manifest_path.open() as f:
-        manifest = json.load(f)
-    return manifest["tools"]
+# ---------------------------------------------------------------------------
+# Schema introspection — derive MCP tool schemas from the simulator methods
+# ---------------------------------------------------------------------------
 
 
-def _build_tool_docstring(tool_def: dict[str, Any]) -> str:
-    """Build a Google-style docstring from manifest tool definition."""
-    doc = tool_def["description"] + "\n"
-    params = tool_def.get("params", {})
-    if params:
-        doc += "\nArgs:\n"
-        for name, param in params.items():
-            req = " (required)" if param.get("required", True) else " (optional)"
-            doc += f"    {name}: {param['description']}{req}\n"
-    return doc
+def _annotation_to_json_type(ann: Any) -> str:  # noqa: PLR0911
+    """Map a Python type annotation to a JSON Schema type string."""
+    if ann is str:
+        return "string"
+    if ann is int:
+        return "integer"
+    if ann is float:
+        return "number"
+    if ann is bool:
+        return "boolean"
+
+    origin = get_origin(ann)
+    if origin is list:
+        return "array"
+
+    # Handle Union / Optional (e.g. str | None)
+    if origin is type(str | None):
+        args = [a for a in get_args(ann) if a is not type(None)]
+        if args:
+            return _annotation_to_json_type(args[0])
+    return "string"
 
 
-def register_tools(manifest_path: Path) -> None:
-    """Register all manifest tools as MCP tools backed by the simulator."""
-    tools = _load_manifest(manifest_path)
+def _annotation_to_schema(ann: Any) -> dict[str, Any]:
+    """Build a mini JSON Schema for a single parameter annotation."""
+    origin = get_origin(ann)
 
-    for tool_def in tools:
-        tool_name = tool_def["name"]
+    # Handle Optional / Union types (e.g. str | None, list[str] | None)
+    if origin is type(str | None):
+        args = [a for a in get_args(ann) if a is not type(None)]
+        if args:
+            return _annotation_to_schema(args[0])
 
-        if tool_name not in _TOOL_ROUTES:
+    if origin is list:
+        inner = get_args(ann)
+        if inner:
+            inner_origin = get_origin(inner[0])
+            if inner_origin is list:
+                return {"type": "array", "items": {"type": "array"}}
+            return {"type": "array", "items": {"type": _annotation_to_json_type(inner[0])}}
+        return {"type": "array"}
+
+    return {"type": _annotation_to_json_type(ann)}
+
+
+def _humanize(name: str) -> str:
+    """``get_range_values`` → ``Get range values``."""
+    return name.replace("_", " ").capitalize()
+
+
+def register_tools_from_routes() -> None:
+    """Register individual tools from the routing table.
+
+    Schemas are derived by inspecting the simulator method signatures and
+    reversing the camelCase→snake_case remap in each routing entry.
+    """
+    for tool_name, (method_name, remap) in _TOOL_ROUTES.items():
+        method = getattr(_sim, method_name, None)
+        if method is None:
             continue
 
-        # Build the param signature for the tool
-        params_meta = tool_def.get("params", {})
+        # Reverse remap: snake_case → camelCase
+        reverse: dict[str, str] = {}
+        if remap:
+            reverse = {v: k for k, v in remap.items()}
 
-        # Create a closure-based handler
-        def make_handler(tn: str, pm: dict[str, Any]) -> Any:
-            """Create a tool handler closure."""
+        sig = inspect.signature(method)
+        sig_params: list[inspect.Parameter] = []
+        annotations: dict[str, Any] = {}
+
+        for pname, param in sig.parameters.items():
+            if pname == "self" or pname in _DISPATCH_ONLY_PARAMS:
+                continue
+            # Skip **kwargs
+            if param.kind == inspect.Parameter.VAR_KEYWORD:
+                continue
+
+            camel_name = reverse.get(pname, pname)
+            ann = param.annotation if param.annotation is not inspect.Parameter.empty else str
+            schema = _annotation_to_schema(ann)
+            base_type = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list}.get(schema["type"], str)
+            desc = f"The {pname.replace('_', ' ')}"
+            extra = {"items": schema["items"]} if "items" in schema else None
+
+            if param.default is not inspect.Parameter.empty:
+                pydantic_ann = Annotated[base_type, Field(default=None, description=desc, json_schema_extra=extra)]
+                sig_params.append(inspect.Parameter(
+                    camel_name, inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    default=None, annotation=pydantic_ann,
+                ))
+            else:
+                pydantic_ann = Annotated[base_type, Field(description=desc, json_schema_extra=extra)]
+                sig_params.append(inspect.Parameter(
+                    camel_name, inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=pydantic_ann,
+                ))
+            annotations[camel_name] = pydantic_ann
+
+        annotations["return"] = str
+        required_params = [p for p in sig_params if p.default is inspect.Parameter.empty]
+        optional_params = [p for p in sig_params if p.default is not inspect.Parameter.empty]
+
+        # Build handler closure
+        def make_handler(tn: str = tool_name) -> Any:
             def handler(**kwargs: Any) -> str:
                 return _dispatch(tn, kwargs)
-
-            # Set function metadata for FastMCP
             handler.__name__ = tn
-            handler.__doc__ = _build_tool_docstring({"description": tool_def["description"], "params": pm})
-
-            # Build proper inspect.Signature so FastMCP exposes individual
-            # parameters with descriptions and enum constraints matching
-            # what the production Zod schemas generate.
-            sig_params: list[inspect.Parameter] = []
-            annotations: dict[str, Any] = {}
-            for pname, pdef in pm.items():
-                ptype = pdef.get("type", "string")
-                required = pdef.get("required", True)
-                desc = pdef.get("description", "")
-                enum_values = pdef.get("enum")
-
-                if ptype == "string":
-                    base = str
-                elif ptype == "number":
-                    base = float
-                elif ptype == "boolean":
-                    base = bool
-                elif ptype in ("string[]",):
-                    base = list[str]
-                elif ptype in ("any[][]", "string[][]"):
-                    base = list[list[Any]]
-                else:
-                    base = str
-
-                # Build Pydantic Field with description + optional enum.
-                # Use base type directly (not base | None) so FastMCP
-                # generates {"type": "string"} instead of {"anyOf": [{string}, {null}]},
-                # matching how Zod .optional() serializes in production.
-                extra = {"enum": enum_values} if enum_values else None
-
-                if not required:
-                    ann = Annotated[base, Field(default=None, description=desc, json_schema_extra=extra)]
-                    sig_params.append(inspect.Parameter(
-                        pname,
-                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                        default=None,
-                        annotation=ann,
-                    ))
-                else:
-                    ann = Annotated[base, Field(description=desc, json_schema_extra=extra)]
-                    sig_params.append(inspect.Parameter(
-                        pname,
-                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                        annotation=ann,
-                    ))
-                annotations[pname] = ann
-
-            annotations["return"] = str
-            # Required params must come before optional ones in the signature
-            required_params = [p for p in sig_params if p.default is inspect.Parameter.empty]
-            optional_params = [p for p in sig_params if p.default is not inspect.Parameter.empty]
+            handler.__doc__ = _humanize(tn)
             handler.__signature__ = inspect.Signature(required_params + optional_params, return_annotation=str)
-            handler.__annotations__ = annotations
-
+            handler.__annotations__ = dict(annotations)
             return handler
 
-        handler = make_handler(tool_name, params_meta)
-        mcp.tool()(handler)
+        mcp.tool()(make_handler())
 
 
 # ---------------------------------------------------------------------------
@@ -310,8 +345,8 @@ def main() -> None:
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=Path(__file__).parent / "src" / "tools" / "tools-manifest.json",
-        help="Path to tools-manifest.json",
+        default=Path(__file__).parent / "manifests" / "excel-tools-manifest.json",
+        help="Path to Excel aggregate manifest (kept for reference; tools are registered from routing table).",
     )
     parser.add_argument(
         "--transport",
@@ -322,25 +357,18 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args()
 
-    if not args.manifest.exists():
-        print(f"Manifest not found: {args.manifest}", file=sys.stderr)
-        print("Run 'npm run manifest' first.", file=sys.stderr)
-        raise SystemExit(1)
-
-    register_tools(args.manifest)
-    print(f"Registered {len(mcp._tool_manager._tools)} tools from {args.manifest}", file=sys.stderr)
+    # Register individual decomposed tools from routing table
+    register_tools_from_routes()
+    print(f"Registered {len(mcp._tool_manager._tools)} tools", file=sys.stderr)
 
     mcp.settings.host = args.host
     mcp.settings.port = args.port
 
-    if args.transport == "stdio":
-        mcp.run(transport="stdio")
-    elif args.transport == "sse":
-        mcp.run(transport="sse")
-    elif args.transport == "streamable-http":
+    if args.transport == "streamable-http":
         mcp.settings.stateless_http = True
         mcp.settings.json_response = True
-        mcp.run(transport="streamable-http")
+
+    mcp.run(transport=args.transport)
 
 
 if __name__ == "__main__":
