@@ -21,7 +21,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Annotated, Any, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin, get_type_hints
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -515,6 +515,41 @@ def _remap_params(params: dict[str, Any], remap: dict[str, str] | None) -> dict[
 # ---------------------------------------------------------------------------
 
 
+def _coerce_array_params(params: dict[str, Any], tool_name: str) -> dict[str, Any]:
+    """Parse JSON strings back to Python lists for array-typed params.
+
+    FastMCP may deliver array values as JSON strings when the Pydantic schema
+    uses ``list`` but the LLM sends a serialised array.
+    """
+    result = dict(params)
+    route = _TOOL_ROUTES.get(tool_name)
+    if not route:
+        return result
+    method_name, _remap = route
+    method = getattr(_sim, method_name, None)
+    if not method:
+        return result
+    try:
+        hints = get_type_hints(method)
+    except Exception:
+        return result
+    for key, val in result.items():
+        if not isinstance(val, str):
+            continue
+        hint = hints.get(key)
+        if hint is None:
+            continue
+        origin = get_origin(hint)
+        if origin is list or hint is list:
+            try:
+                parsed = json.loads(val)
+                if isinstance(parsed, list):
+                    result[key] = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return result
+
+
 def _dispatch(tool_name: str, params: dict[str, Any]) -> str:
     """Route a tool call to the appropriate simulator method."""
     route = _TOOL_ROUTES.get(tool_name)
@@ -525,6 +560,9 @@ def _dispatch(tool_name: str, params: dict[str, Any]) -> str:
     method = getattr(_sim, method_name, None)
     if not method:
         return json.dumps({"error": f"Simulator has no method: {method_name}"})
+
+    # Coerce JSON string arrays to Python lists before remapping
+    params = _coerce_array_params(params, tool_name)
 
     # Decomposed conditional-format tools → synthesise rule_type
     if tool_name.startswith("add_") and method_name == "add_conditional_format":
@@ -592,11 +630,10 @@ def _annotation_to_schema(ann: Any) -> dict[str, Any]:
     if origin is list:
         inner = get_args(ann)
         if inner:
-            inner_origin = get_origin(inner[0])
-            if inner_origin is list:
-                return {"type": "array", "items": {"type": "array"}}
-            return {"type": "array", "items": {"type": _annotation_to_json_type(inner[0])}}
-        return {"type": "array"}
+            # Recurse into inner type for nested arrays (list[list[Any]] etc.)
+            return {"type": "array", "items": _annotation_to_schema(inner[0])}
+        # Bare list without type args — use permissive schema
+        return {"type": "array", "items": {}}
 
     return {"type": _annotation_to_json_type(ann)}
 
@@ -641,6 +678,11 @@ def register_tools_from_routes(manifest_path: Path) -> None:
             reverse = {v: k for k, v in remap.items()}
 
         sig = inspect.signature(method)
+        # Resolve string annotations from `from __future__ import annotations`
+        try:
+            resolved_hints = get_type_hints(method)
+        except Exception:
+            resolved_hints = {}
         sig_params: list[inspect.Parameter] = []
         annotations: dict[str, Any] = {}
 
@@ -652,7 +694,9 @@ def register_tools_from_routes(manifest_path: Path) -> None:
                 continue
 
             camel_name = reverse.get(pname, pname)
-            ann = param.annotation if param.annotation is not inspect.Parameter.empty else str
+            ann = resolved_hints.get(pname, param.annotation)
+            if ann is inspect.Parameter.empty:
+                ann = str
             schema = _annotation_to_schema(ann)
             base_type = {"string": str, "integer": int, "number": float, "boolean": bool, "array": list}.get(schema["type"], str)
             desc = _resolve_manifest_param_description(manifest_entry, camel_name, manifest_param_aliases)
