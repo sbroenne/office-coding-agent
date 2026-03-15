@@ -51,3 +51,16 @@
 - Treat `tests-aitest/manifests/excel-tools-manifest.json` as the description source of truth for Excel AI eval tools; avoid inventing docs from method names when the manifest already has richer copy.
 - The decomposed conditional-format and data-validation tools in `tests-aitest/excel_mcp.py` encode manifest `type` values in the tool name, so descriptions should call out the fixed rule/validation type.
 - Fast verification path for this area: `uv run python tests-aitest/excel_mcp.py --help`, `uv run pytest tests-aitest/test_excel_tools.py::TestRangeOperations::test_write_and_read_range -v -x`, then `uv run pytest tests-aitest/ --collect-only`.
+
+### 2026-03-15 — npm dependency refresh across lint/build/test stack
+
+**What changed:**
+- Updated `lucide-react` to `^0.577.0`, `skillpm` to `^0.0.12`, `@eslint/js` to `^10.0.1`, `eslint` to `^10.0.3`, `vite` to `^8.0.0`, `@vitejs/plugin-react` to `^6.0.1`, `jsdom` to `^29.0.0`, and `electron` to `^41.0.2`.
+- Replaced `eslint-plugin-vitest` with `@vitest/eslint-plugin` because the older plugin only supports ESLint 8/9 and breaks under ESLint 10.
+- Fixed new ESLint 10 `no-useless-assignment` findings in `src/tools/powerpoint/index.ts` and `src/tools/word/index.ts` so the upgraded lint stack stays green.
+- Verified the dependency refresh with `npm run build:dev`, `npm run lint`, `npm run test:integration`, `npm run test:e2e:ppt`, and `npm run test:e2e:word`.
+
+**Patterns / paths to remember:**
+- Keep Vitest lint rules wired through `eslint.config.mjs` using `@vitest/eslint-plugin` when the repo is on ESLint 10+.
+- `vite.config.ts` and `vitest.config.ts` both remained compatible with Vite 8 / jsdom 29; dependency refreshes here are mostly package-level unless a future plugin introduces its own migration.
+- Backend dependency touchpoints for this area are `package.json`, `package-lock.json`, `eslint.config.mjs`, and host tool implementations under `src/tools/`.

@@ -24,7 +24,6 @@ export const wordConfigs: readonly WordToolConfig[] = [
 
       const headings: string[] = [];
       let paragraphCount = 0;
-      let tableCount = 0;
 
       for (const para of paragraphs.items) {
         paragraphCount++;
@@ -38,7 +37,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
       const tables = body.tables;
       tables.load('items');
       await context.sync();
-      tableCount = tables.items.length;
+      const tableCount = tables.items.length;
 
       return [
         `Document Overview`,
@@ -463,14 +462,17 @@ export const wordConfigs: readonly WordToolConfig[] = [
       },
     },
     execute: async (context, args) => {
-      const { text, location = 'End', style } = args as {
+      const {
+        text,
+        location = 'End',
+        style,
+      } = args as {
         text: string;
         location?: string;
         style?: string;
       };
       const body = context.document.body;
-      const insertLoc =
-        location === 'Start' ? Word.InsertLocation.start : Word.InsertLocation.end;
+      const insertLoc = location === 'Start' ? Word.InsertLocation.start : Word.InsertLocation.end;
       const paragraph = body.insertParagraph(text, insertLoc);
       if (style) paragraph.style = style;
       await context.sync();
@@ -511,8 +513,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
     params: {
       styleName: {
         type: 'string',
-        description:
-          'The Word style name to apply (e.g. "Heading 1", "Title", "Normal", "Quote").',
+        description: 'The Word style name to apply (e.g. "Heading 1", "Title", "Normal", "Quote").',
       },
     },
     execute: async (context, args) => {
@@ -594,8 +595,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
       if (lineSpacing !== undefined) applied.push(`lineSpacing=${String(lineSpacing)}`);
       if (spaceBefore !== undefined) applied.push(`spaceBefore=${String(spaceBefore)}`);
       if (spaceAfter !== undefined) applied.push(`spaceAfter=${String(spaceAfter)}`);
-      if (firstLineIndent !== undefined)
-        applied.push(`firstLineIndent=${String(firstLineIndent)}`);
+      if (firstLineIndent !== undefined) applied.push(`firstLineIndent=${String(firstLineIndent)}`);
       return applied.length > 0
         ? `Applied to ${String(paragraphs.items.length)} paragraph(s): ${applied.join(', ')}.`
         : 'No formatting properties specified.';
@@ -768,7 +768,11 @@ export const wordConfigs: readonly WordToolConfig[] = [
       },
     },
     execute: async (context, args) => {
-      const { bookmarkName, text, insertLocation = 'Replace' } = args as {
+      const {
+        bookmarkName,
+        text,
+        insertLocation = 'Replace',
+      } = args as {
         bookmarkName: string;
         text: string;
         insertLocation?: string;
@@ -818,8 +822,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
 
   {
     name: 'set_header_footer',
-    description:
-      'Set header or footer HTML content for a specific section of the Word document.',
+    description: 'Set header or footer HTML content for a specific section of the Word document.',
     params: {
       sectionIndex: { type: 'number', description: '0-based section index.' },
       type: {
@@ -836,7 +839,12 @@ export const wordConfigs: readonly WordToolConfig[] = [
       html: { type: 'string', description: 'HTML content to set.' },
     },
     execute: async (context, args) => {
-      const { sectionIndex, type, headerFooterType = 'Primary', html } = args as {
+      const {
+        sectionIndex,
+        type,
+        headerFooterType = 'Primary',
+        html,
+      } = args as {
         sectionIndex: number;
         type: 'header' | 'footer';
         headerFooterType?: string;
@@ -884,7 +892,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
           cell.body.load('text');
         }
         await context.sync();
-        rows.push(row.cells.items.map((cell) => cell.body.text.trim()));
+        rows.push(row.cells.items.map(cell => cell.body.text.trim()));
       }
       const lines = rows.map((r, i) => `Row ${String(i)}: ${r.join(' | ')}`);
       return `Table ${String(tableIndex)} (${String(rows.length)} rows):\n${lines.join('\n')}`;
@@ -910,7 +918,12 @@ export const wordConfigs: readonly WordToolConfig[] = [
       },
     },
     execute: async (context, args) => {
-      const { tableIndex, rowCount, insertLocation = 'End', values } = args as {
+      const {
+        tableIndex,
+        rowCount,
+        insertLocation = 'End',
+        values,
+      } = args as {
         tableIndex: number;
         rowCount: number;
         insertLocation?: string;
@@ -923,8 +936,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
         return `Table index ${String(tableIndex)} is out of range (0–${String(tables.items.length - 1)}).`;
       }
       const table = tables.items[tableIndex];
-      const loc =
-        insertLocation === 'Start' ? Word.InsertLocation.start : Word.InsertLocation.end;
+      const loc = insertLocation === 'Start' ? Word.InsertLocation.start : Word.InsertLocation.end;
       table.addRows(loc, rowCount, values);
       await context.sync();
       return `Added ${String(rowCount)} row(s) at ${insertLocation} of table ${String(tableIndex)}.`;
@@ -950,7 +962,12 @@ export const wordConfigs: readonly WordToolConfig[] = [
       },
     },
     execute: async (context, args) => {
-      const { tableIndex, columnCount, insertLocation = 'End', values } = args as {
+      const {
+        tableIndex,
+        columnCount,
+        insertLocation = 'End',
+        values,
+      } = args as {
         tableIndex: number;
         columnCount: number;
         insertLocation?: string;
@@ -963,8 +980,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
         return `Table index ${String(tableIndex)} is out of range (0–${String(tables.items.length - 1)}).`;
       }
       const table = tables.items[tableIndex];
-      const loc =
-        insertLocation === 'Start' ? Word.InsertLocation.start : Word.InsertLocation.end;
+      const loc = insertLocation === 'Start' ? Word.InsertLocation.start : Word.InsertLocation.end;
       table.addColumns(loc, columnCount, values);
       await context.sync();
       return `Added ${String(columnCount)} column(s) at ${insertLocation} of table ${String(tableIndex)}.`;
@@ -1175,16 +1191,18 @@ export const wordConfigs: readonly WordToolConfig[] = [
       },
     },
     execute: async (context, args) => {
-      const { title, tag, type = 'RichText' } = args as {
+      const {
+        title,
+        tag,
+        type = 'RichText',
+      } = args as {
         title?: string;
         tag?: string;
         type?: string;
       };
       const selection = context.document.getSelection();
       const ccType =
-        type === 'PlainText'
-          ? Word.ContentControlType.plainText
-          : Word.ContentControlType.richText;
+        type === 'PlainText' ? Word.ContentControlType.plainText : Word.ContentControlType.richText;
       const cc = selection.insertContentControl(ccType);
       if (title !== undefined) cc.title = title;
       if (tag !== undefined) cc.tag = tag;
@@ -1195,8 +1213,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
 
   {
     name: 'format_found_text',
-    description:
-      'Search for text in the document and apply font formatting to all matches.',
+    description: 'Search for text in the document and apply font formatting to all matches.',
     params: {
       searchText: { type: 'string', description: 'Text to search for.' },
       bold: { type: 'boolean', required: false, description: 'Make matched text bold.' },
