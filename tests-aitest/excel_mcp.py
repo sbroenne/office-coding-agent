@@ -427,6 +427,24 @@ def _extract_action_detail(description: str, action: str | None) -> str | None:
     return None
 
 
+# Semantic category prefixes that help the LLM distinguish visually similar
+# tool categories.  Conditional formatting is *visual only* (colors, icons,
+# bars); data validation *restricts input*.  Without explicit disambiguation
+# the model confuses "highlight cells" with "block bad input".
+_CATEGORY_PREFIXES: dict[str, str] = {
+    "conditional_format": (
+        "VISUAL-ONLY conditional formatting — changes cell appearance "
+        "(background color, icon sets, data bars) based on cell values. "
+        "Does NOT restrict or block what users can type"
+    ),
+    "data_validation": (
+        "INPUT RESTRICTION data validation — controls what values users "
+        "are ALLOWED to enter in a cell. Rejects invalid input with an "
+        "error dialog. Does NOT change cell appearance or colors"
+    ),
+}
+
+
 def _build_tool_description(
     tool_name: str,
     manifest_tool: str,
@@ -438,7 +456,14 @@ def _build_tool_description(
     if not manifest_description:
         return _humanize(tool_name)
 
-    prefix = _description_prefix(manifest_description)
+    # Use the semantic category prefix when available; fall back to the
+    # generic manifest prefix.
+    category_prefix = _CATEGORY_PREFIXES.get(manifest_tool)
+    if category_prefix:
+        prefix = category_prefix
+    else:
+        prefix = _description_prefix(manifest_description)
+
     detail = _extract_action_detail(manifest_description, action)
     parts: list[str] = []
 
