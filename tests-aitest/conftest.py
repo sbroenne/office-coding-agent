@@ -76,6 +76,7 @@ def pytest_configure(config: pytest.Config) -> None:
         "word: Word host AI test",
         "outlook: Outlook host AI test",
         "token_efficiency: token efficiency experiment",
+        "adversarial: adversarial AI eval that probes tool quality edge cases",
     ]:
         config.addinivalue_line("markers", marker)
 
