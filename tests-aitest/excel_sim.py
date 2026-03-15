@@ -14,8 +14,8 @@ from typing import Any
 
 
 # ---------------------------------------------------------------------------
-# ToolResult — inlined from pytest_aitest.testing.types to keep this
-# module self-contained within the excel-ai-addin project.
+# ToolResult — kept local so the simulator stays self-contained within
+# the office-coding-agent skill eval project.
 # ---------------------------------------------------------------------------
 
 

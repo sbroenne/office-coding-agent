@@ -16,25 +16,15 @@ Run with: uv run pytest tests-aitest/test_token_efficiency.py -v -s
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
-from pytest_aitest import Agent, MCPServer, Provider, Wait
+from pytest_skill_engineering import Eval, MCPServer, Provider
 
-from conftest import (
-    DEFAULT_MAX_TURNS,
-    DEFAULT_MODEL,
-    DEFAULT_RPM,
-    DEFAULT_TPM,
-    MANIFEST_PATH,
-    SYSTEM_PROMPT_PATH,
-)
+from conftest import DEFAULT_MAX_TURNS, DEFAULT_MODEL, DEFAULT_RPM, DEFAULT_TPM, SYSTEM_PROMPTS
 
 pytestmark = [pytest.mark.integration, pytest.mark.token_efficiency]
 
-EXCEL_PROMPT = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
+EXCEL_PROMPT = SYSTEM_PROMPTS["excel"]
 
 # ─── Shared dataset: 50 rows × 6 columns (~300 cells) ────────────────────────
 
@@ -59,28 +49,8 @@ def _end_cell(num_rows: int, num_cols: int = 6) -> str:
     return f"A1:{col}{num_rows + 1}"  # +1 for header
 
 
-# ─── Fixture ─────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture(scope="module")
-def excel_server():
-    """Excel MCP server for token efficiency tests."""
-    if not MANIFEST_PATH.exists():
-        pytest.skip(f"Manifest not found: {MANIFEST_PATH}. Run 'npm run manifest' first.")
-    return MCPServer(
-        command=[
-            sys.executable,
-            "-u",
-            str(Path(__file__).parent / "excel_mcp.py"),
-            "--manifest",
-            str(MANIFEST_PATH),
-        ],
-        wait=Wait.for_tools(["get_range_values", "get_used_range", "set_range_values"]),
-    )
-
-
-def _agent(excel_server: MCPServer, name: str, allowed_tools: list[str]) -> Agent:
-    return Agent(
+def _make_eval(excel_server: MCPServer, name: str, allowed_tools: list[str]) -> Eval:
+    return Eval(
         name=name,
         provider=Provider(model=f"azure/{DEFAULT_MODEL}", rpm=DEFAULT_RPM, tpm=DEFAULT_TPM),
         mcp_servers=[excel_server],
@@ -111,14 +81,14 @@ class TestBaselineFullRead:
     tool response. Establishes the token ceiling to beat.
     """
 
-    async def test_full_read_20_rows(self, aitest_run, excel_server):
+    async def test_full_read_20_rows(self, eval_run, excel_server):
         """Read 20 rows × 6 cols (120 cells) in a single get_range_values call."""
         dataset = _make_dataset(20)
         addr = _end_cell(20)
 
-        agent = _agent(excel_server, "baseline-20", ["set_range_values", "get_range_values"])
+        agent = _make_eval(excel_server, "baseline-20", ["set_range_values", "get_range_values"])
 
-        result = await aitest_run(
+        result = await eval_run(
             agent,
             f"Write this data to {addr}: {dataset}. "
             "Then read back the entire range and tell me the total Q1 sales.",
@@ -128,7 +98,7 @@ class TestBaselineFullRead:
         assert result.tool_was_called("get_range_values")
         _print_tokens("Baseline 20 rows × 6 cols (full read)", result.token_usage)
 
-    async def test_full_read_50_rows(self, aitest_run, excel_server):
+    async def test_full_read_50_rows(self, eval_run, excel_server):
         """Read 50 rows × 6 cols (300 cells) in a single get_range_values call.
 
         With 50 rows the response JSON is significantly larger.
@@ -136,9 +106,9 @@ class TestBaselineFullRead:
         dataset = _make_dataset(50)
         addr = _end_cell(50)
 
-        agent = _agent(excel_server, "baseline-50", ["set_range_values", "get_range_values"])
+        agent = _make_eval(excel_server, "baseline-50", ["set_range_values", "get_range_values"])
 
-        result = await aitest_run(
+        result = await eval_run(
             agent,
             f"Write this data to {addr}: {dataset}. "
             "Then read back the entire range and tell me which product appears most often.",
@@ -161,18 +131,18 @@ class TestDimensionsFirstRead:
     Goal: reduce tokens by letting the LLM decide what subset to read.
     """
 
-    async def test_dimensions_then_targeted_read(self, aitest_run, excel_server):
+    async def test_dimensions_then_targeted_read(self, eval_run, excel_server):
         """Write 50 rows, then use get_used_range to discover shape before reading."""
         dataset = _make_dataset(50)
         addr = _end_cell(50)
 
-        agent = _agent(
+        agent = _make_eval(
             excel_server,
             "dimensions-first",
             ["set_range_values", "get_used_range", "get_range_values"],
         )
 
-        result = await aitest_run(
+        result = await eval_run(
             agent,
             f"Write this data to {addr}: {dataset}. "
             "Use get_used_range first to find the sheet dimensions. "
@@ -201,18 +171,18 @@ class TestMaxRowsPreview:
     This is the existing mechanism — tests how well the LLM exploits it.
     """
 
-    async def test_maxrows_preview_summarise(self, aitest_run, excel_server):
+    async def test_maxrows_preview_summarise(self, eval_run, excel_server):
         """Write 50 rows then ask for a summary using maxRows preview."""
         dataset = _make_dataset(50)
         addr = _end_cell(50)
 
-        agent = _agent(
+        agent = _make_eval(
             excel_server,
             "maxrows-preview",
             ["set_range_values", "get_used_range"],
         )
 
-        result = await aitest_run(
+        result = await eval_run(
             agent,
             f"Write this data to {addr}: {dataset}. "
             "Use get_used_range with maxRows=5 to preview the sheet, "
@@ -230,7 +200,7 @@ class TestMaxRowsPreview:
             max_rows = c.arguments.get("maxRows", "not set")
             print(f"  get_used_range(maxRows={max_rows})")
 
-    async def test_maxrows_vs_full_read_token_delta(self, aitest_run, excel_server):
+    async def test_maxrows_vs_full_read_token_delta(self, eval_run, excel_server):
         """Compare: ask the agent to read all data vs use maxRows.
 
         This reveals whether the LLM self-selects a paged approach or
@@ -240,13 +210,13 @@ class TestMaxRowsPreview:
         addr = _end_cell(50)
 
         # Agent with only get_used_range (forces maxRows path)
-        agent_paged = _agent(
+        agent_paged = _make_eval(
             excel_server,
             "forced-paged",
             ["set_range_values", "get_used_range"],
         )
 
-        result_paged = await aitest_run(
+        result_paged = await eval_run(
             agent_paged,
             f"Write this data to {addr}: {dataset}. "
             "Read the sheet and count how many rows belong to the 'North' region.",
@@ -256,13 +226,13 @@ class TestMaxRowsPreview:
         _print_tokens("Paged (get_used_range only, 50 rows)", result_paged.token_usage)
 
         # Agent with only get_range_values (forces full read path)
-        agent_full = _agent(
+        agent_full = _make_eval(
             excel_server,
             "forced-full",
             ["set_range_values", "get_range_values"],
         )
 
-        result_full = await aitest_run(
+        result_full = await eval_run(
             agent_full,
             f"Write this data to {addr}: {dataset}. "
             "Read the sheet and count how many rows belong to the 'North' region.",
@@ -289,7 +259,7 @@ class TestNaturalBehaviour:
     which to use, and measures what the model naturally selects.
     """
 
-    async def test_natural_tool_selection_50_rows(self, aitest_run, excel_server):
+    async def test_natural_tool_selection_50_rows(self, eval_run, excel_server):
         """Give LLM all read tools and ask a question requiring data inspection.
 
         Uses 20 rows to stay within TPM limits when both tools are available.
@@ -297,13 +267,13 @@ class TestNaturalBehaviour:
         dataset = _make_dataset(20)
         addr = _end_cell(20)
 
-        agent = _agent(
+        agent = _make_eval(
             excel_server,
             "natural-50",
             ["set_range_values", "get_used_range", "get_range_values"],
         )
 
-        result = await aitest_run(
+        result = await eval_run(
             agent,
             f"Write this data to {addr}: {dataset}. "
             "Which product has the highest average quarterly sales?",

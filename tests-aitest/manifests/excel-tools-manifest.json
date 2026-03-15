@@ -1,0 +1,1330 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-15T13:30:20.687Z",
+  "tools": [
+    {
+      "name": "range",
+      "description": "Operate on cell ranges. Actions: \"get_values\", \"set_values\", \"get_formulas\", \"set_formulas\", \"get_used\" (used range + optional paged values), \"clear\", \"copy\", \"sort\", \"fill\" (auto-fill), \"flash_fill\", \"find\", \"replace\", \"get_special_cells\", \"get_precedents\", \"get_dependents\", \"get_tables\", \"remove_duplicates\", \"merge\", \"unmerge\", \"group\", \"ungroup\", \"insert\", \"delete\", \"recalculate\".",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "get_values",
+            "set_values",
+            "get_formulas",
+            "set_formulas",
+            "get_used",
+            "clear",
+            "copy",
+            "sort",
+            "fill",
+            "flash_fill",
+            "find",
+            "replace",
+            "get_special_cells",
+            "get_precedents",
+            "get_dependents",
+            "get_tables",
+            "remove_duplicates",
+            "merge",
+            "unmerge",
+            "group",
+            "ungroup",
+            "insert",
+            "delete",
+            "recalculate"
+          ]
+        },
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Range address (e.g. \"A1:C10\"). Required for most actions."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        },
+        "maxRows": {
+          "type": "number",
+          "required": false,
+          "description": "Max rows to return (get_values/get_used)."
+        },
+        "maxColumns": {
+          "type": "number",
+          "required": false,
+          "description": "Max columns to return."
+        },
+        "startRow": {
+          "type": "number",
+          "required": false,
+          "description": "1-based starting row offset. Default 1."
+        },
+        "startColumn": {
+          "type": "number",
+          "required": false,
+          "description": "1-based starting column offset. Default 1."
+        },
+        "values": {
+          "type": "any[][]",
+          "required": false,
+          "description": "2D array of values (set_values)."
+        },
+        "formulas": {
+          "type": "string[][]",
+          "required": false,
+          "description": "2D array of formula strings (set_formulas)."
+        },
+        "column": {
+          "type": "number",
+          "required": false,
+          "description": "Zero-based column index to sort by."
+        },
+        "ascending": {
+          "type": "boolean",
+          "required": false,
+          "description": "Ascending sort. Default true."
+        },
+        "hasHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "First row is header (sort). Default true."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "required": false,
+          "description": "Destination for copy."
+        },
+        "sourceSheet": {
+          "type": "string",
+          "required": false,
+          "description": "Source sheet name (copy)."
+        },
+        "destinationSheet": {
+          "type": "string",
+          "required": false,
+          "description": "Destination sheet name (copy)."
+        },
+        "sourceAddress": {
+          "type": "string",
+          "required": false,
+          "description": "Source range for fill."
+        },
+        "autoFillType": {
+          "type": "string",
+          "required": false,
+          "description": "Auto-fill behavior (fill). Default FillDefault.",
+          "enum": [
+            "FillDefault",
+            "FillCopy",
+            "FillSeries",
+            "FillFormats",
+            "FillValues",
+            "FillDays",
+            "FillWeekdays",
+            "FillMonths",
+            "FillYears",
+            "LinearTrend",
+            "GrowthTrend",
+            "FlashFill"
+          ]
+        },
+        "searchText": {
+          "type": "string",
+          "required": false,
+          "description": "Text to find (find)."
+        },
+        "matchCase": {
+          "type": "boolean",
+          "required": false,
+          "description": "Case-sensitive (find). Default false."
+        },
+        "matchEntireCell": {
+          "type": "boolean",
+          "required": false,
+          "description": "Match entire cell (find). Default false."
+        },
+        "find": {
+          "type": "string",
+          "required": false,
+          "description": "Text to find (replace)."
+        },
+        "replace": {
+          "type": "string",
+          "required": false,
+          "description": "Replacement text (replace)."
+        },
+        "cellType": {
+          "type": "string",
+          "required": false,
+          "description": "Special cell type (get_special_cells).",
+          "enum": [
+            "ConditionalFormats",
+            "DataValidations",
+            "Blanks",
+            "Constants",
+            "Formulas",
+            "SameConditionalFormat",
+            "SameDataValidation",
+            "Visible"
+          ]
+        },
+        "cellValueType": {
+          "type": "string",
+          "required": false,
+          "description": "Value filter for get_special_cells.",
+          "enum": [
+            "All",
+            "Errors",
+            "ErrorsLogical",
+            "ErrorsNumbers",
+            "ErrorsText",
+            "ErrorsLogicalNumber",
+            "ErrorsLogicalText",
+            "ErrorsNumberText",
+            "Logical",
+            "LogicalNumbers",
+            "LogicalText",
+            "LogicalNumbersText",
+            "Numbers",
+            "NumbersText",
+            "Text"
+          ]
+        },
+        "fullyContained": {
+          "type": "boolean",
+          "required": false,
+          "description": "Only tables fully inside range (get_tables). Default false."
+        },
+        "columns": {
+          "type": "string[]",
+          "required": false,
+          "description": "Zero-based column indices to compare (remove_duplicates)."
+        },
+        "across": {
+          "type": "boolean",
+          "required": false,
+          "description": "Merge each row separately (merge). Default false."
+        },
+        "shift": {
+          "type": "string",
+          "required": false,
+          "description": "Shift direction for insert (\"down\",\"right\") or delete (\"up\",\"left\"). Default \"down\"/\"up\".",
+          "enum": [
+            "down",
+            "right",
+            "up",
+            "left"
+          ]
+        }
+      }
+    },
+    {
+      "name": "range_format",
+      "description": "Apply formatting to cell ranges. Actions: \"format\" (bold/italic/font/fill/alignment/wrap), \"set_number_format\" (number display formats), \"auto_fit\" (column/row widths), \"set_borders\", \"set_hyperlink\", \"toggle_visibility\" (hide/show rows or columns).",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Formatting operation to perform",
+          "enum": [
+            "format",
+            "set_number_format",
+            "auto_fit",
+            "set_borders",
+            "set_hyperlink",
+            "toggle_visibility"
+          ]
+        },
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Range address. Required for most actions."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        },
+        "bold": {
+          "type": "boolean",
+          "required": false,
+          "description": "Bold text."
+        },
+        "italic": {
+          "type": "boolean",
+          "required": false,
+          "description": "Italic text."
+        },
+        "underline": {
+          "type": "boolean",
+          "required": false,
+          "description": "Underline text."
+        },
+        "fontSize": {
+          "type": "number",
+          "required": false,
+          "description": "Font size in points."
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color hex (e.g. \"#FF0000\")."
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Cell background color hex."
+        },
+        "horizontalAlignment": {
+          "type": "string",
+          "required": false,
+          "description": "Horizontal alignment.",
+          "enum": [
+            "General",
+            "Left",
+            "Center",
+            "Right",
+            "Fill",
+            "Justify",
+            "Distributed"
+          ]
+        },
+        "wrapText": {
+          "type": "boolean",
+          "required": false,
+          "description": "Enable text wrap."
+        },
+        "format": {
+          "type": "string",
+          "required": false,
+          "description": "Excel number format string, e.g. \"#,##0.00\", \"0.00%\", \"yyyy-mm-dd\"."
+        },
+        "fitTarget": {
+          "type": "string",
+          "required": false,
+          "description": "What to auto-fit (auto_fit). Default \"columns\".",
+          "enum": [
+            "columns",
+            "rows",
+            "both"
+          ]
+        },
+        "borderStyle": {
+          "type": "string",
+          "required": false,
+          "description": "Border style.",
+          "enum": [
+            "Thin",
+            "Medium",
+            "Thick",
+            "Double",
+            "Dotted",
+            "Dashed",
+            "DashDot"
+          ]
+        },
+        "borderColor": {
+          "type": "string",
+          "required": false,
+          "description": "Border color hex."
+        },
+        "side": {
+          "type": "string",
+          "required": false,
+          "description": "Which side(s) to apply border.",
+          "enum": [
+            "EdgeLeft",
+            "EdgeRight",
+            "EdgeTop",
+            "EdgeBottom",
+            "EdgeAll"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "required": false,
+          "description": "URL or cell ref for hyperlink. Use \"\" to remove."
+        },
+        "textToDisplay": {
+          "type": "string",
+          "required": false,
+          "description": "Hyperlink display text."
+        },
+        "tooltip": {
+          "type": "string",
+          "required": false,
+          "description": "Hyperlink tooltip."
+        },
+        "hidden": {
+          "type": "boolean",
+          "required": false,
+          "description": "True to hide (toggle_visibility)."
+        },
+        "target": {
+          "type": "string",
+          "required": false,
+          "description": "Whether to hide rows or columns.",
+          "enum": [
+            "rows",
+            "columns"
+          ]
+        }
+      }
+    },
+    {
+      "name": "table",
+      "description": "Manage structured Excel tables. Actions: \"list\" (list tables), \"create\" (convert range to table), \"delete\" (remove table), \"get_data\" (read rows/headers), \"add_rows\" (append rows), \"sort\", \"filter\", \"clear_filters\", \"reapply_filters\", \"add_column\", \"delete_column\", \"convert_to_range\", \"resize\", \"configure\" (style/headers/totals).",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "list",
+            "create",
+            "delete",
+            "get_data",
+            "add_rows",
+            "sort",
+            "filter",
+            "clear_filters",
+            "reapply_filters",
+            "add_column",
+            "delete_column",
+            "convert_to_range",
+            "resize",
+            "configure"
+          ]
+        },
+        "tableName": {
+          "type": "string",
+          "required": false,
+          "description": "Table name. Required for most actions except list/create."
+        },
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Range address for create/resize."
+        },
+        "hasHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "First row has headers (create). Default true."
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "description": "Name for new table (create)."
+        },
+        "values": {
+          "type": "any[][]",
+          "required": false,
+          "description": "2D array of row data (add_rows)."
+        },
+        "column": {
+          "type": "number",
+          "required": false,
+          "description": "Zero-based column index for sort/filter."
+        },
+        "ascending": {
+          "type": "boolean",
+          "required": false,
+          "description": "Ascending sort. Default true."
+        },
+        "filterValues": {
+          "type": "string[]",
+          "required": false,
+          "description": "Values to show (filter)."
+        },
+        "columnName": {
+          "type": "string",
+          "required": false,
+          "description": "Header name for new column (add_column/delete_column)."
+        },
+        "columnData": {
+          "type": "string[]",
+          "required": false,
+          "description": "Values for new column (add_column)."
+        },
+        "style": {
+          "type": "string",
+          "required": false,
+          "description": "Table style name (configure), e.g. \"TableStyleMedium2\"."
+        },
+        "showHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show header row (configure)."
+        },
+        "showTotals": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show totals row (configure)."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name (used for list/create)."
+        }
+      }
+    },
+    {
+      "name": "chart",
+      "description": "Manage charts. Use action \"list\" to list charts on a sheet, \"create\" to make a new chart, \"delete\" to remove one, or \"configure\" to update title/type/data/position/legend of an existing chart.",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "list",
+            "create",
+            "delete",
+            "configure"
+          ]
+        },
+        "chartName": {
+          "type": "string",
+          "required": false,
+          "description": "Chart name. Required for delete/configure."
+        },
+        "chartType": {
+          "type": "string",
+          "required": false,
+          "description": "Chart type for create/configure.",
+          "enum": [
+            "ColumnClustered",
+            "ColumnStacked",
+            "BarClustered",
+            "BarStacked",
+            "Line",
+            "LineMarkers",
+            "Pie",
+            "Doughnut",
+            "Area",
+            "XYScatter"
+          ]
+        },
+        "dataRange": {
+          "type": "string",
+          "required": false,
+          "description": "Data range address (e.g. \"A1:D20\"). Required for create; used in configure to change data source."
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "description": "Name to assign to the new chart (create action)."
+        },
+        "seriesBy": {
+          "type": "string",
+          "required": false,
+          "description": "How to interpret series. Default \"Auto\".",
+          "enum": [
+            "Auto",
+            "Columns",
+            "Rows"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "description": "Chart title text (configure)."
+        },
+        "left": {
+          "type": "number",
+          "required": false,
+          "description": "Left position in points."
+        },
+        "top": {
+          "type": "number",
+          "required": false,
+          "description": "Top position in points."
+        },
+        "width": {
+          "type": "number",
+          "required": false,
+          "description": "Width in points."
+        },
+        "height": {
+          "type": "number",
+          "required": false,
+          "description": "Height in points."
+        },
+        "startCell": {
+          "type": "string",
+          "required": false,
+          "description": "Top-left anchor cell."
+        },
+        "endCell": {
+          "type": "string",
+          "required": false,
+          "description": "Bottom-right anchor cell."
+        },
+        "legendVisible": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show/hide legend."
+        },
+        "legendPosition": {
+          "type": "string",
+          "required": false,
+          "description": "Legend position.",
+          "enum": [
+            "Top",
+            "Bottom",
+            "Left",
+            "Right",
+            "Corner"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "sheet",
+      "description": "Manage worksheets. Actions: \"list\", \"create\", \"delete\", \"rename\", \"copy\", \"move\", \"activate\", \"protect\", \"unprotect\", \"freeze\" (panes), \"set_visibility\", \"set_gridlines\", \"set_headings\", \"set_page_layout\", \"recalculate\".",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "list",
+            "create",
+            "delete",
+            "rename",
+            "copy",
+            "move",
+            "activate",
+            "protect",
+            "unprotect",
+            "freeze",
+            "set_visibility",
+            "set_gridlines",
+            "set_headings",
+            "set_page_layout",
+            "recalculate"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "description": "Worksheet name (most actions). For create, this is the new sheet name."
+        },
+        "newName": {
+          "type": "string",
+          "required": false,
+          "description": "New name for rename/copy."
+        },
+        "currentName": {
+          "type": "string",
+          "required": false,
+          "description": "Current name for rename."
+        },
+        "position": {
+          "type": "number",
+          "required": false,
+          "description": "New 0-based position (move)."
+        },
+        "password": {
+          "type": "string",
+          "required": false,
+          "description": "Protection password (protect/unprotect)."
+        },
+        "freezeAt": {
+          "type": "string",
+          "required": false,
+          "description": "Cell address to freeze at (freeze). Omit to unfreeze."
+        },
+        "visibility": {
+          "type": "string",
+          "required": false,
+          "description": "Visibility state (set_visibility).",
+          "enum": [
+            "Visible",
+            "Hidden",
+            "VeryHidden"
+          ]
+        },
+        "tabColor": {
+          "type": "string",
+          "required": false,
+          "description": "Tab color hex (set_visibility)."
+        },
+        "showGridlines": {
+          "type": "boolean",
+          "required": false,
+          "description": "True to show gridlines (set_gridlines)."
+        },
+        "showHeadings": {
+          "type": "boolean",
+          "required": false,
+          "description": "True to show row/col headings (set_headings)."
+        },
+        "orientation": {
+          "type": "string",
+          "required": false,
+          "description": "Page orientation (set_page_layout).",
+          "enum": [
+            "Portrait",
+            "Landscape"
+          ]
+        },
+        "paperSize": {
+          "type": "string",
+          "required": false,
+          "description": "Paper size (set_page_layout).",
+          "enum": [
+            "Letter",
+            "LetterSmall",
+            "Tabloid",
+            "Ledger",
+            "Legal",
+            "Statement",
+            "Executive",
+            "A3",
+            "A4",
+            "A4Small",
+            "A5"
+          ]
+        },
+        "leftMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Left margin inches (set_page_layout)."
+        },
+        "rightMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Right margin inches."
+        },
+        "topMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Top margin inches."
+        },
+        "bottomMargin": {
+          "type": "number",
+          "required": false,
+          "description": "Bottom margin inches."
+        },
+        "recalcType": {
+          "type": "string",
+          "required": false,
+          "description": "Recalc type (recalculate).",
+          "enum": [
+            "Recalculate",
+            "Full"
+          ]
+        }
+      }
+    },
+    {
+      "name": "workbook",
+      "description": "Manage the workbook. Actions: \"get_info\" (overview), \"get_selected_range\" (user selection), \"get_properties\" / \"set_properties\" (doc metadata), \"protect\" / \"unprotect\", \"save\", \"recalculate\", \"refresh_connections\", \"define_named_range\", \"list_named_ranges\", \"list_queries\", \"get_query\".",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "get_info",
+            "get_selected_range",
+            "get_properties",
+            "set_properties",
+            "get_protection",
+            "protect",
+            "unprotect",
+            "save",
+            "recalculate",
+            "refresh_connections",
+            "define_named_range",
+            "list_named_ranges",
+            "list_queries",
+            "get_query"
+          ]
+        },
+        "author": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook author (set_properties)."
+        },
+        "category": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook category."
+        },
+        "comments": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook comments metadata."
+        },
+        "company": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook company."
+        },
+        "keywords": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook keywords."
+        },
+        "manager": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook manager."
+        },
+        "subject": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook subject."
+        },
+        "title": {
+          "type": "string",
+          "required": false,
+          "description": "Workbook title."
+        },
+        "password": {
+          "type": "string",
+          "required": false,
+          "description": "Protection password."
+        },
+        "saveBehavior": {
+          "type": "string",
+          "required": false,
+          "description": "Save behavior (save).",
+          "enum": [
+            "Save",
+            "Prompt"
+          ]
+        },
+        "recalcType": {
+          "type": "string",
+          "required": false,
+          "description": "Recalc type.",
+          "enum": [
+            "Recalculate",
+            "Full"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "description": "Named range name (define_named_range / get_query)."
+        },
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Range address for define_named_range."
+        },
+        "comment": {
+          "type": "string",
+          "required": false,
+          "description": "Comment for define_named_range."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Sheet for define_named_range."
+        },
+        "queryName": {
+          "type": "string",
+          "required": false,
+          "description": "Power Query name for get_query."
+        }
+      }
+    },
+    {
+      "name": "comment",
+      "description": "Manage cell comments. Use action \"list\" to list all comments, \"add\" to create, \"edit\" to update, \"delete\" to remove.",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "list",
+            "add",
+            "edit",
+            "delete"
+          ]
+        },
+        "cellAddress": {
+          "type": "string",
+          "required": false,
+          "description": "Cell address (e.g. \"A1\"). Required for add/edit/delete."
+        },
+        "text": {
+          "type": "string",
+          "required": false,
+          "description": "Comment text. Required for add; replacement text for edit."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "conditional_format",
+      "description": "Manage conditional formatting rules. Use action \"add\" to create a rule (specify type), \"list\" to show existing rules, or \"clear\" to remove all rules from a range.",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "add",
+            "list",
+            "clear"
+          ]
+        },
+        "address": {
+          "type": "string",
+          "required": false,
+          "description": "Range address (e.g. \"A1:D20\"). Required for add/clear; optional for list."
+        },
+        "type": {
+          "type": "string",
+          "required": false,
+          "description": "Rule type for action=add.",
+          "enum": [
+            "colorScale",
+            "dataBar",
+            "cellValue",
+            "topBottom",
+            "containsText",
+            "custom"
+          ]
+        },
+        "minColor": {
+          "type": "string",
+          "required": false,
+          "description": "Min color hex (colorScale)."
+        },
+        "midColor": {
+          "type": "string",
+          "required": false,
+          "description": "Mid color hex (colorScale, optional)."
+        },
+        "maxColor": {
+          "type": "string",
+          "required": false,
+          "description": "Max color hex (colorScale)."
+        },
+        "fillColor": {
+          "type": "string",
+          "required": false,
+          "description": "Fill color hex (dataBar)."
+        },
+        "showDataBarOnly": {
+          "type": "boolean",
+          "required": false,
+          "description": "Hide cell value (dataBar)."
+        },
+        "operator": {
+          "type": "string",
+          "required": false,
+          "description": "Comparison operator (cellValue).",
+          "enum": [
+            "Between",
+            "NotBetween",
+            "EqualTo",
+            "NotEqualTo",
+            "GreaterThan",
+            "LessThan",
+            "GreaterThanOrEqualTo",
+            "LessThanOrEqualTo"
+          ]
+        },
+        "formula1": {
+          "type": "string",
+          "required": false,
+          "description": "First value/formula (cellValue/custom)."
+        },
+        "formula2": {
+          "type": "string",
+          "required": false,
+          "description": "Second value for Between/NotBetween (cellValue)."
+        },
+        "fontColor": {
+          "type": "string",
+          "required": false,
+          "description": "Font color hex for matching cells."
+        },
+        "backgroundColor": {
+          "type": "string",
+          "required": false,
+          "description": "Background color hex for matching cells."
+        },
+        "topBottomRank": {
+          "type": "number",
+          "required": false,
+          "description": "Number of items (topBottom)."
+        },
+        "topBottomType": {
+          "type": "string",
+          "required": false,
+          "description": "Top or bottom, absolute or percent (topBottom).",
+          "enum": [
+            "TopItems",
+            "TopPercent",
+            "BottomItems",
+            "BottomPercent"
+          ]
+        },
+        "containsText": {
+          "type": "string",
+          "required": false,
+          "description": "Text to match (containsText)."
+        },
+        "containsOperator": {
+          "type": "string",
+          "required": false,
+          "description": "Match mode (containsText).",
+          "enum": [
+            "Contains",
+            "NotContains",
+            "BeginsWith",
+            "EndsWith"
+          ]
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "data_validation",
+      "description": "Manage data validation rules on cells. Use action \"get\" to read the current rule, \"set\" to apply a new rule (specify type), or \"clear\" to remove all validation.",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "get",
+            "set",
+            "clear"
+          ]
+        },
+        "address": {
+          "type": "string",
+          "required": true,
+          "description": "Range address (e.g. \"A1:A100\")."
+        },
+        "type": {
+          "type": "string",
+          "required": false,
+          "description": "Validation type for action=set.",
+          "enum": [
+            "list",
+            "number",
+            "decimal",
+            "date",
+            "textLength",
+            "custom"
+          ]
+        },
+        "listValues": {
+          "type": "string[]",
+          "required": false,
+          "description": "Allowed values for type=list (e.g. [\"Yes\",\"No\",\"Maybe\"])."
+        },
+        "operator": {
+          "type": "string",
+          "required": false,
+          "description": "Comparison operator (number/date/textLength).",
+          "enum": [
+            "Between",
+            "NotBetween",
+            "EqualTo",
+            "NotEqualTo",
+            "GreaterThan",
+            "LessThan",
+            "GreaterThanOrEqualTo",
+            "LessThanOrEqualTo"
+          ]
+        },
+        "formula1": {
+          "type": "string",
+          "required": false,
+          "description": "Min value or formula."
+        },
+        "formula2": {
+          "type": "string",
+          "required": false,
+          "description": "Max value for Between."
+        },
+        "customFormula": {
+          "type": "string",
+          "required": false,
+          "description": "Custom validation formula (type=custom)."
+        },
+        "showError": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show error alert on invalid input. Default true."
+        },
+        "errorTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Error alert title."
+        },
+        "errorMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Error alert message."
+        },
+        "errorStyle": {
+          "type": "string",
+          "required": false,
+          "description": "Error alert style.",
+          "enum": [
+            "Stop",
+            "Warning",
+            "Information"
+          ]
+        },
+        "showPrompt": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show input prompt message."
+        },
+        "promptTitle": {
+          "type": "string",
+          "required": false,
+          "description": "Input prompt title."
+        },
+        "promptMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Input prompt message."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    },
+    {
+      "name": "pivot",
+      "description": "Manage PivotTables. Actions: \"list\" (all PivotTables on a sheet), \"create\" (new PivotTable), \"delete\", \"get_info\" (source, hierarchies), \"refresh\", \"configure\" (layout/options), \"add_field\" (add to row/column/data/filter), \"remove_field\", \"filter\" (apply/clear filters on a field), \"sort\" (by labels or values).",
+      "params": {
+        "action": {
+          "type": "string",
+          "required": true,
+          "description": "Operation to perform",
+          "enum": [
+            "list",
+            "create",
+            "delete",
+            "get_info",
+            "refresh",
+            "configure",
+            "add_field",
+            "remove_field",
+            "filter",
+            "sort"
+          ]
+        },
+        "pivotTableName": {
+          "type": "string",
+          "required": false,
+          "description": "PivotTable name. Required for most actions except list/create."
+        },
+        "name": {
+          "type": "string",
+          "required": false,
+          "description": "Name for new PivotTable (create)."
+        },
+        "sourceAddress": {
+          "type": "string",
+          "required": false,
+          "description": "Source data range with headers, e.g. \"Sheet1!A1:D100\" (create)."
+        },
+        "destinationAddress": {
+          "type": "string",
+          "required": false,
+          "description": "Top-left destination cell, e.g. \"Sheet2!A1\" (create)."
+        },
+        "rowFields": {
+          "type": "string[]",
+          "required": false,
+          "description": "Column names for row labels (create)."
+        },
+        "valueFields": {
+          "type": "string[]",
+          "required": false,
+          "description": "Column names to aggregate (create)."
+        },
+        "sourceSheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Source data sheet (create)."
+        },
+        "destinationSheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Destination sheet (create)."
+        },
+        "fieldName": {
+          "type": "string",
+          "required": false,
+          "description": "Source column name for field operations."
+        },
+        "fieldType": {
+          "type": "string",
+          "required": false,
+          "description": "Field area (add_field/remove_field).",
+          "enum": [
+            "row",
+            "column",
+            "data",
+            "filter"
+          ]
+        },
+        "layoutType": {
+          "type": "string",
+          "required": false,
+          "description": "Layout type (configure).",
+          "enum": [
+            "Compact",
+            "Tabular",
+            "Outline"
+          ]
+        },
+        "subtotalLocation": {
+          "type": "string",
+          "required": false,
+          "description": "Subtotal location (configure).",
+          "enum": [
+            "AtTop",
+            "AtBottom",
+            "Off"
+          ]
+        },
+        "showFieldHeaders": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show field headers (configure)."
+        },
+        "showRowGrandTotals": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show row grand totals (configure)."
+        },
+        "showColumnGrandTotals": {
+          "type": "boolean",
+          "required": false,
+          "description": "Show column grand totals (configure)."
+        },
+        "allowMultipleFiltersPerField": {
+          "type": "boolean",
+          "required": false,
+          "description": "Allow multiple filters per field (configure)."
+        },
+        "useCustomSortLists": {
+          "type": "boolean",
+          "required": false,
+          "description": "Use custom sort lists for sorting (configure)."
+        },
+        "refreshOnOpen": {
+          "type": "boolean",
+          "required": false,
+          "description": "Refresh on open (configure)."
+        },
+        "filterType": {
+          "type": "string",
+          "required": false,
+          "description": "For filter action: \"label\" (label filter), \"manual\" (item selection), or \"clear\" (clear filters).",
+          "enum": [
+            "label",
+            "manual",
+            "clear"
+          ]
+        },
+        "labelCondition": {
+          "type": "string",
+          "required": false,
+          "description": "Label filter condition (filter action, filterType=label).",
+          "enum": [
+            "Equals",
+            "DoesNotEqual",
+            "BeginsWith",
+            "DoesNotBeginWith",
+            "EndsWith",
+            "DoesNotEndWith",
+            "Contains",
+            "DoesNotContain",
+            "GreaterThan",
+            "GreaterThanOrEqualTo",
+            "LessThan",
+            "LessThanOrEqualTo",
+            "Between",
+            "NotBetween"
+          ]
+        },
+        "labelValue1": {
+          "type": "string",
+          "required": false,
+          "description": "Primary comparator for label filter."
+        },
+        "labelValue2": {
+          "type": "string",
+          "required": false,
+          "description": "Second comparator for Between/NotBetween."
+        },
+        "selectedItems": {
+          "type": "string[]",
+          "required": false,
+          "description": "Items to show for manual filter."
+        },
+        "sortBy": {
+          "type": "string",
+          "required": false,
+          "description": "Sort direction (sort action).",
+          "enum": [
+            "Ascending",
+            "Descending"
+          ]
+        },
+        "sortMode": {
+          "type": "string",
+          "required": false,
+          "description": "Sort by labels or by values (sort action).",
+          "enum": [
+            "labels",
+            "values"
+          ]
+        },
+        "valuesHierarchyName": {
+          "type": "string",
+          "required": false,
+          "description": "Data hierarchy name for value-based sort."
+        },
+        "pivotItemScope": {
+          "type": "string",
+          "required": false,
+          "description": "Pivot item scope for value sort."
+        },
+        "sheetName": {
+          "type": "string",
+          "required": false,
+          "description": "Optional worksheet name."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,813 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-15T13:30:20.688Z",
+  "host": "powerpoint",
+  "tools": [
+    {
+      "name": "get_presentation_overview",
+      "description": "Get a full overview of the PowerPoint presentation: total slide count, a text preview of each slide's shapes, AND a PNG thumbnail image of every slide. Call this FIRST before making any changes. The thumbnail images let you see the exact visual layout, design, and positioning of each slide — without them you cannot know the slide layout. Requires PowerPoint on Windows (16.0.17628+), Mac (16.85+), or PowerPoint on the web for images.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "thumbnailWidth": {
+            "type": "number",
+            "description": "Width in pixels for slide thumbnails. Default: 600."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_presentation_content",
+      "description": "Get the text content of one or more slides. Specify slideIndex for a single slide, startIndex/endIndex for a range, or omit all to read every slide.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based index for reading a single slide. Omit to use range or read all."
+          },
+          "startIndex": {
+            "type": "number",
+            "description": "0-based start index for a range of slides."
+          },
+          "endIndex": {
+            "type": "number",
+            "description": "0-based end index (inclusive) for a range of slides."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_slide_image",
+      "description": "Capture a slide as a PNG image to see its visual design, layout, colors, and styling. Use region=\"full\" for an overview, or \"bottom-left\"/\"bottom-right\" for 2× zoom into the bottom corners to check text overflow. Requires PowerPoint on Windows (16.0.17628+), Mac (16.85+), or PowerPoint on the web.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "width": {
+            "type": "number",
+            "description": "Image width in pixels. Aspect ratio is preserved. Default: 800."
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "full",
+              "top-left",
+              "top-right",
+              "bottom-left",
+              "bottom-right"
+            ],
+            "description": "Which part of the slide to return. \"full\" (default) = entire slide. \"top-left\", \"top-right\", \"bottom-left\", \"bottom-right\" = that quadrant zoomed 2×. Use bottom quadrants to inspect text overflow at the bottom of slides."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "get_slide_notes",
+      "description": "Get speaker notes from a PowerPoint slide. Note: The notes API has limited support in web add-ins; notes may not be available in all environments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index. Omit to get notes from all slides."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "set_presentation_content",
+      "description": "Add a text box to a slide. Pass slideIndex equal to the current total slide count to add a new slide first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index. Pass the total slide count to append a new slide before adding."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text content to add."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "add_slide_from_code",
+      "description": "Add a richly formatted slide to the presentation using PptxGenJS code.\nProvide a JavaScript function body that receives a 'slide' parameter (PptxGenJS Slide object).\n\nPptxGenJS API reference:\n- Text:   slide.addText(\"Hello\", { x:1, y:1, w:8, h:1, fontSize:24, bold:true, color:\"363636\" })\n- Bullets: slide.addText([{text:\"Point 1\",options:{bullet:true}},{text:\"Point 2\",options:{bullet:true}}], { x:0.5, y:1.5, w:9, h:3, fontSize:18 })\n- Image (base64): slide.addImage({ data:\"data:image/png;base64,...\", x:1, y:1, w:4, h:3 })\n- Table:  slide.addTable([[\"H1\",\"H2\"],[\"R1\",\"R2\"]], { x:0.5, y:2, w:9, fontSize:14 })\n- Shape:  slide.addShape(\"rect\", { x:1, y:1, w:3, h:1, fill:{ color:\"FF0000\" } })\n- All positions (x, y, w, h) are in inches.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "JavaScript code (function body) receiving a 'slide' parameter. Call PptxGenJS methods on it to build slide content."
+          },
+          "replaceSlideIndex": {
+            "type": "number",
+            "description": "Optional 0-based index of an existing slide to replace. If omitted, the new slide is appended."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    },
+    {
+      "name": "clear_slide",
+      "description": "Remove all shapes from a specific slide, leaving it blank.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "update_slide_shape",
+      "description": "Update the text content of an existing shape on a PowerPoint slide.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index within the slide."
+          },
+          "text": {
+            "type": "string",
+            "description": "The new text content for the shape."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "set_slide_notes",
+      "description": "Add or update speaker notes for a slide. Due to API limitations, this provides guidance rather than directly modifying notes in all environments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "notes": {
+            "type": "string",
+            "description": "The speaker notes text."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "notes"
+        ]
+      }
+    },
+    {
+      "name": "duplicate_slide",
+      "description": "Duplicate an existing slide by copying its text content into a new slide. Note: Only text shapes are copied; complex graphics may not be preserved.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sourceIndex": {
+            "type": "number",
+            "description": "0-based index of the slide to duplicate."
+          }
+        },
+        "required": [
+          "sourceIndex"
+        ]
+      }
+    },
+    {
+      "name": "get_selected_slides",
+      "description": "Get the currently selected slide(s). Call this first to know which slide the user is working on.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get_slide_shapes",
+      "description": "List all shapes on a slide with their index, name, type, position (inches), size (inches), and text. Use this before modifying, moving, or deleting individual shapes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "get_slide_layouts",
+      "description": "List all available slide layouts from the first slide master. Use before apply_slide_layout.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "delete_slide",
+      "description": "Delete a slide from the presentation by its 0-based index.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based index of the slide to delete."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "move_slide",
+      "description": "Reorder a slide by moving it to a new position. Requires PowerPoint 16.0.14326+ (requirement set 1.8).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fromIndex": {
+            "type": "number",
+            "description": "0-based index of the slide to move."
+          },
+          "toIndex": {
+            "type": "number",
+            "description": "0-based destination index the slide should occupy after the move."
+          }
+        },
+        "required": [
+          "fromIndex",
+          "toIndex"
+        ]
+      }
+    },
+    {
+      "name": "delete_shape",
+      "description": "Delete a specific shape from a slide by its index. Use get_slide_shapes first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index (from get_slide_shapes)."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex"
+        ]
+      }
+    },
+    {
+      "name": "set_shape_text",
+      "description": "Set the text content of a shape by name (preferred) or by index. Use get_slide_shapes first to identify names and indices.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "text": {
+            "type": "string",
+            "description": "New text content for the shape."
+          },
+          "shapeName": {
+            "type": "string",
+            "description": "Name of the shape to update (preferred over shapeIndex)."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index. Used when shapeName is not provided."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "move_resize_shape",
+      "description": "Move and/or resize a shape on a slide. All values are in inches (matching add_slide_from_code). Omit any property to leave it unchanged.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index (from get_slide_shapes)."
+          },
+          "left": {
+            "type": "number",
+            "description": "New left position in inches from the left edge of the slide."
+          },
+          "top": {
+            "type": "number",
+            "description": "New top position in inches from the top edge of the slide."
+          },
+          "width": {
+            "type": "number",
+            "description": "New width in inches."
+          },
+          "height": {
+            "type": "number",
+            "description": "New height in inches."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex"
+        ]
+      }
+    },
+    {
+      "name": "update_shape_style",
+      "description": "Update the visual style of a shape: fill color, font color, font size, bold. Use get_slide_shapes to get the shapeIndex first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index (from get_slide_shapes)."
+          },
+          "fillColor": {
+            "type": "string",
+            "description": "6-digit hex fill color without # (e.g. \"4472C4\"). Use \"none\" to remove fill."
+          },
+          "fontColor": {
+            "type": "string",
+            "description": "6-digit hex font color without # (e.g. \"FFFFFF\")."
+          },
+          "fontSize": {
+            "type": "number",
+            "description": "Font size in points."
+          },
+          "bold": {
+            "type": "boolean",
+            "description": "Set text bold (true/false)."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex"
+        ]
+      }
+    },
+    {
+      "name": "set_slide_background",
+      "description": "Set the solid background color of a slide.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "color": {
+            "type": "string",
+            "description": "6-digit hex color without # (e.g. \"1F2937\" for dark charcoal). Use \"none\" to reset to theme default."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "color"
+        ]
+      }
+    },
+    {
+      "name": "apply_slide_layout",
+      "description": "Apply a slide layout to a slide by name or index. Use get_slide_layouts to see available layouts first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "layoutName": {
+            "type": "string",
+            "description": "Name of the layout to apply (from get_slide_layouts). Preferred."
+          },
+          "layoutIndex": {
+            "type": "number",
+            "description": "0-based layout index. Used when layoutName is not provided."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "add_geometric_shape",
+      "description": "Add a geometric shape to a slide. Position and size are in inches, consistent with add_slide_from_code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeType": {
+            "type": "string",
+            "description": "Shape type — e.g. \"rectangle\", \"roundedRectangle\", \"ellipse\", \"triangle\", \"rightTriangle\", \"diamond\", \"pentagon\", \"hexagon\", \"star5\", \"heart\", \"cloud\", \"arrowRight\", \"arrowLeft\". See PowerPoint.GeometricShapeType for full list."
+          },
+          "left": {
+            "type": "number",
+            "description": "Left position in inches."
+          },
+          "top": {
+            "type": "number",
+            "description": "Top position in inches."
+          },
+          "width": {
+            "type": "number",
+            "description": "Width in inches."
+          },
+          "height": {
+            "type": "number",
+            "description": "Height in inches."
+          },
+          "fillColor": {
+            "type": "string",
+            "description": "6-digit hex fill color without # (e.g. \"4472C4\"). Optional."
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional name for the shape."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeType",
+          "left",
+          "top",
+          "width",
+          "height"
+        ]
+      }
+    },
+    {
+      "name": "add_line",
+      "description": "Add a straight line (connector) to a slide. Coordinates are in inches, consistent with add_slide_from_code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "startX": {
+            "type": "number",
+            "description": "Start X position in inches."
+          },
+          "startY": {
+            "type": "number",
+            "description": "Start Y position in inches."
+          },
+          "endX": {
+            "type": "number",
+            "description": "End X position in inches."
+          },
+          "endY": {
+            "type": "number",
+            "description": "End Y position in inches."
+          },
+          "connectorType": {
+            "type": "string",
+            "enum": [
+              "straight",
+              "elbow",
+              "curve"
+            ],
+            "description": "Connector type: \"straight\" (default), \"elbow\", or \"curve\"."
+          },
+          "color": {
+            "type": "string",
+            "description": "6-digit hex line color without # (e.g. \"363636\"). Optional."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "startX",
+          "startY",
+          "endX",
+          "endY"
+        ]
+      }
+    },
+    {
+      "name": "group_shapes",
+      "description": "Group multiple shapes on a slide into a single group shape. Use get_slide_shapes first to identify the shape indices. Requires PowerPoint 16.0.17531+ (requirement set 1.8).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndices": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "Array of 0-based shape indices (from get_slide_shapes) to group together. Must contain at least 2 indices."
+          },
+          "groupName": {
+            "type": "string",
+            "description": "Optional name for the resulting group shape."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndices"
+        ]
+      }
+    },
+    {
+      "name": "ungroup_shapes",
+      "description": "Ungroup a grouped shape on a slide, releasing its child shapes back to the slide. Use get_slide_shapes first to identify the group shape index (type will be \"Group\"). Requires PowerPoint 16.0.17531+ (requirement set 1.8).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based index of the group shape to ungroup (from get_slide_shapes, type should be \"Group\")."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex"
+        ]
+      }
+    },
+    {
+      "name": "get_smartart_info",
+      "description": "List all SmartArt and diagram shapes on a slide with their index, name, position, and size. Use this to inspect existing SmartArt graphics. Note: SmartArt content cannot be modified via the Office.js API — use add_slide_from_code with PptxGenJS to create SmartArt-like visuals programmatically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "get_theme_colors",
+      "description": "Read the presentation theme color palette from the first slide master. Returns the named theme colors (e.g., dk1, dk2, lt1, lt2, accent1–accent6, hlink, folHlink) so you can use brand-consistent colors instead of hardcoded hex values. Call this early when creating slides to match the presentation style.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get_presentation_properties",
+      "description": "Read presentation document properties: title, subject, author, keywords, and category.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "set_presentation_properties",
+      "description": "Set presentation document properties. Only provided fields are updated; others are left unchanged.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Presentation title."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Presentation subject."
+          },
+          "author": {
+            "type": "string",
+            "description": "Author name."
+          },
+          "keywords": {
+            "type": "string",
+            "description": "Keywords (comma-separated)."
+          },
+          "category": {
+            "type": "string",
+            "description": "Category."
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_selected_text_range",
+      "description": "Read the currently selected text in PowerPoint. Use this when the user says \"rephrase this\", \"translate this\", \"make this shorter\", or refers to selected content. Returns the selected text and the slide index where the selection is.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "set_shape_alt_text",
+      "description": "Set the alternative text (alt text) on a shape for accessibility. Use this for images, charts, and decorative shapes so screen readers can describe them.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index (from get_slide_shapes)."
+          },
+          "altText": {
+            "type": "string",
+            "description": "Descriptive alt text for the shape. For decorative shapes, use empty string."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex",
+          "altText"
+        ]
+      }
+    },
+    {
+      "name": "get_hyperlinks",
+      "description": "List all hyperlinks on a slide. Returns the shape name/index, linked text, and URL for each hyperlink.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          }
+        },
+        "required": [
+          "slideIndex"
+        ]
+      }
+    },
+    {
+      "name": "add_hyperlink",
+      "description": "Add a hyperlink to an existing shape on a slide. The entire shape becomes clickable.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index (from get_slide_shapes)."
+          },
+          "url": {
+            "type": "string",
+            "description": "The URL to link to (e.g., \"https://example.com\")."
+          },
+          "screenTip": {
+            "type": "string",
+            "description": "Tooltip text shown on hover."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex",
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "fetch_image_as_base64",
+      "description": "Fetch an image from a URL and return it as a base64 data URI. Use the returned data URI with add_slide_from_code's slide.addImage({data: \"...\"}) to place the image on a slide.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The image URL to fetch (must be HTTPS)."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "name": "get_table_data",
+      "description": "Read all cell values from a table shape on a slide. Use get_slide_shapes first to find table shape indices (shapes with type \"Table\").",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index of the table (from get_slide_shapes)."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex"
+        ]
+      }
+    },
+    {
+      "name": "set_table_cell",
+      "description": "Update the text in a specific cell of a table shape. Use get_table_data first to see current values.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slideIndex": {
+            "type": "number",
+            "description": "0-based slide index."
+          },
+          "shapeIndex": {
+            "type": "number",
+            "description": "0-based shape index of the table."
+          },
+          "row": {
+            "type": "number",
+            "description": "0-based row index."
+          },
+          "column": {
+            "type": "number",
+            "description": "0-based column index."
+          },
+          "text": {
+            "type": "string",
+            "description": "New text for the cell."
+          }
+        },
+        "required": [
+          "slideIndex",
+          "shapeIndex",
+          "row",
+          "column",
+          "text"
+        ]
+      }
+    }
+  ]
+}
