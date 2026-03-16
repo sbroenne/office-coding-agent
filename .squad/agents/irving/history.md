@@ -7,6 +7,15 @@
 
 ## Learnings
 
+### 2026-03-16 — Backend/server review findings
+
+**Key findings:**
+- `src/copilotProxy.mjs` is generally defensive on disconnect cleanup, but browser-routed `tool.call` requests have no timeout, so a hung browser tool can stall a session indefinitely.
+- The browser WebSocket stack (`src/lib/websocket-client.ts` + `src/lib/websocket-transport.ts`) has no native reconnect loop; recovery mostly happens in `useOfficeChat` during send failures, so idle disconnects can leave stale clients behind until the next action.
+- `src/server.mjs` exposes `GET /api/env`, `GET /api/browse`, and permissive `cors({ origin: '*' })` with no auth/origin check. Combined with the prefix-based path allowlist, localhost attack surface is broader than it should be.
+- Tool configs are a strong source of truth, but `src/tools/codegen/factory.ts` does not enforce runtime argument validation or `additionalProperties: false`, so bad tool calls fall through to Office runtime errors instead of clean validation failures.
+- `src/mcpClient.mjs` is isolated and not currently wired into the reviewed proxy path, but if revived it needs connection timeouts and guaranteed transport cleanup on partial startup failures.
+
 ### 2026-03-15 — @github/copilot 0.0.414 → 1.0.5 upgrade (GHSA-g8r9-g2v8-jv6f fix)
 
 **What changed:**
