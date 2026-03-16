@@ -11,6 +11,7 @@ interface ChatPanelProps {
   isRunning: boolean;
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
+  onSwitchModel?: (modelId: string) => Promise<void>;
   onEnqueue?: (text: string) => void;
   queuedPrompts?: string[];
   onDequeue?: (index: number) => void;
@@ -21,6 +22,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   isRunning,
   onSend,
   onCancel,
+  onSwitchModel,
   onEnqueue,
   queuedPrompts,
   onDequeue,
@@ -49,7 +51,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         leftToolbar={
           <>
             <AgentPicker />
-            <ModelPicker />
+            <ModelPicker hasActiveSession={messages.length > 0} onSwitchModel={onSwitchModel} />
           </>
         }
         rightToolbar={<McpPicker />}

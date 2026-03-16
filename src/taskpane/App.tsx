@@ -1,20 +1,29 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { Loader2, RefreshCw } from 'lucide-react';
 import { ChatHeader } from '@/components/ChatHeader';
 import { ChatPanel } from '@/components/ChatPanel';
 import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { SlidePanel } from '@/components/SlidePanel';
 import { SessionHistoryPanel } from '@/components/SessionHistoryDialog';
 import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
+import { Codicon } from '@/components/Codicon';
 import { useSettingsStore } from '@/stores';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { ChatActionsContext } from '@/contexts/ChatActionsContext';
 import { detectOfficeHost } from '@/services/office/host';
 import type { OfficeHostApp } from '@/services/office/host';
 
+const bannerBaseStyle: React.CSSProperties = {
+  borderBottomColor: 'var(--vscode-widget-border)',
+  backgroundColor: 'var(--vscode-editorWidget-background)',
+  color: 'var(--vscode-descriptionForeground)',
+};
+
+const buttonBaseClassName =
+  'shrink-0 rounded-[var(--vscode-cornerRadius-medium)] border px-2 py-0.5 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] focus-visible:outline-offset-0';
+
 const ConnectingBanner: React.FC = () => (
-  <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-    <Loader2 className="size-3.5 animate-spin shrink-0" />
+  <div className="flex items-center gap-2 border-b px-3 py-2 text-sm" style={bannerBaseStyle}>
+    <Codicon name="loading" className="shrink-0 animate-spin text-[14px]" />
     <span>Connecting to Copilot...</span>
   </div>
 );
@@ -23,15 +32,33 @@ const SessionErrorBanner: React.FC<{ error: Error; onRetry: () => void }> = ({
   error,
   onRetry,
 }) => (
-  <div className="flex items-center gap-2 border-b border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive dark:text-red-200">
+  <div
+    className="flex items-center gap-2 border-b px-3 py-2 text-sm"
+    style={{
+      ...bannerBaseStyle,
+      borderBottomColor: 'var(--vscode-errorForeground)',
+      color: 'var(--vscode-errorForeground)',
+    }}
+  >
     <span className="min-w-0 flex-1 truncate" title={error.message}>
       Connection failed: {error.message}
     </span>
     <button
       onClick={onRetry}
-      className="flex items-center gap-1 shrink-0 rounded-md border border-destructive/30 px-2 py-0.5 text-xs font-medium hover:bg-destructive/20 transition-colors"
+      className={buttonBaseClassName}
+      style={{
+        borderColor: 'var(--vscode-widget-border)',
+        color: 'var(--vscode-foreground)',
+        backgroundColor: 'transparent',
+      }}
+      onMouseEnter={event => {
+        event.currentTarget.style.backgroundColor = 'var(--vscode-toolbar-hoverBackground)';
+      }}
+      onMouseLeave={event => {
+        event.currentTarget.style.backgroundColor = 'transparent';
+      }}
     >
-      <RefreshCw className="size-3" />
+      <Codicon name="refresh" className="text-[12px]" />
       Retry
     </button>
   </div>
@@ -44,31 +71,76 @@ const PermissionBanner: React.FC<{
   onDeny: () => void;
   onAlwaysAllow: () => void;
 }> = ({ kind, detail, onApprove, onDeny, onAlwaysAllow }) => (
-  <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+  <div
+    className="flex items-center gap-2 border-b px-3 py-2 text-sm"
+    style={{
+      ...bannerBaseStyle,
+      color: 'var(--vscode-foreground)',
+    }}
+  >
+    <Codicon name="warning" className="shrink-0 text-[14px]" />
     <div className="min-w-0 flex-1">
       <div className="truncate font-medium" title={kind}>
         Permission requested: {kind}
       </div>
-      <div className="truncate text-xs" title={detail}>
+      <div
+        className="truncate text-xs"
+        title={detail}
+        style={{ color: 'var(--vscode-descriptionForeground)' }}
+      >
         {detail}
       </div>
     </div>
     <div className="flex items-center gap-1">
       <button
         onClick={onDeny}
-        className="shrink-0 rounded-md border border-amber-500/40 px-2 py-0.5 text-xs font-medium hover:bg-amber-200/60 dark:hover:bg-amber-900/40"
+        className={buttonBaseClassName}
+        style={{
+          borderColor: 'var(--vscode-widget-border)',
+          backgroundColor: 'var(--vscode-button-secondaryBackground)',
+          color: 'var(--vscode-button-secondaryForeground)',
+        }}
+        onMouseEnter={event => {
+          event.currentTarget.style.backgroundColor =
+            'var(--vscode-button-secondaryHoverBackground)';
+        }}
+        onMouseLeave={event => {
+          event.currentTarget.style.backgroundColor = 'var(--vscode-button-secondaryBackground)';
+        }}
       >
         Deny
       </button>
       <button
         onClick={onApprove}
-        className="shrink-0 rounded-md border border-amber-600/40 bg-amber-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-amber-700"
+        className={buttonBaseClassName}
+        style={{
+          borderColor: 'var(--vscode-button-background)',
+          backgroundColor: 'var(--vscode-button-background)',
+          color: 'var(--vscode-button-foreground)',
+        }}
+        onMouseEnter={event => {
+          event.currentTarget.style.backgroundColor = 'var(--vscode-button-hoverBackground)';
+        }}
+        onMouseLeave={event => {
+          event.currentTarget.style.backgroundColor = 'var(--vscode-button-background)';
+        }}
       >
         Allow
       </button>
       <button
         onClick={onAlwaysAllow}
-        className="shrink-0 rounded-md border border-amber-600/40 px-2 py-0.5 text-xs font-medium hover:bg-amber-200/60 dark:hover:bg-amber-900/40"
+        className={buttonBaseClassName}
+        style={{
+          borderColor: 'var(--vscode-widget-border)',
+          backgroundColor: 'transparent',
+          color: 'var(--vscode-foreground)',
+        }}
+        onMouseEnter={event => {
+          event.currentTarget.style.backgroundColor = 'var(--vscode-toolbar-hoverBackground)';
+        }}
+        onMouseLeave={event => {
+          event.currentTarget.style.backgroundColor = 'transparent';
+        }}
       >
         Always allow
       </button>
@@ -91,6 +163,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     isConnecting,
     clearMessages,
     compactSession,
+    switchModel,
     restoreSession,
     deleteSession,
     sessions,
@@ -153,6 +226,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               isRunning={isRunning}
               onSend={send}
               onCancel={cancel}
+              onSwitchModel={switchModel}
               onEnqueue={enqueue}
               queuedPrompts={queuedPrompts}
               onDequeue={dequeue}
@@ -211,7 +285,7 @@ export const App: React.FC = () => {
   if (!hasHydrated) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background text-foreground">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        <Codicon name="loading" className="animate-spin text-[32px]" />
         <p className="text-sm text-muted-foreground">Initializing...</p>
       </div>
     );
