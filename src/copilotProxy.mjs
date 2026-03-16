@@ -24,6 +24,7 @@ import {
   discoverPluginAgents,
   discoverPluginPrompts,
 } from './pluginDiscovery.mjs';
+import { isTrustedRequestOrigin } from './serverSecurity.mjs';
 
 const execFileAsync = promisify(execFile);
 /** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
@@ -736,6 +737,12 @@ export function setupCopilotProxy(httpsServer) {
     const url = new URL(request.url, `https://${request.headers.host}`);
 
     if (url.pathname === '/api/copilot') {
+      if (!isTrustedRequestOrigin(request.headers.origin, request.socket?.remoteAddress)) {
+        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
       wss.handleUpgrade(request, socket, head, ws => {
         wss.emit('connection', ws, request);
       });

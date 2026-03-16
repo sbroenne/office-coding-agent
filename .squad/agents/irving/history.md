@@ -7,6 +7,21 @@
 
 ## Learnings
 
+### 2026-03-16 — Localhost server hardening shipped
+
+**What changed:**
+- Added shared origin and browse-path guards in `src/serverSecurity.mjs` and used them in both `src/server.mjs` and `src/server-prod.mjs`.
+- Replaced wildcard CORS with an allowlist for localhost plus trusted Microsoft/Office hosts, and reject unexpected `Origin` headers before `/api` routes run.
+- Added WebSocket `Origin` validation in `src/copilotProxy.mjs` so `/api/copilot` now returns HTTP 403 for untrusted browser origins.
+- Locked `/api/env` down to non-sensitive runtime metadata only, and removed the PermissionManager dependency on path-bearing env data.
+- Hardened `/api/browse` with trusted-caller checks, canonical path checks, and explicit `..` traversal rejection while still allowing project/home browsing.
+- Updated live WebSocket integration tests to send `Origin: https://localhost:3000`, which matches real browser behaviour after the new upgrade gate.
+
+**Verification:**
+- `npm run build:dev`
+- `npm run test:integration`
+- Manual probes confirmed 403 responses for untrusted REST origins, path traversal on `/api/browse`, and untrusted WebSocket upgrades.
+
 ### 2026-03-16 — Backend/server review findings
 
 **Key findings:**

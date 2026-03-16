@@ -25,6 +25,7 @@ global.WebSocket = class PatchedWebSocket extends WS {
   constructor(url: string | URL, protocols?: string | string[]) {
     super(url, typeof protocols === 'string' ? protocols : (protocols ?? []), {
       rejectUnauthorized: false,
+      origin: 'https://localhost:3000',
     });
   }
 } as unknown as typeof WebSocket;
