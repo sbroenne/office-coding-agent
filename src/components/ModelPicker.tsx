@@ -3,8 +3,6 @@ import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
-import { useOfficeChat } from '@/hooks/useOfficeChat';
-import { detectOfficeHost } from '@/services/office/host';
 import type { CopilotModel, ModelProvider } from '@/types';
 
 const PROVIDER_ORDER: ModelProvider[] = ['Anthropic', 'OpenAI', 'Google', 'Other'];
@@ -17,13 +15,19 @@ function formatModelId(id: string): string {
     .join(' ');
 }
 
-export const ModelPicker: React.FC = () => {
+interface ModelPickerProps {
+  hasActiveSession?: boolean;
+  onSwitchModel?: (modelId: string) => Promise<void>;
+}
+
+export const ModelPicker: React.FC<ModelPickerProps> = ({
+  hasActiveSession = false,
+  onSwitchModel,
+}) => {
   const [open, setOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const { activeModel, setActiveModel, availableModels } = useSettingsStore();
-  const host = detectOfficeHost();
-  const { switchModel, messages } = useOfficeChat(host);
 
   const models = availableModels ?? [];
   const currentModel = models.find(m => m.id === activeModel);
@@ -59,7 +63,10 @@ export const ModelPicker: React.FC = () => {
           align="start"
         >
           {switchError && (
-            <div className="px-3 py-2 text-xs text-red-500 border-b border-border">
+            <div
+              className="border-b border-border px-3 py-2 text-xs"
+              style={{ color: 'var(--vscode-errorForeground)' }}
+            >
               {switchError}
             </div>
           )}
@@ -83,24 +90,19 @@ export const ModelPicker: React.FC = () => {
                         onClick={() => {
                           void (async () => {
                             setSwitchError(null);
-                            const hasActiveSession = messages.length > 0;
-
-                            if (hasActiveSession) {
-                              // Mid-session switch
+                            if (hasActiveSession && onSwitchModel) {
                               setIsSwitching(true);
                               try {
-                                await switchModel(model.id);
+                                await onSwitchModel(model.id);
                                 setOpen(false);
                               } catch (err) {
                                 setSwitchError(
                                   err instanceof Error ? err.message : 'Failed to switch model'
                                 );
-                                // Keep popover open to show error
                               } finally {
                                 setIsSwitching(false);
                               }
                             } else {
-                              // No active session - just update store for next session
                               setActiveModel(model.id);
                               setOpen(false);
                             }
