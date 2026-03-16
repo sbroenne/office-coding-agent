@@ -1,0 +1,52 @@
+{
+  "agents": {
+    "Harmony": {
+      "persistent_name": "Harmony",
+      "role": "Lead",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-03-15T09:52:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "Ellis": {
+      "persistent_name": "Ellis",
+      "role": "Product Manager",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-03-15T09:52:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "Dylan": {
+      "persistent_name": "Dylan",
+      "role": "Frontend Dev",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-03-15T09:52:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "Irving": {
+      "persistent_name": "Irving",
+      "role": "Backend Dev",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-03-15T09:52:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "Mark": {
+      "persistent_name": "Mark",
+      "role": "Tester",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-03-15T09:52:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "Parker": {
+      "persistent_name": "Parker",
+      "role": "UX Tester",
+      "universe": "Ocean's Eleven",
+      "created_at": "2026-03-15T09:52:00Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}

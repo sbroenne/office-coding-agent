@@ -79,6 +79,166 @@ Use per-host manifest files under `tests-aitest/manifests/` instead of single sh
 
 **Follow-up:** If project standardizes all hosts on single manifest shape, revisit Excel simulator to move off decomposed config manifest onto runtime `Tool[]` surface.
 
+### Harmony: Host Registry / Plugin Architecture (2026-03-16)
+**Owner:** Harmony  
+**Status:** Proposed  
+Consolidate per-host configuration into a single registry centralizing:
+- prompt sources
+- tool definitions
+- agent defaults
+- optional orchestrators
+- capability metadata
+
+**Why:** Current architecture has proxy boundary too wide, host fallback leaks Excel assumptions, tool definitions split three ways (Excel config, PowerPoint/Word inline, Outlook handwritten), and `useOfficeChat.ts` carries excessive responsibilities. Centralized registry would shrink `useOfficeChat.ts`, remove scattered host switches, and unify host targeting including Outlook.
+
+### Irving: Lock Down Localhost APIs & WebSocket (2026-03-16)
+**Owner:** Irving  
+**Status:** Proposed  
+Security hardening roadmap:
+1. Remove permissive CORS from `src/server.mjs`; add Origin validation to WebSocket upgrades
+2. Fix prefix bypass vulnerability in `/api/browse` path checks
+3. Add per-tool execution deadlines to prevent blocking tool calls
+4. Improve WebSocket lifecycle with complete reconnect strategy and buffer management
+
+**Why:** Current implementation has permissive `cors({ origin: '*' })`, unauthenticated API endpoints (`/api/env`, `/api/browse`), and no tool execution timeouts. `src/copilotProxy.mjs` accepts upgrades without Origin validation.
+
+### Irving: Harden WebSocket Lifecycle & Failure Containment (2026-03-16)
+**Owner:** Irving  
+**Status:** Proposed  
+Improve WebSocket transport:
+- Add timeout and failure containment around `sendRequest('tool.call', ...)` to prevent indefinite blocking
+- Harden `src/lib/websocket-client.ts` reconnect strategy
+- Fix buffer ceiling and malformed header handling in `src/lib/websocket-transport.ts`
+- Handle idle disconnect scenarios better (currently under-handled outside `useOfficeChat`)
+
+**Why:** Hanging browser tool handlers can block proxy indefinitely. WebSocket lifecycle is incomplete; recovery mostly happens during active send failures.
+
+### Dylan: Refactor ModelPicker Session Lifecycle (2026-03-16)
+**Owner:** Dylan  
+**Status:** Proposed  
+ModelPicker currently calls `useOfficeChat(host)` directly, creating a duplicate session outside the main app tree. Refactor to:
+- Consume session context from App instead of creating its own WebSocket connection
+- Eliminate risk of WebSocket churn, stale messages, and model switching against wrong session
+
+**Why:** Current implementation bypasses the main session lifecycle, risking out-of-sync state and duplicate socket connections.
+
+### Dylan: Audit & Harmonize VS Code Design Tokens (2026-03-16)
+**Owner:** Dylan  
+**Status:** Proposed  
+UI fidelity hardening:
+1. Remove `lucide-react` from App-level banners and loading states
+2. Replace all color values with `--vscode-*` CSS custom properties
+3. Replace all icons with codicons (`@vscode/codicons`)
+4. Declare and validate all referenced tokens (e.g., `--vscode-icon-foreground`, `--vscode-badge-*`, `--vscode-keybindingLabel-*`, `--vscode-quickInput-background`, `--vscode-widget-shadow`)
+
+**Why:** App-level UI breaks VS Code Copilot Chat fidelity. Components reference undeclared tokens. This is the clearest visual break from the design system.
+
+### Dylan: Remove Dead Control Handlers & Improve Accessibility (2026-03-16)
+**Owner:** Dylan  
+**Status:** Proposed  
+UI quality improvements:
+1. Either wire `regenerate` and `feedback` button handlers in `ActionBar` or remove the buttons from `ChatPanel`
+2. Make `UserMessage` edit affordance keyboard accessible (currently mouse-centric)
+3. Add combobox semantics to slash command listbox (`aria-controls`, `aria-activedescendant`, option IDs)
+4. Enhance `ChatHeader` with Copilot-style title/header treatment
+
+**Why:** Exposing dead controls creates confusion. Accessibility gaps limit usability for keyboard-only and assistive-device users.
+
+### Mark: Expand Non-Excel Host E2E Coverage (2026-03-16)
+**Owner:** Mark  
+**Status:** Proposed  
+Extend E2E test depth for non-Excel hosts:
+- **PowerPoint:** Cover 37 named tools, not just 13; prioritize write/edit/shape/layout flows
+- **Word:** Cover 35 named tools, not just 12; prioritize selection awareness and editing workflows
+- **Outlook:** Cover 22 tools and real workflows (reply chains, calendar lookups, multi-recipient handling, advanced search, categories, flags, archives), not just shallow read operations
+
+**Why:** Non-Excel hosts have significantly shallower coverage (PowerPoint 13/37, Word 12/35, Outlook 6/22) compared to Excel (233 tests). Real workflows are underrepresented.
+
+### Mark: Split Playwright Tests into Smoke vs Live E2E (2026-03-16)
+**Owner:** Mark  
+**Status:** Proposed  
+Clarify test boundaries:
+- `tests-ui/fixtures.ts` currently mocks WebSocket, uses synthetic JSON-RPC responses, and pre-seeds state
+- This directly violates the repo rule that Playwright should not mock network/WebSocket/server behavior
+- Solution: Split into two suites — smoke tests (mocked, Vitest) and true E2E (live server, Playwright)
+
+**Why:** Current Playwright tests contradict their stated purpose of verifying end-to-end flows through the real Copilot API.
+
+### Mark: Add Real-Path Coverage for Critical Chat Flows (2026-03-16)
+**Owner:** Mark  
+**Status:** Proposed  
+Critical orchestration flows lack end-to-end coverage:
+- Permission approval workflows
+- MCP tool registration and execution
+- Reconnect and session recovery
+- Slash-command-to-plugin execution
+
+Current coverage is mostly mocked in Vitest (`use-office-chat.test.tsx`, `management-tools.test.ts`, `chat-composer-slash.test.tsx`). Add one real-path test per flow before expanding long-tail component coverage.
+
+**Why:** These flows are user-critical and currently untested in live conditions.
+
+### Mark: Clean Up Test Artifacts & Unify vitest Config (2026-03-16)
+**Owner:** Mark  
+**Status:** Proposed  
+Test infrastructure improvements:
+1. Remove generated artifacts from `tests-e2e/`, `tests-aitest/` (dist, node_modules, .pycache, report.html)
+2. Add to `.gitignore` to prevent future commits
+3. Remove `unit` project from `vitest.config.ts` (conflicts with repo policy against unit tests)
+4. Consolidate `tests/` structure (currently overlaps between `unit` and `integration`)
+
+**Why:** Test directories currently contain noise that makes review harder and can hide real test changes.
+
+### Ellis: Strengthen Outlook Host Support (2026-03-16)
+**Owner:** Ellis  
+**Status:** Proposed  
+Outlook expansion (2–3 sprint effort):
+1. Expand Outlook agent AGENT.md to detail level matching PowerPoint/Word (include use-case narratives)
+2. Add 50+ E2E tests covering:
+   - Reply chains and threading
+   - Calendar lookups for scheduling
+   - Multi-recipient handling (To/Cc/Bcc)
+   - Advanced search + filters
+   - Categories, flags, archives
+3. Ensure all 22 Outlook tools have integration test coverage
+4. Add Outlook AI eval tests to catch LLM confusion on email semantics
+
+**Success Metric:** Outlook E2E tests ≥ 50; agent quality matches PowerPoint.
+
+**Why:** Outlook is the thinnest host (8 tests vs 233 Excel). Agent definition is skeletal. Real workflows are underrepresented.
+
+### Ellis: Add Welcome Screen for Onboarding (2026-03-16)
+**Owner:** Ellis  
+**Status:** Proposed  
+New user onboarding (1 sprint effort):
+1. Design welcome screen (Copilot-style, centered, friendly) with:
+   - Host-specific prompt suggestions
+   - Link to "Learn more" → host-specific docs
+   - Dismiss toggle (persist welcome state)
+2. Add "?" help button in header → links to agent instructions + docs
+3. Host-specific guidance:
+   - **Excel:** "Read values from A1:B10" / "Create a pivot table"
+   - **PowerPoint:** "Create a 5-slide presentation on…" / "Redesign this slide"
+   - **Word:** "Summarize this document" / "Format this heading"
+   - **Outlook:** "Draft a reply to this email" / "Find my meetings next week"
+
+**Success Metric:** New users convert (don't abandon at blank chat).
+
+**Why:** Add-in ships with blank chat. No prompt examples, no host-specific guidance, no quick-start help. Most critical UX gap.
+
+### Ellis: Create Developer Documentation Suite (2026-03-16)
+**Owner:** Ellis  
+**Status:** Proposed  
+New extensibility guides (1 sprint effort):
+1. `docs/TOOL_API_REFERENCE.md` — auto-generated from `src/tools/` configs, per-host tooling with parameters, return types, examples
+2. `docs/SKILL_DEVELOPMENT.md` — example skill, YAML frontmatter spec, local testing
+3. `docs/AGENT_DEVELOPMENT.md` — agent template, host declaration, custom agent testing
+4. `docs/PLUGIN_DEVELOPMENT.md` — full plugin structure, build/publish workflow, link to CLI spec
+5. Link all four guides from README.md under new "Extending" section
+
+**Success Metric:** Third-party plugins submitted; reduced support burden for "how do I add a tool?" questions.
+
+**Why:** Developers who want to extend the add-in (plugins, skills, agents) have no documented starting points. Tool API exists only in code.
+
 ## Governance
 
 - All meaningful changes require team consensus
