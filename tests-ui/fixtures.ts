@@ -1,4 +1,4 @@
-import { test as base, type Page } from '@playwright/test';
+import { test as base, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
  * Polyfill for OfficeRuntime.storage using localStorage.
@@ -57,78 +57,24 @@ function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
   });
 }
 
-// ─── Mock WebSocket server helpers ───────────────────────────────────────────
-// The app uses LSP framing over WebSocket: `Content-Length: N\r\n\r\n<json>`
-// These helpers parse incoming messages and send correctly framed responses.
-
-/**
- * Models returned by the mock WebSocket server.
- * Deliberately different from the app's default model (claude-sonnet-4) to
- * exercise the auto-correction path in loadAvailableModels().
- */
-export const MOCK_SERVER_MODELS = [
-  { id: 'mock-model-opus', name: 'Mock Model Opus' },
-  { id: 'mock-model-turbo', name: 'Mock Model Turbo' },
-];
-
-/** Parse an LSP-framed JSON-RPC message from the WebSocket transport. */
-function parseLspMessage(
-  raw: string | Buffer
-): { id: number; method?: string; params?: unknown } | null {
-  const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-  const idx = text.indexOf('\r\n\r\n');
-  if (idx === -1) return null;
+export async function hasDevServer(request: APIRequestContext): Promise<boolean> {
   try {
-    return JSON.parse(text.slice(idx + 4)) as { id: number; method?: string; params?: unknown };
+    const response = await request.get('/api/ping');
+    return response.ok();
   } catch {
-    return null;
+    return false;
   }
 }
 
-/** Wrap a JSON-RPC result in an LSP-framed response string. */
-function makeLspResponse(id: number, result: unknown): string {
-  const json = JSON.stringify({ jsonrpc: '2.0', id, result });
-  const byteLen = Buffer.byteLength(json, 'utf-8');
-  return `Content-Length: ${byteLen}\r\n\r\n${json}`;
-}
-
-/** Wrap a JSON-RPC error in an LSP-framed response string. */
-function makeLspError(id: number, code: number, message: string): string {
-  const json = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } });
-  const byteLen = Buffer.byteLength(json, 'utf-8');
-  return `Content-Length: ${byteLen}\r\n\r\n${json}`;
-}
-
-/** Wrap a JSON-RPC notification in an LSP-framed string. */
-function makeLspNotification(method: string, params: unknown): string {
-  const json = JSON.stringify({ jsonrpc: '2.0', method, params });
-  const byteLen = Buffer.byteLength(json, 'utf-8');
-  return `Content-Length: ${byteLen}\r\n\r\n${json}`;
-}
-
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
 /**
  * Shared fixtures for UI tests.
  *
- * - `taskpane`: fresh state, no pre-seeded data, no WS mock (real dev server).
- * - `configuredTaskpane`: pre-seeds localStorage with known model/agent/skill
- *    settings. Use for deterministic UI rendering tests that don't test the
- *    connection flow.
- * - `mockServerTaskpane`: fresh state with a mock WebSocket server that
- *    responds to session.create and models.list. Tests the real connection
- *    flow — models are genuinely fetched and applied to the UI.
- * - `disconnectedTaskpane`: WS connection is accepted then immediately closed.
- *    Tests that the app correctly surfaces session errors to the user.
- * - `toolCardMockTaskpane`: deterministic mock that injects a synthetic
- *    manage_skills tool call on every session.send, making tool card UI
- *    tests fast and reliable without any live LLM calls.
+ * These fixtures never intercept WebSocket traffic. Playwright coverage in this
+ * repo must exercise the real proxy server and Copilot session flow.
  */
 export const test = base.extend<{
   taskpane: Page;
   configuredTaskpane: Page;
-  mockServerTaskpane: Page;
-  disconnectedTaskpane: Page;
-  toolCardMockTaskpane: Page;
 }>({
   /** Navigate to the task pane (default/fresh state). */
   taskpane: async ({ page }, use) => {
@@ -140,199 +86,13 @@ export const test = base.extend<{
 
   /**
    * Navigate with pre-seeded settings for deterministic UI rendering tests.
-   * availableModels is seeded directly — no WS connection is made.
-   * Use this for testing UI components (model picker, agent picker, etc.)
-   * with a known, stable data set.
+   * This only seeds persisted settings; the page still talks to the live proxy.
    */
   configuredTaskpane: async ({ page }, use) => {
     await page.addInitScript(officeRuntimePolyfill);
     await page.addInitScript((json: string) => {
       localStorage.setItem('office-coding-agent-settings', json);
     }, makeSettingsJSON());
-    await page.goto('/taskpane.html');
-    await page.waitForLoadState('domcontentloaded');
-    await use(page);
-  },
-
-  /**
-   * Navigate with a mock WebSocket server that speaks the app's JSON-RPC
-   * protocol. Tests the REAL connection flow: the app connects, sends
-   * session.create and models.list, and the UI updates from the responses.
-   *
-   * MOCK_SERVER_MODELS contains IDs that do NOT match the default activeModel
-   * (claude-sonnet-4), deliberately triggering the auto-correction path.
-   */
-  mockServerTaskpane: async ({ page }, use) => {
-    await page.addInitScript(officeRuntimePolyfill);
-
-    // Intercept the WebSocket before navigating so the mock is in place
-    await page.routeWebSocket('wss://localhost:3000/api/copilot', ws => {
-      ws.onMessage(raw => {
-        const msg = parseLspMessage(raw);
-        if (!msg || msg.id === undefined) return;
-
-        if (msg.method === 'session.create') {
-          ws.send(makeLspResponse(msg.id, { sessionId: 'mock-session-1' }));
-        } else if (msg.method === 'models.list') {
-          ws.send(makeLspResponse(msg.id, { models: MOCK_SERVER_MODELS }));
-        }
-        // Other methods (session.destroy, etc.) are silently ignored
-      });
-    });
-
-    await page.goto('/taskpane.html');
-    await page.waitForLoadState('domcontentloaded');
-    await use(page);
-  },
-
-  /**
-   * Navigate with a WebSocket mock that responds to every JSON-RPC request
-   * with a server-error response, simulating a server that is reachable but
-   * rejects all operations (e.g., authentication failure, service down).
-   *
-   * The sequence: WebSocket opens → session.create receives an error response
-   * → createSession() rejects with ResponseError → sessionError is set →
-   * SessionErrorBanner renders. availableModels is never populated (because
-   * loadAvailableModels() is only called after a successful createSession()),
-   * so the model picker shows "Connecting to Copilot…".
-   *
-   * This approach is deterministic because it uses the normal JSON-RPC error
-   * response path rather than relying on WebSocket close timing.
-   */
-  disconnectedTaskpane: async ({ page }, use) => {
-    await page.addInitScript(officeRuntimePolyfill);
-
-    await page.routeWebSocket('wss://localhost:3000/api/copilot', ws => {
-      ws.onMessage(raw => {
-        const msg = parseLspMessage(raw);
-        if (!msg || msg.id === undefined) return;
-        // Reject every request with a server-side error
-        ws.send(makeLspError(msg.id, -32001, 'Server is unavailable'));
-      });
-    });
-
-    await page.goto('/taskpane.html');
-    await page.waitForLoadState('domcontentloaded');
-    await use(page);
-  },
-
-  /**
-   * Deterministic mock for tool-card UI tests.
-   *
-   * On every session.send, injects a synthetic sequence of session events:
-   *   1. report_intent tool execution (should be filtered — no card created)
-   *   2. manage_skills tool execution start
-   *   3. manage_skills tool execution complete (with a canned result)
-   *   4. assistant.message_delta (short text reply)
-   *   5. session.idle (marks response as done)
-   *
-   * This lets tests verify tool-card rendering (CSS classes, structure,
-   * summary text, Input/Output headers) without any live LLM calls.
-   */
-  toolCardMockTaskpane: async ({ page }, use) => {
-    await page.addInitScript(officeRuntimePolyfill);
-    await page.addInitScript((json: string) => {
-      localStorage.setItem('office-coding-agent-settings', json);
-    }, makeSettingsJSON());
-
-    await page.routeWebSocket('wss://localhost:3000/api/copilot', ws => {
-      ws.onMessage(raw => {
-        const msg = parseLspMessage(raw);
-        if (!msg || msg.id === undefined) return;
-
-        if (msg.method === 'session.create') {
-          ws.send(makeLspResponse(msg.id, { sessionId: 'tool-card-session' }));
-        } else if (msg.method === 'models.list') {
-          ws.send(
-            makeLspResponse(msg.id, {
-              models: [{ id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }],
-            })
-          );
-        } else if (msg.method === 'session.send') {
-          const sessionId = 'tool-card-session';
-          // Acknowledge the send immediately
-          ws.send(makeLspResponse(msg.id, { messageId: 'mock-msg-1' }));
-
-          // Fire synthetic events with small delays so the UI renders each step
-          // 1. report_intent — must NOT produce a tool card
-          setTimeout(() => {
-            ws.send(
-              makeLspNotification('session.event', {
-                sessionId,
-                event: {
-                  type: 'tool.execution_start',
-                  data: {
-                    toolCallId: 'tc-intent',
-                    toolName: 'report_intent',
-                    arguments: { intent: 'Looking up the skill list…' },
-                  },
-                },
-              })
-            );
-          }, 30);
-
-          // 2. manage_skills start — creates the Working box + tool card
-          setTimeout(() => {
-            ws.send(
-              makeLspNotification('session.event', {
-                sessionId,
-                event: {
-                  type: 'tool.execution_start',
-                  data: {
-                    toolCallId: 'tc-skills',
-                    toolName: 'manage_skills',
-                    arguments: { action: 'list' },
-                  },
-                },
-              })
-            );
-          }, 80);
-
-          // 3. manage_skills complete — populates result + summary
-          setTimeout(() => {
-            ws.send(
-              makeLspNotification('session.event', {
-                sessionId,
-                event: {
-                  type: 'tool.execution_complete',
-                  data: {
-                    toolCallId: 'tc-skills',
-                    result: {
-                      content: 'Found 3 bundled skills: Excel Helper, Data Analyzer, Chart Builder.',
-                    },
-                  },
-                },
-              })
-            );
-          }, 130);
-
-          // 4. Text reply delta
-          setTimeout(() => {
-            ws.send(
-              makeLspNotification('session.event', {
-                sessionId,
-                event: {
-                  type: 'assistant.message_delta',
-                  data: { deltaContent: 'You have 3 bundled skills available.' },
-                },
-              })
-            );
-          }, 180);
-
-          // 5. session.idle — response complete
-          setTimeout(() => {
-            ws.send(
-              makeLspNotification('session.event', {
-                sessionId,
-                event: { type: 'session.idle', data: {} },
-              })
-            );
-          }, 230);
-        }
-        // Other methods (session.destroy, session.compact, etc.) are silently ignored
-      });
-    });
-
     await page.goto('/taskpane.html');
     await page.waitForLoadState('domcontentloaded');
     await use(page);

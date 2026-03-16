@@ -8,6 +8,7 @@
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
 - 2026-03-15: `tests-aitest/` now uses `pytest-skill-engineering` end to end. In this repo, `uv sync` is required after switching from `pytest-aitest` or pytest will autoload the stale `pytest_aitest` plugin and force HTML/AI analysis with the old `aitest_run` fixture behavior.
 - 2026-03-15: AI eval manifests now live under `tests-aitest/manifests/` and are host-specific. Excel still needs a decomposed config-driven manifest so legacy Excel simulator routes keep working, while PowerPoint, Word, and Outlook use manifests generated from runtime `Tool[]` definitions.
 - 2026-03-15: The Azure OpenAI eval resource `stbrnner1` is in subscription `f036a9c9-6d6c-4d28-8d2c-3b68997cd99b` / tenant `16b3c013-d300-468d-ac64-7eda0820b6d3`. If evals start failing with `Tenant provided in token does not match resource tenant`, switch the Azure CLI default subscription back to that tenant before running `uv run pytest tests-aitest ...`.
@@ -17,3 +18,4 @@
 - 2026-03-16: Integration coverage is broad (53 files) but the Vitest `unit` project still includes `tests/**/*.test.*`, so many `tests/integration/` files are eligible for duplicate execution unless callers explicitly scope to `--project integration`.
 - 2026-03-16: Host E2E depth is uneven. Excel exercises the major config families end to end, but current runners only cover a subset of runtime tools in other hosts: PowerPoint 13 of 37 named tools, Word 12 of 35, and Outlook 6 of 22.
 - 2026-03-16: Playwright coverage is mixed-quality because several UI tests rely on `page.routeWebSocket`, pre-seeded localStorage, and synthetic tool events in `tests-ui/fixtures.ts`, which conflicts with the repo rule that Playwright should verify real end-to-end behavior without mocks.
+- 2026-03-16: `tests-ui/fixtures.ts` must stay free of `page.routeWebSocket` and synthetic JSON-RPC helpers. Playwright coverage in this repo is only valid when it exercises the live proxy/Copilot path; disconnected/error-path assertions belong in integration tests unless they can be reproduced without mocking.
