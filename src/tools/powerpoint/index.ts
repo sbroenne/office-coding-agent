@@ -369,7 +369,7 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
       slides.load('items');
       await context.sync();
 
-      let slideCount = slides.items.length;
+      const slideCount = slides.items.length;
       if (slideIndex < 0 || slideIndex > slideCount) {
         throw new Error(
           `Invalid slideIndex ${String(slideIndex)}. Must be 0-${String(slideCount)}.`
@@ -381,7 +381,6 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
         await context.sync();
         slides.load('items');
         await context.sync();
-        slideCount = slides.items.length;
       }
 
       const slide = slides.items[slideIndex];
@@ -969,27 +968,31 @@ PptxGenJS API reference:
       }
       await context.sync();
 
-      let targetIndex = -1;
-      if (shapeName) {
-        targetIndex = slide.shapes.items.findIndex(
-          s => s.name.toLowerCase() === shapeName.toLowerCase()
-        );
-        if (targetIndex === -1) {
-          const available = slide.shapes.items.map(s => `"${s.name}"`).join(', ');
-          throw new Error(
-            `Shape named "${shapeName}" not found on slide ${String(slideIndex + 1)}. Available: ${available}`
+      const targetIndex = (() => {
+        if (shapeName) {
+          const foundIndex = slide.shapes.items.findIndex(
+            s => s.name.toLowerCase() === shapeName.toLowerCase()
           );
+          if (foundIndex === -1) {
+            const available = slide.shapes.items.map(s => `"${s.name}"`).join(', ');
+            throw new Error(
+              `Shape named "${shapeName}" not found on slide ${String(slideIndex + 1)}. Available: ${available}`
+            );
+          }
+          return foundIndex;
         }
-      } else if (shapeIndex !== undefined) {
-        if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
-          throw new Error(
-            `Invalid shapeIndex ${String(shapeIndex)}. Slide has ${String(slide.shapes.items.length)} shape(s).`
-          );
+
+        if (shapeIndex !== undefined) {
+          if (shapeIndex < 0 || shapeIndex >= slide.shapes.items.length) {
+            throw new Error(
+              `Invalid shapeIndex ${String(shapeIndex)}. Slide has ${String(slide.shapes.items.length)} shape(s).`
+            );
+          }
+          return shapeIndex;
         }
-        targetIndex = shapeIndex;
-      } else {
+
         throw new Error('Provide either shapeName or shapeIndex.');
-      }
+      })();
 
       const shape = slide.shapes.items[targetIndex];
       shape.textFrame.textRange.text = text;
