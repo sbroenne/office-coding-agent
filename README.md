@@ -371,6 +371,10 @@ The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/
 - **[@trsdn (Torsten)](https://github.com/trsdn)** and **[@urosstojkic](https://github.com/urosstojkic)** — Contributed the Word document orchestrator (planner→worker pattern), 22 Outlook tools, expanded PowerPoint tooling (24 tools), WorkIQ MCP stdio integration, host-specific welcome prompts, improved auto-scroll, and new skills (Outlook email/calendar/drafting, Word formatting/tables/document-builder, PowerPoint content/layout/animation/presentation). Originally submitted as [PR #33](https://github.com/sbroenne/office-coding-agent/pull/33) and merged in [PR #45](https://github.com/sbroenne/office-coding-agent/pull/45).
 - **[Vercel AI SDK](https://ai-sdk.dev/)** — Original AI runtime used in Phase 1.
 
+## Development
+
+This project is developed with a [Squad AI team](https://github.com/bradygaster/squad) running on the Copilot CLI. Squad orchestrates collaborative development through named agents, each with specialized responsibilities. The team composition and agent configuration are stored in `.squad/` — team members include: Harmony (Lead), Ellis (PM), Dylan (Frontend), Irving (Backend), Mark (Tester), Parker (QA), Scribe, and Ralph. Contributors can review `.squad/team.md` to understand the current team structure and responsibilities.
+
 ## Community & Security
 
 - [Code of Conduct](./CODE_OF_CONDUCT.md)

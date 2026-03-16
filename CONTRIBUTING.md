@@ -51,4 +51,8 @@ Please include:
 - Reproduction steps
 - Environment details (OS, Office host, Node version)
 
+## AI-Assisted Development
+
+This project uses [Squad](https://github.com/bradygaster/squad), a framework for orchestrating collaborative AI-assisted development on the Copilot CLI. The team configuration and member roles are documented in `.squad/team.md` for reference.
+
 Thanks for contributing.
