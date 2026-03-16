@@ -239,6 +239,33 @@ New extensibility guides (1 sprint effort):
 
 **Why:** Developers who want to extend the add-in (plugins, skills, agents) have no documented starting points. Tool API exists only in code.
 
+### Dylan: ModelPicker Session Ownership Fix (2026-03-16T121900Z)
+**Owner:** Dylan  
+**Status:** In Progress (PR #144)  
+`ModelPicker` should not call `useOfficeChat()` directly. It remains a presentational picker backed by `useSettingsStore` for model list/current selection, while `ChatPanel` owns the session context and passes `hasActiveSession` plus `onSwitchModel` as props.
+
+**Why:** Mounting `useOfficeChat()` inside the picker created a second WebSocket/session lifecycle that could drift from the visible conversation. Passing session-aware props keeps model switching aligned with the active session while preserving no-session behavior (store-only model updates for the next conversation).
+
+**UI Note:** App-level connection, error, and permission banners were also normalized to codicons and `--vscode-*` tokens so the task pane matches VS Code Copilot Chat more closely.
+
+### Mark: Remove Playwright WebSocket Mocking (2026-03-16T121900Z)
+**Owner:** Mark  
+**Status:** In Progress (PR #143)  
+Remove all Playwright WebSocket mocking helpers from `tests-ui/fixtures.ts`. Keep only real-session fixtures (`taskpane`, `configuredTaskpane`) and a lightweight live-server availability helper. Rewrite mocked connection/tool-card specs to use the live proxy path.
+
+**Why:** Project policy says Playwright tests in `tests-ui/` must verify real end-to-end behavior through the live proxy and Copilot API. The prior fixture layer used `page.routeWebSocket` plus synthetic JSON-RPC events, which invalidated that coverage boundary.
+
+**Follow-up:** Playwright now requires `npm run dev` to be running. Offline/error-path coverage should remain in integration tests unless reproduced without mocks.
+
+### Irving: Lock Down Localhost APIs & WebSocket (2026-03-16T121900Z)
+**Owner:** Irving  
+**Status:** In Progress (PR #145)  
+Add Origin validation to WebSocket upgrades, per-tool execution deadlines, and close permissive CORS. Fix prefix-bypass vulnerability in `/api/browse` path checks.
+
+**Why:** Current implementation has permissive `cors({ origin: '*' })`, unauthenticated API endpoints, and no tool execution timeouts. Hanging browser tool handlers can block proxy indefinitely.
+
+**Impact:** Transparent to browser clients; improves proxy isolation and resilience.
+
 ## Governance
 
 - All meaningful changes require team consensus
