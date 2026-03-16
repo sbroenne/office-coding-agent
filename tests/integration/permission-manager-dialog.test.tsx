@@ -12,7 +12,7 @@ import { renderWithProviders } from '../test-utils';
 import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
 import { usePermissionStore } from '@/stores/permissionStore';
 
-// Mock fetch for /api/browse and /api/env
+// Mock fetch for /api/browse
 const mockFetchResponses: Record<string, unknown> = {};
 
 beforeEach(() => {
@@ -23,7 +23,6 @@ beforeEach(() => {
   });
 
   // Default fetch mocks
-  mockFetchResponses['/api/env'] = { cwd: '/Users/test/project', home: '/Users/test' };
   mockFetchResponses['/api/browse'] = {
     path: '/Users/test/project',
     parent: '/Users/test',

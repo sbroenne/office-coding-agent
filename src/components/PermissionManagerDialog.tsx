@@ -49,20 +49,7 @@ export const PermissionManagerPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (workingDirectory) {
-      void loadDir(workingDirectory);
-      return;
-    }
-    void (async () => {
-      try {
-        const response = await fetch(`${getLocalApiBase()}/api/env`);
-        const data = (await response.json()) as { cwd?: string; home?: string };
-        void loadDir(data.cwd ?? data.home);
-      } catch {
-        // Server unavailable — load root or leave empty
-        void loadDir();
-      }
-    })();
+    void loadDir(workingDirectory ?? undefined);
   }, [workingDirectory]);
 
   return (
