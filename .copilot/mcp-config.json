@@ -9,14 +9,6 @@
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       }
-    },
-    "adaptive-cards": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "adaptive-cards-mcp"
-      ],
-      "env": {}
     }
   }
 }
