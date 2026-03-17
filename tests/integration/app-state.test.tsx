@@ -31,6 +31,36 @@ vi.mock('@/components/ChatPanel', () => ({
     }),
 }));
 
+// Prevent real WebSocket connection attempts during teardown (no dev server in CI).
+// app-state.test.tsx only tests theme detection and App state transitions — it
+// doesn't need a live Copilot session.
+vi.mock('@/hooks/useOfficeChat', () => ({
+  useOfficeChat: () => ({
+    messages: [],
+    isRunning: false,
+    send: vi.fn(),
+    cancel: vi.fn(),
+    sessionError: null,
+    isConnecting: false,
+    clearMessages: vi.fn(),
+    restoreSession: vi.fn(),
+    deleteSession: vi.fn(),
+    sessions: [],
+    activeSessionId: undefined,
+    pendingPermission: null,
+    allowAllPermissions: vi.fn(),
+    approvePermission: vi.fn(),
+    denyPermission: vi.fn(),
+    allowPermissionAlways: vi.fn(),
+    compactSession: vi.fn().mockResolvedValue(undefined),
+    switchModel: vi.fn().mockResolvedValue(undefined),
+    enqueue: vi.fn(),
+    queuedPrompts: [],
+    dequeue: vi.fn(),
+    clearQueue: vi.fn(),
+  }),
+}));
+
 const { App } = await import('@/taskpane/App');
 
 describe('App — state transitions and theme', () => {
