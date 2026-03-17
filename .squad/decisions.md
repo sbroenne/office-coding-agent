@@ -2,6 +2,12 @@
 
 ## Active Decisions
 
+### 2026-03-17: Host AI test expansion complete
+**By:** Mark (Tester)  
+**What:** Expanded PPT/Word/Outlook AI eval tests via branch `feat/expand-host-ai-tests`.  
+**Final counts:** PowerPoint 17 tests (was 5, +12), Word 18 tests (was 5, +13), Outlook 15 tests (was 3, +12).  
+**Coverage gaps:** Tools skipped because simulator lacks backing methods — PPT: `get_slide_image`, `get_slide_notes`, `delete_slide`, `move_slide`, `clear_slide`; Word: `insert_paragraph`, `insert_break`, `insert_image`, `get_comments`; Outlook: `get_mail_attachments`, `forward_mail`, `get_user_profile`, `display_new_appointment`, `get_diagnostics`. Simulator expansion is the primary next step for further coverage.
+
 ### User Directive: Python Testing Framework & Expansion (2026-03-15T10:27Z)
 **Owner:** Stefan Broenner (via Copilot)  
 **Status:** Captured  
