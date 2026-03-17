@@ -2,7 +2,7 @@
   "name": "office-coding-agent",
   "version": "0.5.17",
   "private": true,
-  "main": "src/tray/main.cjs",
+  "main":"src/tray/main.cjs",
   "description": "Office coding agent add-in with host-routed AI chat",
   "license": "MIT",
   "scripts": {
@@ -151,7 +151,8 @@
   "overrides": {
     "tmp": "0.2.4",
     "@noble/hashes": "2.0.1",
-    "vscode-jsonrpc": "$vscode-jsonrpc"
+    "vscode-jsonrpc": "$vscode-jsonrpc",
+    "serialize-javascript": "7.0.4"
   },
   "build": {
     "appId": "com.officecodingagent.tray",
