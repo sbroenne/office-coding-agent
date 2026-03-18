@@ -1,9 +1,12 @@
 export {
   getAgents,
+  getPickerAgents,
   getAllAgents,
   getBundledAgents,
   getImportedAgents,
   setImportedAgents,
+  sanitizeImportedAgents,
+  isBuiltInOfficePluginAgentName,
   getAgent,
   getAgentInstructions,
   getDefaultAgent,

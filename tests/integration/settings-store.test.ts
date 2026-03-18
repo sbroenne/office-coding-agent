@@ -60,6 +60,35 @@ describe('settingsStore — agents', () => {
     expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
   });
 
+  it('setPluginAgents filters built-in Office plugin agents from store state', () => {
+    useSettingsStore.getState().setPluginAgents([
+      {
+        metadata: {
+          name: 'office-excel',
+          description: 'Built-in Office plugin agent',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'Built-in instructions.',
+      },
+      {
+        metadata: {
+          name: 'Contoso Excel Agent',
+          description: 'External plugin agent',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'External instructions.',
+      },
+    ]);
+
+    expect(useSettingsStore.getState().pluginAgents.map(agent => agent.metadata.name)).toEqual([
+      'Contoso Excel Agent',
+    ]);
+  });
+
   it('getActiveAgent returns the current agent id', () => {
     expect(useSettingsStore.getState().getActiveAgent()).toBe('Excel');
   });

@@ -14,6 +14,7 @@ import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
 import { setImportedAgents } from '@/services/agents';
+import { getToolsForHost } from '@/tools';
 import type { AgentConfig } from '@/types/agent';
 
 // ─── Fake session builder ─────────────────────────────────────────────────────
@@ -830,6 +831,39 @@ describe('useOfficeChat', () => {
     expect(agents[0].prompt).toContain('AI assistant');
   });
 
+  it('external plugin agents keep access to the built-in Office tool set', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    useSettingsStore.getState().setPluginAgents([
+      {
+        metadata: {
+          name: 'Contoso Excel Agent',
+          description: 'External plugin agent',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'External plugin instructions.',
+      },
+    ]);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    const customAgents = config.customAgents as { name: string; tools: string[] | null }[];
+    const pluginAgent = customAgents.find(agent => agent.name === 'Contoso Excel Agent');
+
+    expect(pluginAgent).toBeDefined();
+    expect(pluginAgent?.tools).toBeNull();
+    expect(config.tools).toEqual(getToolsForHost('excel'));
+  });
+
   it('systemMessage includes host default agent instructions', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
@@ -927,6 +961,52 @@ describe('useOfficeChat', () => {
     expect(pluginAgents.some(a => a.metadata.name === 'Plugin Agent')).toBe(true);
 
     // Cleanup
+    useSettingsStore.getState().setPluginAgents([]);
+  });
+
+  it('plugin.agents notification filters built-in Office plugin agents from the picker state', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    let capturedPluginAgentsHandler: ((payload: unknown) => void) | undefined;
+
+    const client = {
+      ...makeFakeClient(session),
+      onPluginAgents: vi.fn((handler: (payload: unknown) => void) => {
+        capturedPluginAgentsHandler = handler;
+        return () => undefined;
+      }),
+    };
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    await act(async () => {
+      capturedPluginAgentsHandler?.({
+        agents: [
+          {
+            name: 'office-excel',
+            description: 'Built-in Office plugin agent',
+            prompt: 'Built-in instructions.',
+            hosts: ['excel'],
+          },
+          {
+            name: 'Contoso Excel Agent',
+            description: 'External plugin agent',
+            prompt: 'External instructions.',
+            hosts: ['excel'],
+          },
+        ],
+      });
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    expect(useSettingsStore.getState().pluginAgents.map(agent => agent.metadata.name)).toEqual([
+      'Contoso Excel Agent',
+    ]);
+
     useSettingsStore.getState().setPluginAgents([]);
   });
 

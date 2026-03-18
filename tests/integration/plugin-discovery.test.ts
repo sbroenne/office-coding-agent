@@ -18,6 +18,7 @@ import {
   discoverPluginSkillDirs,
   discoverPluginAgents,
   isPluginForHost,
+  parsePluginAgentFrontmatter,
   slugify,
 } from '@/../src/pluginDiscovery.mjs';
 
@@ -559,5 +560,54 @@ Multi-host instructions.`;
     expect(result).toHaveLength(1);
     expect(result[0].hosts).toContain('excel');
     expect(result[0].hosts).toContain('word');
+  });
+
+  it('extracts tools from AGENT.md frontmatter', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const agentContent = `---
+name: Scoped Agent
+description: Scoped tool access
+version: 1.0.0
+hosts: [excel]
+tools: [range, workbook]
+---
+Scoped instructions.`;
+
+    const pluginDir = await makePluginWithAgent(dir, 'office-excel', 'AGENT.md', agentContent);
+    const configPath = await writeConfig(dir, [
+      { name: 'office-excel', enabled: true, cache_path: pluginDir },
+    ]);
+
+    const result = await discoverPluginAgents(undefined, configPath);
+    expect(result).toHaveLength(1);
+    expect(result[0].tools).toEqual(['range', 'workbook']);
+  });
+});
+
+describe('parsePluginAgentFrontmatter', () => {
+  it('parses inline tools arrays', () => {
+    const parsed = parsePluginAgentFrontmatter(`---
+description: Scoped
+hosts: [excel]
+tools: [range, workbook]
+---
+Body`);
+
+    expect(parsed.description).toBe('Scoped');
+    expect(parsed.hosts).toEqual(['excel']);
+    expect(parsed.tools).toEqual(['range', 'workbook']);
+  });
+
+  it('parses block-list tools arrays', () => {
+    const parsed = parsePluginAgentFrontmatter(`---
+tools:
+  - range
+  - workbook
+---
+Body`);
+
+    expect(parsed.tools).toEqual(['range', 'workbook']);
   });
 });

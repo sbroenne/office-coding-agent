@@ -147,9 +147,20 @@ function parseInlineArray(value: string): string[] {
 }
 
 export const SUPPORTED_AGENT_HOSTS: AgentHost[] = ['excel', 'powerpoint', 'word', 'outlook'];
+const BUILT_IN_OFFICE_PLUGIN_AGENT_NAMES = new Set(
+  SUPPORTED_AGENT_HOSTS.map(host => `office-${host}`)
+);
 
 function isAgentHost(value: string): value is AgentHost {
   return SUPPORTED_AGENT_HOSTS.includes(value as AgentHost);
+}
+
+export function isBuiltInOfficePluginAgentName(name: string): boolean {
+  return BUILT_IN_OFFICE_PLUGIN_AGENT_NAMES.has(name.trim().toLowerCase());
+}
+
+export function sanitizeImportedAgents(agents: AgentConfig[]): AgentConfig[] {
+  return agents.filter(agent => !isBuiltInOfficePluginAgentName(agent.metadata.name));
 }
 
 function setAgentArrayField(metadata: AgentMetadata, key: string, values: string[]): void {
@@ -199,6 +210,10 @@ function toAgentHost(host: OfficeHostApp): AgentHost | undefined {
   return undefined;
 }
 
+function getHostBundledAgents(host: AgentHost): AgentConfig[] {
+  return bundledAgents.filter(agent => agent.metadata.hosts.includes(host));
+}
+
 /**
  * Get all loaded agents.
  * Agents with an empty `hosts` array are treated as universal (all-hosts) agents
@@ -209,6 +224,23 @@ export function getAgents(host: OfficeHostApp = 'excel'): AgentConfig[] {
   if (!targetHost) return [];
   return [...bundledAgents, ...importedAgents].filter(
     agent => agent.metadata.hosts.length === 0 || agent.metadata.hosts.includes(targetHost)
+  );
+}
+
+/**
+ * Agents that should appear in the picker for the current host.
+ * Bundled Office agents remain always-on host defaults and are intentionally hidden from the UI.
+ */
+export function getPickerAgents(host: OfficeHostApp = 'excel'): AgentConfig[] {
+  const targetHost = toAgentHost(host);
+  if (!targetHost) return [];
+
+  const bundledNames = new Set(getHostBundledAgents(targetHost).map(agent => agent.metadata.name));
+
+  return importedAgents.filter(
+    agent =>
+      (agent.metadata.hosts.length === 0 || agent.metadata.hosts.includes(targetHost)) &&
+      !bundledNames.has(agent.metadata.name)
   );
 }
 
