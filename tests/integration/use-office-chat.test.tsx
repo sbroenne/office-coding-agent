@@ -121,6 +121,92 @@ describe('useOfficeChat', () => {
     expect(result.current.messages).toBeDefined();
   });
 
+  it('deleting an inactive saved session removes it without changing the active one', async () => {
+    useSessionHistoryStore.setState({
+      sessions: [
+        {
+          id: 'old-session',
+          title: 'Old chat',
+          host: 'excel',
+          updatedAt: 1,
+          messages: [{ role: 'assistant', content: [{ type: 'text', text: 'old' }] }],
+        },
+        {
+          id: 'active-session',
+          title: 'Active chat',
+          host: 'excel',
+          updatedAt: 2,
+          messages: [{ role: 'assistant', content: [{ type: 'text', text: 'active' }] }],
+        },
+      ],
+      activeSessionId: 'active-session',
+    });
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    act(() => {
+      result.current.deleteSession('old-session');
+    });
+
+    const state = useSessionHistoryStore.getState();
+    expect(state.sessions.map(s => s.id)).toEqual(['active-session']);
+    expect(state.activeSessionId).toBe('active-session');
+  });
+
+  it('deleting the active saved session restores the next session for the same host', async () => {
+    useSessionHistoryStore.setState({
+      sessions: [
+        {
+          id: 'older-session',
+          title: 'Older chat',
+          host: 'excel',
+          updatedAt: 10,
+          messages: [{ role: 'assistant', content: [{ type: 'text', text: 'older' }] }],
+        },
+        {
+          id: 'active-session',
+          title: 'Active chat',
+          host: 'excel',
+          updatedAt: 20,
+          messages: [{ role: 'assistant', content: [{ type: 'text', text: 'active' }] }],
+        },
+      ],
+      activeSessionId: 'active-session',
+    });
+
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    act(() => {
+      result.current.deleteSession('active-session');
+    });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50));
+    });
+
+    const state = useSessionHistoryStore.getState();
+    expect(state.sessions.map(s => s.id)).toEqual(['older-session']);
+    expect(state.activeSessionId).toBe('older-session');
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].role).toBe('assistant');
+  });
+
   it('adds user + assistant messages when onNew is called', async () => {
     const session = makeFakeSession([
       makeEvent('assistant.message', { messageId: 'msg1', content: 'Hello!' }),

@@ -4,6 +4,7 @@ import os from 'node:os';
 
 const LOOPBACK_HOST_RE = /^(localhost|127\.0\.0\.1|::1)$/i;
 const TRUSTED_HTTPS_HOST_RE = /^(?:[a-z0-9-]+\.)*(officeapps\.live\.com|office\.com|microsoft\.com)$/i;
+const TRUSTED_GITHUB_PAGES_HOST_RE = /^sbroenne\.github\.io$/i;
 const PATH_TRAVERSAL_RE = /(^|[\\/])\.\.([\\/]|$)/;
 
 export function isAllowedOrigin(origin) {
@@ -18,7 +19,10 @@ export function isAllowedOrigin(origin) {
       return protocol === 'https:' || protocol === 'http:';
     }
 
-    return protocol === 'https:' && TRUSTED_HTTPS_HOST_RE.test(host);
+    return (
+      protocol === 'https:' &&
+      (TRUSTED_HTTPS_HOST_RE.test(host) || TRUSTED_GITHUB_PAGES_HOST_RE.test(host))
+    );
   } catch {
     return false;
   }

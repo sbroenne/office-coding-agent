@@ -926,14 +926,39 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   const deleteSession = useCallback(
     (sessionId: string) => {
+      const deletedWasActive = activeSessionId === sessionId;
+      const nextHostSession = deletedWasActive
+        ? [...sessions]
+            .filter(session => session.id !== sessionId && session.host === host)
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+        : null;
+
       deleteSessionHistoryItem(sessionId);
-      if (activeSessionId === sessionId) {
+      if (!deletedWasActive) return;
+
+      setPendingPermission(null);
+      activePermissionRequestRef.current = null;
+
+      if (nextHostSession) {
+        setActiveSession(nextHostSession.id);
+        setMessages(deserializeMessages(nextHostSession.messages));
+      } else {
         setMessages([]);
         createSession(host);
-        void initSession();
       }
+
+      void initSession();
     },
-    [activeSessionId, createSession, deleteSessionHistoryItem, host, initSession]
+    [
+      activeSessionId,
+      createSession,
+      deleteSessionHistoryItem,
+      deserializeMessages,
+      host,
+      initSession,
+      sessions,
+      setActiveSession,
+    ]
   );
 
   const respondPermission = useCallback(async (decision: 'approved' | 'denied') => {
