@@ -98,7 +98,7 @@ The workflow:
 - derives the next version from the latest git tag
 - builds the production bundle
 - creates and pushes the Git tag
-- optionally publishes the GitHub Release artifact
+- publishes the GitHub Release artifact
 
 Run it from the Actions tab in one step:
 

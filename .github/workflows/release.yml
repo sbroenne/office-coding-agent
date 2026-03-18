@@ -20,11 +20,6 @@ on:
         description: Optional exact version (for example 1.2.3). Overrides version_type.
         required: false
         type: string
-      create_release:
-        description: Create a GitHub release after tagging
-        required: true
-        default: true
-        type: boolean
 
 permissions:
   contents: write
@@ -110,7 +105,6 @@ jobs:
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Create GitHub Release
-        if: ${{ inputs.create_release }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -126,5 +120,5 @@ jobs:
             echo "- Version: \`${{ steps.version.outputs.version }}\`"
             echo "- Tag: \`${{ steps.version.outputs.tag }}\`"
             echo "- Version source: latest git tag"
-            echo "- GitHub Release created: \`${{ inputs.create_release }}\`"
+            echo "- GitHub Release created: \`true\`"
           } >> "$GITHUB_STEP_SUMMARY"
