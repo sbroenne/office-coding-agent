@@ -3,7 +3,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
-import { getAgents, getBundledAgents, resolveActiveAgent } from '@/services/agents';
+import { getDefaultAgent, getPickerAgents, resolveActiveAgent } from '@/services/agents';
 import { detectOfficeHost } from '@/services/office/host';
 
 export const AgentPicker: React.FC = () => {
@@ -18,30 +18,27 @@ export const AgentPicker: React.FC = () => {
     host === 'excel' || host === 'powerpoint' || host === 'word' || host === 'outlook'
       ? host
       : undefined;
-  const allAgents = getAgents(host);
-  const bundledAgents = targetHost
-    ? getBundledAgents().filter(agent => agent.metadata.hosts.includes(targetHost))
-    : [];
-  // Use name-based deduplication: a plugin agent with the same name as a bundled agent
-  // should NOT appear as a separate Custom entry.
-  const bundledAgentNames = new Set(bundledAgents.map(a => a.metadata.name));
-  const customAgents = allAgents.filter(a => !bundledAgentNames.has(a.metadata.name));
+  const defaultAgent = getDefaultAgent(host);
+  const pickerAgents = getPickerAgents(host);
 
-  if (allAgents.length === 0) return null;
+  if (!targetHost || !defaultAgent) return null;
 
   const activeAgent = resolveActiveAgent(activeAgentId, host);
-  const displayName = activeAgent?.metadata.name ?? allAgents[0].metadata.name;
-
+  const isDefaultAgentActive = activeAgent?.metadata.name === defaultAgent.metadata.name;
+  const displayName = isDefaultAgentActive ? 'Default' : (activeAgent?.metadata.name ?? 'Default');
   const resolvedName = activeAgent?.metadata.name ?? null;
 
-  const renderAgentOption = (agentName: string, agentDescription: string) => {
-    const isActive = agentName === resolvedName;
-
+  const renderAgentOption = (
+    agentName: string,
+    agentDescription: string,
+    isActive: boolean,
+    onSelect: () => void
+  ) => {
     return (
       <button
         key={agentName}
         onClick={() => {
-          setActiveAgent(agentName);
+          onSelect();
           setOpen(false);
         }}
         className={cn(
@@ -84,26 +81,26 @@ export const AgentPicker: React.FC = () => {
             align="start"
           >
             <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Agent</div>
-            {bundledAgents.length > 0 && (
-              <>
-                <div className="flex items-center justify-between px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  <span>Bundled</span>
-                  <span>Read-only</span>
-                </div>
-                {bundledAgents.map(agent =>
-                  renderAgentOption(agent.metadata.name, agent.metadata.description)
-                )}
-              </>
+            {renderAgentOption(
+              'Default',
+              'Use the built-in Office agent for this host.',
+              isDefaultAgentActive,
+              () => setActiveAgent(defaultAgent.metadata.name)
             )}
 
-            {customAgents.length > 0 && (
+            {pickerAgents.length > 0 && (
               <>
                 <div className="mt-1 border-t border-border" />
                 <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                   Custom
                 </div>
-                {customAgents.map(agent =>
-                  renderAgentOption(agent.metadata.name, agent.metadata.description)
+                {pickerAgents.map(agent =>
+                  renderAgentOption(
+                    agent.metadata.name,
+                    agent.metadata.description,
+                    agent.metadata.name === resolvedName,
+                    () => setActiveAgent(agent.metadata.name)
+                  )
                 )}
               </>
             )}

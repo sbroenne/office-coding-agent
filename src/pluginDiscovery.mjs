@@ -65,6 +65,77 @@ export async function readPluginManifest(pluginDir) {
   return null;
 }
 
+function parseFrontmatterListValue(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    return trimmed
+      .slice(1, -1)
+      .split(',')
+      .map(item => item.trim().replace(/^['"]|['"]$/g, ''))
+      .filter(Boolean);
+  }
+  return [trimmed.replace(/^['"]|['"]$/g, '')];
+}
+
+/**
+ * Parse the subset of AGENT.md frontmatter needed by plugin discovery.
+ *
+ * @param {string} raw
+ * @returns {{description: string, hosts: string[], tools?: string[]}}
+ */
+export function parsePluginAgentFrontmatter(raw) {
+  const trimmed = raw.trimStart();
+  const metadata = { description: '', hosts: [], tools: undefined };
+  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return metadata;
+
+  /** @type {'hosts' | 'tools' | null} */
+  let currentListKey = null;
+
+  for (const line of match[1].split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+
+    if (trimmedLine.startsWith('- ') && currentListKey) {
+      const values = parseFrontmatterListValue(trimmedLine.slice(2));
+      if (currentListKey === 'hosts') metadata.hosts.push(...values);
+      if (currentListKey === 'tools') metadata.tools = [...(metadata.tools ?? []), ...values];
+      continue;
+    }
+
+    currentListKey = null;
+    const colonIdx = trimmedLine.indexOf(':');
+    if (colonIdx === -1) continue;
+
+    const key = trimmedLine.slice(0, colonIdx).trim();
+    const value = trimmedLine.slice(colonIdx + 1).trim();
+
+    if (key === 'description') {
+      metadata.description = value.replace(/^['"]|['"]$/g, '');
+      continue;
+    }
+
+    if (key === 'hosts' || key === 'tools') {
+      if (!value) {
+        currentListKey = key;
+        continue;
+      }
+
+      const values = parseFrontmatterListValue(value);
+      if (key === 'hosts') metadata.hosts.push(...values);
+      if (key === 'tools') metadata.tools = [...(metadata.tools ?? []), ...values];
+    }
+  }
+
+  metadata.hosts = Array.from(new Set(metadata.hosts));
+  if (metadata.tools) {
+    metadata.tools = Array.from(new Set(metadata.tools));
+  }
+
+  return metadata;
+}
+
 /**
  * Discover skill directories from installed Copilot CLI plugins.
  *
@@ -116,7 +187,7 @@ export async function discoverPluginSkillDirs(host, configPath = COPILOT_CONFIG_
  *
  * For each enabled plugin with a cache_path, scans <cache_path>/agents/ for
  * *.agent.md and AGENT.md files. Returns an array of
- * {name, description, prompt, hosts} objects compatible with the SDK's customAgents.
+ * {name, description, prompt, hosts, tools} objects compatible with the SDK's customAgents.
  *
  * The `hosts` field is extracted from the AGENT.md frontmatter when present.
  * An empty `hosts` array means "all hosts" — the caller (browser-side agentService)
@@ -124,7 +195,7 @@ export async function discoverPluginSkillDirs(host, configPath = COPILOT_CONFIG_
  *
  * @param {string} [host] - Office host slug for filtering
  * @param {string} [configPath] - path to config.json (defaults to COPILOT_CONFIG_PATH)
- * @returns {Promise<Array<{name: string, description: string, prompt: string, hosts: string[]}>>}
+ * @returns {Promise<Array<{name: string, description: string, prompt: string, hosts: string[], tools?: string[]}>>}
  */
 export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PATH) {
   const config = await readCopilotConfig(configPath);
@@ -157,24 +228,16 @@ export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PAT
             ? plugin.name
             : entry.name.replace(/\.agent\.md$/, '');
 
-        let description = `Agent from plugin ${plugin.name}`;
-        let hosts = [];
-        const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-        if (fmMatch) {
-          const descMatch = fmMatch[1].match(/description:\s*(.+)/);
-          if (descMatch) description = descMatch[1].trim();
+        const metadata = parsePluginAgentFrontmatter(content);
+        const description = metadata.description || `Agent from plugin ${plugin.name}`;
 
-          // Extract hosts from frontmatter inline array: hosts: [excel, word]
-          const hostsMatch = fmMatch[1].match(/hosts:\s*\[([^\]]*)\]/);
-          if (hostsMatch) {
-            hosts = hostsMatch[1]
-              .split(',')
-              .map(h => h.trim())
-              .filter(Boolean);
-          }
-        }
-
-        agents.push({ name: agentName, description, prompt: content, hosts });
+        agents.push({
+          name: agentName,
+          description,
+          prompt: content,
+          hosts: metadata.hosts,
+          tools: metadata.tools,
+        });
       } catch {
         // skip unreadable agent files
       }

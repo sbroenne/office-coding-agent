@@ -2,11 +2,14 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   parseAgentFrontmatter,
   getAgents,
+  getPickerAgents,
   getAllAgents,
   getAgent,
   getAgentInstructions,
   getDefaultAgent,
   resolveActiveAgent,
+  isBuiltInOfficePluginAgentName,
+  sanitizeImportedAgents,
   setImportedAgents,
 } from '@/services/agents/agentService';
 import type { AgentConfig } from '@/types/agent';
@@ -80,6 +83,55 @@ describe('agentService — getAgents', () => {
   });
 });
 
+describe('agentService — getPickerAgents', () => {
+  afterEach(() => {
+    setImportedAgents([]);
+  });
+
+  it('hides bundled Office agents from the picker', () => {
+    expect(getPickerAgents('excel')).toEqual([]);
+    expect(getPickerAgents('powerpoint')).toEqual([]);
+    expect(getPickerAgents('word')).toEqual([]);
+    expect(getPickerAgents('outlook')).toEqual([]);
+  });
+
+  it('includes imported agents for the matching host', () => {
+    setImportedAgents([
+      {
+        metadata: {
+          name: 'Adaptive Excel Coach',
+          description: 'Custom Excel behavior',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'Instructions.',
+      },
+    ]);
+
+    expect(getPickerAgents('excel').map(agent => agent.metadata.name)).toEqual([
+      'Adaptive Excel Coach',
+    ]);
+  });
+
+  it('keeps imported agents with bundled names hidden from the picker', () => {
+    setImportedAgents([
+      {
+        metadata: {
+          name: 'Excel',
+          description: 'Plugin override that should stay hidden',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'Instructions.',
+      },
+    ]);
+
+    expect(getPickerAgents('excel')).toEqual([]);
+  });
+});
+
 describe('agentService — getAgent', () => {
   it('returns an agent by name', () => {
     const agents = getAgents();
@@ -117,6 +169,44 @@ describe('agentService — getDefaultAgent', () => {
 
   it('returns undefined for unknown host', () => {
     expect(getDefaultAgent('unknown' as never)).toBeUndefined();
+  });
+});
+
+describe('agentService — imported agent sanitization', () => {
+  it('recognizes built-in Office plugin agent names', () => {
+    expect(isBuiltInOfficePluginAgentName('office-excel')).toBe(true);
+    expect(isBuiltInOfficePluginAgentName('OFFICE-WORD')).toBe(true);
+    expect(isBuiltInOfficePluginAgentName('Excel')).toBe(false);
+    expect(isBuiltInOfficePluginAgentName('contoso-excel-plugin')).toBe(false);
+  });
+
+  it('removes built-in Office plugin agents but keeps external plugin agents', () => {
+    const agents: AgentConfig[] = [
+      {
+        metadata: {
+          name: 'office-excel',
+          description: 'Bundled Office plugin agent',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'Built-in Office plugin instructions.',
+      },
+      {
+        metadata: {
+          name: 'Contoso Excel Agent',
+          description: 'External plugin agent',
+          version: '1.0.0',
+          hosts: ['excel'],
+          defaultForHosts: [],
+        },
+        instructions: 'External plugin instructions.',
+      },
+    ];
+
+    expect(sanitizeImportedAgents(agents).map(agent => agent.metadata.name)).toEqual([
+      'Contoso Excel Agent',
+    ]);
   });
 });
 

@@ -110,6 +110,74 @@ function lspFrame(obj) {
   return `Content-Length: ${len}\r\n\r\n${body}`;
 }
 
+/**
+ * Return the set of tool names actually active for this session.
+ *
+ * If availableTools is provided, it narrows the session-level tool list.
+ *
+ * @param {Array<{name?: string}>} [toolDefs]
+ * @param {string[]} [availableTools]
+ * @returns {string[]}
+ */
+export function getRegisteredToolNames(toolDefs = [], availableTools) {
+  const definedToolNames = toolDefs
+    .map(tool => (typeof tool?.name === 'string' ? tool.name : ''))
+    .filter(Boolean);
+  const uniqueToolNames = Array.from(new Set(definedToolNames));
+
+  if (!Array.isArray(availableTools) || availableTools.length === 0) {
+    return uniqueToolNames;
+  }
+
+  const allowedToolNames = new Set(
+    availableTools.filter(toolName => typeof toolName === 'string' && toolName.length > 0)
+  );
+  return uniqueToolNames.filter(toolName => allowedToolNames.has(toolName));
+}
+
+/**
+ * Ensure every custom agent gets an explicit tool allowlist before it reaches the SDK.
+ *
+ * Plugin- and browser-provided agents often omit `tools`, intending "all active session
+ * tools". The SDK expects an explicit allowlist for custom agents, so we expand omitted,
+ * null, empty, or "*" values to the current session tool names here.
+ *
+ * @param {Array<{tools?: string[] | null}>} [customAgents]
+ * @param {string[]} [sessionToolNames]
+ * @returns {Array<{tools?: string[]}>}
+ */
+export function applySessionToolAccessToCustomAgents(customAgents = [], sessionToolNames = []) {
+  const fallbackToolNames = Array.from(
+    new Set(sessionToolNames.filter(toolName => typeof toolName === 'string' && toolName.length > 0))
+  );
+
+  return customAgents.map(agent => {
+    const requestedTools = Array.isArray(agent?.tools)
+      ? Array.from(
+          new Set(
+            agent.tools.filter(toolName => typeof toolName === 'string' && toolName.length > 0)
+          )
+        )
+      : null;
+
+    if (!requestedTools || requestedTools.length === 0 || requestedTools.includes('*')) {
+      return {
+        ...agent,
+        tools: fallbackToolNames.length > 0 ? fallbackToolNames : undefined,
+      };
+    }
+
+    if (fallbackToolNames.length === 0) {
+      return { ...agent, tools: requestedTools };
+    }
+
+    return {
+      ...agent,
+      tools: requestedTools.filter(toolName => fallbackToolNames.includes(toolName)),
+    };
+  });
+}
+
 // ── Singleton CopilotClient ───────────────────────────────────────────────
 // One shared client for the lifetime of the server process — avoids spawning
 // a new CLI subprocess (and re-authenticating) on every WebSocket connection.
@@ -329,6 +397,7 @@ async function handleConnection(ws) {
         console.log(
           `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, customAgents=${(customAgents || []).length})`
         );
+        const sessionToolNames = getRegisteredToolNames(toolDefs || [], availableTools);
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
           name: t.name,
@@ -365,7 +434,10 @@ async function handleConnection(ws) {
         //
         // We also send a plugin.agents notification so the browser-side agentService can
         // register these agents in the AgentPicker without requiring a manual import.
-        const allCustomAgents = [...(customAgents || [])];
+        const allCustomAgents = applySessionToolAccessToCustomAgents(
+          customAgents || [],
+          sessionToolNames
+        );
         try {
           const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
           if (pluginAgents.length > 0) {
@@ -400,7 +472,13 @@ async function handleConnection(ws) {
             // (they may be present if the browser already registered them from a previous
             // plugin.agents notification).
             const existingNames = new Set(allCustomAgents.map(a => a.name));
-            allCustomAgents.push(...extraAgents.filter(a => !existingNames.has(a.name)));
+            const registeredExtraAgents = applySessionToolAccessToCustomAgents(
+              extraAgents,
+              sessionToolNames
+            );
+            allCustomAgents.push(
+              ...registeredExtraAgents.filter(a => !existingNames.has(a.name))
+            );
           }
         } catch (err) {
           console.warn('[proxy] Plugin agent discovery failed:', err.message);
