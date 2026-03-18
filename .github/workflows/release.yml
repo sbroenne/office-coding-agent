@@ -1,88 +1,41 @@
-# Release Pipeline
-#
-# Triggered manually via workflow_dispatch.
-# Phase 1 ("prepare") creates a release PR with the version bump so branch
-# protection is respected.
-# Phase 2 ("publish"), after that PR is merged, builds from main, creates the
-# git tag, and publishes the GitHub Release.
-
 name: Release
+
+# Excel-style release workflow.
+# Version is derived from the latest git tag (or an optional custom version),
+# then the workflow builds, pushes the new tag, and publishes the GitHub release.
 
 on:
   workflow_dispatch:
     inputs:
-      phase:
-        description: Release phase
+      version_type:
+        description: Version increment type
         required: true
-        type: choice
-        default: prepare
-        options:
-          - prepare
-          - publish
-      version_bump:
-        description: Version bump type
-        required: true
-        type: choice
         default: patch
+        type: choice
         options:
-          - patch
-          - minor
           - major
+          - minor
+          - patch
       custom_version:
-        description: 'Optional: exact version to release (e.g. 1.2.3). Overrides version_bump.'
+        description: Optional exact version (for example 1.2.3). Overrides version_type.
         required: false
         type: string
+      create_release:
+        description: Create a GitHub release after tagging
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
-  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  # ─── Calculate Version ───────────────────────────────────────
-  version:
-    name: Calculate Version
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.calc.outputs.version }}
-      tag: ${{ steps.calc.outputs.tag }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Calculate next version
-        id: calc
-        run: |
-          if [ -n "${{ inputs.custom_version }}" ]; then
-            VERSION="${{ inputs.custom_version }}"
-          else
-            LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-            CURRENT="${LATEST#v}"
-            MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-            MINOR=$(echo "$CURRENT" | cut -d. -f2)
-            PATCH=$(echo "$CURRENT" | cut -d. -f3)
-            case "${{ inputs.version_bump }}" in
-              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-              patch) PATCH=$((PATCH+1)) ;;
-            esac
-            VERSION="$MAJOR.$MINOR.$PATCH"
-          fi
-          TAG="v$VERSION"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists" && exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Releasing $TAG"
-
-  # ─── Build ───────────────────────────────────────────────────
-  build:
-    name: Build
-    needs: version
-    if: ${{ inputs.phase == 'publish' }}
+  publish:
+    name: Publish GitHub Release
     runs-on: ubuntu-latest
 
     steps:
@@ -90,6 +43,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -100,121 +54,77 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (production)
-        run: npm run build
-
-      - name: Package dist + manifests
+      - name: Resolve release version
+        id: version
         run: |
-          zip -r office-coding-agent-${{ needs.version.outputs.version }}.zip dist/ manifests/ taskpane.html
+          if [ -n "${{ inputs.custom_version }}" ]; then
+            VERSION="${{ inputs.custom_version }}"
+            echo "Using custom version: $VERSION"
+          else
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            CURRENT_VERSION="${LATEST_TAG#v}"
+            echo "Latest tag: $LATEST_TAG"
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-build
-          path: office-coding-agent-*.zip
-          retention-days: 7
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
 
-  # ─── Prepare Release PR ──────────────────────────────────────
-  prepare-release-pr:
-    name: Prepare Release PR
-    needs: version
-    if: ${{ inputs.phase == 'prepare' }}
-    runs-on: ubuntu-latest
+            case "${{ inputs.version_type }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 20
-          cache: npm
+          TAG="v$VERSION"
 
-      - name: Bump package.json version
-        run: npm version ${{ needs.version.outputs.version }} --no-git-tag-version
-
-      - name: Create release PR
-        id: create-pr
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: release/${{ needs.version.outputs.tag }}
-          delete-branch: true
-          commit-message: 'chore: release ${{ needs.version.outputs.tag }}'
-          title: 'chore: release ${{ needs.version.outputs.tag }}'
-          body: |
-            ## Summary
-            - bump `package.json` and `package-lock.json` to `${{ needs.version.outputs.version }}`
-            - prepare the repository for release `${{ needs.version.outputs.tag }}`
-
-            ## Next steps
-            1. Review and **Squash and merge** this PR.
-            2. Re-run the `Release` workflow with:
-               - `phase: publish`
-               - `custom_version: ${{ needs.version.outputs.version }}`
-
-      - name: Write summary
-        run: |
-          {
-            echo "## Release PR created"
-            echo ""
-            echo "- Version: \`${{ needs.version.outputs.version }}\`"
-            echo "- Tag: \`${{ needs.version.outputs.tag }}\`"
-            echo "- PR: ${{ steps.create-pr.outputs.pull-request-url }}"
-            echo ""
-            echo "After merging the PR with **Squash and merge**, run this workflow again with \`phase=publish\` and \`custom_version=${{ needs.version.outputs.version }}\`."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # ─── Create Tag ──────────────────────────────────────────────
-  create-tag:
-    name: Create Tag
-    needs: [version, build]
-    if: ${{ inputs.phase == 'publish' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Verify package.json version matches release version
-        run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if [ "$PACKAGE_VERSION" != "${{ needs.version.outputs.version }}" ]; then
-            echo "package.json version ($PACKAGE_VERSION) does not match requested release version (${{ needs.version.outputs.version }})." >&2
-            echo "Merge the release PR first, then re-run this workflow with phase=publish and custom_version=${{ needs.version.outputs.version }}." >&2
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists." >&2
             exit 1
           fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Package release artifact
+        run: |
+          zip -r "office-coding-agent-${{ steps.version.outputs.version }}.zip" dist/ manifests/ taskpane.html
 
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
-          git push origin "${{ needs.version.outputs.tag }}"
-
-  # ─── GitHub Release ─────────────────────────────────────────
-  create-release:
-    name: Publish GitHub Release
-    needs: [version, create-tag]
-    if: ${{ inputs.phase == 'publish' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: release-build
-          path: release/
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Create GitHub Release
+        if: ${{ inputs.create_release }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.version.outputs.tag }}
-          name: ${{ needs.version.outputs.tag }}
-          files: release/**
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: office-coding-agent-${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Release published"
+            echo ""
+            echo "- Version: \`${{ steps.version.outputs.version }}\`"
+            echo "- Tag: \`${{ steps.version.outputs.tag }}\`"
+            echo "- Version source: latest git tag"
+            echo "- GitHub Release created: \`${{ inputs.create_release }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

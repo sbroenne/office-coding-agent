@@ -2,9 +2,11 @@
 
 Thanks for your interest in contributing to Office Coding Agent.
 
-> **⛔ Never push or merge directly to `main`.** All changes must go through a pull request on a feature branch. Branch protection is enforced on GitHub.
+> **⛔ Never push or merge directly to `main`.** All normal code changes must go through a pull request on a feature branch. Branch protection is enforced on GitHub.
 >
 > **Squash merge only.** When merging a PR on GitHub, always use **"Squash and merge"**. Merge commits and rebase merges are disabled.
+>
+> **Releases do not push commits to `main`.** The manual GitHub Actions **Release** workflow derives the next version from git tags, then creates and pushes only the new release tag.
 
 ## Development Setup
 

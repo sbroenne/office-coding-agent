@@ -89,6 +89,23 @@ The proxy server runs on `https://localhost:3000` and handles both the Vite dev 
 
 For local shared-folder sideloading and staging manifest workflows, see [docs/SIDELOADING.md](./docs/SIDELOADING.md).
 
+## Releasing
+
+Normal development changes still go through pull requests, but releases are handled by the manual GitHub Actions **Release** workflow.
+
+The workflow:
+
+- derives the next version from the latest git tag
+- builds the production bundle
+- creates and pushes the Git tag
+- optionally publishes the GitHub Release artifact
+
+Run it from the Actions tab in one step:
+
+1. choose the version increment (`patch`, `minor`, or `major`)
+2. optionally provide `custom_version`
+3. run the workflow
+
 ## Available Scripts
 
 ## Available Scripts
@@ -292,13 +309,13 @@ copilot plugin remove <plugin-name>
 
 Plugin file conventions (required by the Copilot CLI spec):
 
-| Content type | File pattern | Notes |
-|---|---|---|
-| Agent | `agents/<name>.agent.md` | YAML frontmatter with `hosts`, `defaultForHosts` |
-| Skill | `skills/<name>/SKILL.md` | YAML frontmatter with optional `hosts` |
-| Prompt (slash command) | `prompts/<name>.prompt.md` | Appears in `/` slash menu |
-| MCP server config | `mcp.json` | Servers discovered automatically |
-| Plugin-level agent | `agents/AGENT.md` | Uses the plugin name as agent ID |
+| Content type           | File pattern               | Notes                                            |
+| ---------------------- | -------------------------- | ------------------------------------------------ |
+| Agent                  | `agents/<name>.agent.md`   | YAML frontmatter with `hosts`, `defaultForHosts` |
+| Skill                  | `skills/<name>/SKILL.md`   | YAML frontmatter with optional `hosts`           |
+| Prompt (slash command) | `prompts/<name>.prompt.md` | Appears in `/` slash menu                        |
+| MCP server config      | `mcp.json`                 | Servers discovered automatically                 |
+| Plugin-level agent     | `agents/AGENT.md`          | Uses the plugin name as agent ID                 |
 
 > **Note:** Files with the wrong extension (e.g. `agents/my-agent.md` instead of `agents/my-agent.agent.md`) are silently ignored by the Copilot CLI.
 
@@ -383,4 +400,3 @@ This project is developed with a [Squad AI team](https://github.com/bradygaster/
 ## License
 
 MIT
-
