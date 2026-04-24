@@ -1,5 +1,7 @@
 # Office Coding Agent
 
+[中文](README-CN.md) | English
+
 An Office add-in that brings GitHub Copilot directly into Excel, PowerPoint, Word, and Outlook — with full support for **[Copilot CLI plugins](https://docs.github.com/en/copilot/reference/cli-plugin-reference)**. Install any plugin and its agents, skills, prompts, and MCP servers instantly appear in the task pane. No API keys, no configuration — just sign in with your GitHub account.
 
 Built with React, Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). Architecture based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office).
