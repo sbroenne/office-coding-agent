@@ -45,7 +45,7 @@ The app does not maintain a separate plugin registry, sandbox, marketplace brows
 - **VS Code–style chat UI** — identical look and feel to GitHub Copilot in VS Code (design tokens, codicons, shimmer thinking indicator, per-phase Working boxes)
 - **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
 - **Agent picker** — switch between host-targeted agents owned by the task pane
-- **Slash skills and prompts** — type `/skill-name` or `/prompt-name` to invoke installed CLI skills and prompt files; `/skills` shows CLI-style skills command suggestions
+- **Slash skills and prompts** — type `/skill-name` or `/prompt-name` to invoke installed CLI skills and prompt files
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
 
 ### 📊 Office Host Tools

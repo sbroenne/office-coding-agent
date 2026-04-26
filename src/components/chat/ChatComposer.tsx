@@ -17,40 +17,13 @@ interface SlashItemsResponse {
 }
 
 interface SlashSuggestion {
-  type: 'skill' | 'prompt' | 'command';
+  type: 'skill' | 'prompt';
   value: string;
   name: string;
   description?: string;
   plugin?: string;
   source?: string;
 }
-
-const SKILLS_COMMANDS: SlashSuggestion[] = [
-  {
-    type: 'command',
-    value: '/skills',
-    name: '/skills',
-    description: 'Manage enabled skills in Copilot CLI.',
-  },
-  {
-    type: 'command',
-    value: '/skills list',
-    name: '/skills list',
-    description: 'List currently available skills.',
-  },
-  {
-    type: 'command',
-    value: '/skills info ',
-    name: '/skills info <skill-name>',
-    description: 'Show details for a skill.',
-  },
-  {
-    type: 'command',
-    value: '/skills reload',
-    name: '/skills reload',
-    description: 'Reload skills added during a CLI session.',
-  },
-];
 
 interface ChatComposerProps {
   onSend: (text: string) => void | Promise<void>;
@@ -102,11 +75,9 @@ export const ChatComposer: FC<ChatComposerProps> = ({
       .catch(() => setSlashItems({}));
   }, []);
 
-  const skillsCommandMatch = /^\/skills(?:\s+([\w-]*))?$/i.exec(text);
   const rootSlashMatch = /^\/([\w-]*)$/i.exec(text);
   const slashQuery = rootSlashMatch?.[1]?.toLowerCase() ?? '';
-  const skillsCommandQuery = skillsCommandMatch?.[1]?.toLowerCase() ?? '';
-  const slashMode = skillsCommandMatch ? 'skills-command' : rootSlashMatch ? 'skill' : undefined;
+  const slashMode = rootSlashMatch ? 'slash' : undefined;
   const skillSuggestions = (slashItems.skills ?? [])
     .filter(item => {
       if (!slashQuery) return true;
@@ -139,15 +110,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         source: item.source,
       })
     );
-  const commandSuggestions = SKILLS_COMMANDS.filter(command => {
-    const query = slashMode === 'skills-command' ? skillsCommandQuery : slashQuery;
-    return !query || command.name.toLowerCase().includes(query);
-  });
-  const visibleSlashSuggestions = (
-    slashMode === 'skills-command'
-      ? commandSuggestions
-      : [...commandSuggestions, ...skillSuggestions, ...promptSuggestions]
-  ).slice(0, 8);
+  const visibleSlashSuggestions = [...skillSuggestions, ...promptSuggestions].slice(0, 8);
 
   const applySlashSuggestion = useCallback((suggestion: SlashSuggestion) => {
     setText(suggestion.value);
@@ -255,9 +218,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         <div
           className="max-h-56 overflow-y-auto border-b border-border p-1"
           role="listbox"
-          aria-label={
-            slashMode === 'skills-command' ? 'skills command suggestions' : 'slash suggestions'
-          }
+          aria-label="slash suggestions"
         >
           {visibleSlashSuggestions.length > 0 ? (
             visibleSlashSuggestions.map(suggestion => (
@@ -269,13 +230,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
                 role="option"
               >
                 <Codicon
-                  name={
-                    suggestion.type === 'skill'
-                      ? 'lightbulb-sparkle'
-                      : suggestion.type === 'prompt'
-                        ? 'symbol-keyword'
-                        : 'terminal'
-                  }
+                  name={suggestion.type === 'skill' ? 'lightbulb-sparkle' : 'symbol-keyword'}
                   className="mt-0.5 text-[14px] text-[var(--vscode-icon-foreground)]"
                 />
                 <span className="min-w-0 flex-1">

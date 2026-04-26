@@ -356,15 +356,15 @@ async function handleConnection(ws) {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               // Auto-approve custom-tool permissions — these are tools explicitly
               // registered by the session creator, not built-in filesystem tools.
-              // The SDK v0.1.28+ denies all permissions by default; our own tools
+              // The SDK denies permissions by default; our own tools
               // should always be allowed to execute.
               if (request.kind === 'custom-tool') {
                 console.log(`[proxy] permission.request auto-approved: ${request.kind}`);
-                return { kind: 'approved' };
+                return { kind: 'approve-once' };
               }
               const decision = await requestPermissionDecision(session.sessionId, request);
               console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision}`);
-              return { kind: decision };
+              return decision === 'approved' ? { kind: 'approve-once' } : { kind: 'reject' };
             },
           });
         } catch (err) {

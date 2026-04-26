@@ -85,13 +85,13 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('/skills opens Copilot CLI skills management suggestions', async ({
+  test('/skills does not expose management command suggestions', async ({
     configuredTaskpane: page,
   }) => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
     await composer.fill('/skills');
-    await expect(page.getByRole('listbox', { name: 'skills command suggestions' })).toBeVisible();
-    await expect(page.getByRole('option', { name: /\/skills list/i })).toBeVisible();
+    await expect(page.getByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
+    await expect(page.getByRole('option', { name: /\/skills list/i })).toHaveCount(0);
   });
 
   test('direct slash suggestions include installed Copilot CLI skills', async ({

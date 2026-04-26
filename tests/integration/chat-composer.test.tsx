@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { renderWithProviders } from '../test-utils';
 import { ChatComposer } from '@/components/chat/ChatComposer';
 
@@ -57,7 +57,7 @@ describe('ChatComposer slash commands', () => {
     expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue('/explain-code ');
   });
 
-  it('shows Copilot CLI skills management command suggestions for /skills', async () => {
+  it('does not show skills management commands in slash suggestions', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -72,9 +72,7 @@ describe('ChatComposer slash commands', () => {
       target: { value: '/skills' },
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole('listbox', { name: 'skills command suggestions' })).toBeVisible();
-    });
-    expect(screen.getByRole('option', { name: /\/skills list/i })).toBeVisible();
+    expect(await screen.findByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
+    expect(screen.queryByRole('option', { name: /\/skills list/i })).not.toBeInTheDocument();
   });
 });
