@@ -105,7 +105,7 @@ test.describe('Action bar (live Copilot)', () => {
   }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
 
-    // This prompt triggers manage_skills (a pure tool call).
+    // This prompt triggers manage_memory (a pure tool call).
     // Some Copilot responses end with the tool result and no trailing text
     // part — this was the scenario that caused the "MessagePartText can only
     // be used inside text or reasoning message parts" crash.
@@ -114,7 +114,7 @@ test.describe('Action bar (live Copilot)', () => {
     await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
 
     await composer.fill(
-      'Use the manage_skills tool with action "list". Only call the tool, do not add any text response after it.'
+      'Use the manage_memory tool with action "list". Only call the tool, do not add any text response after it.'
     );
     await composer.press('Enter');
 
@@ -165,3 +165,4 @@ test.describe('Action bar (live Copilot)', () => {
     await expect(page.getByRole('button', { name: 'Copy' })).toBeVisible({ timeout: 3_000 });
   });
 });
+

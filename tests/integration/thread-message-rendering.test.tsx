@@ -54,9 +54,6 @@ function makeFakeClient(session: ReturnType<typeof makeFakeSession>) {
     onMcpStatus: vi.fn(() => () => undefined),
     onMcpLog: vi.fn(() => () => undefined),
     onMcpTools: vi.fn(() => () => undefined),
-    onPluginAgents: vi.fn(() => () => undefined),
-    onPluginSkills: vi.fn(() => () => undefined),
-    onPluginPrompts: vi.fn(() => () => undefined),
   };
 }
 
@@ -198,7 +195,7 @@ describe('Thread – AssistantMessage rendering', () => {
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
-        toolName: 'manage_plugins',
+        toolName: 'manage_memory',
         arguments: { action: 'list' },
       }),
       makeEvent('tool.execution_complete', {
@@ -1383,7 +1380,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
     const session = makeFakeSession([
       makeEvent('tool.execution_start', {
         toolCallId: 'tc1',
-        toolName: 'manage_plugins',
+        toolName: 'manage_memory',
         arguments: { action: 'list' },
       }),
       makeEvent('tool.execution_complete', {
@@ -1393,7 +1390,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       }),
       makeEvent('tool.execution_start', {
         toolCallId: 'tc2',
-        toolName: 'manage_plugins',
+        toolName: 'manage_memory',
         arguments: { action: 'browse' },
       }),
       makeEvent('tool.execution_complete', {
@@ -2227,3 +2224,4 @@ describe('task_complete: summary rendering and multi-turn Working box isolation'
     expect(assistantMsgs[0].textContent).not.toContain('Set range values');
   });
 });
+

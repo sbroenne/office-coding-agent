@@ -4,7 +4,6 @@ import { AgentPicker } from './AgentPicker';
 import { ModelPicker } from './ModelPicker';
 import { McpPicker } from './McpPicker';
 import type { ChatMessage } from '@/types';
-import { useSettingsStore } from '@/stores/settingsStore';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -27,9 +26,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   queuedPrompts,
   onDequeue,
 }) => {
-  const pluginPrompts = useSettingsStore(s => s.pluginPrompts);
-  const setActiveAgent = useSettingsStore(s => s.setActiveAgent);
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <MessageList
@@ -46,8 +42,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         onRegenerate={() => {
           /* TODO */
         }}
-        slashCommands={pluginPrompts}
-        onAgentSelect={setActiveAgent}
         leftToolbar={
           <>
             <AgentPicker />

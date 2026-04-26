@@ -60,35 +60,6 @@ describe('settingsStore — agents', () => {
     expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
   });
 
-  it('setPluginAgents filters built-in Office plugin agents from store state', () => {
-    useSettingsStore.getState().setPluginAgents([
-      {
-        metadata: {
-          name: 'office-excel',
-          description: 'Built-in Office plugin agent',
-          version: '1.0.0',
-          hosts: ['excel'],
-          defaultForHosts: [],
-        },
-        instructions: 'Built-in instructions.',
-      },
-      {
-        metadata: {
-          name: 'Contoso Excel Agent',
-          description: 'External plugin agent',
-          version: '1.0.0',
-          hosts: ['excel'],
-          defaultForHosts: [],
-        },
-        instructions: 'External instructions.',
-      },
-    ]);
-
-    expect(useSettingsStore.getState().pluginAgents.map(agent => agent.metadata.name)).toEqual([
-      'Contoso Excel Agent',
-    ]);
-  });
-
   it('getActiveAgent returns the current agent id', () => {
     expect(useSettingsStore.getState().getActiveAgent()).toBe('Excel');
   });
@@ -130,26 +101,6 @@ describe('settingsStore — skills', () => {
     useSettingsStore.getState().toggleSkill('excel');
     useSettingsStore.getState().reset();
     expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
-  });
-
-  it('setPluginSkills populates pluginSkills', () => {
-    const skill = {
-      metadata: { name: 'test-skill', description: 'A skill', version: '1.0.0', tags: [], hosts: [] as import('@/types/agent').AgentHost[] },
-      content: 'content',
-    };
-    useSettingsStore.getState().setPluginSkills([skill]);
-    expect(useSettingsStore.getState().pluginSkills).toHaveLength(1);
-    expect(useSettingsStore.getState().pluginSkills[0].metadata.name).toBe('test-skill');
-  });
-
-  it('reset clears pluginSkills', () => {
-    const skill = {
-      metadata: { name: 'test-skill', description: 'A skill', version: '1.0.0', tags: [], hosts: [] as import('@/types/agent').AgentHost[] },
-      content: 'content',
-    };
-    useSettingsStore.getState().setPluginSkills([skill]);
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().pluginSkills).toHaveLength(0);
   });
 });
 

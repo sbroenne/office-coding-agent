@@ -47,9 +47,9 @@ test.describe('Thinking indicator (live Copilot)', () => {
       observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     });
 
-    // Prompt that triggers manage_skills tool (no Excel needed)
+    // Prompt that triggers manage_memory tool (no Excel needed)
     await composer.fill(
-      'Use the manage_skills tool with action "list" and tell me how many skills you have.'
+      'Use the manage_memory tool with action "list" and tell me how many skills you have.'
     );
     await composer.press('Enter');
 
@@ -80,9 +80,9 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(page.getByText('Connecting to Copilot...')).not.toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
-    // Use manage_skills — a tool that doesn't need Excel
+    // Use manage_memory — a tool that doesn't need Excel
     await composer.fill(
-      'Use the manage_skills tool with action "list" and tell me how many skills you have.'
+      'Use the manage_memory tool with action "list" and tell me how many skills you have.'
     );
     await composer.press('Enter');
 
@@ -114,14 +114,22 @@ test.describe('Thinking indicator (live Copilot)', () => {
     await expect(page.getByText('Connection failed')).not.toBeVisible();
 
     await composer.fill(
-      'Use the manage_skills tool with action "list" and tell me how many skills you have.'
+      'Use the manage_memory tool with action "list" and tell me how many skills you have.'
     );
     await composer.press('Enter');
 
     // Wait for either the inline shimmer OR the Working box to appear
     const indicator = page.locator('.inline-working-progress');
     const workingBox = page.locator('.chat-thinking-box');
-    await expect(indicator.or(workingBox)).toBeVisible({ timeout: AI_TIMEOUT });
+    await page.waitForFunction(
+      () =>
+        Boolean(
+          document.querySelector('.inline-working-progress') ||
+            document.querySelector('.chat-thinking-box')
+        ),
+      undefined,
+      { timeout: AI_TIMEOUT }
+    );
 
     // Whichever appears must be inside the assistant message (not in the footer)
     const progressElement = (await indicator.isVisible()) ? indicator : workingBox;
@@ -213,7 +221,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
 
     // Prompt that triggers tool calls
     await composer.fill(
-      'Use the manage_skills tool with action "list" and then use manage_agents with action "list". Tell me the counts.'
+      'Use the manage_memory tool with action "list" and then use manage_memory with action "search" and query "missing". Tell me the counts.'
     );
     await composer.press('Enter');
 
@@ -246,3 +254,4 @@ test.describe('Thinking indicator (live Copilot)', () => {
     });
   });
 });
+

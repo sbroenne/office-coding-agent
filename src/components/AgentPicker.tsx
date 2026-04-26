@@ -10,8 +10,6 @@ export const AgentPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
   const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const setActiveAgent = useSettingsStore(s => s.setActiveAgent);
-  // Subscribe to pluginAgents so the picker re-renders when the proxy sends plugin.agents
-  useSettingsStore(s => s.pluginAgents);
 
   const host = detectOfficeHost();
   const targetHost =

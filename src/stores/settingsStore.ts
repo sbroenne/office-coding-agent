@@ -2,10 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CopilotModel, UserSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
-import { getAllAgents, setImportedAgents, sanitizeImportedAgents } from '@/services/agents';
-import type { AgentSkill } from '@/types/skill';
-import type { AgentConfig } from '@/types/agent';
-import type { PluginPrompt } from '@/types/plugin';
+import { getAllAgents } from '@/services/agents';
 import { officeStorage } from './officeStorage';
 
 interface SettingsState extends UserSettings {
@@ -18,29 +15,6 @@ interface SettingsState extends UserSettings {
   // ─── Agent management ───
   setActiveAgent: (agentId: string) => void;
   getActiveAgent: () => string;
-  /**
-   * Plugin agents discovered from the Copilot CLI config at session start.
-   * Ephemeral — NOT persisted. Populated by the plugin.agents notification.
-   */
-  pluginAgents: AgentConfig[];
-  /** Replace the current plugin agent list (called on each session.create). */
-  setPluginAgents: (agents: AgentConfig[]) => void;
-
-  /**
-   * Plugin skills discovered from the Copilot CLI config at session start.
-   * Ephemeral — NOT persisted. Populated by the plugin.skills notification.
-   */
-  pluginSkills: AgentSkill[];
-  /** Replace the current plugin skill list (called on each session.create). */
-  setPluginSkills: (skills: AgentSkill[]) => void;
-
-  /**
-   * Plugin prompts (slash commands) discovered from plugin prompts/ directories.
-   * Ephemeral — NOT persisted. Populated by the plugin.prompts notification.
-   */
-  pluginPrompts: PluginPrompt[];
-  /** Replace the current plugin prompt list (called on each session.create). */
-  setPluginPrompts: (prompts: PluginPrompt[]) => void;
 
   // ─── Skill management ───
   toggleSkill: (name: string) => void;
@@ -60,9 +34,6 @@ export const useSettingsStore = create<SettingsState>()(
       // ─── Initial state ───
       ...DEFAULT_SETTINGS,
       availableModels: null,
-      pluginAgents: [],
-      pluginSkills: [],
-      pluginPrompts: [],
 
       // ─── Model management ───
       setAvailableModels: models => {
@@ -87,20 +58,6 @@ export const useSettingsStore = create<SettingsState>()(
 
       getActiveAgent: () => {
         return get().activeAgentId;
-      },
-
-      setPluginAgents: agents => {
-        const visibleAgents = sanitizeImportedAgents(agents);
-        set({ pluginAgents: visibleAgents });
-        setImportedAgents(visibleAgents);
-      },
-
-      setPluginSkills: skills => {
-        set({ pluginSkills: skills });
-      },
-
-      setPluginPrompts: prompts => {
-        set({ pluginPrompts: prompts });
       },
 
       // ─── Skill management ───
@@ -133,8 +90,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       // ─── Reset ───
       reset: () => {
-        set({ ...DEFAULT_SETTINGS, pluginAgents: [], pluginSkills: [], pluginPrompts: [] });
-        setImportedAgents([]);
+        set({ ...DEFAULT_SETTINGS });
       },
     }),
     {

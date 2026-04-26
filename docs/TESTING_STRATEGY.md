@@ -64,6 +64,7 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 | `chat-error-boundary.test.tsx`             | Component wiring                    | No               |
 | `chat-header-settings-flow.test.tsx`       | Component wiring                    | No               |
 | `chat-panel.test.tsx`                      | Component wiring                    | No               |
+| `cli-plugin-bootstrap.test.ts`             | CLI plugin startup bootstrap        | No               |
 | `chat-store.test.ts`                       | Chat message store                  | No               |
 | `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills  | Yes              |
 | `copilot-websocket.integration.test.ts`    | Live Copilot WebSocket E2E          | Yes              |
@@ -73,8 +74,6 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 | `id.test.ts`                               | `generateId` utility                | No               |
 | `management-tools.test.ts`                 | Management tool schemas + handlers  | No               |
 | `manifest.test.ts`                         | Office manifest / host assumptions  | No               |
-| `mcp-manager-dialog.test.tsx`              | Component wiring                    | No               |
-| `mcp-service.test.ts`                      | MCP server config parsing           | No               |
 | `model-manager.test.tsx`                   | Component wiring                    | No               |
 | `model-picker-interactions.test.tsx`       | Component wiring                    | No               |
 | `office-storage.test.ts`                   | `officeStorage` with OfficeRuntime  | No               |

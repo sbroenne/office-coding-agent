@@ -64,12 +64,6 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   disabledSkills?: string[];
   /** Custom agent configs passed natively to the SDK. */
   customAgents?: CustomAgentPayload[];
-  /**
-   * Override path to the Copilot CLI config file used for plugin discovery.
-   * Used in integration tests to inject a synthetic plugin config without
-   * touching the real ~/.copilot/config.json.
-   */
-  pluginConfigPath?: string;
 }
 
 /**
@@ -233,48 +227,6 @@ export interface McpToolsPayload {
   tools: { name: string; description: string }[];
 }
 
-/** A single agent descriptor from a plugin, as sent in the plugin.agents notification. */
-export interface PluginAgentDescriptor {
-  name: string;
-  description: string;
-  prompt: string;
-  /** Empty array means the agent is universal (all hosts). */
-  hosts: string[];
-}
-
-/** Payload for the plugin.agents notification sent by the proxy after session.create. */
-export interface PluginAgentsPayload {
-  agents: PluginAgentDescriptor[];
-}
-
-/** A single skill descriptor from a plugin, as sent in the plugin.skills notification. */
-export interface PluginSkillDescriptor {
-  name: string;
-  description: string;
-  version: string;
-  hosts: string[];
-  content: string;
-}
-
-/** Payload for the plugin.skills notification. */
-export interface PluginSkillsPayload {
-  skills: PluginSkillDescriptor[];
-}
-
-/** A single prompt/slash-command descriptor from a plugin's prompts/*.prompt.md. */
-export interface PluginPromptDescriptor {
-  name: string;
-  description: string;
-  agent: string;
-  argumentHint: string;
-  body: string;
-}
-
-/** Payload for the plugin.prompts notification. */
-export interface PluginPromptsPayload {
-  prompts: PluginPromptDescriptor[];
-}
-
 /**
  * Browser-compatible Copilot client connected via WebSocket proxy.
  */
@@ -285,9 +237,6 @@ export class WebSocketCopilotClient {
   private mcpStatusHandlers = new Set<(payload: McpStatusPayload) => void>();
   private mcpLogHandlers = new Set<(payload: McpLogPayload) => void>();
   private mcpToolsHandlers = new Set<(payload: McpToolsPayload) => void>();
-  private pluginAgentsHandlers = new Set<(payload: PluginAgentsPayload) => void>();
-  private pluginSkillsHandlers = new Set<(payload: PluginSkillsPayload) => void>();
-  private pluginPromptsHandlers = new Set<(payload: PluginPromptsPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -335,7 +284,6 @@ export class WebSocketCopilotClient {
       host: config.host,
       disabledSkills: config.disabledSkills,
       customAgents: config.customAgents,
-      pluginConfigPath: config.pluginConfigPath,
     });
 
     const sessionId = response.sessionId;
@@ -374,27 +322,6 @@ export class WebSocketCopilotClient {
     this.mcpToolsHandlers.add(handler);
     return () => {
       this.mcpToolsHandlers.delete(handler);
-    };
-  }
-
-  onPluginAgents(handler: (payload: PluginAgentsPayload) => void): () => void {
-    this.pluginAgentsHandlers.add(handler);
-    return () => {
-      this.pluginAgentsHandlers.delete(handler);
-    };
-  }
-
-  onPluginSkills(handler: (payload: PluginSkillsPayload) => void): () => void {
-    this.pluginSkillsHandlers.add(handler);
-    return () => {
-      this.pluginSkillsHandlers.delete(handler);
-    };
-  }
-
-  onPluginPrompts(handler: (payload: PluginPromptsPayload) => void): () => void {
-    this.pluginPromptsHandlers.add(handler);
-    return () => {
-      this.pluginPromptsHandlers.delete(handler);
     };
   }
 
@@ -460,39 +387,6 @@ export class WebSocketCopilotClient {
     this.connection.onNotification('mcp.tools', (notification: unknown) => {
       const payload = notification as McpToolsPayload;
       for (const handler of this.mcpToolsHandlers) {
-        try {
-          handler(payload);
-        } catch {
-          /* ignore */
-        }
-      }
-    });
-
-    this.connection.onNotification('plugin.agents', (notification: unknown) => {
-      const payload = notification as PluginAgentsPayload;
-      for (const handler of this.pluginAgentsHandlers) {
-        try {
-          handler(payload);
-        } catch {
-          /* ignore */
-        }
-      }
-    });
-
-    this.connection.onNotification('plugin.skills', (notification: unknown) => {
-      const payload = notification as PluginSkillsPayload;
-      for (const handler of this.pluginSkillsHandlers) {
-        try {
-          handler(payload);
-        } catch {
-          /* ignore */
-        }
-      }
-    });
-
-    this.connection.onNotification('plugin.prompts', (notification: unknown) => {
-      const payload = notification as PluginPromptsPayload;
-      for (const handler of this.pluginPromptsHandlers) {
         try {
           handler(payload);
         } catch {

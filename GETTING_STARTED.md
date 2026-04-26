@@ -106,10 +106,10 @@ This opens the Office application and injects the add-in. The task pane will app
 
 The task pane opens with an AI chat interface. Type a message to get started.
 
-- Use the **Agent picker** (bottom of the input bar) to switch agents — includes agents from any installed Copilot CLI plugins.
+- Use the **Agent picker** (bottom of the input bar) to switch task-pane agents when more than one is available.
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
-- Use the **Skill picker** (header icon) to toggle context skills on/off — includes skills from installed plugins.
-- Use the `copilot plugin` CLI commands to install, update, or remove Copilot CLI plugins.
+- Use the **Skill picker** (header icon) for SDK-provided skill toggles when available.
+- Use `copilot plugin` CLI commands to install, update, or remove user plugins. On startup, the proxy automatically ensures the Office Coding Agent marketplace plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) are installed and updated in your normal Copilot CLI config.
 - Use the **New Conversation** button (header) to reset the chat.
 
 ---

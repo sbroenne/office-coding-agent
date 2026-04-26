@@ -1,9 +1,8 @@
 /**
  * VS Code-style MCP server tools picker.
  *
- * Shows ALL available MCP servers (bundled + from installed plugins) with
- * per-server enable/disable toggles. Mirrors the "Select tools" quick-pick
- * in VS Code Copilot Chat.
+ * Shows built-in MCP servers with per-server enable/disable toggles.
+ * Mirrors the "Select tools" quick-pick in VS Code Copilot Chat.
  */
 import React, { useState, useEffect } from 'react';
 import * as Popover from '@radix-ui/react-popover';
@@ -36,7 +35,7 @@ export const McpPicker: React.FC = () => {
     void fetchAllMcpServers().then(setServers);
   }, []);
 
-  // Re-fetch when popover opens so it reflects newly installed plugins
+  // Re-fetch when popover opens so the built-in server list stays current.
   useEffect(() => {
     if (open) void fetchAllMcpServers().then(setServers);
   }, [open]);
@@ -75,9 +74,7 @@ export const McpPicker: React.FC = () => {
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">MCP Servers</div>
 
           {servers.length === 0 ? (
-            <div className="px-2 py-2 text-xs text-muted-foreground">
-              No MCP servers available. Install a plugin to add MCP servers.
-            </div>
+            <div className="px-2 py-2 text-xs text-muted-foreground">No MCP servers available.</div>
           ) : (
             servers.map(server => {
               const enabled = isMcpServerEnabled(server.name);

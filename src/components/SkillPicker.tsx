@@ -2,35 +2,28 @@ import React, { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
-import { detectOfficeHost } from '@/services/office/host';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { AgentSkill } from '@/types/skill';
 
 export const SkillPicker: React.FC = () => {
   const [open, setOpen] = useState(false);
   const toggleSkill = useSettingsStore(s => s.toggleSkill);
   const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
-  const pluginSkills = useSettingsStore(s => s.pluginSkills);
 
-  const host = detectOfficeHost();
+  const allSkills: { name: string; description: string }[] = [];
+  const enabledCount = allSkills.filter(s => !disabledSkillNames.includes(s.name)).length;
 
-  const allSkills = pluginSkills.filter(
-    s => s.metadata.hosts.length === 0 || (host !== 'unknown' && s.metadata.hosts.includes(host))
-  );
-  const enabledCount = allSkills.filter(s => !disabledSkillNames.includes(s.metadata.name)).length;
-
-  const renderSkillRow = (skill: AgentSkill) => {
-    const enabled = !disabledSkillNames.includes(skill.metadata.name);
+  const renderSkillRow = (skill: { name: string; description: string }) => {
+    const enabled = !disabledSkillNames.includes(skill.name);
     return (
       <button
-        key={skill.metadata.name}
-        onClick={() => toggleSkill(skill.metadata.name)}
+        key={skill.name}
+        onClick={() => toggleSkill(skill.name)}
         className={cn(
           'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
           !enabled && 'opacity-50'
         )}
         aria-pressed={enabled}
-        title={enabled ? `Disable ${skill.metadata.name}` : `Enable ${skill.metadata.name}`}
+        title={enabled ? `Disable ${skill.name}` : `Enable ${skill.name}`}
       >
         <div
           className={cn(
@@ -45,9 +38,9 @@ export const SkillPicker: React.FC = () => {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-foreground">{skill.metadata.name}</div>
+          <div className="font-medium text-foreground">{skill.name}</div>
           <div className="text-xs text-muted-foreground line-clamp-2">
-            {skill.metadata.description.split('.')[0]}
+            {skill.description.split('.')[0]}
           </div>
         </div>
       </button>

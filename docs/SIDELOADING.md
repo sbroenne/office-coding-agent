@@ -114,44 +114,16 @@ Use this after the add-in is loaded (desktop or staging) to verify ZIP import fl
 npm run extensions:samples
 ```
 
-Expected files:
+The task pane no longer imports agent/skill ZIP files. Agents, skills, prompts, MCP servers, and plugin updates are owned by the Copilot CLI. Use `copilot plugin` commands for local plugin development and installation:
 
-- `samples/extensions/sample-skills.zip`
-- `samples/extensions/sample-agents.zip`
+```bash
+copilot plugin list
+copilot plugin install <local-path-or-name@marketplace>
+copilot plugin update <plugin-name@marketplace-name>
+copilot plugin uninstall <plugin-name>
+```
 
-2. Open the task pane and open picker management
-
-- In Excel, open the add-in task pane.
-- For agents: open **Agent picker** in the input toolbar, then click **Manage agents…**
-- For skills: open **Skill picker** in the header, then click **Manage skills…**
-
-3. Import agents ZIP
-
-- Click **Import Agents ZIP**.
-- Select `sample-agents.zip`.
-- Verify success message appears.
-- Verify imported agents appear under **Imported** list.
-- Verify bundled agents remain under **Bundled (read-only)**.
-
-4. Import skills ZIP
-
-- Click **Import Skills ZIP**.
-- Select `sample-skills.zip`.
-- Verify success message appears.
-- Verify imported skills appear under **Imported** list.
-- Verify bundled skills remain under **Bundled (read-only)**.
-
-5. Verify pickers
-
-- Agent picker and Skill picker should show grouped sections:
-  - **Bundled**
-  - **Imported**
-
-6. Verify remove behavior
-
-- Remove one imported agent and one imported skill from Settings.
-- Confirm they disappear from Imported lists and pickers.
-- Confirm bundled entries cannot be removed.
+On startup, the proxy automatically registers the Office Coding Agent marketplace when missing and ensures the required `office-excel`, `office-powerpoint`, `office-word`, and `office-outlook` plugins are installed and updated.
 
 ## Troubleshooting
 

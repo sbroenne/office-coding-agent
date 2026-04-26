@@ -63,7 +63,9 @@ test.describe('Chat UI (configured state)', () => {
 
   test('displays the agent picker', async ({ configuredTaskpane: page }) => {
     // The agent picker should show the active agent
-    await expect(page.getByText('Excel')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: 'Select agent' })).toContainText('Default', {
+      timeout: 5000,
+    });
   });
 
   test('new conversation button is clickable', async ({ configuredTaskpane: page }) => {

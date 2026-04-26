@@ -10,98 +10,8 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import {
-  slugify,
-  discoverPluginSkillDirs,
-  discoverPluginSkillObjects,
-  discoverPluginAgents,
-  discoverPluginPrompts,
-} from './pluginDiscovery.mjs';
 import { isTrustedRequestOrigin } from './serverSecurity.mjs';
-
-const execFileAsync = promisify(execFile);
-/** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
-const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-/** execFileAsync options for npm: shell:true is required on Windows for .cmd files. */
-const NPM_EXEC_OPTS = process.platform === 'win32' ? { shell: true } : {};
-
-// ── LSP framing helpers ─────────────────────────────────────────────────────
-
-/**
- * Scan a node_modules directory for skillpm-compatible skill directories.
- * The skillpm spec places skills at: node_modules/<pkg>/skills/<name>/SKILL.md
- * Returns an array of skill subdirectory paths (the directory containing SKILL.md).
- *
- * @param {string} nodeModulesDir - path to node_modules
- * @returns {Promise<string[]>}
- */
-async function findSkillDirs(nodeModulesDir) {
-  const skillDirs = [];
-  let pkgEntries;
-  try {
-    pkgEntries = await readdir(nodeModulesDir, { withFileTypes: true });
-  } catch {
-    return skillDirs; // node_modules doesn't exist
-  }
-
-  for (const entry of pkgEntries) {
-    // Handle scoped packages (@org/...)
-    if (entry.isDirectory() && entry.name.startsWith('@')) {
-      const scopeDir = join(nodeModulesDir, entry.name);
-      let scopedEntries;
-      try {
-        scopedEntries = await readdir(scopeDir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const scopedEntry of scopedEntries) {
-        if (scopedEntry.isDirectory()) {
-          const pkgDir = join(scopeDir, scopedEntry.name);
-          const dirs = await findSkillDirsInPackage(pkgDir);
-          skillDirs.push(...dirs);
-        }
-      }
-    } else if (entry.isDirectory()) {
-      const pkgDir = join(nodeModulesDir, entry.name);
-      const dirs = await findSkillDirsInPackage(pkgDir);
-      skillDirs.push(...dirs);
-    }
-  }
-  return skillDirs;
-}
-
-/**
- * Within a single package directory, find all skills/<name>/ subdirs that contain SKILL.md.
- *
- * @param {string} pkgDir
- * @returns {Promise<string[]>}
- */
-async function findSkillDirsInPackage(pkgDir) {
-  const skillsRoot = join(pkgDir, 'skills');
-  const result = [];
-  let skillSubdirs;
-  try {
-    skillSubdirs = await readdir(skillsRoot, { withFileTypes: true });
-  } catch {
-    return result; // no skills/ directory in this package
-  }
-  for (const sub of skillSubdirs) {
-    if (sub.isDirectory()) {
-      const skillDir = join(skillsRoot, sub.name);
-      if (existsSync(join(skillDir, 'SKILL.md'))) {
-        result.push(skillDir);
-      }
-    }
-  }
-  return result;
-}
 
 /** Wrap a JSON payload in an LSP Content-Length frame. */
 function lspFrame(obj) {
@@ -391,9 +301,8 @@ async function handleConnection(ws) {
           availableTools,
           disabledSkills,
           customAgents,
-          pluginConfigPath,
         } = params || {};
-        let systemMessage = systemMessageParam;
+        const systemMessage = systemMessageParam;
         console.log(
           `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, customAgents=${(customAgents || []).length})`
         );
@@ -413,98 +322,10 @@ async function handleConnection(ws) {
             return response.result;
           },
         }));
-
-        const skillDirectories = [];
-
-        // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
-        try {
-          const pluginSkillDirs = await discoverPluginSkillDirs(host, pluginConfigPath);
-          if (pluginSkillDirs.length > 0) {
-            skillDirectories.push(...pluginSkillDirs);
-            console.log(`[proxy] Added ${pluginSkillDirs.length} skill dir(s) from installed plugins`);
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin skill discovery failed:', err.message);
-        }
-
-        // Discover agents from installed Copilot CLI plugins and merge into systemMessage.
-        // The SDK's customAgents are VS Code agent-picker entries, NOT auto-applied system
-        // prompts — they require explicit @mention. To guarantee plugin agent instructions
-        // reach the model, we append them to the systemMessage content instead.
-        //
-        // We also send a plugin.agents notification so the browser-side agentService can
-        // register these agents in the AgentPicker without requiring a manual import.
         const allCustomAgents = applySessionToolAccessToCustomAgents(
           customAgents || [],
           sessionToolNames
         );
-        try {
-          const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
-          if (pluginAgents.length > 0) {
-            console.log(`[proxy] Merging ${pluginAgents.length} plugin agent(s) into system message`);
-
-            // Notify the browser about discovered plugin agents so they can be shown
-            // in the AgentPicker. Send before the session.create response so the browser
-            // can update its agentService state promptly.
-            sendNotification('plugin.agents', {
-              agents: pluginAgents.map(a => ({
-                name: a.name,
-                description: a.description,
-                prompt: a.prompt,
-                hosts: a.hosts,
-              })),
-            });
-
-            // Pick the first plugin agent as the default; additional ones go into customAgents
-            // for agent-picker UI (future @mention support).
-            const [defaultPluginAgent, ...extraAgents] = pluginAgents;
-            if (defaultPluginAgent?.prompt) {
-              const existingContent = systemMessage?.content ?? '';
-              const merged = existingContent
-                ? `${existingContent}\n\n${defaultPluginAgent.prompt}`
-                : defaultPluginAgent.prompt;
-              systemMessage = {
-                mode: systemMessage?.mode ?? 'replace',
-                content: merged,
-              };
-            }
-            // Deduplicate: only add extra agents that are not already in allCustomAgents
-            // (they may be present if the browser already registered them from a previous
-            // plugin.agents notification).
-            const existingNames = new Set(allCustomAgents.map(a => a.name));
-            const registeredExtraAgents = applySessionToolAccessToCustomAgents(
-              extraAgents,
-              sessionToolNames
-            );
-            allCustomAgents.push(
-              ...registeredExtraAgents.filter(a => !existingNames.has(a.name))
-            );
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin agent discovery failed:', err.message);
-        }
-
-        // Discover plugin skills and notify the browser so SkillPicker can show them.
-        try {
-          const pluginSkills = await discoverPluginSkillObjects(host, pluginConfigPath);
-          if (pluginSkills.length > 0) {
-            console.log(`[proxy] Sending ${pluginSkills.length} plugin skill(s) to browser`);
-            sendNotification('plugin.skills', { skills: pluginSkills });
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin skill discovery failed:', err.message);
-        }
-
-        // Discover plugin prompts (slash commands) and notify the browser.
-        try {
-          const pluginPrompts = await discoverPluginPrompts(host, pluginConfigPath);
-          if (pluginPrompts.length > 0) {
-            console.log(`[proxy] Sending ${pluginPrompts.length} plugin prompt(s) to browser`);
-            sendNotification('plugin.prompts', { prompts: pluginPrompts });
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin prompt discovery failed:', err.message);
-        }
 
         // Emit 'starting' status for each configured MCP server
         const mcpServerNames = Object.keys(mcpServers || {});
@@ -529,7 +350,6 @@ async function handleConnection(ws) {
             tools,
             mcpServers,
             availableTools,
-            skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
             customAgents: allCustomAgents.length > 0 ? allCustomAgents : undefined,
             onPermissionRequest: async request => {
