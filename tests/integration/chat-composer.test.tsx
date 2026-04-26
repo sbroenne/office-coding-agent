@@ -9,7 +9,7 @@ describe('ChatComposer slash commands', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows installed CLI skills as direct slash suggestions and inserts the selected skill', async () => {
+  it('shows installed skills and prompt files as direct slash suggestions', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -19,6 +19,14 @@ describe('ChatComposer slash commands', () => {
             name: 'excel',
             description: 'Work with Excel workbooks',
             plugin: 'office-excel@office-coding-agent',
+          },
+        ],
+        prompts: [
+          {
+            type: 'prompt',
+            name: 'explain-code',
+            description: 'Explain selected code',
+            source: 'workspace',
           },
         ],
       }),
@@ -37,6 +45,16 @@ describe('ChatComposer slash commands', () => {
 
     expect(onSend).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue('/excel ');
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Message input' }), {
+      target: { value: '/explain' },
+    });
+
+    const promptOption = await screen.findByRole('option', { name: /\/explain-code/i });
+    fireEvent.click(promptOption);
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue('/explain-code ');
   });
 
   it('shows Copilot CLI skills management command suggestions for /skills', async () => {
@@ -44,7 +62,7 @@ describe('ChatComposer slash commands', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ skills: [] }),
+        json: async () => ({ skills: [], prompts: [] }),
       })
     );
 

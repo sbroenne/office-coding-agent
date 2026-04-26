@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const DEFAULT_INSTALLED_PLUGINS_DIR = path.join(os.homedir(), '.copilot', 'installed-plugins');
+const DEFAULT_WORKSPACE_PROMPTS_DIR = path.join(process.cwd(), '.github', 'prompts');
 
 function parseFrontmatter(markdown) {
   if (!markdown.startsWith('---')) return {};
@@ -61,19 +62,55 @@ async function readSkill(filePath, installedPluginsDir) {
   };
 }
 
+async function readPrompt(filePath, source) {
+  const markdown = await fs.promises.readFile(filePath, 'utf8');
+  const metadata = parseFrontmatter(markdown);
+  const fallbackName = path.basename(filePath).replace(/\.prompt\.md$/i, '');
+  const bodyStart = markdown.startsWith('---') ? markdown.indexOf('\n---', 3) : -1;
+  const body = bodyStart === -1 ? markdown : markdown.slice(bodyStart + 4);
+  const firstBodyLine = body
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .find(Boolean);
+
+  return {
+    type: 'prompt',
+    name: String(metadata.name ?? fallbackName),
+    description: String(metadata.description ?? firstBodyLine ?? ''),
+    source,
+  };
+}
+
+function isPromptFile(filePath) {
+  return path.basename(filePath).toLowerCase().endsWith('.prompt.md');
+}
+
 export async function getCliSlashItems(options = {}) {
   const installedPluginsDir = options.installedPluginsDir ?? DEFAULT_INSTALLED_PLUGINS_DIR;
+  const workspacePromptsDir = options.workspacePromptsDir ?? DEFAULT_WORKSPACE_PROMPTS_DIR;
   const skills = [];
+  const prompts = [];
 
   await walk(installedPluginsDir, async filePath => {
     const base = path.basename(filePath).toLowerCase();
     if (base === 'skill.md') {
       skills.push(await readSkill(filePath, installedPluginsDir));
+      return;
+    }
+    if (isPromptFile(filePath)) {
+      prompts.push(await readPrompt(filePath, pluginNameFor(filePath, installedPluginsDir)));
+    }
+  });
+
+  await walk(workspacePromptsDir, async filePath => {
+    if (isPromptFile(filePath)) {
+      prompts.push(await readPrompt(filePath, 'workspace'));
     }
   });
 
   const byName = (a, b) => a.name.localeCompare(b.name);
   return {
     skills: skills.sort(byName),
+    prompts: prompts.sort(byName),
   };
 }

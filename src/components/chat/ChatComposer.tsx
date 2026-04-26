@@ -4,22 +4,25 @@ import { cn } from '@/lib/utils';
 import { getLocalApiBase } from '@/lib/api';
 
 interface SlashItem {
-  type: 'skill';
+  type: 'skill' | 'prompt';
   name: string;
   description?: string;
   plugin?: string;
+  source?: string;
 }
 
 interface SlashItemsResponse {
   skills?: SlashItem[];
+  prompts?: SlashItem[];
 }
 
 interface SlashSuggestion {
-  type: 'skill' | 'command';
+  type: 'skill' | 'prompt' | 'command';
   value: string;
   name: string;
   description?: string;
   plugin?: string;
+  source?: string;
 }
 
 const SKILLS_COMMANDS: SlashSuggestion[] = [
@@ -120,6 +123,22 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         plugin: item.plugin,
       })
     );
+  const promptSuggestions = (slashItems.prompts ?? [])
+    .filter(item => {
+      if (!slashQuery) return true;
+      return [item.name, item.description, item.source].some(
+        value => value?.toLowerCase().includes(slashQuery) ?? false
+      );
+    })
+    .map(
+      (item): SlashSuggestion => ({
+        type: 'prompt',
+        value: `/${item.name} `,
+        name: `/${item.name}`,
+        description: item.description,
+        source: item.source,
+      })
+    );
   const commandSuggestions = SKILLS_COMMANDS.filter(command => {
     const query = slashMode === 'skills-command' ? skillsCommandQuery : slashQuery;
     return !query || command.name.toLowerCase().includes(query);
@@ -127,7 +146,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
   const visibleSlashSuggestions = (
     slashMode === 'skills-command'
       ? commandSuggestions
-      : [...commandSuggestions, ...skillSuggestions]
+      : [...commandSuggestions, ...skillSuggestions, ...promptSuggestions]
   ).slice(0, 8);
 
   const applySlashSuggestion = useCallback((suggestion: SlashSuggestion) => {
@@ -243,23 +262,33 @@ export const ChatComposer: FC<ChatComposerProps> = ({
           {visibleSlashSuggestions.length > 0 ? (
             visibleSlashSuggestions.map(suggestion => (
               <button
-                key={`${suggestion.type}:${suggestion.plugin ?? ''}:${suggestion.name}`}
+                key={`${suggestion.type}:${suggestion.plugin ?? suggestion.source ?? ''}:${suggestion.name}`}
                 type="button"
                 onClick={() => applySlashSuggestion(suggestion)}
                 className="flex w-full items-start gap-2 rounded-[var(--vscode-cornerRadius-small)] px-2 py-1.5 text-left text-sm hover:bg-accent"
                 role="option"
               >
                 <Codicon
-                  name={suggestion.type === 'skill' ? 'lightbulb-sparkle' : 'terminal'}
+                  name={
+                    suggestion.type === 'skill'
+                      ? 'lightbulb-sparkle'
+                      : suggestion.type === 'prompt'
+                        ? 'symbol-keyword'
+                        : 'terminal'
+                  }
                   className="mt-0.5 text-[14px] text-[var(--vscode-icon-foreground)]"
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-foreground">
                     {suggestion.name}
                   </span>
-                  {[suggestion.description, suggestion.plugin].some(Boolean) && (
+                  {[suggestion.description, suggestion.plugin ?? suggestion.source].some(
+                    Boolean
+                  ) && (
                     <span className="block truncate text-xs text-muted-foreground">
-                      {[suggestion.description, suggestion.plugin].filter(Boolean).join(' — ')}
+                      {[suggestion.description, suggestion.plugin ?? suggestion.source]
+                        .filter(Boolean)
+                        .join(' — ')}
                     </span>
                   )}
                 </span>
@@ -267,7 +296,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
             ))
           ) : (
             <div className="px-2 py-2 text-xs text-muted-foreground">
-              No matching skills found from installed Copilot CLI plugins.
+              No matching slash commands found.
             </div>
           )}
         </div>

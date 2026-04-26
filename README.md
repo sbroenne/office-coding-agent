@@ -45,7 +45,7 @@ The app does not maintain a separate plugin registry, sandbox, marketplace brows
 - **VS Code–style chat UI** — identical look and feel to GitHub Copilot in VS Code (design tokens, codicons, shimmer thinking indicator, per-phase Working boxes)
 - **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
 - **Agent picker** — switch between host-targeted agents owned by the task pane
-- **Slash skills** — type `/skill-name` to steer Copilot toward an installed CLI skill; `/skills` shows CLI-style skills command suggestions
+- **Slash skills and prompts** — type `/skill-name` or `/prompt-name` to invoke installed CLI skills and prompt files; `/skills` shows CLI-style skills command suggestions
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
 
 ### 📊 Office Host Tools
@@ -290,7 +290,7 @@ The AI agent uses a **split system prompt** architecture:
 
 ### Skills, Agents, and CLI Plugins
 
-The add-in ships with bundled agents for each Office host. Copilot CLI plugins are installed into the user's normal CLI config and consumed by the CLI/SDK, not by an app-owned plugin management layer. The task pane can discover installed CLI plugin skills so users can reference them as `/skill-name`, matching Copilot CLI skill invocation. Installation, updates, and removal stay in the CLI.
+The add-in ships with bundled agents for each Office host. Copilot CLI plugins are installed into the user's normal CLI config and consumed by the CLI/SDK, not by an app-owned plugin management layer. The task pane can discover installed CLI plugin skills and `.prompt.md` prompt files so users can reference them as `/skill-name` or `/prompt-name`, matching Copilot slash invocation. Installation, updates, and removal stay in the CLI.
 
 #### Copilot CLI Plugins
 
