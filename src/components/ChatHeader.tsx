@@ -1,9 +1,11 @@
 import React from 'react';
 import { SessionHistoryPicker } from './SessionHistoryPicker';
-import { SkillPicker } from './SkillPicker';
 import { Codicon } from '@/components/Codicon';
 import type { SessionHistoryItem } from '@/stores/sessionHistoryStore';
 import type { OfficeHostApp } from '@/services/office/host';
+
+const COPILOT_CLI_PLUGIN_HELP_URL =
+  'https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-marketplace';
 
 export interface ChatHeaderProps {
   host: OfficeHostApp;
@@ -39,7 +41,17 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-1">
-        <SkillPicker />
+        <a
+          href={COPILOT_CLI_PLUGIN_HELP_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+          style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
+          aria-label="Copilot CLI plugin help"
+          title="Copilot CLI plugin help"
+        >
+          <Codicon name="question" className="text-[14px]" />
+        </a>
         <button
           onClick={() => onOpenPanel?.('permissions')}
           className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"

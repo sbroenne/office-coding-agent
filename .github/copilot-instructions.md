@@ -121,7 +121,7 @@ Rules:
 
 ### Skills System
 
-Bundled skill files in `src/skills/` provide additional context injected into the system prompt. Skills are **host-targeted** via an optional `hosts` field in their YAML frontmatter (same pattern as agents — empty `hosts` = available to all hosts). `buildSkillContext(activeNames?, host?)` filters skills by both active state and host compatibility. Skills can be toggled on/off via the SkillPicker. Active skills are stored as `activeSkillNames` in the settings store (`null` = all ON).
+Plugin-provided skills and prompts are managed by the Copilot CLI. The task pane does not render a skills picker; users can type `/skills` or `/prompts` for CLI guidance and manage installed plugins from the terminal with `copilot plugin`.
 
 ### The Host Runtime Boundary
 
@@ -160,7 +160,7 @@ Bundled skill files in `src/skills/` provide additional context injected into th
 
 The task pane is split into three areas:
 
-- **ChatHeader** — "AI Chat" title + SkillPicker (icon-only with badge) + New Conversation button + Settings gear (SettingsDialog)
+- **ChatHeader** — session history, Copilot CLI plugin help link, permissions, compact conversation, and new conversation controls
 - **ChatPanel** — message list (MessageList), Copilot-style progress indicators, choice cards, error bar, ChatComposer, and an **input toolbar** below the input box with AgentPicker + ModelPicker (GitHub Copilot-style)
 - **App** — owns settings dialog state, detects system theme and Office host; no setup wizard (Copilot CLI handles auth)
 
@@ -251,7 +251,6 @@ The task pane is split into three areas:
 | `settings-dialog.test.tsx`                 | Component wiring                    | No                         |
 | `settings-store.test.ts`                   | Zustand store (model/agent/skills)  | No                         |
 | `skill-manager-dialog.test.tsx`            | Component wiring                    | No                         |
-| `skill-picker.test.tsx`                    | Component wiring                    | No                         |
 | `skill-service.test.ts`                    | Skill service + context building    | No                         |
 | `stale-state.test.tsx`                     | Store hydration                     | No                         |
 | `thread-message-rendering.test.tsx`        | Component wiring                    | No                         |
@@ -345,7 +344,7 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/lib/websocket-transport.ts` — JSON-RPC WebSocket transport (browser-compatible)
 - `src/server.mjs` — Express HTTPS server (port 3000): Vite dev middleware + Copilot WebSocket proxy
 - `src/copilotProxy.mjs` — bridges WebSocket to `@github/copilot-sdk` CopilotClient
-- `src/components/ChatHeader.tsx` — header: title, SkillPicker, new convo, Settings
+- `src/components/ChatHeader.tsx` — header: session history, plugin help, permissions, compact conversation, new conversation
 - `src/components/ChatPanel.tsx` — messages (MessageList), progress, input (ChatComposer), AgentPicker, ModelPicker
 - `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI
 - `src/components/chat/MessageList.tsx` — renders `ChatMessage[]` as AssistantMessage, UserMessage, or ToolProgress components
@@ -357,7 +356,6 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/components/chat/ActionBar.tsx` — action buttons (copy, retry, etc.)
 - `src/components/AgentPicker.tsx` — single-select agent dropdown (Radix Popover)
 - `src/components/ModelPicker.tsx` — model selection dropdown (dynamic, fetched from Copilot API)
-- `src/components/SkillPicker.tsx` — icon-only skill toggle with badge count
 - `src/components/SettingsDialog.tsx` — settings/preferences dialog
 - `src/services/ai/BASE_PROMPT.md` — universal base system prompt
 - `src/services/ai/prompts/` — host-level app prompts (`EXCEL_APP_PROMPT.md`, `POWERPOINT_APP_PROMPT.md`, `WORD_APP_PROMPT.md`)

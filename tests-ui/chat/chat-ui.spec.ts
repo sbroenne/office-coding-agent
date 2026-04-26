@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures';
 
 test.describe('Chat UI (fresh launch)', () => {
   test('renders header controls with no pre-seeded settings', async ({ taskpane }) => {
-    await expect(taskpane.getByRole('button', { name: 'Agent skills' })).toBeVisible({
+    await expect(taskpane.getByRole('link', { name: 'Copilot CLI plugin help' })).toBeVisible({
       timeout: 10_000,
     });
     await expect(taskpane.getByRole('button', { name: 'New conversation' })).toBeVisible({
@@ -23,7 +23,7 @@ test.describe('Chat UI (fresh launch)', () => {
 
 test.describe('Chat UI (configured state)', () => {
   test('renders the chat header controls', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Copilot CLI plugin help' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
@@ -52,8 +52,8 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'powerbi' })).toBeVisible({ timeout: 5000 });
   });
 
-  test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
+  test('does not show the removed skill picker button', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Agent skills' })).toHaveCount(0);
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
@@ -85,13 +85,22 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('skill picker has no manage plugins button — plugin management is via CLI', async ({
+  test('/skills shows Copilot CLI plugin guidance', async ({
     configuredTaskpane: page,
   }) => {
-    await page.getByRole('button', { name: 'Agent skills' }).click();
-    await expect(page.getByRole('button', { name: 'Manage plugins…' })).toHaveCount(0);
-    // Close the picker
-    await page.keyboard.press('Escape');
+    const composer = page.getByRole('textbox', { name: 'Message input' });
+    await composer.fill('/skills');
+    await composer.press('Enter');
+    await expect(page.locator('[data-role="assistant"]').first()).toContainText(/copilot plugin/i);
+  });
+
+  test('/prompts shows Copilot CLI plugin guidance', async ({
+    configuredTaskpane: page,
+  }) => {
+    const composer = page.getByRole('textbox', { name: 'Message input' });
+    await composer.fill('/prompts');
+    await composer.press('Enter');
+    await expect(page.locator('[data-role="assistant"]').first()).toContainText(/copilot plugin/i);
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({

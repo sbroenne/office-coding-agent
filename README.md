@@ -342,7 +342,7 @@ State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill config
 
 The task pane is organized into three areas:
 
-- **ChatHeader** — SkillPicker, Session History picker, Permissions button, and New Conversation action
+- **ChatHeader** — Session History picker, Copilot CLI plugin help link, Permissions button, and New Conversation action
 - **ChatPanel** — thread/message stream, inline thinking indicator, composer, and input toolbar with AgentPicker + ModelPicker
 - **App** — root shell that handles Office host detection, theme sync, and connection/session/permission banners
 

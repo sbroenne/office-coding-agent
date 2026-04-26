@@ -80,8 +80,6 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 | `powerpoint-tools.test.ts`                 | Tool schema + factory (PPT)         | No               |
 | `settings-dialog.test.tsx`                 | Component wiring                    | No               |
 | `settings-store.test.ts`                   | Zustand store (model/agent/skills)  | No               |
-| `skill-manager-dialog.test.tsx`            | Component wiring                    | No               |
-| `skill-picker.test.tsx`                    | Component wiring                    | No               |
 | `skill-service.test.ts`                    | Skill service + context building    | No               |
 | `stale-state.test.tsx`                     | Store hydration                     | No               |
 | `use-office-chat.test.tsx`                 | useOfficeChat hook                  | No               |

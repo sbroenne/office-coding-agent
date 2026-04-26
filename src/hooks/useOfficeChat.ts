@@ -18,6 +18,8 @@ import { generateId } from '@/utils/id';
 
 const MODEL_FETCH_TIMEOUT_MS = 10_000;
 const DEFAULT_THINKING_TEXT = 'Thinking…';
+const COPILOT_CLI_PLUGIN_HELP_URL =
+  'https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-marketplace';
 
 /** Race a promise against a timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -390,7 +392,36 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   const send = useCallback(
     async (userText: string) => {
-      if (!userText.trim()) return;
+      const trimmed = userText.trim();
+      if (!trimmed) return;
+
+      const slashCommand = trimmed.toLowerCase();
+      if (slashCommand === '/skills' || slashCommand === '/prompts') {
+        const noun = slashCommand === '/skills' ? 'Skills' : 'Prompts';
+        const lowerNoun = noun.toLowerCase();
+        setMessages(prev => [
+          ...prev,
+          {
+            id: generateId(),
+            role: 'user',
+            content: [{ type: 'text', text: trimmed }],
+            createdAt: new Date(),
+          },
+          {
+            id: generateId(),
+            role: 'assistant',
+            content: [
+              {
+                type: 'text',
+                text: `${noun} are managed by the Copilot CLI. Use \`copilot plugin\` in your terminal to list, install, update, or remove plugin-provided ${lowerNoun}.\n\nSee the [Copilot CLI plugin docs](${COPILOT_CLI_PLUGIN_HELP_URL}).`,
+              },
+            ],
+            status: { type: 'complete', reason: 'stop' },
+            createdAt: new Date(),
+          },
+        ]);
+        return;
+      }
 
       let client = clientRef.current;
       if ((!sessionRef.current || !client) && isConnectingRef.current && !sessionErrorRef.current) {

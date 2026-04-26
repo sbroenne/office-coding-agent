@@ -6,7 +6,7 @@
  * Tests verify AgentPicker, ModelPicker in left toolbar and McpPicker
  * (server icon) in right toolbar.
  *
- * Note: SkillPicker lives in ChatHeader, not here.
+ * Note: plugin help lives in ChatHeader, not here.
  */
 
 import React from 'react';

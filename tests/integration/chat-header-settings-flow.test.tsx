@@ -1,7 +1,7 @@
 /**
  * Integration test: ChatHeader — New Conversation, panel buttons.
  *
- * ChatHeader contains: SessionHistoryPicker, SkillPicker, Permissions, New Conversation.
+ * ChatHeader contains: SessionHistoryPicker, plugin help, Permissions, New Conversation.
  * MCP pill lives in the Composer toolbar (ChatPanel).
  * All settings panels are opened via onOpenPanel callback.
  */
@@ -36,6 +36,7 @@ describe('Integration: ChatHeader', () => {
     );
 
     expect(screen.getByLabelText('New conversation')).toBeInTheDocument();
+    expect(screen.getByLabelText('Copilot CLI plugin help')).toBeInTheDocument();
   });
 
   it('calls onClearMessages when New conversation is clicked', async () => {
