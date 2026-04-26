@@ -18,9 +18,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
-import { listMarketplaces, removeMarketplace as removeMarketplaceSvc } from './marketplaceService.mjs';
+import {
+  addPluginMarketplace,
+  browsePluginMarketplace,
+  installPlugin,
+  listPluginMarketplaces,
+  removePluginMarketplace,
+  uninstallPlugin,
+  updatePlugin,
+  updatePluginMarketplace,
+} from './plugins/pluginCli.mjs';
+import { autoSetupPlugins, OCA_MARKETPLACE_NAME } from './plugins/pluginAutoSetup.mjs';
+import { getPluginManager } from './plugins/pluginManager.mjs';
 import {
   getBrowseRoots,
   isAllowedOrigin,
@@ -33,174 +43,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3000;
 const isDev = process.env.NODE_ENV !== 'production';
 
-// ─── Copilot Plugin Helpers ────────────────────────────────────────────────
-
-function getCopilotConfigPath() {
-  return path.join(os.homedir(), '.copilot', 'config.json');
-}
-
-function readCopilotConfig() {
-  const configPath = getCopilotConfigPath();
-  if (!fs.existsSync(configPath)) return { installed_plugins: [] };
-  try {
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  } catch {
-    return { installed_plugins: [] };
-  }
-}
-
-function findPluginManifest(pluginDir) {
-  const candidates = [
-    path.join(pluginDir, 'plugin.json'),
-    path.join(pluginDir, '.github', 'plugin', 'plugin.json'),
-    path.join(pluginDir, '.claude-plugin', 'plugin.json'),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) {
-      try {
-        return JSON.parse(fs.readFileSync(p, 'utf-8'));
-      } catch {
-        continue;
-      }
-    }
-  }
-  return null;
-}
-
-function findMarketplaceManifest(cacheDir) {
-  const candidates = [
-    path.join(cacheDir, '.github', 'plugin', 'marketplace.json'),
-    path.join(cacheDir, '.claude-plugin', 'marketplace.json'),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) {
-      try {
-        return JSON.parse(fs.readFileSync(p, 'utf-8'));
-      } catch {
-        continue;
-      }
-    }
-  }
-  return null;
-}
-
-function countPluginComponents(pluginDir, manifest) {
-  const result = {
-    agentCount: 0, agentNames: [],
-    skillCount: 0, skillNames: [],
-    mcpServerCount: 0, mcpServerNames: [],
-    hookCount: 0, commandCount: 0,
-  };
-
-  // Count agents from agents/ directory (*.agent.md files)
-  const agentsDir = path.join(pluginDir, 'agents');
-  if (fs.existsSync(agentsDir)) {
-    try {
-      const entries = fs.readdirSync(agentsDir, { withFileTypes: true, recursive: true });
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name.endsWith('.agent.md')) {
-          result.agentCount++;
-          result.agentNames.push(entry.name.replace(/\.agent\.md$/, ''));
-        }
-      }
-    } catch { /* ignore unreadable dirs */ }
-  }
-
-  // Count skills from skills/ directory (SKILL.md files)
-  const skillsDir = path.join(pluginDir, 'skills');
-  if (fs.existsSync(skillsDir)) {
-    try {
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true, recursive: true });
-      for (const entry of entries) {
-        if (entry.isFile() && entry.name === 'SKILL.md') {
-          // Use parent directory name as skill name
-          const parentPath = entry.parentPath || entry.path || '';
-          result.skillCount++;
-          result.skillNames.push(path.basename(parentPath));
-        }
-      }
-    } catch { /* ignore */ }
-  }
-
-  // Count MCP servers from .mcp.json
-  const mcpJsonPath = path.join(pluginDir, '.mcp.json');
-  if (fs.existsSync(mcpJsonPath)) {
-    try {
-      const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
-      const servers = mcpConfig.mcpServers || mcpConfig.servers || {};
-      const names = Object.keys(servers);
-      result.mcpServerCount = names.length;
-      result.mcpServerNames = names;
-    } catch { /* ignore */ }
-  }
-
-  // Count hooks and commands from manifest
-  if (manifest) {
-    if (Array.isArray(manifest.hooks)) result.hookCount = manifest.hooks.length;
-    if (Array.isArray(manifest.commands)) result.commandCount = manifest.commands.length;
-  }
-
-  return result;
-}
-
-function runCopilotCommand(args) {
-  try {
-    const output = execSync(`copilot plugin ${args}`, {
-      encoding: 'utf-8',
-      timeout: 60000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return { success: true, message: output.trim() };
-  } catch (err) {
-    return { success: false, message: err.stderr?.trim() || err.message };
-  }
-}
-
-// ─── Auto-Setup: register our marketplace and install host plugins ──────────
-
-const OCA_MARKETPLACE = 'sbroenne/office-coding-agent-plugins';
-const OCA_MARKETPLACE_NAME = 'office-coding-agent';
-const HOST_PLUGINS = ['office-excel', 'office-powerpoint', 'office-word', 'office-outlook'];
-
-function autoSetupPlugins() {
-  try {
-    const config = readCopilotConfig();
-    const marketplaces = config.marketplaces || {};
-    const installed = config.installed_plugins || [];
-
-    // 1. Register our marketplace if not already registered
-    const hasMarketplace = OCA_MARKETPLACE_NAME in marketplaces;
-    if (!hasMarketplace) {
-      console.log(`  [auto-setup] Registering marketplace: ${OCA_MARKETPLACE}`);
-      const result = runCopilotCommand(`marketplace add ${OCA_MARKETPLACE}`);
-      if (result.success) {
-        console.log(`  [auto-setup] ✓ Marketplace registered`);
-      } else {
-        console.warn(`  [auto-setup] ⚠ Marketplace registration failed: ${result.message}`);
-      }
-    }
-
-    // 2. Install host plugins if missing
-    for (const pluginName of HOST_PLUGINS) {
-      const isInstalled = Array.isArray(installed)
-        ? installed.some(p => p.name === pluginName)
-        : false;
-      if (!isInstalled) {
-        console.log(`  [auto-setup] Installing plugin: ${pluginName}`);
-        const result = runCopilotCommand(`install ${pluginName}@${OCA_MARKETPLACE_NAME}`);
-        if (result.success) {
-          console.log(`  [auto-setup] ✓ ${pluginName} installed`);
-        } else {
-          console.warn(`  [auto-setup] ⚠ ${pluginName} install failed: ${result.message}`);
-        }
-      }
-    }
-
-    console.log('  [auto-setup] Plugin setup complete');
-  } catch (err) {
-    console.warn(`  [auto-setup] Auto-setup failed (non-fatal): ${err.message}`);
-  }
-}
+const BUNDLED_MCP_SERVERS = [
+  {
+    name: 'workiq',
+    description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@microsoft/workiq', 'mcp'],
+  },
+  {
+    name: 'powerbi',
+    description: 'Power BI — query semantic models, generate DAX, explore data',
+    transport: 'http',
+    url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
+  },
+];
 
 /** Check that the port is available, exit early if it's in use. */
 async function checkPort(port) {
@@ -348,64 +205,175 @@ async function createServer() {
 
   // ─── Plugin Management Routes ──────────────────────────────────────────────
 
-  // GET /api/plugins/installed — list installed plugins with enriched metadata
-  apiRouter.get('/plugins/installed', (_req, res) => {
+  // GET /api/plugins/installed — list sandbox-installed plugins with enriched metadata
+  apiRouter.get('/plugins/installed', async (_req, res) => {
     try {
-      const config = readCopilotConfig();
-      const plugins = (config.installed_plugins || []).map(plugin => {
-        let manifest = null;
-        let components = null;
-        if (plugin.cache_path && fs.existsSync(plugin.cache_path)) {
-          manifest = findPluginManifest(plugin.cache_path);
-          components = countPluginComponents(plugin.cache_path, manifest);
-        }
-        return { ...plugin, manifest, components };
-      });
-      res.json({ plugins });
+      const manager = await getPluginManager();
+      await manager.refresh();
+      res.json({ plugins: manager.list() });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
+  apiRouter.get('/plugins/marketplaces', async (_req, res) => {
+    const result = await listPluginMarketplaces();
+    if (!result.success) {
+      res.status(500).json({ error: result.error ?? 'Failed to list plugin marketplaces' });
+      return;
+    }
+    res.json({
+      marketplaces: (result.data ?? []).map(marketplace => ({
+        slug: marketplace.name,
+        name: marketplace.name,
+        kind: marketplace.kind,
+        sourceKind: marketplace.sourceKind,
+        source: marketplace.source,
+        isBuiltIn: marketplace.kind === 'builtin',
+        isOwn: marketplace.name === OCA_MARKETPLACE_NAME,
+        registeredKey: marketplace.kind === 'registered' ? marketplace.name : null,
+      })),
+    });
+  });
+
+  apiRouter.get('/plugins/browse/:marketplace', async (req, res) => {
+    const result = await browsePluginMarketplace(req.params.marketplace);
+    if (!result.success) {
+      res.status(500).json({ error: result.error ?? 'Failed to browse plugin marketplace' });
+      return;
+    }
+    const manager = await getPluginManager();
+    const installed = new Set(manager.list().map(plugin => `${plugin.name}@${plugin.marketplace}`));
+    res.json({
+      marketplace: req.params.marketplace,
+      plugins: (result.data ?? []).map(plugin => ({
+        ...plugin,
+        installed: installed.has(`${plugin.name}@${plugin.marketplace}`),
+      })),
+    });
+  });
+
+  apiRouter.get('/plugins/:name/details', async (req, res) => {
+    const manager = await getPluginManager();
+    const plugin = manager.list().find(p => p.name === req.params.name);
+    if (!plugin) {
+      res.status(404).json({ error: `Plugin '${req.params.name}' not found` });
+      return;
+    }
+    res.json(plugin);
+  });
+
+  apiRouter.post('/plugins/install', async (req, res) => {
+    const spec = typeof req.body?.spec === 'string' ? req.body.spec.trim() : '';
+    if (!spec) {
+      res.status(400).json({ success: false, message: 'Plugin spec is required.' });
+      return;
+    }
+    const result = await installPlugin(spec);
+    await (await getPluginManager()).refresh();
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || `Installed ${spec}` : result.error,
+      plugin: spec,
+    });
+  });
+
+  apiRouter.post('/plugins/uninstall', async (req, res) => {
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const marketplace = typeof req.body?.marketplace === 'string' ? req.body.marketplace.trim() : undefined;
+    if (!name) {
+      res.status(400).json({ success: false, message: 'Plugin name is required.' });
+      return;
+    }
+    const result = await uninstallPlugin(name, marketplace);
+    await (await getPluginManager()).refresh();
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || `Uninstalled ${name}` : result.error,
+      plugin: name,
+    });
+  });
+
+  apiRouter.post('/plugins/update', async (req, res) => {
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const marketplace = typeof req.body?.marketplace === 'string' ? req.body.marketplace.trim() : undefined;
+    const result = await updatePlugin(name, marketplace);
+    await (await getPluginManager()).refresh();
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || (name ? `Updated ${name}` : 'Updated plugins') : result.error,
+      plugin: name || undefined,
+    });
+  });
+
+  apiRouter.post('/plugins/update-all', async (_req, res) => {
+    const result = await updatePlugin();
+    await (await getPluginManager()).refresh();
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || 'Updated plugins' : result.error,
+    });
+  });
+
+  apiRouter.post('/plugins/marketplace/add', async (req, res) => {
+    const spec = typeof req.body?.spec === 'string' ? req.body.spec.trim() : '';
+    if (!spec) {
+      res.status(400).json({ success: false, message: 'Marketplace source is required.' });
+      return;
+    }
+    const result = await addPluginMarketplace(spec);
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || `Added marketplace ${spec}` : result.error,
+    });
+  });
+
+  apiRouter.post('/plugins/marketplace/remove', async (req, res) => {
+    const name =
+      (typeof req.body?.registeredKey === 'string' && req.body.registeredKey.trim()) ||
+      (typeof req.body?.slug === 'string' && req.body.slug.trim()) ||
+      (typeof req.body?.name === 'string' && req.body.name.trim());
+    if (!name) {
+      res.status(400).json({ success: false, message: 'Marketplace name is required.' });
+      return;
+    }
+    if (name === OCA_MARKETPLACE_NAME) {
+      res.status(400).json({ success: false, message: 'Cannot remove the office-coding-agent marketplace.' });
+      return;
+    }
+    const result = await removePluginMarketplace(name, { force: true });
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || `Removed marketplace ${name}` : result.error,
+    });
+  });
+
+  apiRouter.post('/plugins/marketplace/update', async (req, res) => {
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : undefined;
+    const result = await updatePluginMarketplace(name);
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? result.stdout.trim() || `Updated marketplace${name ? ` ${name}` : 's'}` : result.error,
+    });
+  });
+
   // GET /api/mcp-servers — all available MCP server configs (bundled + from installed plugins)
-  apiRouter.get('/mcp-servers', (_req, res) => {
+  apiRouter.get('/mcp-servers', async (_req, res) => {
     try {
-      const BUNDLED = [
-        { name: 'workiq', description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams', transport: 'stdio', command: 'npx', args: ['-y', '@microsoft/workiq', 'mcp'] },
-        { name: 'powerbi', description: 'Power BI — query semantic models, generate DAX, explore data', transport: 'http', url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi' },
-      ];
-
-      const pluginServers = [];
-      const config = readCopilotConfig();
-      const installedPlugins = config.installed_plugins || [];
-
-      for (const plugin of installedPlugins) {
-        if (!plugin.enabled) continue;
-        if (!plugin.cache_path || !fs.existsSync(plugin.cache_path)) continue;
-        const mcpJsonPath = path.join(plugin.cache_path, '.mcp.json');
-        if (!fs.existsSync(mcpJsonPath)) continue;
-        try {
-          const mcpConfig = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
-          const servers = mcpConfig.mcpServers || mcpConfig.servers || {};
-          for (const [name, cfg] of Object.entries(servers)) {
-            // Normalise to McpServerConfig shape
-            const server = { name, description: `From plugin: ${plugin.name}`, ...cfg };
-            if (cfg.command) server.transport = 'stdio';
-            else if (cfg.url) server.transport = 'http';
-            pluginServers.push(server);
-          }
-        } catch { /* skip malformed .mcp.json */ }
-      }
-
-      // Bundled servers take priority — drop any plugin server pointing to the same
-      // endpoint (same command for stdio, same url for http/sse), regardless of name.
+      const manager = await getPluginManager();
+      const pluginServers = manager.getMcpServerConfigs();
       const bundledEndpoints = new Set(
-        BUNDLED.map(s => (s.transport === 'stdio' ? `stdio:${s.command}` : `url:${(s.url ?? '').replace(/\/$/, '')}`))
+        BUNDLED_MCP_SERVERS.map(s =>
+          s.transport === 'stdio' ? `stdio:${s.command}` : `url:${(s.url ?? '').replace(/\/$/, '')}`
+        )
       );
+      const bundledNames = new Set(BUNDLED_MCP_SERVERS.map(s => s.name));
       const endpointKey = s =>
         s.transport === 'stdio' ? `stdio:${s.command}` : `url:${(s.url ?? '').replace(/\/$/, '')}`;
-      const dedupedPluginServers = pluginServers.filter(s => !bundledEndpoints.has(endpointKey(s)));
-      res.json({ servers: [...BUNDLED, ...dedupedPluginServers] });
+      const dedupedPluginServers = pluginServers.filter(
+        s => !bundledNames.has(s.name) && !bundledEndpoints.has(endpointKey(s))
+      );
+      res.json({ servers: [...BUNDLED_MCP_SERVERS, ...dedupedPluginServers] });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }

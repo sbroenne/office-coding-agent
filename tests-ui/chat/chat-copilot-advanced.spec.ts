@@ -22,8 +22,8 @@ test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
     const agentButton = page.getByRole('button', { name: 'Select agent' });
     await expect(agentButton).toBeVisible({ timeout: 5000 });
 
-    // The default "Excel" agent should be active
-    await expect(page.getByText('Excel')).toBeVisible({ timeout: 5000 });
+    // The default agent display name should be active
+    await expect(page.getByText('Default')).toBeVisible({ timeout: 5000 });
 
     // Type a prompt
     const composer = page.getByPlaceholder('Send a message...');

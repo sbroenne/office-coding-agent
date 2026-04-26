@@ -1,68 +1,81 @@
 /**
- * pluginDiscovery.mjs — discovers skills and agents from installed Copilot CLI plugins.
+ * Discovers agents, skills, prompts, and MCP servers from sandboxed Copilot CLI plugins.
  *
- * Extracted from copilotProxy.mjs so these functions can be tested independently.
- *
- * Plugin layout (under ~/.copilot/installed-plugins/<marketplace>/<name>/):
- *   skills/<skill-name>/SKILL.md   — skill files loaded via skillDirectories
- *   agents/AGENT.md                — agent definition (name = plugin name)
- *   agents/<name>.agent.md         — named agent definition
+ * The default config path is the Office Coding Agent sandbox, not the user's
+ * terminal Copilot home. Tests can still pass an explicit configPath.
  */
 
-import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
-import { homedir } from 'node:os';
+import { readdir, readFile } from 'node:fs/promises';
+import { basename, isAbsolute, join, resolve } from 'node:path';
+import { getCopilotConfigPath } from './plugins/pluginPaths.mjs';
 
-/** Path to the Copilot CLI config file. */
-export const COPILOT_CONFIG_PATH = join(homedir(), '.copilot', 'config.json');
+/** Path to the sandboxed Copilot CLI config file. */
+export const COPILOT_CONFIG_PATH = getCopilotConfigPath();
 
-/** Convert a name to a safe lowercase directory slug. */
+export class ConfigReadError extends Error {
+  constructor(message, cause) {
+    super(message);
+    this.name = 'ConfigReadError';
+    this.cause = cause;
+  }
+}
+
 export function slugify(name) {
-  const slug = name
+  const slug = String(name)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return slug || 'skill';
 }
 
-/**
- * Read a Copilot CLI config file and return its parsed contents.
- * Returns a safe default if the file doesn't exist or is malformed.
- *
- * @param {string} [configPath] - path to config.json (defaults to COPILOT_CONFIG_PATH)
- * @returns {Promise<{installed_plugins?: Array<{name: string, marketplace: string, version: string, installed_at: string, enabled: boolean, cache_path: string}>}>}
- */
 export async function readCopilotConfig(configPath = COPILOT_CONFIG_PATH) {
+  let raw;
   try {
-    const raw = await readFile(configPath, 'utf8');
-    return JSON.parse(raw);
-  } catch {
-    return {};
+    raw = await readFile(configPath, 'utf8');
+  } catch (err) {
+    const code = err && typeof err === 'object' && typeof err.code === 'string' ? err.code : undefined;
+    if (code === 'ENOENT') return {};
+    throw new ConfigReadError(`Failed to read ${configPath}: ${String(err)}`, err);
+  }
+
+  try {
+    const stripped = raw.replace(/^\s*\/\/[^\n]*\n/gm, '');
+    const parsed = JSON.parse(stripped);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (err) {
+    throw new ConfigReadError(`Failed to parse ${configPath}: ${String(err)}`, err);
   }
 }
 
-/**
- * Find the plugin.json manifest in a plugin cache directory.
- * Checks standard locations: plugin.json, .github/plugin/plugin.json.
- *
- * @param {string} pluginDir
- * @returns {Promise<object|null>}
- */
+export async function listAllPluginConfigs(configPath = COPILOT_CONFIG_PATH) {
+  const config = await readCopilotConfig(configPath);
+  const plugins = Array.isArray(config.installedPlugins)
+    ? config.installedPlugins
+    : Array.isArray(config.installed_plugins)
+      ? config.installed_plugins
+      : [];
+  return plugins.filter(plugin => plugin && typeof plugin === 'object');
+}
+
 export async function readPluginManifest(pluginDir) {
   const candidates = [
     join(pluginDir, 'plugin.json'),
     join(pluginDir, '.github', 'plugin', 'plugin.json'),
+    join(pluginDir, '.claude-plugin', 'plugin.json'),
   ];
-  for (const p of candidates) {
-    try {
-      const raw = await readFile(p, 'utf8');
-      return JSON.parse(raw);
-    } catch {
-      continue;
-    }
-  }
-  return null;
+  const results = await Promise.all(
+    candidates.map(async p => {
+      try {
+        const raw = await readFile(p, 'utf8');
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
+    })
+  );
+  return results.find(Boolean) ?? null;
 }
 
 function parseFrontmatterListValue(value) {
@@ -78,22 +91,43 @@ function parseFrontmatterListValue(value) {
   return [trimmed.replace(/^['"]|['"]$/g, '')];
 }
 
-/**
- * Parse the subset of AGENT.md frontmatter needed by plugin discovery.
- *
- * @param {string} raw
- * @returns {{description: string, hosts: string[], tools?: string[]}}
- */
+function parseFrontmatterScalarValue(lines, index, line, value) {
+  if (value !== '>' && value !== '|' && value !== '>-' && value !== '|-') {
+    return { value: value.replace(/^['"]|['"]$/g, ''), nextIndex: index };
+  }
+
+  const collected = [];
+  const baseIndent = line.match(/^\s*/)?.[0].length ?? 0;
+  let nextIndex = index;
+  while (nextIndex + 1 < lines.length) {
+    const next = lines[nextIndex + 1];
+    if (!next.trim()) {
+      nextIndex++;
+      collected.push('');
+      continue;
+    }
+    const nextIndent = next.match(/^\s*/)?.[0].length ?? 0;
+    if (nextIndent <= baseIndent) break;
+    collected.push(next.trim());
+    nextIndex++;
+  }
+
+  return {
+    value: collected.join(value.startsWith('|') ? '\n' : ' ').trim(),
+    nextIndex,
+  };
+}
+
 export function parsePluginAgentFrontmatter(raw) {
   const trimmed = raw.trimStart();
   const metadata = { description: '', hosts: [], tools: undefined };
-  const match = trimmed.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(trimmed);
   if (!match) return metadata;
 
-  /** @type {'hosts' | 'tools' | null} */
   let currentListKey = null;
-
-  for (const line of match[1].split(/\r?\n/)) {
+  const lines = match[1].split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const trimmedLine = line.trim();
     if (!trimmedLine) continue;
 
@@ -112,7 +146,9 @@ export function parsePluginAgentFrontmatter(raw) {
     const value = trimmedLine.slice(colonIdx + 1).trim();
 
     if (key === 'description') {
-      metadata.description = value.replace(/^['"]|['"]$/g, '');
+      const parsed = parseFrontmatterScalarValue(lines, i, line, value);
+      metadata.description = parsed.value;
+      i = parsed.nextIndex;
       continue;
     }
 
@@ -121,7 +157,6 @@ export function parsePluginAgentFrontmatter(raw) {
         currentListKey = key;
         continue;
       }
-
       const values = parseFrontmatterListValue(value);
       if (key === 'hosts') metadata.hosts.push(...values);
       if (key === 'tools') metadata.tools = [...(metadata.tools ?? []), ...values];
@@ -129,86 +164,141 @@ export function parsePluginAgentFrontmatter(raw) {
   }
 
   metadata.hosts = Array.from(new Set(metadata.hosts));
-  if (metadata.tools) {
-    metadata.tools = Array.from(new Set(metadata.tools));
-  }
-
+  if (metadata.tools) metadata.tools = Array.from(new Set(metadata.tools));
   return metadata;
 }
 
-/**
- * Discover skill directories from installed Copilot CLI plugins.
- *
- * Reads config → installed_plugins[], then for each enabled plugin with a
- * cache_path, scans <cache_path>/skills/ for subdirectories containing SKILL.md
- * files (same layout as bundled skills and skillpm packages).
- *
- * Host filtering: plugins whose name contains a different host slug (e.g.
- * "office-powerpoint" when host is "excel") are skipped. Universal plugins
- * (no recognisable host in their name) are always included.
- *
- * @param {string} [host] - Office host slug (e.g. 'excel', 'powerpoint')
- * @param {string} [configPath] - path to config.json (defaults to COPILOT_CONFIG_PATH)
- * @returns {Promise<string[]>} array of skill directory paths (each containing SKILL.md)
- */
-export async function discoverPluginSkillDirs(host, configPath = COPILOT_CONFIG_PATH) {
-  const config = await readCopilotConfig(configPath);
-  const plugins = config.installed_plugins || [];
-  const skillDirs = [];
+function parsePluginPromptFrontmatter(raw) {
+  const trimmed = raw.trimStart();
+  const metadata = { description: '', agent: '', argumentHint: '' };
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(trimmed);
+  if (!match) return metadata;
 
-  for (const plugin of plugins) {
-    if (!plugin.enabled || !plugin.cache_path) continue;
-    if (!existsSync(plugin.cache_path)) continue;
+  const lines = match[1].split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+    const colonIdx = trimmedLine.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = trimmedLine.slice(0, colonIdx).trim();
+    const value = trimmedLine.slice(colonIdx + 1).trim();
+    const parsed = parseFrontmatterScalarValue(lines, i, line, value);
+    i = parsed.nextIndex;
+    if (key === 'description') metadata.description = parsed.value;
+    if (key === 'agent') metadata.agent = parsed.value;
+    if (key === 'argument-hint' || key === 'argumentHint') metadata.argumentHint = parsed.value;
+  }
+  return metadata;
+}
 
-    if (host && !isPluginForHost(plugin.name, host)) continue;
+function parsePluginSkillFrontmatter(raw, fallbackName) {
+  const trimmed = raw.trimStart();
+  const metadata = { name: fallbackName, description: '', version: '0.0.0', hosts: [] };
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(trimmed);
+  if (!match) return { metadata, content: trimmed };
 
-    const skillsRoot = join(plugin.cache_path, 'skills');
-    let entries;
-    try {
-      entries = await readdir(skillsRoot, { withFileTypes: true });
-    } catch {
+  const lines = match[1].split(/\r?\n/);
+  let currentListKey = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+
+    if (trimmedLine.startsWith('- ') && currentListKey === 'hosts') {
+      metadata.hosts.push(...parseFrontmatterListValue(trimmedLine.slice(2)));
       continue;
     }
 
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const skillDir = join(skillsRoot, entry.name);
-        if (existsSync(join(skillDir, 'SKILL.md'))) {
-          skillDirs.push(skillDir);
-        }
-      }
+    currentListKey = null;
+    const colonIdx = trimmedLine.indexOf(':');
+    if (colonIdx === -1) continue;
+    const key = trimmedLine.slice(0, colonIdx).trim();
+    const value = trimmedLine.slice(colonIdx + 1).trim();
+    if (key === 'hosts' && !value) {
+      currentListKey = 'hosts';
+      continue;
     }
+
+    const parsed = parseFrontmatterScalarValue(lines, i, line, value);
+    i = parsed.nextIndex;
+    if (key === 'name') metadata.name = parsed.value || fallbackName;
+    if (key === 'description') metadata.description = parsed.value;
+    if (key === 'version') metadata.version = parsed.value || '0.0.0';
+    if (key === 'hosts') metadata.hosts.push(...parseFrontmatterListValue(parsed.value));
   }
-  return skillDirs;
+
+  metadata.hosts = Array.from(new Set(metadata.hosts));
+  return { metadata, content: trimmed.slice(match[0].length).trim() };
 }
 
-/**
- * Discover custom agent definitions from installed Copilot CLI plugins.
- *
- * For each enabled plugin with a cache_path, scans <cache_path>/agents/ for
- * *.agent.md and AGENT.md files. Returns an array of
- * {name, description, prompt, hosts, tools} objects compatible with the SDK's customAgents.
- *
- * The `hosts` field is extracted from the AGENT.md frontmatter when present.
- * An empty `hosts` array means "all hosts" — the caller (browser-side agentService)
- * treats agents with no hosts as universal agents visible for every host.
- *
- * @param {string} [host] - Office host slug for filtering
- * @param {string} [configPath] - path to config.json (defaults to COPILOT_CONFIG_PATH)
- * @returns {Promise<Array<{name: string, description: string, prompt: string, hosts: string[], tools?: string[]}>>}
- */
-export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PATH) {
-  const config = await readCopilotConfig(configPath);
-  const plugins = config.installed_plugins || [];
-  const agents = [];
+function pluginComponentPaths(manifestValue, fallback) {
+  if (!manifestValue) return [fallback];
+  return (Array.isArray(manifestValue) ? manifestValue : [manifestValue]).filter(
+    value => typeof value === 'string' && value.length > 0
+  );
+}
+
+function resolvePluginPath(pluginDir, candidate) {
+  return isAbsolute(candidate) ? candidate : resolve(pluginDir, candidate);
+}
+
+export async function discoverPluginSkillDirs(host, configPath = COPILOT_CONFIG_PATH) {
+  const plugins = await listAllPluginConfigs(configPath);
+  const skillDirs = [];
 
   for (const plugin of plugins) {
-    if (!plugin.enabled || !plugin.cache_path) continue;
-    if (!existsSync(plugin.cache_path)) continue;
-
+    if (!plugin.enabled || !plugin.cache_path || !existsSync(plugin.cache_path)) continue;
     if (host && !isPluginForHost(plugin.name, host)) continue;
+    const manifest = await readPluginManifest(plugin.cache_path);
+    skillDirs.push(...(await skillDirectoriesForPlugin(plugin, manifest)));
+  }
+  return Array.from(new Set(skillDirs));
+}
 
-    const agentsDir = join(plugin.cache_path, 'agents');
+export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PATH) {
+  const plugins = await listAllPluginConfigs(configPath);
+  const agents = [];
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path || !existsSync(plugin.cache_path)) continue;
+    if (host && !isPluginForHost(plugin.name, host)) continue;
+    const manifest = await readPluginManifest(plugin.cache_path);
+    agents.push(...(await discoverAgentsForPlugin(plugin, manifest)));
+  }
+  return agents;
+}
+
+export async function discoverPluginSkillObjects(host, configPath = COPILOT_CONFIG_PATH) {
+  const plugins = await listAllPluginConfigs(configPath);
+  const skills = [];
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path || !existsSync(plugin.cache_path)) continue;
+    if (host && !isPluginForHost(plugin.name, host)) continue;
+    const manifest = await readPluginManifest(plugin.cache_path);
+    skills.push(...(await discoverSkillsForPlugin(plugin, manifest)));
+  }
+  return skills;
+}
+
+export async function discoverPluginPrompts(host, configPath = COPILOT_CONFIG_PATH) {
+  const plugins = await listAllPluginConfigs(configPath);
+  const prompts = [];
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path || !existsSync(plugin.cache_path)) continue;
+    if (host && !isPluginForHost(plugin.name, host)) continue;
+    const manifest = await readPluginManifest(plugin.cache_path);
+    prompts.push(...(await discoverPromptsForPlugin(plugin, manifest)));
+  }
+  return prompts;
+}
+
+export async function discoverAgentsForPlugin(plugin, manifest = null) {
+  if (!plugin.cache_path || !existsSync(plugin.cache_path)) return [];
+  const agents = [];
+  const roots = pluginComponentPaths(manifest?.agents, 'agents');
+
+  for (const root of roots) {
+    const agentsDir = resolvePluginPath(plugin.cache_path, root);
     let entries;
     try {
       entries = await readdir(agentsDir, { withFileTypes: true });
@@ -218,22 +308,14 @@ export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PAT
 
     for (const entry of entries) {
       if (!entry.isFile()) continue;
-      const isAgentMd = entry.name.endsWith('.agent.md') || entry.name === 'AGENT.md';
-      if (!isAgentMd) continue;
-
+      if (!entry.name.endsWith('.agent.md') && entry.name !== 'AGENT.md') continue;
       try {
         const content = await readFile(join(agentsDir, entry.name), 'utf8');
-        const agentName =
-          entry.name === 'AGENT.md'
-            ? plugin.name
-            : entry.name.replace(/\.agent\.md$/, '');
-
+        const agentName = entry.name === 'AGENT.md' ? plugin.name : entry.name.replace(/\.agent\.md$/, '');
         const metadata = parsePluginAgentFrontmatter(content);
-        const description = metadata.description || `Agent from plugin ${plugin.name}`;
-
         agents.push({
           name: agentName,
-          description,
+          description: metadata.description || `Agent from plugin ${plugin.name}`,
           prompt: content,
           hosts: metadata.hosts,
           tools: metadata.tools,
@@ -243,128 +325,57 @@ export async function discoverPluginAgents(host, configPath = COPILOT_CONFIG_PAT
       }
     }
   }
+
   return agents;
 }
 
-/**
- * Discover plugin skills as parsed objects (name, description, hosts, content).
- * Reads SKILL.md from each skill directory found via discoverPluginSkillDirs.
- *
- * @param {string} [host]
- * @param {string} [configPath]
- * @returns {Promise<Array<{name: string, description: string, version: string, hosts: string[], content: string}>>}
- */
-export async function discoverPluginSkillObjects(host, configPath = COPILOT_CONFIG_PATH) {
-  const skillDirs = await discoverPluginSkillDirs(host, configPath);
+export async function discoverSkillsForPlugin(plugin, manifest = null) {
+  const skillDirs = await skillDirectoriesForPlugin(plugin, manifest);
   const skills = [];
-
   for (const skillDir of skillDirs) {
     try {
       const raw = await readFile(join(skillDir, 'SKILL.md'), 'utf8');
-      const trimmed = raw.trimStart();
-
-      let name = basename(skillDir);
-      let description = '';
-      let version = '0.0.0';
-      let hosts = [];
-      let content = trimmed;
-
-      if (trimmed.startsWith('---')) {
-        const endIdx = trimmed.indexOf('---', 3);
-        if (endIdx !== -1) {
-          const yamlBlock = trimmed.slice(3, endIdx).trim();
-          content = trimmed.slice(endIdx + 3).trim();
-
-          for (const line of yamlBlock.split('\n')) {
-            const colonIdx = line.indexOf(':');
-            if (colonIdx === -1) continue;
-            const key = line.slice(0, colonIdx).trim();
-            const value = line.slice(colonIdx + 1).trim();
-            if (key === 'name') name = value;
-            else if (key === 'description')
-              description = value.replace(/^['"]|['"]$/g, '');
-            else if (key === 'version') version = value;
-            else if (key === 'hosts' && value.startsWith('[') && value.endsWith(']')) {
-              hosts = value
-                .slice(1, -1)
-                .split(',')
-                .map(h => h.trim())
-                .filter(Boolean);
-            }
-          }
-        }
-      }
-
-      skills.push({ name, description, version, hosts, content });
+      const { metadata, content } = parsePluginSkillFrontmatter(raw, basename(skillDir));
+      skills.push({ ...metadata, content, dir: skillDir });
     } catch {
       // skip unreadable skill files
     }
   }
-
   return skills;
 }
 
-/**
- * Discover prompt templates from installed plugin prompts/ directories.
- * Each .prompt.md file becomes a slash command in the ChatComposer.
- *
- * @param {string} [host]
- * @param {string} [configPath]
- * @returns {Promise<Array<{name: string, description: string, agent: string, argumentHint: string, body: string}>>}
- */
-export async function discoverPluginPrompts(host, configPath = COPILOT_CONFIG_PATH) {
-  const config = await readCopilotConfig(configPath);
-  const plugins = config.installed_plugins || [];
+export async function discoverPromptsForPlugin(plugin, manifest = null) {
+  if (!plugin.cache_path || !existsSync(plugin.cache_path)) return [];
   const prompts = [];
+  const roots = pluginComponentPaths(manifest?.commands ?? manifest?.prompts, 'prompts');
 
-  for (const plugin of plugins) {
-    if (!plugin.enabled || !plugin.cache_path) continue;
-    if (!existsSync(plugin.cache_path)) continue;
-    if (host && !isPluginForHost(plugin.name, host)) continue;
-
-    const promptsDir = join(plugin.cache_path, 'prompts');
+  for (const root of roots) {
+    const promptsDir = resolvePluginPath(plugin.cache_path, root);
     let entries;
     try {
       entries = await readdir(promptsDir, { withFileTypes: true });
     } catch {
-      continue; // no prompts dir — that's fine
+      continue;
     }
 
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith('.prompt.md')) continue;
-
       try {
         const raw = await readFile(join(promptsDir, entry.name), 'utf8');
         const trimmed = raw.trimStart();
-
-        let name = entry.name.replace(/\.prompt\.md$/, '');
-        let description = '';
-        let agent = '';
-        let argumentHint = '';
-        let body = trimmed;
-
-        if (trimmed.startsWith('---')) {
-          const endIdx = trimmed.indexOf('---', 3);
-          if (endIdx !== -1) {
-            const yamlBlock = trimmed.slice(3, endIdx).trim();
-            body = trimmed.slice(endIdx + 3).trim();
-
-            for (const line of yamlBlock.split('\n')) {
-              const colonIdx = line.indexOf(':');
-              if (colonIdx === -1) continue;
-              const key = line.slice(0, colonIdx).trim();
-              const value = line.slice(colonIdx + 1).trim().replace(/^['"]|['"]$/g, '');
-              if (key === 'name') name = value;
-              else if (key === 'description') description = value;
-              else if (key === 'agent') agent = value;
-              else if (key === 'argument-hint') argumentHint = value;
-            }
-          }
-        }
-
-        prompts.push({ name, description, agent, argumentHint, body });
+        const metadata = parsePluginPromptFrontmatter(trimmed);
+        const body = trimmed.startsWith('---')
+          ? trimmed.slice(trimmed.indexOf('---', 3) + 3).trim()
+          : trimmed;
+        prompts.push({
+          name: entry.name.replace(/\.prompt\.md$/, ''),
+          description: metadata.description,
+          agent: metadata.agent,
+          argumentHint: metadata.argumentHint,
+          body,
+        });
       } catch {
-        // skip unreadable files
+        // skip unreadable prompt files
       }
     }
   }
@@ -372,25 +383,58 @@ export async function discoverPluginPrompts(host, configPath = COPILOT_CONFIG_PA
   return prompts;
 }
 
-// ─── Internal helpers ────────────────────────────────────────────────────────
+export async function skillDirectoriesForPlugin(plugin, manifest = null) {
+  if (!plugin.cache_path || !existsSync(plugin.cache_path)) return [];
+  const roots = pluginComponentPaths(manifest?.skills, 'skills');
+  const skillDirs = [];
+  for (const root of roots) {
+    const skillsRoot = resolvePluginPath(plugin.cache_path, root);
+    let entries;
+    try {
+      entries = await readdir(skillsRoot, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const skillDir = join(skillsRoot, entry.name);
+      if (existsSync(join(skillDir, 'SKILL.md'))) skillDirs.push(skillDir);
+    }
+  }
+  return skillDirs;
+}
+
+export async function readMcpServersForPlugin(plugin, manifest = null) {
+  if (!plugin.cache_path || !existsSync(plugin.cache_path)) return {};
+
+  const declaration = manifest?.mcpServers;
+  if (declaration && typeof declaration === 'object' && !Array.isArray(declaration)) {
+    return declaration;
+  }
+
+  const candidates = [];
+  if (typeof declaration === 'string') candidates.push(resolvePluginPath(plugin.cache_path, declaration));
+  candidates.push(join(plugin.cache_path, '.mcp.json'));
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(await readFile(candidate, 'utf8'));
+      const servers = parsed?.mcpServers ?? parsed?.servers ?? parsed;
+      if (servers && typeof servers === 'object' && !Array.isArray(servers)) return servers;
+    } catch {
+      continue;
+    }
+  }
+
+  return {};
+}
 
 const HOST_PREFIXES = ['excel', 'powerpoint', 'word', 'outlook'];
 
-/**
- * Returns true if the plugin should be included for the given host.
- * A plugin is included when:
- *  - its name contains the host slug (e.g. "office-excel" matches "excel"), OR
- *  - its name contains no recognised host slug at all (universal plugin).
- * A plugin is excluded when its name targets a DIFFERENT recognised host.
- *
- * @param {string} pluginName
- * @param {string} host
- * @returns {boolean}
- */
 export function isPluginForHost(pluginName, host) {
   const pluginSlug = slugify(pluginName);
   const hostSlug = slugify(host);
   const pluginHostTarget = HOST_PREFIXES.find(h => pluginSlug.includes(h));
-  if (!pluginHostTarget) return true; // universal plugin
+  if (!pluginHostTarget) return true;
   return pluginHostTarget === hostSlug;
 }

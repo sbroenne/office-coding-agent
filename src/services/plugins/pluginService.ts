@@ -5,11 +5,11 @@
 
 import type {
   InstalledPlugin,
-  RegisteredMarketplace,
   BrowsePlugin,
   PluginManifest,
   PluginComponents,
   PluginActionResult,
+  PluginMarketplaceSummary,
 } from '@/types/plugin';
 import { getLocalApiBase } from '@/lib/api';
 
@@ -39,8 +39,8 @@ export async function getInstalledPlugins(): Promise<InstalledPlugin[]> {
 }
 
 /** Get all registered marketplaces. */
-export async function getMarketplaces(): Promise<RegisteredMarketplace[]> {
-  const data = await fetchJson<{ marketplaces: RegisteredMarketplace[] }>(
+export async function getMarketplaces(): Promise<PluginMarketplaceSummary[]> {
+  const data = await fetchJson<{ marketplaces: PluginMarketplaceSummary[] }>(
     `${API_BASE}/marketplaces`
   );
   return data.marketplaces;
@@ -74,28 +74,34 @@ export async function installPlugin(spec: string): Promise<PluginActionResult> {
 }
 
 /** Uninstall a plugin. */
-export async function uninstallPlugin(name: string): Promise<PluginActionResult> {
-  return postJson<PluginActionResult>(`${API_BASE}/uninstall`, { name });
-}
-
-/** Enable a disabled plugin. */
-export async function enablePlugin(name: string): Promise<PluginActionResult> {
-  return postJson<PluginActionResult>(`${API_BASE}/enable`, { name });
-}
-
-/** Disable a plugin without uninstalling it. */
-export async function disablePlugin(name: string): Promise<PluginActionResult> {
-  return postJson<PluginActionResult>(`${API_BASE}/disable`, { name });
+export async function uninstallPlugin(
+  name: string,
+  marketplace?: string
+): Promise<PluginActionResult> {
+  return postJson<PluginActionResult>(`${API_BASE}/uninstall`, { name, marketplace });
 }
 
 /** Update a plugin to the latest version. */
-export async function updatePlugin(name: string): Promise<PluginActionResult> {
-  return postJson<PluginActionResult>(`${API_BASE}/update`, { name });
+export async function updatePlugin(
+  name: string,
+  marketplace?: string
+): Promise<PluginActionResult> {
+  return postJson<PluginActionResult>(`${API_BASE}/update`, { name, marketplace });
+}
+
+/** Update all installed plugins. */
+export async function updateAllPlugins(): Promise<PluginActionResult> {
+  return postJson<PluginActionResult>(`${API_BASE}/update-all`, {});
 }
 
 /** Register a new marketplace. */
 export async function addMarketplace(spec: string): Promise<PluginActionResult> {
   return postJson<PluginActionResult>(`${API_BASE}/marketplace/add`, { spec });
+}
+
+/** Refresh one marketplace or all marketplaces. */
+export async function updateMarketplace(name?: string): Promise<PluginActionResult> {
+  return postJson<PluginActionResult>(`${API_BASE}/marketplace/update`, { name });
 }
 
 /** Remove a marketplace — registered (by CLI) or cache-only (by slug). */

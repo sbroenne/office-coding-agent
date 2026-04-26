@@ -93,9 +93,8 @@ describe('management tool schemas', () => {
       ).toBe(true);
     });
 
-    it('accepts enable and disable', () => {
-      expect(validate(managePluginsTool.parameters, { action: 'enable', name: 'p' })).toBe(true);
-      expect(validate(managePluginsTool.parameters, { action: 'disable', name: 'p' })).toBe(true);
+    it('accepts update all', () => {
+      expect(validate(managePluginsTool.parameters, { action: 'update_all' })).toBe(true);
     });
 
     it('accepts update with name', () => {
@@ -132,9 +131,8 @@ describe('management tool schemas', () => {
         'browse',
         'install',
         'uninstall',
-        'enable',
-        'disable',
         'update',
+        'update_all',
         'marketplaces',
         'add_marketplace',
         'remove_marketplace',
@@ -249,20 +247,6 @@ describe('manage_plugins handler', () => {
 
   it('uninstall requires name', async () => {
     const result = (await callAsync(managePluginsTool, { action: 'uninstall' })) as {
-      error: string;
-    };
-    expect(result.error).toContain('name');
-  });
-
-  it('enable requires name', async () => {
-    const result = (await callAsync(managePluginsTool, { action: 'enable' })) as {
-      error: string;
-    };
-    expect(result.error).toContain('name');
-  });
-
-  it('disable requires name', async () => {
-    const result = (await callAsync(managePluginsTool, { action: 'disable' })) as {
       error: string;
     };
     expect(result.error).toContain('name');

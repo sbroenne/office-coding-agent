@@ -23,7 +23,12 @@ import {
   discoverPluginSkillObjects,
   discoverPluginAgents,
   discoverPluginPrompts,
+  readMcpServersForPlugin,
+  listAllPluginConfigs,
+  readPluginManifest,
+  isPluginForHost,
 } from './pluginDiscovery.mjs';
+import { getPluginManager } from './plugins/pluginManager.mjs';
 import { isTrustedRequestOrigin } from './serverSecurity.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -176,6 +181,83 @@ export function applySessionToolAccessToCustomAgents(customAgents = [], sessionT
       tools: requestedTools.filter(toolName => fallbackToolNames.includes(toolName)),
     };
   });
+}
+
+export function mergePluginMcpServers(baseServers = {}, pluginServers = {}) {
+  const merged = { ...(baseServers || {}) };
+  for (const [name, config] of Object.entries(pluginServers || {})) {
+    if (merged[name]) continue;
+    merged[name] = config;
+  }
+  return merged;
+}
+
+async function discoverPluginMcpServers(host, configPath, disabledMcpServerNames = []) {
+  const plugins = await listAllPluginConfigs(configPath);
+  const disabled = new Set(disabledMcpServerNames);
+  const servers = {};
+  for (const plugin of plugins) {
+    if (!plugin.enabled || !plugin.cache_path) continue;
+    if (host && !isPluginForHost(plugin.name, host)) continue;
+    const manifest = await readPluginManifest(plugin.cache_path);
+    const pluginServers = await readMcpServersForPlugin(plugin, manifest);
+    for (const [name, config] of Object.entries(pluginServers)) {
+      if (disabled.has(name) || servers[name]) continue;
+      servers[name] = config;
+    }
+  }
+  return servers;
+}
+
+/**
+ * Merge discovered plugin skill content into the system message as a defensive
+ * fallback when the SDK does not surface `skillDirectories` strongly enough for
+ * prompt-only validation scenarios.
+ *
+ * @param {{ mode?: string, content?: string } | undefined} systemMessage
+ * @param {Array<{name: string, description?: string, content?: string}>} pluginSkills
+ * @param {string[] | undefined} disabledSkills
+ * @returns {{ mode: string, content: string } | undefined}
+ */
+export function mergePluginSkillsIntoSystemMessage(
+  systemMessage,
+  pluginSkills = [],
+  disabledSkills = []
+) {
+  const disabledSkillNames = new Set(
+    Array.isArray(disabledSkills)
+      ? disabledSkills.filter(skillName => typeof skillName === 'string' && skillName.length > 0)
+      : []
+  );
+  const enabledPluginSkills = pluginSkills.filter(
+    skill =>
+      typeof skill?.content === 'string' &&
+      skill.content.trim().length > 0 &&
+      !disabledSkillNames.has(skill.name)
+  );
+
+  if (enabledPluginSkills.length === 0) {
+    return systemMessage;
+  }
+
+  const skillContext = enabledPluginSkills
+    .map(skill => {
+      const header = skill.description
+        ? `### ${skill.name}\n${skill.description}`
+        : `### ${skill.name}`;
+      return `${header}\n${skill.content.trim()}`;
+    })
+    .join('\n\n');
+
+  const existingContent = systemMessage?.content ?? '';
+  const mergedContent = existingContent
+    ? `${existingContent}\n\n## Plugin Skill Context\n\n${skillContext}`
+    : `## Plugin Skill Context\n\n${skillContext}`;
+
+  return {
+    mode: systemMessage?.mode ?? 'replace',
+    content: mergedContent,
+  };
 }
 
 // ── Singleton CopilotClient ───────────────────────────────────────────────
@@ -390,6 +472,7 @@ async function handleConnection(ws) {
           mcpServers,
           availableTools,
           disabledSkills,
+          disabledMcpServerNames,
           customAgents,
           pluginConfigPath,
         } = params || {};
@@ -415,16 +498,60 @@ async function handleConnection(ws) {
         }));
 
         const skillDirectories = [];
+        let pluginSkills = [];
+        let pluginAgents = [];
+        let pluginPrompts = [];
+        let pluginMcpServers = {};
 
-        // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
+        // Discover plugin inputs from either a test override config or the sandboxed plugin manager.
         try {
-          const pluginSkillDirs = await discoverPluginSkillDirs(host, pluginConfigPath);
-          if (pluginSkillDirs.length > 0) {
+          if (pluginConfigPath) {
+            const [pluginSkillDirs, discoveredSkills, discoveredAgents, discoveredPrompts, discoveredMcp] =
+              await Promise.all([
+                discoverPluginSkillDirs(host, pluginConfigPath),
+                discoverPluginSkillObjects(host, pluginConfigPath),
+                discoverPluginAgents(host, pluginConfigPath),
+                discoverPluginPrompts(host, pluginConfigPath),
+                discoverPluginMcpServers(host, pluginConfigPath, disabledMcpServerNames),
+              ]);
             skillDirectories.push(...pluginSkillDirs);
-            console.log(`[proxy] Added ${pluginSkillDirs.length} skill dir(s) from installed plugins`);
+            pluginSkills = discoveredSkills;
+            pluginAgents = discoveredAgents;
+            pluginPrompts = discoveredPrompts;
+            pluginMcpServers = discoveredMcp;
+          } else {
+            const manager = await getPluginManager();
+            const inputs = manager.getSessionInputs(host, disabledMcpServerNames);
+            skillDirectories.push(...inputs.skillDirectories);
+            pluginSkills = inputs.skills;
+            pluginAgents = inputs.customAgents;
+            pluginPrompts = inputs.prompts;
+            pluginMcpServers = inputs.mcpServers;
+          }
+          if (skillDirectories.length > 0) {
+            console.log(`[proxy] Added ${skillDirectories.length} skill dir(s) from installed plugins`);
+          }
+          if (Object.keys(pluginMcpServers).length > 0) {
+            console.log(`[proxy] Added ${Object.keys(pluginMcpServers).length} MCP server(s) from installed plugins`);
           }
         } catch (err) {
-          console.warn('[proxy] Plugin skill discovery failed:', err.message);
+          console.warn('[proxy] Plugin discovery failed:', err.message);
+        }
+
+        // Discover plugin skills once so they can be both surfaced to the browser and
+        // injected into the initial system message as a compatibility fallback.
+        try {
+          if (pluginSkills.length > 0) {
+            console.log(`[proxy] Sending ${pluginSkills.length} plugin skill(s) to browser`);
+            sendNotification('plugin.skills', { skills: pluginSkills });
+            systemMessage = mergePluginSkillsIntoSystemMessage(
+              systemMessage,
+              pluginSkills,
+              disabledSkills
+            );
+          }
+        } catch (err) {
+          console.warn('[proxy] Plugin skill notification failed:', err.message);
         }
 
         // Discover agents from installed Copilot CLI plugins and merge into systemMessage.
@@ -439,7 +566,6 @@ async function handleConnection(ws) {
           sessionToolNames
         );
         try {
-          const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
           if (pluginAgents.length > 0) {
             console.log(`[proxy] Merging ${pluginAgents.length} plugin agent(s) into system message`);
 
@@ -481,33 +607,23 @@ async function handleConnection(ws) {
             );
           }
         } catch (err) {
-          console.warn('[proxy] Plugin agent discovery failed:', err.message);
-        }
-
-        // Discover plugin skills and notify the browser so SkillPicker can show them.
-        try {
-          const pluginSkills = await discoverPluginSkillObjects(host, pluginConfigPath);
-          if (pluginSkills.length > 0) {
-            console.log(`[proxy] Sending ${pluginSkills.length} plugin skill(s) to browser`);
-            sendNotification('plugin.skills', { skills: pluginSkills });
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin skill discovery failed:', err.message);
+          console.warn('[proxy] Plugin agent notification failed:', err.message);
         }
 
         // Discover plugin prompts (slash commands) and notify the browser.
         try {
-          const pluginPrompts = await discoverPluginPrompts(host, pluginConfigPath);
           if (pluginPrompts.length > 0) {
             console.log(`[proxy] Sending ${pluginPrompts.length} plugin prompt(s) to browser`);
             sendNotification('plugin.prompts', { prompts: pluginPrompts });
           }
         } catch (err) {
-          console.warn('[proxy] Plugin prompt discovery failed:', err.message);
+          console.warn('[proxy] Plugin prompt notification failed:', err.message);
         }
 
+        const resolvedMcpServers = mergePluginMcpServers(mcpServers || {}, pluginMcpServers);
+
         // Emit 'starting' status for each configured MCP server
-        const mcpServerNames = Object.keys(mcpServers || {});
+        const mcpServerNames = Object.keys(resolvedMcpServers || {});
         for (const name of mcpServerNames) {
           sendNotification('mcp.status', { server: name, status: 'starting' });
           sendNotification('mcp.log', {
@@ -527,7 +643,7 @@ async function handleConnection(ws) {
             sessionId,
             systemMessage,
             tools,
-            mcpServers,
+            mcpServers: Object.keys(resolvedMcpServers).length > 0 ? resolvedMcpServers : undefined,
             availableTools,
             skillDirectories,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,

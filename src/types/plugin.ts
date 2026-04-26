@@ -85,6 +85,9 @@ export interface InstalledPlugin {
 
 /** Counts and names of components discovered in a plugin's directory. */
 export interface PluginComponents {
+  agents?: PluginAgent[];
+  skills?: PluginSkillInfo[];
+  prompts?: PluginPrompt[];
   agentCount: number;
   agentNames: string[];
   skillCount: number;
@@ -126,6 +129,23 @@ export interface MarketplacePlugin {
   strict?: boolean;
 }
 
+export interface PluginAgent {
+  name: string;
+  description: string;
+  prompt: string;
+  hosts: string[];
+  tools?: string[];
+}
+
+export interface PluginSkillInfo {
+  name: string;
+  description: string;
+  version: string;
+  hosts: string[];
+  content?: string;
+  dir?: string;
+}
+
 /** Marketplace metadata block in marketplace.json */
 export interface MarketplaceMetadata {
   description?: string;
@@ -162,6 +182,11 @@ export interface RegisteredMarketplace {
   registeredKey: string | null;
   /** True if this is the office-coding-agent's own marketplace (cannot be removed). */
   isOwn: boolean;
+}
+
+export interface PluginMarketplaceSummary extends RegisteredMarketplace {
+  kind: 'builtin' | 'registered';
+  sourceKind: string;
 }
 
 /**

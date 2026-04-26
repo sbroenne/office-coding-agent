@@ -13,10 +13,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
+  ConfigReadError,
   readCopilotConfig,
+  listAllPluginConfigs,
   readPluginManifest,
   discoverPluginSkillDirs,
   discoverPluginAgents,
+  readMcpServersForPlugin,
   isPluginForHost,
   parsePluginAgentFrontmatter,
   slugify,
@@ -158,15 +161,53 @@ describe('readCopilotConfig', () => {
     expect(result).toEqual({ installed_plugins: [] });
   });
 
-  it('returns empty object for malformed JSON', async () => {
+  it('throws ConfigReadError for malformed JSON so callers can preserve state', async () => {
     const dir = await makeTempDir();
     tempDirs.push(dir);
 
     const configPath = join(dir, 'config.json');
     await writeFile(configPath, '{ bad json !!', 'utf8');
 
-    const result = await readCopilotConfig(configPath);
-    expect(result).toEqual({});
+    await expect(readCopilotConfig(configPath)).rejects.toBeInstanceOf(ConfigReadError);
+  });
+
+  it('strips Copilot CLI line-comment banner before parsing', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const configPath = join(dir, 'config.json');
+    await writeFile(configPath, '// User settings belong in settings.json.\n{"installedPlugins":[]}', 'utf8');
+
+    await expect(readCopilotConfig(configPath)).resolves.toEqual({ installedPlugins: [] });
+  });
+});
+
+describe('listAllPluginConfigs', () => {
+  it('supports camelCase installedPlugins from the current CLI', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const configPath = join(dir, 'config.json');
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        installedPlugins: [
+          {
+            name: 'office-excel',
+            marketplace: 'test',
+            version: '1.0.0',
+            installed_at: new Date().toISOString(),
+            enabled: true,
+            cache_path: dir,
+          },
+        ],
+      }),
+      'utf8'
+    );
+
+    const plugins = await listAllPluginConfigs(configPath);
+    expect(plugins).toHaveLength(1);
+    expect(plugins[0].name).toBe('office-excel');
   });
 });
 
@@ -212,6 +253,41 @@ describe('readPluginManifest', () => {
 
     const result = await readPluginManifest(dir);
     expect(result?.name).toBe('root');
+  });
+});
+
+describe('readMcpServersForPlugin', () => {
+  it('reads inline mcpServers from plugin manifest', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    const plugin = { name: 'office-excel', enabled: true, cache_path: dir };
+    const servers = await readMcpServersForPlugin(plugin, {
+      mcpServers: {
+        excelExtra: { command: 'node', args: ['server.js'] },
+      },
+    });
+
+    expect(Object.keys(servers)).toEqual(['excelExtra']);
+  });
+
+  it('reads sidecar .mcp.json files from the plugin cache path', async () => {
+    const dir = await makeTempDir();
+    tempDirs.push(dir);
+
+    await writeFile(
+      join(dir, '.mcp.json'),
+      JSON.stringify({ mcpServers: { sidecar: { url: 'https://example.test/mcp' } } }),
+      'utf8'
+    );
+
+    const servers = await readMcpServersForPlugin({
+      name: 'office-excel',
+      enabled: true,
+      cache_path: dir,
+    });
+
+    expect(Object.keys(servers)).toEqual(['sidecar']);
   });
 });
 

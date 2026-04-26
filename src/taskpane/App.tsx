@@ -5,6 +5,7 @@ import { ChatErrorBoundary } from '@/components/ChatErrorBoundary';
 import { SlidePanel } from '@/components/SlidePanel';
 import { SessionHistoryPanel } from '@/components/SessionHistoryDialog';
 import { PermissionManagerPanel } from '@/components/PermissionManagerDialog';
+import { PluginManagerPanel } from '@/components/PluginManagerDialog';
 import { Codicon } from '@/components/Codicon';
 import { useSettingsStore } from '@/stores';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
@@ -150,6 +151,7 @@ const PermissionBanner: React.FC<{
 
 const PANEL_TITLES: Record<string, { title: string; description?: string }> = {
   history: { title: 'Session History' },
+  plugins: { title: 'Plugins', description: 'Install and manage sandboxed Copilot CLI plugins' },
   permissions: { title: 'Permissions', description: 'Manage auto-approval and saved rules' },
 };
 
@@ -252,6 +254,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
                 onDeleteSession={deleteSession}
               />
             )}
+            {key === 'plugins' && <PluginManagerPanel />}
             {key === 'permissions' && <PermissionManagerPanel />}
           </SlidePanel>
         ))}

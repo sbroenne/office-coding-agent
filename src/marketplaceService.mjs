@@ -7,7 +7,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -178,14 +178,17 @@ export function removeMarketplace(cacheDir, slug, registeredKey) {
 
   // Step 1: unregister from CLI if registered
   if (registeredKey) {
-    try {
-      execSync(`copilot plugin marketplace remove ${registeredKey}`, {
-        encoding: 'utf-8',
-        timeout: 30000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } catch (err) {
-      errors.push(`CLI unregister failed: ${err.stderr?.trim() || err.message}`);
+    const command = process.env.COPILOT_CLI_PATH || (process.platform === 'win32' ? 'copilot.cmd' : 'copilot');
+    const result = spawnSync(command, ['plugin', 'marketplace', 'remove', registeredKey], {
+      encoding: 'utf-8',
+      timeout: 30000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+      shell: process.platform === 'win32',
+      env: { ...process.env, COPILOT_HOME: path.dirname(cacheDir) },
+    });
+    if (result.status !== 0) {
+      errors.push(`CLI unregister failed: ${result.stderr?.trim() || result.error?.message || result.stdout?.trim() || 'unknown error'}`);
     }
   }
 

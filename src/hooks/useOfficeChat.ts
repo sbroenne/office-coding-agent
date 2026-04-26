@@ -332,6 +332,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           mcpServers,
           host,
           disabledSkills,
+          disabledMcpServerNames: disabledMcpServerNamesRef.current,
           customAgents,
         }),
         60_000,

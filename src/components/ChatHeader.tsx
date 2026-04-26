@@ -41,6 +41,15 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       <div className="flex items-center gap-1">
         <SkillPicker />
         <button
+          onClick={() => onOpenPanel?.('plugins')}
+          className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
+          style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
+          aria-label="Plugins"
+          title="Plugins"
+        >
+          <Codicon name="extensions" className="text-[14px]" />
+        </button>
+        <button
           onClick={() => onOpenPanel?.('permissions')}
           className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
           style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}

@@ -15,7 +15,7 @@ import { useMemoryStore } from '@/stores/memoryStore';
 export const managePluginsTool: Tool = {
   name: 'manage_plugins',
   description:
-    'Manage Copilot plugins — install, uninstall, enable, disable, list, browse, and update plugins. Also manage plugin marketplaces. Actions: "list" (all installed plugins), "browse" (browse a marketplace), "install" (by spec: owner/repo, name@marketplace, or path), "uninstall" (by name), "enable"/"disable" (by name), "update" (by name), "marketplaces" (list registered marketplaces), "add_marketplace" (register a new marketplace), "remove_marketplace" (remove a marketplace).',
+    'Manage sandboxed Copilot plugins — install, uninstall, list, browse, and update plugins. Uninstalling is the disable path. Also manage plugin marketplaces. Actions: "list" (all installed plugins), "browse" (browse a marketplace), "install" (by spec: owner/repo, name@marketplace, or path), "uninstall" (by name), "update" (by name), "update_all", "marketplaces" (list registered marketplaces), "add_marketplace" (register a new marketplace), "remove_marketplace" (remove a marketplace).',
   parameters: {
     type: 'object',
     properties: {
@@ -27,21 +27,30 @@ export const managePluginsTool: Tool = {
           'browse',
           'install',
           'uninstall',
-          'enable',
-          'disable',
           'update',
+          'update_all',
           'marketplaces',
           'add_marketplace',
           'remove_marketplace',
         ],
       },
-      name: { type: 'string', description: 'Plugin or marketplace name (uninstall, enable, disable, update, remove_marketplace).' },
-      spec: { type: 'string', description: 'Install spec: owner/repo, name@marketplace, URL, or path (install, add_marketplace).' },
+      name: {
+        type: 'string',
+        description: 'Plugin or marketplace name (uninstall, update, remove_marketplace).',
+      },
+      spec: {
+        type: 'string',
+        description:
+          'Install spec: owner/repo, name@marketplace, URL, or path (install, add_marketplace).',
+      },
       marketplace: { type: 'string', description: 'Marketplace name to browse (browse action).' },
     },
     required: ['action'],
   },
-  handler: async (args: unknown, _invocation: ToolInvocation): Promise<ToolResultObject | string> => {
+  handler: async (
+    args: unknown,
+    _invocation: ToolInvocation
+  ): Promise<ToolResultObject | string> => {
     const { action, name, spec, marketplace } = args as {
       action: string;
       name?: string;
@@ -93,21 +102,14 @@ export const managePluginsTool: Tool = {
         return JSON.stringify(result);
       }
 
-      if (action === 'enable') {
-        if (!name) return JSON.stringify({ error: 'name is required for enable' });
-        const result = await pluginService.enablePlugin(name);
-        return JSON.stringify(result);
-      }
-
-      if (action === 'disable') {
-        if (!name) return JSON.stringify({ error: 'name is required for disable' });
-        const result = await pluginService.disablePlugin(name);
-        return JSON.stringify(result);
-      }
-
       if (action === 'update') {
         if (!name) return JSON.stringify({ error: 'name is required for update' });
         const result = await pluginService.updatePlugin(name);
+        return JSON.stringify(result);
+      }
+
+      if (action === 'update_all') {
+        const result = await pluginService.updateAllPlugins();
         return JSON.stringify(result);
       }
 
@@ -235,7 +237,4 @@ export const manageMemoryTool: Tool = {
 };
 
 /** All management tools — included for every host */
-export const managementTools: Tool[] = [
-  managePluginsTool,
-  manageMemoryTool,
-];
+export const managementTools: Tool[] = [managePluginsTool, manageMemoryTool];

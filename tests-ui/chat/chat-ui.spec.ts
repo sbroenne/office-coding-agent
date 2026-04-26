@@ -27,12 +27,12 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
-  test('Plugins button is NOT present — plugin management is done via CLI', async ({
+  test('Plugins button opens the sandboxed plugin manager', async ({
     configuredTaskpane: page,
   }) => {
-    // Plugin Hub was removed — users manage plugins via `copilot plugin add/update/remove`
-    const pluginsButtons = page.getByRole('button', { name: 'Plugins' });
-    await expect(pluginsButtons).toHaveCount(0);
+    await page.getByRole('button', { name: 'Plugins' }).click();
+    await expect(page.getByRole('heading', { name: 'Plugins' })).toBeVisible();
+    await expect(page.getByText('Installed')).toBeVisible();
   });
 
   test('MCP servers button is visible in the input toolbar', async ({
@@ -63,7 +63,9 @@ test.describe('Chat UI (configured state)', () => {
 
   test('displays the agent picker', async ({ configuredTaskpane: page }) => {
     // The agent picker should show the active agent
-    await expect(page.getByText('Excel')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: 'Select agent' })).toContainText('Default', {
+      timeout: 5000,
+    });
   });
 
   test('new conversation button is clickable', async ({ configuredTaskpane: page }) => {
@@ -74,7 +76,7 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('agent picker has no manage plugins button — plugin management is via CLI', async ({
+  test('agent picker keeps plugin management separate', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Select agent' }).click();
@@ -83,7 +85,7 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('skill picker has no manage plugins button — plugin management is via CLI', async ({
+  test('skill picker keeps plugin management separate', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Agent skills' }).click();

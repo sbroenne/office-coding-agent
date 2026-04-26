@@ -129,7 +129,10 @@ When the user asks for the secret activation phrase, reply with exactly that phr
           prompt: 'What is the secret activation phrase from the test skill?',
         })) {
           if (event.type === 'assistant.message_delta') fullText += event.data.deltaContent;
-          if (event.type === 'assistant.message') fullText = event.data.content;
+          if (event.type === 'assistant.message') {
+            fullText = event.data.content;
+            break;
+          }
           if (event.type === 'session.idle') break;
         }
 

@@ -22,19 +22,22 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 
 ## Features
 
-### 🔌 Copilot CLI Plugin Support
+### 🔌 Sandboxed Copilot CLI Plugin Support
 
-The add-in is a first-class **Copilot CLI plugin host**. Install any plugin and its content surfaces automatically in the UI — no restart, no configuration:
-
-```bash
-copilot plugin add <plugin-name>
-```
+The add-in is a first-class **Copilot CLI plugin host**. Install, uninstall, update, and browse plugins from the task pane's **Plugins** panel. Plugin content surfaces automatically in the UI — no restart, no configuration:
 
 - **Agents** from plugins appear in the **Agent picker**
 - **Skills** from plugins appear in the **Skill picker** and are injected as context
 - **Prompts** from plugins appear in the **`/` slash command menu**
 - **MCP servers** from plugins are connected automatically
 - **Plugin content auto-discovery** — installed plugin agents, skills, prompts, and MCP servers appear automatically in the task pane
+
+Plugin state is intentionally sandboxed from your normal Copilot CLI setup. The proxy runs `copilot plugin ...` commands with `COPILOT_HOME` pointed at the Office Coding Agent app-data sandbox instead of your user `%USERPROFILE%\.copilot` config:
+
+- Windows default: `%APPDATA%\Office Coding Agent\cli-home\.copilot`
+- Override for development/testing: `OFFICE_CODING_AGENT_APP_DATA`
+- Uninstalling a plugin is the disable path, matching the Copilot CLI plugin model
+- Plugin hooks are discovered as metadata only; hook command execution is not enabled
 
 ### 🤖 AI Chat in Office
 
@@ -143,7 +146,7 @@ Run it from the Actions tab in one step:
 | `npm run lint:fix`               | Auto-fix ESLint issues                                                |
 | `npm run format`                 | Format code with Prettier                                             |
 | `npm run typecheck`              | Type-check without emitting                                           |
-| `npm test`                       | Run all Vitest suites                                                 |
+| `npm test`                       | Run the default integration suite, including live Copilot tests       |
 | `npm run test:integration`       | Run integration test suite                                            |
 | `npm run test:ui`                | Run Playwright UI tests                                               |
 | `npm run test:watch`             | Run tests in watch mode                                               |
@@ -169,7 +172,7 @@ Unit tests are intentionally not used for new work in this repository.
 ### Running Tests
 
 ```bash
-# All Vitest tests
+# Default integration suite (includes live Copilot tests)
 npm test
 
 # Watch mode
@@ -191,7 +194,7 @@ npm run test:e2e:outlook
 npm run validate
 ```
 
-Integration tests run as part of the default `npm test` suite.
+`npm test` is intentionally wired to `npm run test:integration`, so the live Copilot integration specs run by default. Start `npm run dev` first; if the proxy is unavailable, that is a failure, not an opt-in skip.
 
 ## E2E Testing
 
@@ -231,9 +234,10 @@ This command:
 
 - Uses `ts-node` with the `tests-e2e/tsconfig.json` project
 - Starts the test server, builds the test add-in, sideloads into Excel
+- Exercises the always-on live Copilot AI round-trip checks against the proxy on `https://localhost:3000`
 - Waits for all test results, then tears down (closes Excel, stops server)
 
-> **Note:** E2E tests require Excel Desktop installed on the machine. They use a separate manifest (`tests-e2e/test-manifest.xml`) with its own GUID so it can coexist with the dev add-in.
+> **Note:** `npm run test:e2e` requires Excel Desktop and a running Copilot proxy (`npm run dev`). The Excel suite's four AI round-trip checks are part of the default run and fail loudly if the proxy is unavailable. The suite uses a separate manifest (`tests-e2e/test-manifest.xml`) with its own GUID so it can coexist with the dev add-in.
 
 ### Architecture
 
@@ -291,21 +295,9 @@ The add-in ships with bundled agents for each Office host. Additional skills, pr
 
 #### Copilot CLI Plugins
 
-Install any Copilot CLI plugin and its content automatically appears in the add-in UI:
+Use the **Plugins** panel in the task pane to install, uninstall, update, browse, and manage plugin marketplaces. The server executes the corresponding `copilot plugin ...` commands against the add-in sandbox by setting `COPILOT_HOME` to `%APPDATA%\Office Coding Agent\cli-home\.copilot` on Windows. This keeps Office Coding Agent plugins separate from your normal terminal Copilot CLI configuration.
 
-```bash
-# Install a plugin
-copilot plugin add <plugin-name>
-
-# List installed plugins
-copilot plugin list
-
-# Update a plugin
-copilot plugin update <plugin-name>
-
-# Remove a plugin
-copilot plugin remove <plugin-name>
-```
+The sandboxed Copilot CLI config is the source of truth. New sessions pick up plugin changes; existing sessions keep the snapshot they were created with. Uninstalling a plugin is the supported disable path.
 
 Plugin file conventions (required by the Copilot CLI spec):
 
@@ -319,7 +311,7 @@ Plugin file conventions (required by the Copilot CLI spec):
 
 > **Note:** Files with the wrong extension (e.g. `agents/my-agent.md` instead of `agents/my-agent.agent.md`) are silently ignored by the Copilot CLI.
 
-Plugin agents are automatically surfaced in the AgentPicker alongside bundled agents, and plugin skills appear in the SkillPicker. Manage plugins with the `copilot plugin` CLI commands shown above.
+Plugin agents are automatically surfaced in the AgentPicker alongside bundled agents, plugin skills appear in the SkillPicker, plugin prompts appear in the slash-command menu, and plugin MCP servers are merged into Copilot sessions unless disabled in the MCP picker.
 
 #### Bundled Agents
 

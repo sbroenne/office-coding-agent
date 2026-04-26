@@ -62,6 +62,8 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   host?: string;
   /** Skill names to disable (SDK disabledSkills). */
   disabledSkills?: string[];
+  /** MCP server names to disable, including plugin-declared MCP servers. */
+  disabledMcpServerNames?: string[];
   /** Custom agent configs passed natively to the SDK. */
   customAgents?: CustomAgentPayload[];
   /**
@@ -334,6 +336,7 @@ export class WebSocketCopilotClient {
       availableTools: config.availableTools,
       host: config.host,
       disabledSkills: config.disabledSkills,
+      disabledMcpServerNames: config.disabledMcpServerNames,
       customAgents: config.customAgents,
       pluginConfigPath: config.pluginConfigPath,
     });
