@@ -712,28 +712,6 @@ describe('useOfficeChat', () => {
     expect((textPart as { type: 'text'; text: string }).text).toContain('Not connected');
   });
 
-  it.each(['/skills', '/prompts'])(
-    'handles %s locally with Copilot CLI plugin guidance',
-    async command => {
-      mockCreate.mockRejectedValue(new Error('server unavailable'));
-
-      const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
-
-      await act(async () => {
-        await result.current.send(command);
-      });
-
-      const messages = result.current.messages;
-      expect(messages).toHaveLength(2);
-      expect(messages[0].role).toBe('user');
-      expect(messages[1].role).toBe('assistant');
-      const textPart = messages[1].content.find(c => c.type === 'text');
-      expect(textPart).toBeDefined();
-      expect(textPart!.type).toBe('text');
-      expect((textPart as { type: 'text'; text: string }).text).toContain('copilot plugin');
-    }
-  );
-
   it('auto-corrects activeModel when not in fetched models', async () => {
     // Set activeModel to something not in the available models
     useSettingsStore.setState({ activeModel: 'nonexistent-model' });

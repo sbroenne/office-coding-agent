@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
 import { ensureOfficeCliPlugins } from './plugins/cliPluginBootstrap.mjs';
+import { getCliSlashItems } from './plugins/cliSlashItems.mjs';
 import {
   getBrowseRoots,
   isAllowedOrigin,
@@ -90,6 +91,14 @@ export async function createServer() {
       nodeEnv: process.env.NODE_ENV ?? 'production',
       browseRestricted: true,
     });
+  });
+
+  apiRouter.get('/slash-items', requireTrustedLocalAccess, async (_req, res) => {
+    try {
+      res.json(await getCliSlashItems());
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
   });
 
   apiRouter.get('/browse', requireTrustedLocalAccess, async (req, res) => {

@@ -1,6 +1,19 @@
 import React, { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
+import { getLocalApiBase } from '@/lib/api';
+
+interface SlashItem {
+  type: 'skill' | 'prompt';
+  name: string;
+  description?: string;
+  plugin?: string;
+}
+
+interface SlashItemsResponse {
+  skills?: SlashItem[];
+  prompts?: SlashItem[];
+}
 
 interface ChatComposerProps {
   onSend: (text: string) => void | Promise<void>;
@@ -29,6 +42,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
   autoFocus = true,
 }) => {
   const [text, setText] = useState('');
+  const [slashItems, setSlashItems] = useState<SlashItemsResponse>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // History navigation state: -1 = composing new text, 0 = most recent, etc.
@@ -43,6 +57,43 @@ export const ChatComposer: FC<ChatComposerProps> = ({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [text]);
+
+  useEffect(() => {
+    void fetch(`${getLocalApiBase()}/api/slash-items`)
+      .then(res => (res.ok ? res.json() : {}))
+      .then((data: SlashItemsResponse) => setSlashItems(data))
+      .catch(() => setSlashItems({}));
+  }, []);
+
+  const slashMatch = /^\/(skills|prompts)(?:\s+(.*))?$/i.exec(text);
+  const slashKind = slashMatch?.[1].toLowerCase() as 'skills' | 'prompts' | undefined;
+  const slashQuery = slashMatch?.[2]?.trim().toLowerCase() ?? '';
+  const activeSlashItems =
+    slashKind === 'skills'
+      ? (slashItems.skills ?? [])
+      : slashKind === 'prompts'
+        ? (slashItems.prompts ?? [])
+        : [];
+  const visibleSlashItems = activeSlashItems
+    .filter(item => {
+      if (!slashQuery) return true;
+      return [item.name, item.description, item.plugin].some(
+        value => value?.toLowerCase().includes(slashQuery) ?? false
+      );
+    })
+    .slice(0, 8);
+
+  const invokeSlashItem = useCallback(
+    (item: SlashItem) => {
+      const invocation =
+        item.type === 'skill' ? `Use the ${item.name} skill.` : `Run the ${item.name} prompt.`;
+      setText('');
+      historyIndexRef.current = -1;
+      draftRef.current = '';
+      void onSend(invocation);
+    },
+    [onSend]
+  );
 
   const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -136,6 +187,42 @@ export const ChatComposer: FC<ChatComposerProps> = ({
 
   return (
     <div className="aui-composer-root relative flex w-full flex-col rounded-[var(--vscode-cornerRadius-large)] border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] overflow-hidden outline-none transition-colors focus-within:border-[var(--vscode-focusBorder)]">
+      {slashKind && (
+        <div
+          className="max-h-56 overflow-y-auto border-b border-border p-1"
+          role="listbox"
+          aria-label={`${slashKind} suggestions`}
+        >
+          {visibleSlashItems.length > 0 ? (
+            visibleSlashItems.map(item => (
+              <button
+                key={`${item.type}:${item.plugin ?? ''}:${item.name}`}
+                type="button"
+                onClick={() => invokeSlashItem(item)}
+                className="flex w-full items-start gap-2 rounded-[var(--vscode-cornerRadius-small)] px-2 py-1.5 text-left text-sm hover:bg-accent"
+                role="option"
+              >
+                <Codicon
+                  name={item.type === 'skill' ? 'lightbulb-sparkle' : 'symbol-keyword'}
+                  className="mt-0.5 text-[14px] text-[var(--vscode-icon-foreground)]"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-foreground">{item.name}</span>
+                  {[item.description, item.plugin].some(Boolean) && (
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {[item.description, item.plugin].filter(Boolean).join(' — ')}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              No {slashKind} found from installed Copilot CLI plugins.
+            </div>
+          )}
+        </div>
+      )}
       <textarea
         ref={textareaRef}
         value={text}

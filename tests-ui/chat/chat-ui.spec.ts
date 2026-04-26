@@ -85,22 +85,24 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('/skills shows Copilot CLI plugin guidance', async ({
+  test('/skills opens installed Copilot CLI skill suggestions', async ({
     configuredTaskpane: page,
   }) => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
     await composer.fill('/skills');
-    await composer.press('Enter');
-    await expect(page.locator('[data-role="assistant"]').first()).toContainText(/copilot plugin/i);
+    await expect(page.getByRole('listbox', { name: 'skills suggestions' })).toBeVisible();
+    await expect(page.getByRole('option').filter({ hasText: /excel|powerpoint|word|outlook/i }).first()).toBeVisible();
   });
 
-  test('/prompts shows Copilot CLI plugin guidance', async ({
+  test('/prompts opens installed Copilot CLI prompt suggestions or empty state', async ({
     configuredTaskpane: page,
   }) => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
     await composer.fill('/prompts');
-    await composer.press('Enter');
-    await expect(page.locator('[data-role="assistant"]').first()).toContainText(/copilot plugin/i);
+    await expect(page.getByRole('listbox', { name: 'prompts suggestions' })).toBeVisible();
+    const promptOptions = page.getByRole('option');
+    const emptyState = page.getByText('No prompts found from installed Copilot CLI plugins.');
+    await expect(promptOptions.first().or(emptyState)).toBeVisible();
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({
