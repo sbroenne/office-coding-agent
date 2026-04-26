@@ -76,8 +76,12 @@ export const SkillPicker: React.FC = () => {
             align="start"
           >
             {allSkills.length === 0 ? (
-              <div className="px-2 py-2 text-xs text-muted-foreground">
-                No skills available yet.
+              <div className="px-2 py-2 text-xs text-muted-foreground space-y-1">
+                <div>No skills available in the task pane.</div>
+                <div>
+                  Manage Copilot CLI plugins from your terminal with{' '}
+                  <code className="font-mono">copilot plugin</code>.
+                </div>
               </div>
             ) : (
               <>

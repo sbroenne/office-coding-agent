@@ -74,7 +74,13 @@ export const McpPicker: React.FC = () => {
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">MCP Servers</div>
 
           {servers.length === 0 ? (
-            <div className="px-2 py-2 text-xs text-muted-foreground">No MCP servers available.</div>
+            <div className="px-2 py-2 text-xs text-muted-foreground space-y-1">
+              <div>No MCP servers available.</div>
+              <div>
+                Manage Copilot CLI plugins from your terminal with{' '}
+                <code className="font-mono">copilot plugin</code>.
+              </div>
+            </div>
           ) : (
             servers.map(server => {
               const enabled = isMcpServerEnabled(server.name);

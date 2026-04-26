@@ -26,6 +26,8 @@ describe('Integration: AgentPicker', () => {
     await user.click(screen.getByLabelText('Select agent'));
 
     expect(screen.getByText('Use the built-in Office agent for this host')).toBeInTheDocument();
+    expect(screen.getByText(/Plugin agents are managed by the Copilot CLI/)).toBeInTheDocument();
+    expect(screen.getByText('copilot plugin')).toBeInTheDocument();
     expect(screen.queryByText('Excel')).not.toBeInTheDocument();
   });
 

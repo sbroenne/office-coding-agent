@@ -18,7 +18,9 @@ describe('Integration: SkillPicker', () => {
   it('shows empty state because CLI-owned plugin skills are not app-managed', async () => {
     renderWithProviders(<SkillPicker />);
     await userEvent.click(screen.getByLabelText('Agent skills'));
-    expect(screen.getByText('No skills available yet.')).toBeInTheDocument();
+    expect(screen.getByText('No skills available in the task pane.')).toBeInTheDocument();
+    expect(screen.getByText(/Manage Copilot CLI plugins/)).toBeInTheDocument();
+    expect(screen.getByText('copilot plugin')).toBeInTheDocument();
   });
 
   it('still persists disabled skill names for SDK disabledSkills support', () => {

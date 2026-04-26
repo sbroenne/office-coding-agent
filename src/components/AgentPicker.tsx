@@ -85,6 +85,10 @@ export const AgentPicker: React.FC = () => {
               isDefaultAgentActive,
               () => setActiveAgent(defaultAgent.metadata.name)
             )}
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+              Plugin agents are managed by the Copilot CLI. Use{' '}
+              <code className="font-mono">copilot plugin</code> in your terminal.
+            </div>
 
             {pickerAgents.length > 0 && (
               <>
