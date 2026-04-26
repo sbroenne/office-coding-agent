@@ -42,13 +42,10 @@ function pluginNameFor(filePath, installedPluginsDir) {
   return parts.length >= 2 ? `${parts[1]}@${parts[0]}` : undefined;
 }
 
-async function readMarkdownItem(filePath, type, installedPluginsDir) {
+async function readSkill(filePath, installedPluginsDir) {
   const markdown = await fs.promises.readFile(filePath, 'utf8');
   const metadata = parseFrontmatter(markdown);
-  const fallbackName =
-    type === 'skill' && path.basename(filePath).toLowerCase() === 'skill.md'
-      ? path.basename(path.dirname(filePath))
-      : path.basename(filePath).replace(/\.prompt\.md$|\.md$/i, '');
+  const fallbackName = path.basename(path.dirname(filePath));
   const bodyStart = markdown.startsWith('---') ? markdown.indexOf('\n---', 3) : -1;
   const body = bodyStart === -1 ? markdown : markdown.slice(bodyStart + 4);
   const firstBodyLine = body
@@ -57,41 +54,26 @@ async function readMarkdownItem(filePath, type, installedPluginsDir) {
     .find(Boolean);
 
   return {
-    type,
+    type: 'skill',
     name: String(metadata.name ?? fallbackName),
     description: String(metadata.description ?? firstBodyLine ?? ''),
     plugin: pluginNameFor(filePath, installedPluginsDir),
   };
 }
 
-function isPromptFile(filePath) {
-  const lower = filePath.toLowerCase();
-  return (
-    lower.endsWith('.prompt.md') ||
-    lower.endsWith(path.join('prompts', 'prompt.md').toLowerCase()) ||
-    lower.includes(`${path.sep}prompts${path.sep}`.toLowerCase()) && lower.endsWith('.md')
-  );
-}
-
 export async function getCliSlashItems(options = {}) {
   const installedPluginsDir = options.installedPluginsDir ?? DEFAULT_INSTALLED_PLUGINS_DIR;
   const skills = [];
-  const prompts = [];
 
   await walk(installedPluginsDir, async filePath => {
     const base = path.basename(filePath).toLowerCase();
     if (base === 'skill.md') {
-      skills.push(await readMarkdownItem(filePath, 'skill', installedPluginsDir));
-      return;
-    }
-    if (isPromptFile(filePath)) {
-      prompts.push(await readMarkdownItem(filePath, 'prompt', installedPluginsDir));
+      skills.push(await readSkill(filePath, installedPluginsDir));
     }
   });
 
   const byName = (a, b) => a.name.localeCompare(b.name);
   return {
     skills: skills.sort(byName),
-    prompts: prompts.sort(byName),
   };
 }

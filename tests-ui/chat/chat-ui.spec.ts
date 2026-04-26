@@ -85,24 +85,22 @@ test.describe('Chat UI (configured state)', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('/skills opens installed Copilot CLI skill suggestions', async ({
+  test('/skills opens Copilot CLI skills management suggestions', async ({
     configuredTaskpane: page,
   }) => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
     await composer.fill('/skills');
-    await expect(page.getByRole('listbox', { name: 'skills suggestions' })).toBeVisible();
-    await expect(page.getByRole('option').filter({ hasText: /excel|powerpoint|word|outlook/i }).first()).toBeVisible();
+    await expect(page.getByRole('listbox', { name: 'skills command suggestions' })).toBeVisible();
+    await expect(page.getByRole('option', { name: /\/skills list/i })).toBeVisible();
   });
 
-  test('/prompts opens installed Copilot CLI prompt suggestions or empty state', async ({
+  test('direct slash suggestions include installed Copilot CLI skills', async ({
     configuredTaskpane: page,
   }) => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
-    await composer.fill('/prompts');
-    await expect(page.getByRole('listbox', { name: 'prompts suggestions' })).toBeVisible();
-    const promptOptions = page.getByRole('option');
-    const emptyState = page.getByText('No prompts found from installed Copilot CLI plugins.');
-    await expect(promptOptions.first().or(emptyState)).toBeVisible();
+    await composer.fill('/exc');
+    await expect(page.getByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
+    await expect(page.getByRole('option').filter({ hasText: /\/excel/i }).first()).toBeVisible();
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({

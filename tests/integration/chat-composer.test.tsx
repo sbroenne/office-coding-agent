@@ -9,7 +9,7 @@ describe('ChatComposer slash commands', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows installed CLI skills and sends the selected skill invocation', async () => {
+  it('shows installed CLI skills as direct slash suggestions and inserts the selected skill', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -21,7 +21,6 @@ describe('ChatComposer slash commands', () => {
             plugin: 'office-excel@office-coding-agent',
           },
         ],
-        prompts: [],
       }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -30,32 +29,34 @@ describe('ChatComposer slash commands', () => {
     renderWithProviders(<ChatComposer onSend={onSend} onCancel={vi.fn()} isRunning={false} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Message input' }), {
-      target: { value: '/skills' },
+      target: { value: '/exc' },
     });
 
-    const option = await screen.findByRole('option', { name: /excel/i });
+    const option = await screen.findByRole('option', { name: /\/excel/i });
     fireEvent.click(option);
 
-    expect(onSend).toHaveBeenCalledWith('Use the excel skill.');
+    expect(onSend).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue('/excel ');
   });
 
-  it('shows an empty prompt state when no CLI prompts are installed', async () => {
+  it('shows Copilot CLI skills management command suggestions for /skills', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ skills: [], prompts: [] }),
+        json: async () => ({ skills: [] }),
       })
     );
 
     renderWithProviders(<ChatComposer onSend={vi.fn()} onCancel={vi.fn()} isRunning={false} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Message input' }), {
-      target: { value: '/prompts' },
+      target: { value: '/skills' },
     });
 
     await waitFor(() => {
-      expect(screen.getByText('No prompts found from installed Copilot CLI plugins.')).toBeVisible();
+      expect(screen.getByRole('listbox', { name: 'skills command suggestions' })).toBeVisible();
     });
+    expect(screen.getByRole('option', { name: /\/skills list/i })).toBeVisible();
   });
 });

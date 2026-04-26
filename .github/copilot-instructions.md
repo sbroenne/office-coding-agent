@@ -121,7 +121,7 @@ Rules:
 
 ### Skills System
 
-Plugin-provided skills and prompts are managed by the Copilot CLI. The task pane does not render a skills picker; users can type `/skills` or `/prompts` to invoke installed CLI plugin items discovered from the user's normal Copilot CLI plugin cache. Installation, updates, and removal stay in the terminal with `copilot plugin`.
+Plugin-provided skills are managed by the Copilot CLI. The task pane does not render a skills picker; users can reference installed CLI plugin skills as `/skill-name`, matching Copilot CLI skill invocation. `/skills` is a CLI-style management/list command surface, not the direct skill picker. Installation, updates, and removal stay in the terminal with `copilot plugin`.
 
 ### The Host Runtime Boundary
 

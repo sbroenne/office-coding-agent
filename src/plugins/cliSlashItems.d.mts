@@ -7,7 +7,6 @@ export interface CliSlashItem {
 
 export interface CliSlashItems {
   skills: CliSlashItem[];
-  prompts: CliSlashItem[];
 }
 
 export interface CliSlashItemsOptions {

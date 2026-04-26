@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { getLocalApiBase } from '@/lib/api';
 
 interface SlashItem {
-  type: 'skill' | 'prompt';
+  type: 'skill';
   name: string;
   description?: string;
   plugin?: string;
@@ -12,8 +12,42 @@ interface SlashItem {
 
 interface SlashItemsResponse {
   skills?: SlashItem[];
-  prompts?: SlashItem[];
 }
+
+interface SlashSuggestion {
+  type: 'skill' | 'command';
+  value: string;
+  name: string;
+  description?: string;
+  plugin?: string;
+}
+
+const SKILLS_COMMANDS: SlashSuggestion[] = [
+  {
+    type: 'command',
+    value: '/skills',
+    name: '/skills',
+    description: 'Manage enabled skills in Copilot CLI.',
+  },
+  {
+    type: 'command',
+    value: '/skills list',
+    name: '/skills list',
+    description: 'List currently available skills.',
+  },
+  {
+    type: 'command',
+    value: '/skills info ',
+    name: '/skills info <skill-name>',
+    description: 'Show details for a skill.',
+  },
+  {
+    type: 'command',
+    value: '/skills reload',
+    name: '/skills reload',
+    description: 'Reload skills added during a CLI session.',
+  },
+];
 
 interface ChatComposerProps {
   onSend: (text: string) => void | Promise<void>;
@@ -65,35 +99,46 @@ export const ChatComposer: FC<ChatComposerProps> = ({
       .catch(() => setSlashItems({}));
   }, []);
 
-  const slashMatch = /^\/(skills|prompts)(?:\s+(.*))?$/i.exec(text);
-  const slashKind = slashMatch?.[1].toLowerCase() as 'skills' | 'prompts' | undefined;
-  const slashQuery = slashMatch?.[2]?.trim().toLowerCase() ?? '';
-  const activeSlashItems =
-    slashKind === 'skills'
-      ? (slashItems.skills ?? [])
-      : slashKind === 'prompts'
-        ? (slashItems.prompts ?? [])
-        : [];
-  const visibleSlashItems = activeSlashItems
+  const skillsCommandMatch = /^\/skills(?:\s+([\w-]*))?$/i.exec(text);
+  const rootSlashMatch = /^\/([\w-]*)$/i.exec(text);
+  const slashQuery = rootSlashMatch?.[1]?.toLowerCase() ?? '';
+  const skillsCommandQuery = skillsCommandMatch?.[1]?.toLowerCase() ?? '';
+  const slashMode = skillsCommandMatch ? 'skills-command' : rootSlashMatch ? 'skill' : undefined;
+  const skillSuggestions = (slashItems.skills ?? [])
     .filter(item => {
       if (!slashQuery) return true;
       return [item.name, item.description, item.plugin].some(
         value => value?.toLowerCase().includes(slashQuery) ?? false
       );
     })
-    .slice(0, 8);
+    .map(
+      (item): SlashSuggestion => ({
+        type: 'skill',
+        value: `/${item.name} `,
+        name: `/${item.name}`,
+        description: item.description,
+        plugin: item.plugin,
+      })
+    );
+  const commandSuggestions = SKILLS_COMMANDS.filter(command => {
+    const query = slashMode === 'skills-command' ? skillsCommandQuery : slashQuery;
+    return !query || command.name.toLowerCase().includes(query);
+  });
+  const visibleSlashSuggestions = (
+    slashMode === 'skills-command'
+      ? commandSuggestions
+      : [...commandSuggestions, ...skillSuggestions]
+  ).slice(0, 8);
 
-  const invokeSlashItem = useCallback(
-    (item: SlashItem) => {
-      const invocation =
-        item.type === 'skill' ? `Use the ${item.name} skill.` : `Run the ${item.name} prompt.`;
-      setText('');
-      historyIndexRef.current = -1;
-      draftRef.current = '';
-      void onSend(invocation);
-    },
-    [onSend]
-  );
+  const applySlashSuggestion = useCallback((suggestion: SlashSuggestion) => {
+    setText(suggestion.value);
+    historyIndexRef.current = -1;
+    draftRef.current = '';
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(suggestion.value.length, suggestion.value.length);
+    });
+  }, []);
 
   const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -187,30 +232,34 @@ export const ChatComposer: FC<ChatComposerProps> = ({
 
   return (
     <div className="aui-composer-root relative flex w-full flex-col rounded-[var(--vscode-cornerRadius-large)] border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] overflow-hidden outline-none transition-colors focus-within:border-[var(--vscode-focusBorder)]">
-      {slashKind && (
+      {slashMode && (
         <div
           className="max-h-56 overflow-y-auto border-b border-border p-1"
           role="listbox"
-          aria-label={`${slashKind} suggestions`}
+          aria-label={
+            slashMode === 'skills-command' ? 'skills command suggestions' : 'slash suggestions'
+          }
         >
-          {visibleSlashItems.length > 0 ? (
-            visibleSlashItems.map(item => (
+          {visibleSlashSuggestions.length > 0 ? (
+            visibleSlashSuggestions.map(suggestion => (
               <button
-                key={`${item.type}:${item.plugin ?? ''}:${item.name}`}
+                key={`${suggestion.type}:${suggestion.plugin ?? ''}:${suggestion.name}`}
                 type="button"
-                onClick={() => invokeSlashItem(item)}
+                onClick={() => applySlashSuggestion(suggestion)}
                 className="flex w-full items-start gap-2 rounded-[var(--vscode-cornerRadius-small)] px-2 py-1.5 text-left text-sm hover:bg-accent"
                 role="option"
               >
                 <Codicon
-                  name={item.type === 'skill' ? 'lightbulb-sparkle' : 'symbol-keyword'}
+                  name={suggestion.type === 'skill' ? 'lightbulb-sparkle' : 'terminal'}
                   className="mt-0.5 text-[14px] text-[var(--vscode-icon-foreground)]"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-foreground">{item.name}</span>
-                  {[item.description, item.plugin].some(Boolean) && (
+                  <span className="block truncate font-medium text-foreground">
+                    {suggestion.name}
+                  </span>
+                  {[suggestion.description, suggestion.plugin].some(Boolean) && (
                     <span className="block truncate text-xs text-muted-foreground">
-                      {[item.description, item.plugin].filter(Boolean).join(' — ')}
+                      {[suggestion.description, suggestion.plugin].filter(Boolean).join(' — ')}
                     </span>
                   )}
                 </span>
@@ -218,7 +267,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
             ))
           ) : (
             <div className="px-2 py-2 text-xs text-muted-foreground">
-              No {slashKind} found from installed Copilot CLI plugins.
+              No matching skills found from installed Copilot CLI plugins.
             </div>
           )}
         </div>

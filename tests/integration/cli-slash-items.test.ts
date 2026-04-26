@@ -17,11 +17,10 @@ describe('CLI slash items', () => {
     await Promise.all(tempDirs.splice(0).map(dir => fs.rm(dir, { recursive: true, force: true })));
   });
 
-  it('discovers skills and prompts from installed Copilot CLI plugins', async () => {
+  it('discovers skills from installed Copilot CLI plugins', async () => {
     const installedPluginsDir = await makeInstalledPluginDir();
     const pluginRoot = path.join(installedPluginsDir, 'office-coding-agent', 'office-excel');
     await fs.mkdir(path.join(pluginRoot, 'skills', 'excel'), { recursive: true });
-    await fs.mkdir(path.join(pluginRoot, 'prompts'), { recursive: true });
     await fs.writeFile(
       path.join(pluginRoot, 'skills', 'excel', 'SKILL.md'),
       [
@@ -30,16 +29,6 @@ describe('CLI slash items', () => {
         'description: Work with Excel workbooks',
         '---',
         '# Excel skill',
-      ].join('\n')
-    );
-    await fs.writeFile(
-      path.join(pluginRoot, 'prompts', 'cleanup.prompt.md'),
-      [
-        '---',
-        'name: cleanup-workbook',
-        'description: Clean up workbook data',
-        '---',
-        '# Cleanup prompt',
       ].join('\n')
     );
 
@@ -53,14 +42,6 @@ describe('CLI slash items', () => {
         plugin: 'office-excel@office-coding-agent',
       },
     ]);
-    expect(items.prompts).toEqual([
-      {
-        type: 'prompt',
-        name: 'cleanup-workbook',
-        description: 'Clean up workbook data',
-        plugin: 'office-excel@office-coding-agent',
-      },
-    ]);
   });
 
   it('returns empty lists when no Copilot CLI plugin directory exists', async () => {
@@ -68,6 +49,6 @@ describe('CLI slash items', () => {
       installedPluginsDir: path.join(os.tmpdir(), 'office-cli-slash-items-missing'),
     });
 
-    expect(items).toEqual({ skills: [], prompts: [] });
+    expect(items).toEqual({ skills: [] });
   });
 });
