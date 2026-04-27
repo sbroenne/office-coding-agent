@@ -44,6 +44,15 @@ describe('mcpStatusStore — status', () => {
     expect(useMcpStatusStore.getState().servers['s1'].error).toBeUndefined();
   });
 
+  it('supports OAuth auth-required and failed statuses', () => {
+    useMcpStatusStore.getState().setStatus('powerbi', 'needs-auth');
+    expect(useMcpStatusStore.getState().servers['powerbi'].status).toBe('needs-auth');
+
+    useMcpStatusStore.getState().setStatus('powerbi', 'failed', 'Authentication required');
+    expect(useMcpStatusStore.getState().servers['powerbi'].status).toBe('failed');
+    expect(useMcpStatusStore.getState().servers['powerbi'].error).toBe('Authentication required');
+  });
+
   it('handles multiple servers independently', () => {
     useMcpStatusStore.getState().setStatus('a', 'connected');
     useMcpStatusStore.getState().setStatus('b', 'error', 'fail');

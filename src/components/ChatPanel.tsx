@@ -11,6 +11,7 @@ interface ChatPanelProps {
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
   onSwitchModel?: (modelId: string) => Promise<void>;
+  onInitiateMcpOAuth?: (serverName: string) => Promise<void>;
   onEnqueue?: (text: string) => void;
   queuedPrompts?: string[];
   onDequeue?: (index: number) => void;
@@ -22,6 +23,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onSend,
   onCancel,
   onSwitchModel,
+  onInitiateMcpOAuth,
   onEnqueue,
   queuedPrompts,
   onDequeue,
@@ -48,7 +50,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <ModelPicker hasActiveSession={messages.length > 0} onSwitchModel={onSwitchModel} />
           </>
         }
-        rightToolbar={<McpPicker />}
+        rightToolbar={<McpPicker onInitiateOAuth={onInitiateMcpOAuth} />}
       />
     </div>
   );

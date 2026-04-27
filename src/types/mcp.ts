@@ -2,7 +2,16 @@
 export type McpTransportType = 'http' | 'sse' | 'stdio';
 
 /** Lifecycle status of an MCP server */
-export type McpServerStatus = 'stopped' | 'starting' | 'connected' | 'error';
+export type McpServerStatus =
+  | 'stopped'
+  | 'starting'
+  | 'connected'
+  | 'needs-auth'
+  | 'pending'
+  | 'disabled'
+  | 'not_configured'
+  | 'failed'
+  | 'error';
 
 /** A single log entry from an MCP server */
 export interface McpLogEntry {

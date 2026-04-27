@@ -9,8 +9,10 @@ import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useMcpStatusStore } from '@/stores/mcpStatusStore';
 import { getLocalApiBase } from '@/lib/api';
-import type { McpServerConfig } from '@/types/mcp';
+import type { McpServerConfig, McpServerState } from '@/types/mcp';
+import { toMcpServerKey } from '@/utils/mcpServerKey';
 
 async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
   try {
@@ -23,11 +25,36 @@ async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
   }
 }
 
-export const McpPicker: React.FC = () => {
+interface McpPickerProps {
+  onInitiateOAuth?: (serverName: string) => Promise<void>;
+}
+
+function getRuntimeState(
+  states: Record<string, McpServerState>,
+  serverName: string
+): McpServerState | undefined {
+  const serverKey = toMcpServerKey(serverName);
+  return (
+    states[serverName] ??
+    states[serverKey] ??
+    Object.entries(states).find(([name]) => toMcpServerKey(name) === serverKey)?.[1]
+  );
+}
+
+function needsOAuthAction(server: McpServerConfig, state?: McpServerState): boolean {
+  if (server.transport !== 'http' && server.transport !== 'sse') return false;
+  if (server.headers?.Authorization) return false;
+  return state?.status === 'needs-auth' || state?.status === 'failed' || state?.status === 'error';
+}
+
+export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
+  const [signingInServer, setSigningInServer] = useState<string | null>(null);
+  const [authErrors, setAuthErrors] = useState<Record<string, string>>({});
   const toggleMcpServer = useSettingsStore(s => s.toggleMcpServer);
   const isMcpServerEnabled = useSettingsStore(s => s.isMcpServerEnabled);
+  const runtimeStates = useMcpStatusStore(s => s.servers);
   // Subscribe to disabledMcpServerNames so the component re-renders when toggles change
   useSettingsStore(s => s.disabledMcpServerNames);
 
@@ -43,6 +70,25 @@ export const McpPicker: React.FC = () => {
   const enabledCount = servers.filter(s => isMcpServerEnabled(s.name)).length;
   const total = servers.length;
   const showBadge = total > 0 && enabledCount < total;
+  const handleOAuthClick = (serverName: string) => {
+    if (!onInitiateOAuth) return;
+    setAuthErrors(errors => {
+      const next = { ...errors };
+      delete next[serverName];
+      return next;
+    });
+    setSigningInServer(serverName);
+    void onInitiateOAuth(serverName)
+      .catch(error => {
+        setAuthErrors(errors => ({
+          ...errors,
+          [serverName]: error instanceof Error ? error.message : String(error),
+        }));
+      })
+      .finally(() => {
+        setSigningInServer(null);
+      });
+  };
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -84,25 +130,31 @@ export const McpPicker: React.FC = () => {
           ) : (
             servers.map(server => {
               const enabled = isMcpServerEnabled(server.name);
+              const state = getRuntimeState(runtimeStates, server.name);
+              const showOAuthAction = enabled && onInitiateOAuth && needsOAuthAction(server, state);
+              const isSigningIn = signingInServer === server.name;
+              const authError = authErrors[server.name];
               return (
-                <button
+                <div
                   key={server.name}
-                  onClick={() => toggleMcpServer(server.name)}
                   className={cn(
                     'flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
                     !enabled && 'opacity-50'
                   )}
-                  aria-pressed={enabled}
-                  aria-label={server.name}
-                  title={enabled ? `Disable ${server.name}` : `Enable ${server.name}`}
                 >
-                  <div
-                    className={cn(
-                      'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border',
-                      enabled
-                        ? 'border-[var(--vscode-textLink-foreground)] bg-[var(--vscode-textLink-foreground)]/10'
-                        : 'border-border'
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => toggleMcpServer(server.name)}
+                    className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border"
+                    style={{
+                      borderColor: enabled ? 'var(--vscode-textLink-foreground)' : undefined,
+                      backgroundColor: enabled
+                        ? 'color-mix(in srgb, var(--vscode-textLink-foreground) 10%, transparent)'
+                        : undefined,
+                    }}
+                    aria-pressed={enabled}
+                    aria-label={server.name}
+                    title={enabled ? `Disable ${server.name}` : `Enable ${server.name}`}
                   >
                     {enabled && (
                       <Codicon
@@ -110,7 +162,7 @@ export const McpPicker: React.FC = () => {
                         className="text-xs text-[var(--vscode-textLink-foreground)]"
                       />
                     )}
-                  </div>
+                  </button>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-foreground">{server.name}</div>
                     {server.description && (
@@ -121,8 +173,37 @@ export const McpPicker: React.FC = () => {
                     <div className="text-xs text-muted-foreground opacity-70">
                       {server.transport === 'stdio' ? server.command : server.url}
                     </div>
+                    {state?.status && state.status !== 'stopped' && (
+                      <div className="text-xs text-muted-foreground">
+                        Status: {state.status}
+                        {state.error ? ` — ${state.error}` : ''}
+                      </div>
+                    )}
+                    {authError && signingInServer === null && state?.status !== 'connected' && (
+                      <div className="text-xs text-[var(--vscode-errorForeground)]">
+                        {authError}
+                      </div>
+                    )}
                   </div>
-                </button>
+                  {showOAuthAction && (
+                    <button
+                      type="button"
+                      className="shrink-0 rounded px-2 py-0.5 text-xs text-[var(--vscode-button-foreground)]"
+                      style={{ backgroundColor: 'var(--vscode-button-background)' }}
+                      disabled={isSigningIn}
+                      onClick={event => {
+                        event.stopPropagation();
+                        handleOAuthClick(server.name);
+                      }}
+                    >
+                      {isSigningIn
+                        ? 'Signing in...'
+                        : state?.status === 'failed' || state?.status === 'error'
+                          ? 'Retry sign in'
+                          : 'Sign in'}
+                    </button>
+                  )}
+                </div>
               );
             })
           )}

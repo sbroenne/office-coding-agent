@@ -196,6 +196,13 @@ export class BrowserCopilotSession {
     });
   }
 
+  async initiateMcpOAuth(serverName: string): Promise<McpOAuthResult> {
+    return this.connection.sendRequest<McpOAuthResult>('mcp.initiateOAuth', {
+      sessionId: this.sessionId,
+      serverName,
+    });
+  }
+
   async destroy(): Promise<void> {
     await this.connection.sendRequest('session.destroy', {
       sessionId: this.sessionId,
@@ -209,9 +216,23 @@ export class BrowserCopilotSession {
 /** MCP status notification payload */
 export interface McpStatusPayload {
   server: string;
-  status: 'stopped' | 'starting' | 'connected' | 'error';
+  status:
+    | 'stopped'
+    | 'starting'
+    | 'connected'
+    | 'needs-auth'
+    | 'pending'
+    | 'disabled'
+    | 'not_configured'
+    | 'failed'
+    | 'error';
   error?: string;
 }
+
+export type McpOAuthResult =
+  | { status: 'success'; authorizationUrl?: string }
+  | { status: 'public' }
+  | { status: 'error'; message: string };
 
 /** MCP log notification payload */
 export interface McpLogPayload {

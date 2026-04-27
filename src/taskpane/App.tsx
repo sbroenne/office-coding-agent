@@ -172,6 +172,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    initiateMcpOAuth,
     enqueue,
     queuedPrompts,
     dequeue,
@@ -227,6 +228,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               onSend={send}
               onCancel={cancel}
               onSwitchModel={switchModel}
+              onInitiateMcpOAuth={initiateMcpOAuth}
               onEnqueue={enqueue}
               queuedPrompts={queuedPrompts}
               onDequeue={dequeue}

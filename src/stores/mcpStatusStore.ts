@@ -42,10 +42,12 @@ export const useMcpStatusStore = create<McpStatusState>()(set => ({
     set(state => {
       const servers = ensureServer(state.servers, name);
       const current = servers[name];
+      const nextError =
+        status === 'error' || status === 'failed' ? (error ?? current.error) : undefined;
       return {
         servers: {
           ...servers,
-          [name]: { ...current, status, error: error ?? undefined },
+          [name]: { ...current, status, error: nextError },
         },
       };
     });

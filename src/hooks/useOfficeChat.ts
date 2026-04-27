@@ -981,6 +981,21 @@ export function useOfficeChat(host: OfficeHostApp) {
     void respondPermission('approved');
   }, [addPermissionRule, pendingPermission, respondPermission]);
 
+  const initiateMcpOAuth = useCallback(async (serverName: string) => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Open a chat session before signing in to an MCP server.');
+    }
+
+    const result = await session.initiateMcpOAuth(serverName);
+    if (result.status === 'error') {
+      throw new Error(result.message);
+    }
+    if (result.status === 'success' && result.authorizationUrl) {
+      window.open(result.authorizationUrl, '_blank', 'noopener,noreferrer');
+    }
+  }, []);
+
   const compactSession = useCallback(async () => {
     const session = sessionRef.current;
     if (session) {
@@ -1039,6 +1054,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    initiateMcpOAuth,
     compactSession,
     switchModel,
     enqueue,

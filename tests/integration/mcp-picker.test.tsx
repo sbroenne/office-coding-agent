@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
 import { McpPicker } from '@/components/McpPicker';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useMcpStatusStore } from '@/stores/mcpStatusStore';
 
 const MOCK_SERVERS = [
   { name: 'workiq', description: 'WorkIQ MCP server', transport: 'http' as const, url: 'http://localhost:3001' },
@@ -18,6 +19,7 @@ const MOCK_SERVERS = [
 
 beforeEach(() => {
   useSettingsStore.getState().reset();
+  useMcpStatusStore.getState().clearAll();
   vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     json: async () => ({ servers: MOCK_SERVERS }),
@@ -110,5 +112,87 @@ describe('Integration: McpPicker', () => {
 
     // Only one powerbi entry (the bundled one)
     expect(screen.getAllByText('powerbi')).toHaveLength(1);
+  });
+
+  it('shows a sign-in action for auth-required remote MCP servers', async () => {
+    const initiateOAuth = vi.fn().mockResolvedValue(undefined);
+    useMcpStatusStore.getState().setStatus('powerbi', 'needs-auth');
+
+    renderWithProviders(<McpPicker onInitiateOAuth={initiateOAuth} />);
+    await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
+
+    expect(initiateOAuth).toHaveBeenCalledWith('powerbi');
+  });
+
+  it('matches auth status when SDK events use normalized server keys', async () => {
+    const initiateOAuth = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        servers: [
+          {
+            name: 'Power BI MCP',
+            description: 'Power BI MCP server',
+            transport: 'http' as const,
+            url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
+          },
+        ],
+      }),
+    } as Response);
+    useMcpStatusStore.getState().setStatus('power_bi_mcp', 'needs-auth');
+
+    renderWithProviders(<McpPicker onInitiateOAuth={initiateOAuth} />);
+    await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
+
+    expect(initiateOAuth).toHaveBeenCalledWith('Power BI MCP');
+  });
+
+  it('shows retry sign-in for failed remote MCP servers', async () => {
+    const initiateOAuth = vi.fn().mockResolvedValue(undefined);
+    useMcpStatusStore.getState().setStatus('powerbi', 'failed', 'Authentication required');
+
+    renderWithProviders(<McpPicker onInitiateOAuth={initiateOAuth} />);
+    await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
+
+    expect(await screen.findByText('Status: failed — Authentication required')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry sign in' }));
+
+    expect(initiateOAuth).toHaveBeenCalledWith('powerbi');
+  });
+
+  it('scopes OAuth sign-in errors to the server that failed', async () => {
+    const initiateOAuth = vi.fn().mockRejectedValue(new Error('OAuth failed'));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        servers: [
+          {
+            name: 'powerbi',
+            description: 'Power BI MCP server',
+            transport: 'http' as const,
+            url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
+          },
+          {
+            name: 'custom-api',
+            description: 'Custom API server',
+            transport: 'http' as const,
+            url: 'https://api.example.com/mcp',
+          },
+        ],
+      }),
+    } as Response);
+    useMcpStatusStore.getState().setStatus('powerbi', 'needs-auth');
+    useMcpStatusStore.getState().setStatus('custom-api', 'needs-auth');
+
+    renderWithProviders(<McpPicker onInitiateOAuth={initiateOAuth} />);
+    await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Sign in' }))[0]);
+
+    expect(await screen.findByText('OAuth failed')).toBeInTheDocument();
+    expect(screen.getAllByText('OAuth failed')).toHaveLength(1);
   });
 });
