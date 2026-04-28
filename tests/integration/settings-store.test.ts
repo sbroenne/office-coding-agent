@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { CopilotModel } from '@/types';
+import type { CopilotAgent, CopilotModel } from '@/types';
 
 const TEST_MODELS: CopilotModel[] = [
   { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
   { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
+];
+
+const TEST_AGENTS: CopilotAgent[] = [
+  { name: 'office-excel', displayName: 'Office Excel', description: 'Excel agent' },
+  { name: 'office-word', displayName: 'Office Word', description: 'Word agent' },
 ];
 
 beforeEach(() => {
@@ -40,6 +45,38 @@ describe('settingsStore — model', () => {
     useSettingsStore.getState().setActiveModel('gpt-4.1');
     useSettingsStore.getState().reset();
     expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+  });
+});
+
+// ─── CLI agent management ───
+
+describe('settingsStore — CLI agents', () => {
+  it('starts with the default agent selected', () => {
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
+  });
+
+  it('setActiveAgent accepts any agent when availableAgents is null', () => {
+    useSettingsStore.getState().setActiveAgent('office-excel');
+    expect(useSettingsStore.getState().activeAgentName).toBe('office-excel');
+  });
+
+  it('setActiveAgent validates against availableAgents when set', () => {
+    useSettingsStore.getState().setAvailableAgents(TEST_AGENTS);
+    useSettingsStore.getState().setActiveAgent('unknown-agent');
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
+  });
+
+  it('setActiveAgent accepts a valid CLI agent name from availableAgents', () => {
+    useSettingsStore.getState().setAvailableAgents(TEST_AGENTS);
+    useSettingsStore.getState().setActiveAgent('office-word');
+    expect(useSettingsStore.getState().activeAgentName).toBe('office-word');
+  });
+
+  it('setActiveAgent(null) returns to default agent', () => {
+    useSettingsStore.getState().setAvailableAgents(TEST_AGENTS);
+    useSettingsStore.getState().setActiveAgent('office-excel');
+    useSettingsStore.getState().setActiveAgent(null);
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
   });
 });
 

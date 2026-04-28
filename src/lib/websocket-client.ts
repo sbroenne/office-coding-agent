@@ -55,6 +55,12 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   disabledSkills?: string[];
 }
 
+export interface AgentInfo {
+  name: string;
+  displayName: string;
+  description: string;
+}
+
 /**
  * Browser-compatible Copilot session over WebSocket.
  */
@@ -176,6 +182,27 @@ export class BrowserCopilotSession {
     await this.connection.sendRequest('model.switch', {
       sessionId: this.sessionId,
       model: modelId,
+    });
+  }
+
+  async listAgents(): Promise<AgentInfo[]> {
+    const result = await this.connection.sendRequest<{ agents: AgentInfo[] }>('agent.list', {
+      sessionId: this.sessionId,
+    });
+    return result.agents;
+  }
+
+  async selectAgent(agentName: string): Promise<AgentInfo> {
+    const result = await this.connection.sendRequest<{ agent: AgentInfo }>('agent.select', {
+      sessionId: this.sessionId,
+      name: agentName,
+    });
+    return result.agent;
+  }
+
+  async deselectAgent(): Promise<void> {
+    await this.connection.sendRequest('agent.deselect', {
+      sessionId: this.sessionId,
     });
   }
 
@@ -313,6 +340,7 @@ export class WebSocketCopilotClient {
       availableTools: config.availableTools,
       host: config.host,
       disabledSkills: config.disabledSkills,
+      agent: config.agent,
     });
 
     const sessionId = response.sessionId;

@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
-import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
+import type {
+  AgentInfo,
+  WebSocketCopilotClient,
+  BrowserCopilotSession,
+} from '@/lib/websocket-client';
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
@@ -60,6 +64,29 @@ async function loadAvailableModels(client: WebSocketCopilotClient): Promise<void
   }
 }
 
+/** Fetch CLI-owned agents from the active Copilot session and update the store. */
+async function loadAvailableAgents(session: BrowserCopilotSession): Promise<void> {
+  try {
+    if (typeof session.listAgents !== 'function') {
+      useSettingsStore.getState().setAvailableAgents([]);
+      return;
+    }
+    const agents = await withTimeout(session.listAgents(), MODEL_FETCH_TIMEOUT_MS, 'agent.list');
+    useSettingsStore.getState().setAvailableAgents(agents);
+
+    const { activeAgentName } = useSettingsStore.getState();
+    if (activeAgentName && !agents.some(agent => agent.name === activeAgentName)) {
+      console.warn(
+        `[useOfficeChat] activeAgent '${activeAgentName}' not in available CLI agents, switching to default`
+      );
+      useSettingsStore.getState().setActiveAgent(null);
+    }
+  } catch (err) {
+    console.warn('[useOfficeChat] Failed to load available agents:', err);
+    useSettingsStore.getState().setAvailableAgents([]);
+  }
+}
+
 function getWsUrl(): string {
   if (typeof window === 'undefined') return 'wss://localhost:3000/api/copilot';
   const { hostname, protocol, host } = window.location;
@@ -74,6 +101,7 @@ function getWsUrl(): string {
 
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
+  const activeAgentName = useSettingsStore(s => s.activeAgentName);
   const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
   const sessions = useSessionHistoryStore(s => s.sessions);
@@ -100,11 +128,13 @@ export function useOfficeChat(host: OfficeHostApp) {
   // tear down and restart the Copilot session, losing all conversation context.
   // Model changes take effect on the next new conversation (same as VS Code Copilot).
   const activeModelRef = useRef(activeModel);
+  const activeAgentNameRef = useRef(activeAgentName);
   const disabledSkillNamesRef = useRef(disabledSkillNames);
   const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
+  activeAgentNameRef.current = activeAgentName;
   disabledSkillNamesRef.current = disabledSkillNames;
   disabledMcpServerNamesRef.current = disabledMcpServerNames;
   evaluatePermissionRef.current = evaluatePermission;
@@ -274,6 +304,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           mcpServers,
           host,
           disabledSkills,
+          agent: activeAgentNameRef.current ?? undefined,
         }),
         60_000,
         'session.create'
@@ -305,6 +336,7 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       // Fetch available models (non-blocking, with timeout)
       void loadAvailableModels(client);
+      void loadAvailableAgents(session);
     } catch (err) {
       // If superseded by a newer init, silently bail
       if (initCounterRef.current !== thisInit) return;
@@ -1049,6 +1081,33 @@ export function useOfficeChat(host: OfficeHostApp) {
     [activeModel]
   );
 
+  /**
+   * Switch to a different Copilot CLI-owned agent mid-session.
+   * Passing null returns to the default agent.
+   */
+  const switchAgent = useCallback(async (agentName: string | null) => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Cannot switch agent: no active session');
+    }
+
+    try {
+      let selected: AgentInfo | null = null;
+      if (agentName === null) {
+        console.log('[chat] Switching agent to default');
+        await session.deselectAgent();
+      } else {
+        console.log(`[chat] Switching agent to ${agentName}`);
+        selected = await session.selectAgent(agentName);
+      }
+      useSettingsStore.getState().setActiveAgent(selected?.name ?? null);
+      console.log(`[chat] Agent switched successfully to ${selected?.name ?? 'default'}`);
+    } catch (err) {
+      console.error('[chat] Failed to switch agent:', err);
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }, []);
+
   return {
     messages,
     isRunning,
@@ -1072,6 +1131,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     dismissMcpOAuthPrompt,
     compactSession,
     switchModel,
+    switchAgent,
     enqueue,
     queuedPrompts,
     dequeue,

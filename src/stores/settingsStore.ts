@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { CopilotModel, UserSettings } from '@/types';
+import type { CopilotAgent, CopilotModel, UserSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
 import { officeStorage } from './officeStorage';
 
@@ -10,6 +10,12 @@ interface SettingsState extends UserSettings {
   availableModels: CopilotModel[] | null;
   setAvailableModels: (models: CopilotModel[]) => void;
   setActiveModel: (modelId: string) => void;
+
+  // ─── CLI agent management ───
+  /** Agents discovered from the Copilot CLI (cached across sessions) */
+  availableAgents: CopilotAgent[] | null;
+  setAvailableAgents: (agents: CopilotAgent[]) => void;
+  setActiveAgent: (agentName: string | null) => void;
 
   // ─── Skill management ───
   toggleSkill: (name: string) => void;
@@ -29,6 +35,7 @@ export const useSettingsStore = create<SettingsState>()(
       // ─── Initial state ───
       ...DEFAULT_SETTINGS,
       availableModels: null,
+      availableAgents: null,
 
       // ─── Model management ───
       setAvailableModels: models => {
@@ -39,6 +46,18 @@ export const useSettingsStore = create<SettingsState>()(
         const models = get().availableModels;
         if (!models || models.some(m => m.id === modelId)) {
           set({ activeModel: modelId });
+        }
+      },
+
+      // ─── CLI agent management ───
+      setAvailableAgents: agents => {
+        set({ availableAgents: agents });
+      },
+
+      setActiveAgent: agentName => {
+        const agents = get().availableAgents;
+        if (agentName === null || !agents || agents.some(a => a.name === agentName)) {
+          set({ activeAgentName: agentName });
         }
       },
 
@@ -72,7 +91,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       // ─── Reset ───
       reset: () => {
-        set({ ...DEFAULT_SETTINGS });
+        set({ ...DEFAULT_SETTINGS, availableModels: null, availableAgents: null });
       },
     }),
     {
@@ -80,6 +99,7 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => officeStorage),
       partialize: state => ({
         activeModel: state.activeModel,
+        activeAgentName: state.activeAgentName,
         disabledSkillNames: state.disabledSkillNames,
         disabledMcpServerNames: state.disabledMcpServerNames,
       }),

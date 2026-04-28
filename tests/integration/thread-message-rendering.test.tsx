@@ -41,11 +41,20 @@ function makeFakeSession(events: SessionEvent[]) {
     registerTools: vi.fn(),
     getToolHandler: vi.fn(),
     respondPermission: vi.fn().mockResolvedValue(undefined),
+    setModel: vi.fn().mockResolvedValue(undefined),
+    listAgents: vi.fn().mockResolvedValue([]),
+    selectAgent: vi.fn().mockResolvedValue({
+      name: 'office-excel',
+      displayName: 'Office Excel',
+      description: 'Excel agent',
+    }),
+    deselectAgent: vi.fn().mockResolvedValue(undefined),
+    compact: vi.fn().mockResolvedValue(undefined),
     _dispatchEvent: vi.fn() as EventEmitter,
   };
 }
 
-function makeFakeClient(session: ReturnType<typeof makeFakeSession>) {
+function makeFakeClient(session: unknown) {
   return {
     start: vi.fn().mockResolvedValue(undefined),
     createSession: vi.fn().mockResolvedValue(session),
@@ -421,7 +430,7 @@ describe('Thread – AssistantMessage rendering', () => {
       respondPermission: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -494,7 +503,7 @@ describe('Thread – AssistantMessage rendering', () => {
       compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -560,7 +569,7 @@ describe('Thread – AssistantMessage rendering', () => {
       respondPermission: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -733,7 +742,7 @@ describe('Working box spinner between tool steps (thinking gap fix)', () => {
       compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -809,7 +818,7 @@ describe('Working box spinner between tool steps (thinking gap fix)', () => {
       compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -885,7 +894,7 @@ describe('Working box spinner between tool steps (thinking gap fix)', () => {
       compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -956,7 +965,7 @@ describe('Working box spinner between tool steps (thinking gap fix)', () => {
       compact: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -1249,7 +1258,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       respondPermission: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();
@@ -1318,7 +1327,7 @@ describe('Tool-call visual ordering (VS Code layout: tools above text)', () => {
       respondPermission: vi.fn().mockResolvedValue(undefined),
       _dispatchEvent: vi.fn(),
     };
-    const client = makeFakeClient(pausingSession as ReturnType<typeof makeFakeSession>);
+    const client = makeFakeClient(pausingSession);
     mockCreate.mockResolvedValue(client as never);
 
     const { getHook } = renderThreadWithHook();

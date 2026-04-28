@@ -1,5 +1,6 @@
 import React from 'react';
 import { MessageList } from '@/components/chat/MessageList';
+import { AgentPicker } from './AgentPicker';
 import { ModelPicker } from './ModelPicker';
 import { McpPicker } from './McpPicker';
 import type { McpOAuthPromptRequest } from './McpOAuthPrompt';
@@ -11,6 +12,7 @@ interface ChatPanelProps {
   onSend: (text: string) => void | Promise<void>;
   onCancel: () => void;
   onSwitchModel?: (modelId: string) => Promise<void>;
+  onSwitchAgent?: (agentName: string | null) => Promise<void>;
   onInitiateMcpOAuth?: (serverName: string, loginHint?: string) => Promise<string | undefined>;
   onOpenMcpOAuthPrompt?: (request: McpOAuthPromptRequest) => void;
   onEnqueue?: (text: string) => void;
@@ -24,6 +26,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onSend,
   onCancel,
   onSwitchModel,
+  onSwitchAgent,
   onInitiateMcpOAuth,
   onOpenMcpOAuthPrompt,
   onEnqueue,
@@ -47,7 +50,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           /* TODO */
         }}
         leftToolbar={
-          <ModelPicker hasActiveSession={messages.length > 0} onSwitchModel={onSwitchModel} />
+          <>
+            <AgentPicker onSwitchAgent={onSwitchAgent} />
+            <ModelPicker hasActiveSession={messages.length > 0} onSwitchModel={onSwitchModel} />
+          </>
         }
         rightToolbar={
           <McpPicker

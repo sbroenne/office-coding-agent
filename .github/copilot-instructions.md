@@ -88,7 +88,7 @@ The add-in uses a split prompt architecture with host targeting:
 - **`src/services/ai/prompts/*_APP_PROMPT.md`** — host-level app prompt (Excel/PowerPoint/Word/Outlook)
 - Instructions = `buildSystemPrompt(host) + memory context`
 
-Agents are owned by the Copilot CLI. The add-in does not ship `src/agents/*/AGENT.md`, parse agent frontmatter, render an Agent picker, persist an active agent, or pass browser-owned `customAgents` into `session.create`. The required Office agents are installed through the Office Coding Agent CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) during startup bootstrap.
+Agents are owned by the Copilot CLI. The add-in does not ship `src/agents/*/AGENT.md`, parse agent frontmatter, or pass browser-owned `customAgents` into `session.create`. It does render an Agent picker, but that picker lists/selects CLI-owned agents through the SDK session agent RPC and persists only the selected CLI agent name. The required Office agents are installed through the Office Coding Agent CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) during startup bootstrap.
 
 ### Skills System
 

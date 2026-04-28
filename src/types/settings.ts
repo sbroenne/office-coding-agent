@@ -8,6 +8,13 @@ export interface CopilotModel {
   provider: ModelProvider;
 }
 
+/** A Copilot CLI-owned agent option */
+export interface CopilotAgent {
+  name: string;
+  displayName: string;
+  description: string;
+}
+
 /** Infer provider from model ID prefix */
 export function inferProvider(modelId: string): ModelProvider {
   if (modelId.startsWith('claude')) return 'Anthropic';
@@ -26,6 +33,8 @@ export function inferProvider(modelId: string): ModelProvider {
 export interface UserSettings {
   /** Currently selected Copilot model ID */
   activeModel: string;
+  /** Currently selected Copilot CLI agent name. Null = default agent. */
+  activeAgentName: string | null;
   /** Skill names explicitly disabled by the user. Empty = all enabled. */
   disabledSkillNames: string[];
   /** MCP server names explicitly disabled by the user. Empty = all enabled. */
@@ -35,6 +44,7 @@ export interface UserSettings {
 /** Default settings applied on first run */
 export const DEFAULT_SETTINGS: UserSettings = {
   activeModel: 'claude-sonnet-4.6',
+  activeAgentName: null,
   disabledSkillNames: [],
   disabledMcpServerNames: [],
 };

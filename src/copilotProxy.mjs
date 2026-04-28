@@ -372,6 +372,7 @@ async function handleConnection(ws) {
           mcpServers,
           availableTools,
           disabledSkills,
+          agent,
         } = params || {};
         const systemMessage = systemMessageParam;
         console.log(
@@ -415,6 +416,7 @@ async function handleConnection(ws) {
             tools,
             mcpServers,
             availableTools,
+            agent: typeof agent === 'string' && agent.length > 0 ? agent : undefined,
             disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
@@ -470,6 +472,59 @@ async function handleConnection(ws) {
         eventUnsubs.set(session.sessionId, unsub);
 
         sendResponse(id, { sessionId: session.sessionId });
+        break;
+      }
+
+      case 'agent.list': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.agent.list());
+        } catch (err) {
+          console.error('[proxy] agent.list failed:', err);
+          sendError(id, -32603, err.message || 'Failed to list agents');
+        }
+        break;
+      }
+
+      case 'agent.select': {
+        const { sessionId, name } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        if (typeof name !== 'string' || name.trim().length === 0) {
+          sendError(id, -32602, 'Agent name is required');
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.agent.select({ name }));
+        } catch (err) {
+          console.error('[proxy] agent.select failed:', err);
+          sendError(id, -32603, err.message || 'Failed to select agent');
+        }
+        break;
+      }
+
+      case 'agent.deselect': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.rpc.agent.deselect();
+          sendResponse(id, {});
+        } catch (err) {
+          console.error('[proxy] agent.deselect failed:', err);
+          sendError(id, -32603, err.message || 'Failed to deselect agent');
+        }
         break;
       }
 

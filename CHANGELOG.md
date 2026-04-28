@@ -9,4 +9,4 @@
 - Added one-command local desktop startup via `npm run start:dev:desktop`, which starts the dev server and then sideloads the add-in.
 - Added authenticated remote MCP server recovery with SDK-owned OAuth, login-hint support, foreground sign-in prompts, and MCP picker Sign in/Retry/Switch account actions.
 - Switched MCP server discovery and session wiring to `copilot mcp list --json` so the picker and active Copilot session match the user's CLI MCP config.
-- Removed app-owned agents, the Agent picker, active-agent persistence, local agent frontmatter parsing, agent ZIP import/export helpers, and browser-provided `customAgents`; Office agents are installed and owned by the Copilot CLI plugins.
+- Removed app-owned agent files, local agent frontmatter parsing, agent ZIP import/export helpers, and browser-provided `customAgents`; the Agent picker now selects CLI-owned agents installed by the Copilot CLI plugins.

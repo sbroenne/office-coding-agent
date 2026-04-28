@@ -24,8 +24,8 @@ test.describe('Chat UI (fresh launch)', () => {
     await expect(taskpane.getByPlaceholder('Send a message...')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('does not show an add-in-owned agent picker', async ({ taskpane }) => {
-    await expect(taskpane.getByRole('button', { name: 'Select agent' })).toHaveCount(0, {
+  test('shows the CLI-backed agent picker', async ({ taskpane }) => {
+    await expect(taskpane.getByRole('button', { name: 'Select agent' })).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -76,8 +76,10 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 5000 });
   });
 
-  test('does not display an add-in-owned agent picker', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByRole('button', { name: 'Select agent' })).toHaveCount(0);
+  test('displays the CLI-backed agent picker', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Select agent' })).toBeVisible();
+    await page.getByRole('button', { name: 'Select agent' }).click();
+    await expect(page.getByText('Agents')).toBeVisible();
   });
 
   test('new conversation button is clickable', async ({ configuredTaskpane: page }) => {

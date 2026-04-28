@@ -165,6 +165,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     clearMessages,
     compactSession,
     switchModel,
+    switchAgent,
     restoreSession,
     deleteSession,
     sessions,
@@ -232,6 +233,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               onSend={send}
               onCancel={cancel}
               onSwitchModel={switchModel}
+              onSwitchAgent={switchAgent}
               onInitiateMcpOAuth={initiateMcpOAuth}
               onOpenMcpOAuthPrompt={openMcpOAuthPrompt}
               onEnqueue={enqueue}

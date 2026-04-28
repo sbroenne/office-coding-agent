@@ -3,7 +3,7 @@
  *
  * Renders ChatPanel with real ModelPicker and McpPicker
  * but mocks MessageList since it requires full chat state.
- * Tests verify ModelPicker in left toolbar and McpPicker (server icon) in right toolbar.
+ * Tests verify AgentPicker + ModelPicker in left toolbar and McpPicker in right toolbar.
  *
  * Note: plugin help lives in ChatHeader, not here.
  */
@@ -55,10 +55,11 @@ describe('ChatPanel — integration', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders MessageList with model picker and MCP server button', async () => {
+  it('renders MessageList with CLI agent picker, model picker, and MCP server button', async () => {
     renderWithProviders(<ChatPanel {...DEFAULT_PROPS} />);
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
     expect(screen.getByTestId('message-list')).toBeInTheDocument();
+    expect(screen.getByLabelText('Select agent')).toBeInTheDocument();
     // ModelPicker renders with its aria-label in the left toolbar
     expect(screen.getByLabelText('Select model')).toBeInTheDocument();
     // McpPicker renders with server icon in the right toolbar (NOT the Plugins button)
@@ -70,8 +71,9 @@ describe('ChatPanel — integration', () => {
   it('passes leftToolbar and rightToolbar slots to MessageList', async () => {
     renderWithProviders(<ChatPanel {...DEFAULT_PROPS} />);
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    // Left slot contains model picker
+    // Left slot contains CLI agent picker and model picker
     const leftSlot = screen.getByTestId('left-toolbar');
+    expect(leftSlot).toContainElement(screen.getByLabelText('Select agent'));
     expect(leftSlot).toContainElement(screen.getByLabelText('Select model'));
     // Right slot contains the MCP server picker button
     const rightSlot = screen.getByTestId('right-toolbar');

@@ -360,7 +360,7 @@ Remote HTTP/SSE servers that require authentication can be recovered from the ta
 
 #### Agents
 
-Agents are CLI-owned. The add-in no longer ships `src/agents/*/AGENT.md`, no longer renders an Agent picker, and no longer passes browser-owned `customAgents` into `session.create`. The Office agents are installed with the required Office Coding Agent CLI plugins.
+Agents are CLI-owned. The add-in no longer ships `src/agents/*/AGENT.md` and no longer passes browser-owned `customAgents` into `session.create`. The task pane Agent picker lists/selects CLI-owned agents through the SDK session agent RPC; the Office agents are installed with the required Office Coding Agent CLI plugins.
 
 ### Key Hooks and Components
 

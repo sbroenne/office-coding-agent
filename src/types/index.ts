@@ -1,4 +1,4 @@
-export type { CopilotModel, ModelProvider, UserSettings } from './settings';
+export type { CopilotAgent, CopilotModel, ModelProvider, UserSettings } from './settings';
 export { DEFAULT_SETTINGS, inferProvider } from './settings';
 export type {
   ChatMessage,

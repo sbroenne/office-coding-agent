@@ -36,13 +36,20 @@ function makeFakeSession(events: SessionEvent[]) {
     getToolHandler: vi.fn(),
     respondPermission: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
+    listAgents: vi.fn().mockResolvedValue([]),
+    selectAgent: vi.fn().mockResolvedValue({
+      name: 'office-excel',
+      displayName: 'Office Excel',
+      description: 'Excel agent',
+    }),
+    deselectAgent: vi.fn().mockResolvedValue(undefined),
     compact: vi.fn().mockResolvedValue(undefined),
     _dispatchEvent: vi.fn() as EventEmitter,
   };
 }
 
 function makeFakeClient(
-  session: ReturnType<typeof makeFakeSession>,
+  session: unknown,
   models: { id: string; name: string }[] = []
 ) {
   return {
@@ -836,6 +843,23 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.customAgents).toBeUndefined();
+  });
+
+  it('passes selected CLI-owned agent name into session creation', async () => {
+    useSettingsStore.getState().setActiveAgent('office-excel');
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('excel'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.agent).toBe('office-excel');
     expect(config.customAgents).toBeUndefined();
   });
 
