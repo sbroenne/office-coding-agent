@@ -18,6 +18,20 @@ function validate(schema: unknown, data: unknown): { success: boolean } {
   return { success: !!fn(data) };
 }
 
+/** Assert every array schema declares items, as required by Copilot function schemas. */
+function expectArraySchemasDeclareItems(schema: unknown, path = 'parameters'): void {
+  if (!schema || typeof schema !== 'object') return;
+
+  const node = schema as Record<string, unknown>;
+  if (node.type === 'array') {
+    expect(node, `${path} array schema`).toHaveProperty('items');
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    expectArraySchemasDeclareItems(value, `${path}.${key}`);
+  }
+}
+
 /** Look up an Excel tool by name */
 const toolsByName = Object.fromEntries(excelTools.map(t => [t.name, t]));
 
@@ -59,6 +73,12 @@ describe('Integration: Excel tool configs — structural', () => {
         expect(tool.parameters).toBeDefined();
         expect(typeof tool.handler).toBe('function');
       }
+    }
+  });
+
+  it('every generated schema declares items for array parameters', () => {
+    for (const tool of excelTools) {
+      expectArraySchemasDeclareItems(tool.parameters, tool.name);
     }
   });
 });
