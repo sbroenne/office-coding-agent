@@ -25,11 +25,17 @@ function getApp() {
 }
 
 function runNpmScript(scriptName) {
-  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const result = spawnSync(npmCommand, ['run', scriptName], {
+  const command =
+    process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
+  const args =
+    process.platform === 'win32' ? ['/d', '/c', 'npm', 'run', scriptName] : ['run', scriptName];
+  const result = spawnSync(command, args, {
     cwd: PROJECT_ROOT,
-    stdio: 'inherit',
+    encoding: 'utf8',
   });
+
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
 
   if (result.error) {
     throw result.error;
