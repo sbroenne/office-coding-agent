@@ -5,13 +5,13 @@ import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
 import { resolveActiveAgent, getDefaultAgent, getAgents } from '@/services/agents';
-import { toSdkMcpServers } from '@/services/mcp';
+import { fetchConfiguredMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
 import { buildSessionSystemPrompt } from '@/services/ai/systemPrompt';
-import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
+import { inferProvider } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
@@ -284,8 +284,8 @@ export function useOfficeChat(host: OfficeHostApp) {
             }))
           : undefined;
 
-      // Resolve active MCP servers: bundled list → agent allowlist filter → user disable filter.
-      let activeServers = [...BUNDLED_MCP_SERVERS];
+      // Resolve active MCP servers from the Copilot CLI config, then apply agent/user filters.
+      let activeServers = await fetchConfiguredMcpServers();
       if (resolvedAgent?.metadata.mcpServers !== undefined) {
         const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
         activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));

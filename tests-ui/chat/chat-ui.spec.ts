@@ -1,4 +1,14 @@
+import { execFileSync } from 'node:child_process';
 import { test, expect } from '../fixtures';
+
+function getCliMcpServerNames(): string[] {
+  const stdout = execFileSync('copilot', ['mcp', 'list', '--json'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const parsed = JSON.parse(stdout) as { mcpServers?: Record<string, unknown> };
+  return Object.keys(parsed.mcpServers ?? {});
+}
 
 test.describe('Chat UI (fresh launch)', () => {
   test('renders header controls with no pre-seeded settings', async ({ taskpane }) => {
@@ -43,13 +53,18 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'MCP servers' })).toBeVisible();
   });
 
-  test('MCP servers popover lists workiq and powerbi bundled servers', async ({
-    configuredTaskpane: page,
-  }) => {
+  test('MCP servers popover matches the Copilot CLI config', async ({ configuredTaskpane: page }) => {
+    const cliServerNames = getCliMcpServerNames();
+
     await page.getByRole('button', { name: 'MCP servers' }).click();
-    // Both bundled MCP servers must appear in the popover
-    await expect(page.getByRole('button', { name: 'workiq' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('button', { name: 'powerbi' })).toBeVisible({ timeout: 5000 });
+    if (cliServerNames.length === 0) {
+      await expect(page.getByText('No MCP servers available.')).toBeVisible({ timeout: 5000 });
+      return;
+    }
+
+    for (const serverName of cliServerNames) {
+      await expect(page.getByRole('button', { name: serverName })).toBeVisible({ timeout: 5000 });
+    }
   });
 
   test('does not show the removed skill picker button', async ({ configuredTaskpane: page }) => {

@@ -1,5 +1,3 @@
-import type { McpServerConfig } from './mcp';
-
 /** Provider labels for grouping models in the picker */
 export type ModelProvider = 'Anthropic' | 'OpenAI' | 'Google' | 'Other';
 
@@ -43,20 +41,3 @@ export const DEFAULT_SETTINGS: UserSettings = {
   disabledSkillNames: [],
   disabledMcpServerNames: [],
 };
-
-/** Built-in MCP servers that ship with the add-in. Non-removable, but toggleable. */
-export const BUNDLED_MCP_SERVERS: McpServerConfig[] = [
-  {
-    name: 'workiq',
-    description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams',
-    transport: 'stdio',
-    command: 'npx',
-    args: ['-y', '@microsoft/workiq', 'mcp'],
-  },
-  {
-    name: 'powerbi',
-    description: 'Power BI — query semantic models, generate DAX, explore data',
-    transport: 'http',
-    url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
-  },
-];

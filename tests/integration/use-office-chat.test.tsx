@@ -91,6 +91,10 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('useOfficeChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ servers: [] }),
+    } as Response);
     useSettingsStore.getState().reset();
     useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
   });
@@ -766,7 +770,20 @@ describe('useOfficeChat', () => {
 
   // ─── MCP wiring ────────────────────────────────────────────────────────────
 
-  it('includes bundled MCP servers by default (even with no imported servers)', async () => {
+  it('passes Copilot CLI MCP servers into session creation', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        servers: [
+          {
+            name: 's360-breeze',
+            transport: 'stdio',
+            command: 'C:\\Users\\me\\agency.exe',
+            args: ['mcp', 'remote', '--url', 'https://mcp.example.com'],
+          },
+        ],
+      }),
+    } as Response);
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -778,8 +795,14 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    // Bundled servers (e.g. WorkIQ) are included by default
-    expect(config.mcpServers).toBeDefined();
+    expect(config.mcpServers).toEqual({
+      's360-breeze': {
+        type: 'stdio',
+        command: 'C:\\Users\\me\\agency.exe',
+        args: ['mcp', 'remote', '--url', 'https://mcp.example.com'],
+        tools: ['*'],
+      },
+    });
   });
 
   // ─── Per-agent tool scoping ─────────────────────────────────────────────────

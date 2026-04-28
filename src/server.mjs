@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
 import { ensureOfficeCliPlugins } from './plugins/cliPluginBootstrap.mjs';
 import { getCliSlashItems } from './plugins/cliSlashItems.mjs';
+import { getCliMcpServers } from './plugins/cliMcpServers.mjs';
 import {
   getBrowseRoots,
   isAllowedOrigin,
@@ -185,14 +186,13 @@ async function createServer() {
     }
   });
 
-  // GET /api/mcp-servers — built-in MCP server configs available to the picker
-  apiRouter.get('/mcp-servers', (_req, res) => {
-    res.json({
-      servers: [
-        { name: 'workiq', description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams', transport: 'stdio', command: 'npx', args: ['-y', '@microsoft/workiq', 'mcp'] },
-        { name: 'powerbi', description: 'Power BI — query semantic models, generate DAX, explore data', transport: 'http', url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi' },
-      ],
-    });
+  // GET /api/mcp-servers — MCP server configs from the user's Copilot CLI config.
+  apiRouter.get('/mcp-servers', async (_req, res) => {
+    const result = await getCliMcpServers();
+    if (result.error) {
+      console.warn(`[mcp] Failed to load Copilot CLI MCP servers: ${result.error}`);
+    }
+    res.json(result);
   });
 
   app.use('/api', apiRouter);

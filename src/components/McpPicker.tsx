@@ -10,21 +10,10 @@ import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useMcpStatusStore } from '@/stores/mcpStatusStore';
-import { getLocalApiBase } from '@/lib/api';
+import { fetchConfiguredMcpServers } from '@/services/mcp';
 import type { McpServerConfig, McpServerState } from '@/types/mcp';
 import { toMcpServerKey } from '@/utils/mcpServerKey';
 import type { McpOAuthPromptRequest } from './McpOAuthPrompt';
-
-async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
-  try {
-    const res = await fetch(`${getLocalApiBase()}/api/mcp-servers`);
-    if (!res.ok) return [];
-    const data = (await res.json()) as { servers: McpServerConfig[] };
-    return data.servers ?? [];
-  } catch {
-    return [];
-  }
-}
 
 interface McpPickerProps {
   onInitiateOAuth?: (serverName: string, loginHint?: string) => Promise<string | undefined>;
@@ -117,12 +106,12 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth, onOpenOAu
   useSettingsStore(s => s.disabledMcpServerNames);
 
   useEffect(() => {
-    void fetchAllMcpServers().then(setServers);
+    void fetchConfiguredMcpServers().then(setServers);
   }, []);
 
-  // Re-fetch when popover opens so the built-in server list stays current.
+  // Re-fetch when popover opens so CLI MCP config changes are reflected.
   useEffect(() => {
-    if (open) void fetchAllMcpServers().then(setServers);
+    if (open) void fetchConfiguredMcpServers().then(setServers);
   }, [open]);
 
   const enabledCount = servers.filter(s => isMcpServerEnabled(s.name)).length;

@@ -1,8 +1,8 @@
 /**
  * Integration test: McpPicker component.
  *
- * Verifies the McpPicker fetches servers from /api/mcp-servers and lists
- * them in the popover with enable/disable toggles.
+ * Verifies the McpPicker fetches CLI MCP servers from /api/mcp-servers and
+ * lists them in the popover with enable/disable toggles.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -49,7 +49,7 @@ describe('Integration: McpPicker', () => {
     });
   });
 
-  it('opens popover and shows workiq and powerbi from /api/mcp-servers', async () => {
+  it('opens popover and shows MCP servers from /api/mcp-servers', async () => {
     renderWithProviders(<McpPicker />);
     await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
 
@@ -97,32 +97,27 @@ describe('Integration: McpPicker', () => {
     });
   });
 
-  it('deduplicates by endpoint: plugin server with same url as bundled is dropped', async () => {
-    // A plugin declares a server at the same URL as the bundled powerbi server
-    // but under a different name — the bundled one must win and only one entry appears.
+  it('renders the server list returned by the CLI-backed API', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({
         servers: [
-          // Bundled workiq (stdio) and powerbi (http) — kept
           {
             name: 'workiq',
-            description: 'WorkIQ (bundled)',
+            description: 'Source: user',
             transport: 'stdio' as const,
             command: 'npx',
             args: ['-y', '@microsoft/workiq', 'mcp'],
           },
           {
             name: 'powerbi',
-            description: 'Power BI (bundled)',
+            description: 'Source: plugin',
             transport: 'http' as const,
             url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
           },
-          // Plugin with different name but same URL as powerbi — server already dropped by dedup
-          // custom-plugin has a unique URL — kept
           {
             name: 'custom-plugin',
-            description: 'From plugin: my-plugin',
+            description: 'Source: workspace',
             transport: 'http' as const,
             url: 'http://localhost:3003',
           },
@@ -138,9 +133,6 @@ describe('Integration: McpPicker', () => {
       expect(screen.getByText('powerbi')).toBeInTheDocument();
       expect(screen.getByText('custom-plugin')).toBeInTheDocument();
     });
-
-    // Only one powerbi entry (the bundled one)
-    expect(screen.getAllByText('powerbi')).toHaveLength(1);
   });
 
   it('shows a sign-in action for auth-required remote MCP servers', async () => {

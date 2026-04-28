@@ -50,4 +50,6 @@ export interface McpServerConfig {
   args?: string[];
   /** Optional environment variables (for stdio transport) */
   env?: Record<string, string>;
+  /** Source reported by the Copilot CLI (user, workspace, plugin, builtin). */
+  source?: string;
 }
