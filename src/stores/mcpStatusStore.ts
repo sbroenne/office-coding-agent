@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { McpServerStatus, McpLogEntry, McpServerState } from '@/types';
+import { toMcpServerKey } from '@/utils/mcpServerKey';
 
 const MAX_LOGS_PER_SERVER = 500;
 
@@ -15,6 +16,14 @@ interface McpStatusState {
 
   /** Set the discovered tools for a server */
   setTools: (name: string, tools: { name: string; description: string }[]) => void;
+
+  /** Set transient OAuth UI state for a server */
+  setOAuthState: (
+    name: string,
+    state: NonNullable<McpServerState['oauthState']>,
+    alias?: string,
+    error?: string
+  ) => void;
 
   /** Clear logs for a specific server */
   clearLogs: (name: string) => void;
@@ -35,19 +44,40 @@ function ensureServer(
   return { ...servers, [name]: defaultServerState() };
 }
 
+function serverLookupKey(servers: Record<string, McpServerState>, name: string): string {
+  const normalized = toMcpServerKey(name);
+  return (
+    Object.keys(servers).find(key => key === name || toMcpServerKey(key) === normalized) ??
+    normalized
+  );
+}
+
 export const useMcpStatusStore = create<McpStatusState>()(set => ({
   servers: {},
 
   setStatus: (name, status, error) => {
     set(state => {
-      const servers = ensureServer(state.servers, name);
-      const current = servers[name];
+      const key = serverLookupKey(state.servers, name);
+      const servers = ensureServer(state.servers, key);
+      const current = servers[key];
       const nextError =
         status === 'error' || status === 'failed' ? (error ?? current.error) : undefined;
       return {
         servers: {
           ...servers,
-          [name]: { ...current, status, error: nextError },
+          [key]: {
+            ...current,
+            status,
+            error: nextError,
+            oauthState:
+              status === 'connected'
+                ? 'connected'
+                : status === 'failed' || status === 'error'
+                  ? 'failed'
+                  : status === 'needs-auth'
+                    ? 'idle'
+                    : current.oauthState,
+          },
         },
       };
     });
@@ -78,6 +108,25 @@ export const useMcpStatusStore = create<McpStatusState>()(set => ({
         servers: {
           ...servers,
           [name]: { ...current, tools },
+        },
+      };
+    });
+  },
+
+  setOAuthState: (name, oauthState, alias, error) => {
+    set(state => {
+      const key = serverLookupKey(state.servers, name);
+      const servers = ensureServer(state.servers, key);
+      const current = servers[key];
+      return {
+        servers: {
+          ...servers,
+          [key]: {
+            ...current,
+            oauthState,
+            oauthAlias: alias ?? current.oauthAlias,
+            error: oauthState === 'failed' ? (error ?? current.error) : current.error,
+          },
         },
       };
     });

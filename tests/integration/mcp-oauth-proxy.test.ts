@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 // @ts-expect-error copilotProxy is a Node .mjs module without TypeScript declarations.
 const proxyModule = await import('../../src/copilotProxy.mjs');
-const { initiateMcpOAuthForSession, normalizeMcpEvent, toMcpServerKey } = proxyModule;
+const {
+  addLoginHintToAuthorizationUrl,
+  initiateMcpOAuthForSession,
+  normalizeMcpEvent,
+  normalizeMcpOAuthLoginHint,
+  toMcpServerKey,
+} = proxyModule;
 
 describe('MCP OAuth proxy helpers', () => {
   it.each([
@@ -14,7 +20,9 @@ describe('MCP OAuth proxy helpers', () => {
   });
 
   it('initiates SDK MCP OAuth with the normalized server key', async () => {
-    const login = vi.fn().mockResolvedValue({ authorizationUrl: 'https://login.example/authorize' });
+    const login = vi
+      .fn()
+      .mockResolvedValue({ authorizationUrl: 'https://login.example/authorize' });
     const session = { rpc: { mcp: { oauth: { login } } } };
 
     const result = await initiateMcpOAuthForSession(session, 'Power BI MCP');
@@ -25,6 +33,40 @@ describe('MCP OAuth proxy helpers', () => {
     });
     expect(login).toHaveBeenCalledWith({
       serverName: 'power_bi_mcp',
+      forceReauth: false,
+      clientName: 'office-coding-agent',
+      callbackSuccessMessage: 'You can return to Office Coding Agent.',
+    });
+  });
+
+  it('normalizes MCP OAuth login hints for Microsoft aliases', () => {
+    expect(normalizeMcpOAuthLoginHint('janesmith')).toBe('janesmith@microsoft.com');
+    expect(normalizeMcpOAuthLoginHint(' jane@contoso.com ')).toBe('jane@contoso.com');
+    expect(normalizeMcpOAuthLoginHint('   ')).toBeUndefined();
+  });
+
+  it('adds login_hint to authorization URLs when a login hint is provided', () => {
+    expect(
+      addLoginHintToAuthorizationUrl('https://login.example/authorize?client_id=1', 'janesmith')
+    ).toBe('https://login.example/authorize?client_id=1&login_hint=janesmith%40microsoft.com');
+  });
+
+  it('passes forceReauth and returns oauthAlias when a login hint is provided', async () => {
+    const login = vi
+      .fn()
+      .mockResolvedValue({ authorizationUrl: 'https://login.example/authorize' });
+    const session = { rpc: { mcp: { oauth: { login } } } };
+
+    const result = await initiateMcpOAuthForSession(session, 'Power BI MCP', 'janesmith');
+
+    expect(result).toEqual({
+      status: 'success',
+      authorizationUrl: 'https://login.example/authorize?login_hint=janesmith%40microsoft.com',
+      oauthAlias: 'janesmith@microsoft.com',
+    });
+    expect(login).toHaveBeenCalledWith({
+      serverName: 'power_bi_mcp',
+      forceReauth: true,
       clientName: 'office-coding-agent',
       callbackSuccessMessage: 'You can return to Office Coding Agent.',
     });

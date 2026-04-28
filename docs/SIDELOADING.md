@@ -2,7 +2,7 @@
 
 > **First time?** See [GETTING_STARTED.md](../GETTING_STARTED.md) for the full setup walkthrough including authentication, proxy server startup, and add-in registration.
 >
-> The proxy server (`npm run dev`) must be running on `https://localhost:3000` before any of the sideload commands below will work.
+> For normal local development, use `npm run start:dev:desktop`. It starts the proxy server, waits for `https://localhost:3000`, then sideloads Excel.
 
 This project supports three sideloading lanes:
 
@@ -26,6 +26,14 @@ The add-in web app (task pane HTML/JS/CSS) must be hosted at the HTTPS URLs in t
 - For testing from other machines, use `manifests/manifest.staging.xml` that points to GitHub Pages.
 
 ## Lane 1: Local Desktop Dev
+
+```bash
+npm run start:dev:desktop
+npm run start:dev:desktop:ppt
+npm run start:dev:desktop:word
+```
+
+If the dev server is already running, you can sideload only:
 
 ```bash
 npm run start:desktop:excel

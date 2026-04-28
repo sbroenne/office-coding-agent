@@ -13,8 +13,18 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useMcpStatusStore } from '@/stores/mcpStatusStore';
 
 const MOCK_SERVERS = [
-  { name: 'workiq', description: 'WorkIQ MCP server', transport: 'http' as const, url: 'http://localhost:3001' },
-  { name: 'powerbi', description: 'Power BI MCP server', transport: 'http' as const, url: 'http://localhost:3002' },
+  {
+    name: 'workiq',
+    description: 'WorkIQ MCP server',
+    transport: 'http' as const,
+    url: 'http://localhost:3001',
+  },
+  {
+    name: 'powerbi',
+    description: 'Power BI MCP server',
+    transport: 'http' as const,
+    url: 'http://localhost:3002',
+  },
 ];
 
 beforeEach(() => {
@@ -31,9 +41,12 @@ afterEach(() => {
 });
 
 describe('Integration: McpPicker', () => {
-  it('renders a trigger button with aria-label MCP servers', () => {
+  it('renders a trigger button with aria-label MCP servers', async () => {
     renderWithProviders(<McpPicker />);
     expect(screen.getByRole('button', { name: 'MCP servers' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalled();
+    });
   });
 
   it('opens popover and shows workiq and powerbi from /api/mcp-servers', async () => {
@@ -92,11 +105,27 @@ describe('Integration: McpPicker', () => {
       json: async () => ({
         servers: [
           // Bundled workiq (stdio) and powerbi (http) — kept
-          { name: 'workiq', description: 'WorkIQ (bundled)', transport: 'stdio' as const, command: 'npx', args: ['-y', '@microsoft/workiq', 'mcp'] },
-          { name: 'powerbi', description: 'Power BI (bundled)', transport: 'http' as const, url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi' },
+          {
+            name: 'workiq',
+            description: 'WorkIQ (bundled)',
+            transport: 'stdio' as const,
+            command: 'npx',
+            args: ['-y', '@microsoft/workiq', 'mcp'],
+          },
+          {
+            name: 'powerbi',
+            description: 'Power BI (bundled)',
+            transport: 'http' as const,
+            url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
+          },
           // Plugin with different name but same URL as powerbi — server already dropped by dedup
           // custom-plugin has a unique URL — kept
-          { name: 'custom-plugin', description: 'From plugin: my-plugin', transport: 'http' as const, url: 'http://localhost:3003' },
+          {
+            name: 'custom-plugin',
+            description: 'From plugin: my-plugin',
+            transport: 'http' as const,
+            url: 'http://localhost:3003',
+          },
         ],
       }),
     } as Response);
@@ -123,7 +152,7 @@ describe('Integration: McpPicker', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
 
-    expect(initiateOAuth).toHaveBeenCalledWith('powerbi');
+    expect(initiateOAuth).toHaveBeenCalledWith('powerbi', undefined);
   });
 
   it('matches auth status when SDK events use normalized server keys', async () => {
@@ -148,7 +177,7 @@ describe('Integration: McpPicker', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
 
-    expect(initiateOAuth).toHaveBeenCalledWith('Power BI MCP');
+    expect(initiateOAuth).toHaveBeenCalledWith('Power BI MCP', undefined);
   });
 
   it('shows retry sign-in for failed remote MCP servers', async () => {
@@ -158,10 +187,28 @@ describe('Integration: McpPicker', () => {
     renderWithProviders(<McpPicker onInitiateOAuth={initiateOAuth} />);
     await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
 
-    expect(await screen.findByText('Status: failed — Authentication required')).toBeInTheDocument();
+    expect(await screen.findByText('Failed — Authentication required')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry sign in' }));
 
-    expect(initiateOAuth).toHaveBeenCalledWith('powerbi');
+    expect(initiateOAuth).toHaveBeenCalledWith('powerbi', undefined);
+  });
+
+  it('surfaces signed-in alias and switch-account action for connected OAuth servers', async () => {
+    const openPrompt = vi.fn();
+    useMcpStatusStore.getState().setOAuthState('powerbi', 'connected', 'janesmith@microsoft.com');
+    useMcpStatusStore.getState().setStatus('powerbi', 'connected');
+
+    renderWithProviders(<McpPicker onOpenOAuthPrompt={openPrompt} />);
+    await userEvent.click(screen.getByRole('button', { name: 'MCP servers' }));
+
+    expect(await screen.findByText('Signed in as janesmith@microsoft.com')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+
+    expect(openPrompt).toHaveBeenCalledWith({
+      serverName: 'powerbi',
+      reason: 'switch',
+      defaultLoginHint: 'janesmith@microsoft.com',
+    });
   });
 
   it('scopes OAuth sign-in errors to the server that failed', async () => {

@@ -15,6 +15,7 @@ import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
+import type { McpOAuthPromptRequest } from '@/components/McpOAuthPrompt';
 
 const MODEL_FETCH_TIMEOUT_MS = 10_000;
 const DEFAULT_THINKING_TEXT = 'Thinking…';
@@ -127,6 +128,9 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
+  const [pendingMcpOAuthPrompt, setPendingMcpOAuthPrompt] = useState<McpOAuthPromptRequest | null>(
+    null
+  );
   const activePermissionRequestRef = useRef<string | null>(null);
   const sessionErrorRef = useRef<Error | null>(sessionError);
   const isConnectingRef = useRef(isConnecting);
@@ -215,6 +219,11 @@ export function useOfficeChat(host: OfficeHostApp) {
       mcpStore.clearAll();
       client.onMcpStatus(payload => {
         useMcpStatusStore.getState().setStatus(payload.server, payload.status, payload.error);
+        if (payload.status === 'connected') {
+          setPendingMcpOAuthPrompt(current =>
+            current?.serverName === payload.server ? null : current
+          );
+        }
       });
       client.onMcpLog(payload => {
         useMcpStatusStore.getState().addLog(payload.server, {
@@ -225,6 +234,18 @@ export function useOfficeChat(host: OfficeHostApp) {
       });
       client.onMcpTools(payload => {
         useMcpStatusStore.getState().setTools(payload.server, payload.tools);
+      });
+      client.onMcpOAuthRequired?.(payload => {
+        useMcpStatusStore.getState().setStatus(payload.serverName, 'needs-auth');
+        setPendingMcpOAuthPrompt({
+          serverName: payload.serverName,
+          reason: 'chat-required',
+          blocking: true,
+        });
+      });
+      client.onMcpOAuthCompleted?.(payload => {
+        setPendingMcpOAuthPrompt(null);
+        console.log('[chat] MCP OAuth completed:', payload.requestId);
       });
 
       const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
@@ -981,19 +1002,43 @@ export function useOfficeChat(host: OfficeHostApp) {
     void respondPermission('approved');
   }, [addPermissionRule, pendingPermission, respondPermission]);
 
-  const initiateMcpOAuth = useCallback(async (serverName: string) => {
+  const initiateMcpOAuth = useCallback(async (serverName: string, loginHint?: string) => {
     const session = sessionRef.current;
     if (!session) {
       throw new Error('Open a chat session before signing in to an MCP server.');
     }
 
-    const result = await session.initiateMcpOAuth(serverName);
+    const trimmedLoginHint = loginHint?.trim();
+    const requestedAlias = trimmedLoginHint === '' ? undefined : trimmedLoginHint;
+    useMcpStatusStore.getState().setOAuthState(serverName, 'connecting', requestedAlias);
+    const result = await session.initiateMcpOAuthWithHint(serverName, requestedAlias);
     if (result.status === 'error') {
+      useMcpStatusStore
+        .getState()
+        .setOAuthState(serverName, 'failed', requestedAlias, result.message);
       throw new Error(result.message);
     }
     if (result.status === 'success' && result.authorizationUrl) {
       window.open(result.authorizationUrl, '_blank', 'noopener,noreferrer');
     }
+    const signedInAlias =
+      result.status === 'success' ? (result.oauthAlias ?? requestedAlias) : requestedAlias;
+    useMcpStatusStore
+      .getState()
+      .setOAuthState(
+        serverName,
+        result.status === 'success' && result.authorizationUrl ? 'connecting' : 'connected',
+        signedInAlias
+      );
+    return signedInAlias;
+  }, []);
+
+  const openMcpOAuthPrompt = useCallback((request: McpOAuthPromptRequest) => {
+    setPendingMcpOAuthPrompt(request);
+  }, []);
+
+  const dismissMcpOAuthPrompt = useCallback(() => {
+    setPendingMcpOAuthPrompt(null);
   }, []);
 
   const compactSession = useCallback(async () => {
@@ -1055,6 +1100,9 @@ export function useOfficeChat(host: OfficeHostApp) {
     denyPermission,
     allowPermissionAlways,
     initiateMcpOAuth,
+    pendingMcpOAuthPrompt,
+    openMcpOAuthPrompt,
+    dismissMcpOAuthPrompt,
     compactSession,
     switchModel,
     enqueue,

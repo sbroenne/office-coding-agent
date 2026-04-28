@@ -13,6 +13,7 @@ import { useMcpStatusStore } from '@/stores/mcpStatusStore';
 import { getLocalApiBase } from '@/lib/api';
 import type { McpServerConfig, McpServerState } from '@/types/mcp';
 import { toMcpServerKey } from '@/utils/mcpServerKey';
+import type { McpOAuthPromptRequest } from './McpOAuthPrompt';
 
 async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
   try {
@@ -26,7 +27,8 @@ async function fetchAllMcpServers(): Promise<McpServerConfig[]> {
 }
 
 interface McpPickerProps {
-  onInitiateOAuth?: (serverName: string) => Promise<void>;
+  onInitiateOAuth?: (serverName: string, loginHint?: string) => Promise<string | undefined>;
+  onOpenOAuthPrompt?: (request: McpOAuthPromptRequest) => void;
 }
 
 function getRuntimeState(
@@ -44,10 +46,66 @@ function getRuntimeState(
 function needsOAuthAction(server: McpServerConfig, state?: McpServerState): boolean {
   if (server.transport !== 'http' && server.transport !== 'sse') return false;
   if (server.headers?.Authorization) return false;
-  return state?.status === 'needs-auth' || state?.status === 'failed' || state?.status === 'error';
+  const isRemoteHttpServer =
+    typeof server.url === 'string' &&
+    !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::|\/|$)/i.test(server.url);
+  return (
+    isRemoteHttpServer ||
+    state?.status === 'needs-auth' ||
+    state?.status === 'failed' ||
+    state?.status === 'error' ||
+    state?.status === 'connected' ||
+    state?.oauthState === 'connected' ||
+    !!state?.oauthAlias ||
+    !!server.oauthAlias
+  );
 }
 
-export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
+function getOAuthAction(state?: McpServerState): {
+  label: string;
+  reason: McpOAuthPromptRequest['reason'];
+  disabled?: boolean;
+} {
+  if (state?.oauthState === 'connecting' || state?.status === 'pending') {
+    return { label: 'Connecting...', reason: 'sign-in', disabled: true };
+  }
+  if (state?.status === 'connected' || state?.oauthState === 'connected' || state?.oauthAlias) {
+    return { label: 'Switch account', reason: 'switch' };
+  }
+  if (state?.status === 'failed' || state?.status === 'error' || state?.oauthState === 'failed') {
+    return { label: 'Retry sign in', reason: 'retry' };
+  }
+  if (state?.status === 'needs-auth') return { label: 'Sign in', reason: 'sign-in' };
+  return { label: 'Connect', reason: 'connect' };
+}
+
+function getStatusText(state?: McpServerState, server?: McpServerConfig): string | undefined {
+  const alias = state?.oauthAlias ?? server?.oauthAlias;
+  if (state?.oauthState === 'connecting') return alias ? `Connecting as ${alias}` : 'Connecting';
+  if (state?.oauthState === 'failed') return state.error ? `Failed — ${state.error}` : 'Failed';
+  if (state?.status === 'connected' || state?.oauthState === 'connected') {
+    return alias ? `Signed in as ${alias}` : 'Connected';
+  }
+  if (state?.status === 'needs-auth') return 'Sign-in required';
+  if (state?.status === 'failed' || state?.status === 'error') {
+    return state.error ? `Failed — ${state.error}` : 'Failed';
+  }
+  if (state?.status && state.status !== 'stopped') {
+    return state.status;
+  }
+  if (
+    server &&
+    (server.transport === 'http' || server.transport === 'sse') &&
+    !server.headers?.Authorization &&
+    typeof server.url === 'string' &&
+    !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::|\/|$)/i.test(server.url)
+  ) {
+    return alias ? `Signed in as ${alias}` : 'Not signed in';
+  }
+  return undefined;
+}
+
+export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth, onOpenOAuthPrompt }) => {
   const [open, setOpen] = useState(false);
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [signingInServer, setSigningInServer] = useState<string | null>(null);
@@ -70,7 +128,15 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
   const enabledCount = servers.filter(s => isMcpServerEnabled(s.name)).length;
   const total = servers.length;
   const showBadge = total > 0 && enabledCount < total;
-  const handleOAuthClick = (serverName: string) => {
+  const handleOAuthClick = (
+    serverName: string,
+    reason: McpOAuthPromptRequest['reason'],
+    defaultLoginHint?: string
+  ) => {
+    if (onOpenOAuthPrompt) {
+      onOpenOAuthPrompt({ serverName, reason, defaultLoginHint });
+      return;
+    }
     if (!onInitiateOAuth) return;
     setAuthErrors(errors => {
       const next = { ...errors };
@@ -78,7 +144,7 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
       return next;
     });
     setSigningInServer(serverName);
-    void onInitiateOAuth(serverName)
+    void onInitiateOAuth(serverName, defaultLoginHint)
       .catch(error => {
         setAuthErrors(errors => ({
           ...errors,
@@ -131,9 +197,14 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
             servers.map(server => {
               const enabled = isMcpServerEnabled(server.name);
               const state = getRuntimeState(runtimeStates, server.name);
-              const showOAuthAction = enabled && onInitiateOAuth && needsOAuthAction(server, state);
+              const showOAuthAction =
+                enabled &&
+                (onInitiateOAuth !== undefined || onOpenOAuthPrompt !== undefined) &&
+                needsOAuthAction(server, state);
+              const oauthAction = getOAuthAction(state);
               const isSigningIn = signingInServer === server.name;
               const authError = authErrors[server.name];
+              const statusText = getStatusText(state, server);
               return (
                 <div
                   key={server.name}
@@ -173,11 +244,8 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
                     <div className="text-xs text-muted-foreground opacity-70">
                       {server.transport === 'stdio' ? server.command : server.url}
                     </div>
-                    {state?.status && state.status !== 'stopped' && (
-                      <div className="text-xs text-muted-foreground">
-                        Status: {state.status}
-                        {state.error ? ` — ${state.error}` : ''}
-                      </div>
+                    {statusText && (
+                      <div className="text-xs text-muted-foreground">{statusText}</div>
                     )}
                     {authError && signingInServer === null && state?.status !== 'connected' && (
                       <div className="text-xs text-[var(--vscode-errorForeground)]">
@@ -190,17 +258,17 @@ export const McpPicker: React.FC<McpPickerProps> = ({ onInitiateOAuth }) => {
                       type="button"
                       className="shrink-0 rounded px-2 py-0.5 text-xs text-[var(--vscode-button-foreground)]"
                       style={{ backgroundColor: 'var(--vscode-button-background)' }}
-                      disabled={isSigningIn}
+                      disabled={isSigningIn || oauthAction.disabled}
                       onClick={event => {
                         event.stopPropagation();
-                        handleOAuthClick(server.name);
+                        handleOAuthClick(
+                          server.name,
+                          oauthAction.reason,
+                          state?.oauthAlias ?? server.oauthAlias
+                        );
                       }}
                     >
-                      {isSigningIn
-                        ? 'Signing in...'
-                        : state?.status === 'failed' || state?.status === 'error'
-                          ? 'Retry sign in'
-                          : 'Sign in'}
+                      {isSigningIn ? 'Signing in...' : oauthAction.label}
                     </button>
                   )}
                 </div>

@@ -81,11 +81,8 @@ gh auth login
 npm run register:win    # Windows
 npm run register:mac    # macOS
 
-# 4. Terminal 1 — start the proxy server (keep this running)
-npm run dev
-
-# 5. Terminal 2 — sideload into Office
-npm run start:desktop:excel   # or :ppt / :word
+# 4. Start the dev server and sideload into Office
+npm run start:dev:desktop   # Excel; or :ppt / :word / :outlook
 ```
 
 The proxy server runs on `https://localhost:3000` and handles both the Vite dev server UI and the Copilot WebSocket proxy. It must be running whenever you use the add-in.
@@ -113,10 +110,14 @@ Run it from the Actions tab in one step:
 
 ## Available Scripts
 
-| Script                           | Description                                                           |
-| -------------------------------- | --------------------------------------------------------------------- |
-| `npm run dev`                    | Start Copilot proxy + Vite dev server (port 3000)                     |
-| `npm run start:prod-server`      | Start production HTTPS server from `dist/`                            |
+| Script                              | Description                                                           |
+| ----------------------------------- | --------------------------------------------------------------------- |
+| `npm run dev`                       | Start Copilot proxy + Vite dev server (port 3000)                     |
+| `npm run start:dev:desktop`         | Start dev server, wait for readiness, then sideload Excel Desktop     |
+| `npm run start:dev:desktop:ppt`     | Start dev server, wait for readiness, then sideload PowerPoint        |
+| `npm run start:dev:desktop:word`    | Start dev server, wait for readiness, then sideload Word              |
+| `npm run start:dev:desktop:outlook` | Start dev server, wait for readiness, then sideload Outlook           |
+| `npm run start:prod-server`         | Start production HTTPS server from `dist/`                            |
 | `npm run start:tray`             | Build + run Electron system tray app                                  |
 | `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop (legacy alias) |
 | `npm run start:tray:excel`       | Start tray app (if needed) then sideload Excel desktop                |

@@ -203,6 +203,14 @@ export class BrowserCopilotSession {
     });
   }
 
+  async initiateMcpOAuthWithHint(serverName: string, loginHint?: string): Promise<McpOAuthResult> {
+    return this.connection.sendRequest<McpOAuthResult>('mcp.initiateOAuth', {
+      sessionId: this.sessionId,
+      serverName,
+      loginHint,
+    });
+  }
+
   async destroy(): Promise<void> {
     await this.connection.sendRequest('session.destroy', {
       sessionId: this.sessionId,
@@ -230,9 +238,19 @@ export interface McpStatusPayload {
 }
 
 export type McpOAuthResult =
-  | { status: 'success'; authorizationUrl?: string }
+  | { status: 'success'; authorizationUrl?: string; oauthAlias?: string }
   | { status: 'public' }
   | { status: 'error'; message: string };
+
+export interface McpOAuthRequiredPayload {
+  requestId: string;
+  serverName: string;
+  serverUrl?: string;
+}
+
+export interface McpOAuthCompletedPayload {
+  requestId: string;
+}
 
 /** MCP log notification payload */
 export interface McpLogPayload {
@@ -258,6 +276,8 @@ export class WebSocketCopilotClient {
   private mcpStatusHandlers = new Set<(payload: McpStatusPayload) => void>();
   private mcpLogHandlers = new Set<(payload: McpLogPayload) => void>();
   private mcpToolsHandlers = new Set<(payload: McpToolsPayload) => void>();
+  private mcpOAuthRequiredHandlers = new Set<(payload: McpOAuthRequiredPayload) => void>();
+  private mcpOAuthCompletedHandlers = new Set<(payload: McpOAuthCompletedPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -346,6 +366,20 @@ export class WebSocketCopilotClient {
     };
   }
 
+  onMcpOAuthRequired(handler: (payload: McpOAuthRequiredPayload) => void): () => void {
+    this.mcpOAuthRequiredHandlers.add(handler);
+    return () => {
+      this.mcpOAuthRequiredHandlers.delete(handler);
+    };
+  }
+
+  onMcpOAuthCompleted(handler: (payload: McpOAuthCompletedPayload) => void): () => void {
+    this.mcpOAuthCompletedHandlers.add(handler);
+    return () => {
+      this.mcpOAuthCompletedHandlers.delete(handler);
+    };
+  }
+
   async stop(): Promise<void> {
     for (const session of this.sessions.values()) {
       try {
@@ -408,6 +442,28 @@ export class WebSocketCopilotClient {
     this.connection.onNotification('mcp.tools', (notification: unknown) => {
       const payload = notification as McpToolsPayload;
       for (const handler of this.mcpToolsHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('mcp.oauth-required', (notification: unknown) => {
+      const payload = notification as McpOAuthRequiredPayload;
+      for (const handler of this.mcpOAuthRequiredHandlers) {
+        try {
+          handler(payload);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+
+    this.connection.onNotification('mcp.oauth-completed', (notification: unknown) => {
+      const payload = notification as McpOAuthCompletedPayload;
+      for (const handler of this.mcpOAuthCompletedHandlers) {
         try {
           handler(payload);
         } catch {

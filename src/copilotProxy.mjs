@@ -29,6 +29,21 @@ export function toMcpServerKey(name) {
     .replace(/\s+/g, '_');
 }
 
+export function normalizeMcpOAuthLoginHint(loginHint) {
+  const trimmed = typeof loginHint === 'string' ? loginHint.trim() : '';
+  if (!trimmed) return undefined;
+  return trimmed.includes('@') ? trimmed : `${trimmed}@microsoft.com`;
+}
+
+export function addLoginHintToAuthorizationUrl(authorizationUrl, loginHint) {
+  const normalizedLoginHint = normalizeMcpOAuthLoginHint(loginHint);
+  if (!authorizationUrl || !normalizedLoginHint) return authorizationUrl;
+
+  const url = new URL(authorizationUrl);
+  url.searchParams.set('login_hint', normalizedLoginHint);
+  return url.toString();
+}
+
 function str(value) {
   return typeof value === 'string' ? value : '';
 }
@@ -41,7 +56,7 @@ export function normalizeMcpStatus(value) {
   return MCP_STATUSES.has(value) ? value : 'not_configured';
 }
 
-export async function initiateMcpOAuthForSession(session, serverName) {
+export async function initiateMcpOAuthForSession(session, serverName, loginHint) {
   const oauthRpc = session.rpc?.mcp?.oauth;
   if (!oauthRpc?.login) {
     return {
@@ -51,14 +66,20 @@ export async function initiateMcpOAuthForSession(session, serverName) {
   }
 
   try {
+    const normalizedLoginHint = normalizeMcpOAuthLoginHint(loginHint);
     const result = await oauthRpc.login({
       serverName: toMcpServerKey(serverName),
+      forceReauth: !!normalizedLoginHint,
       clientName: 'office-coding-agent',
       callbackSuccessMessage: 'You can return to Office Coding Agent.',
     });
     return {
       status: 'success',
-      authorizationUrl: result?.authorizationUrl,
+      authorizationUrl: addLoginHintToAuthorizationUrl(
+        result?.authorizationUrl,
+        normalizedLoginHint
+      ),
+      ...(normalizedLoginHint !== undefined && { oauthAlias: normalizedLoginHint }),
     };
   } catch (err) {
     return { status: 'error', message: err.message || String(err) };
@@ -170,7 +191,9 @@ export function getRegisteredToolNames(toolDefs = [], availableTools) {
  */
 export function applySessionToolAccessToCustomAgents(customAgents = [], sessionToolNames = []) {
   const fallbackToolNames = Array.from(
-    new Set(sessionToolNames.filter(toolName => typeof toolName === 'string' && toolName.length > 0))
+    new Set(
+      sessionToolNames.filter(toolName => typeof toolName === 'string' && toolName.length > 0)
+    )
   );
 
   return customAgents.map(agent => {
@@ -529,7 +552,7 @@ async function handleConnection(ws) {
       }
 
       case 'mcp.initiateOAuth': {
-        const { sessionId, serverName } = params || {};
+        const { sessionId, serverName, loginHint } = params || {};
         const targetSessionId = sessionId || currentSessionId;
         const session = targetSessionId ? sessions.get(targetSessionId) : null;
         if (!session) {
@@ -541,7 +564,7 @@ async function handleConnection(ws) {
           return;
         }
 
-        sendResponse(id, await initiateMcpOAuthForSession(session, serverName));
+        sendResponse(id, await initiateMcpOAuthForSession(session, serverName, loginHint));
         break;
       }
 

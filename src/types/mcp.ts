@@ -24,6 +24,8 @@ export interface McpLogEntry {
 export interface McpServerState {
   status: McpServerStatus;
   error?: string;
+  oauthState?: 'idle' | 'connecting' | 'connected' | 'failed';
+  oauthAlias?: string;
   tools: { name: string; description: string }[];
   logs: McpLogEntry[];
 }
@@ -40,6 +42,8 @@ export interface McpServerConfig {
   url?: string;
   /** Optional HTTP headers (e.g. Authorization) — for http/sse transport */
   headers?: Record<string, string>;
+  /** Optional last OAuth account alias for UI recovery actions */
+  oauthAlias?: string;
   /** Executable command (required for stdio transport, e.g. "npx") */
   command?: string;
   /** Command arguments (for stdio transport) */

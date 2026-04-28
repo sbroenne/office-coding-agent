@@ -62,28 +62,30 @@ npm run register:mac
 
 ---
 
-### 4. Start the proxy server
+### 4. Start the dev server and sideload
 
 The proxy server bridges the browser task pane to the GitHub Copilot API via WebSocket. It must be running whenever you use the add-in.
 
 ```bash
-npm run dev
+npm run start:dev:desktop
 ```
 
-You should see output like:
+This starts the dev server, waits for `https://localhost:3000`, then sideloads the add-in into Excel Desktop. Use a host-specific variant for other Office apps:
 
-```
-  Copilot Office Add-in server running on https://localhost:3000
-  API: https://localhost:3000/api
+```bash
+npm run start:dev:desktop:excel
+npm run start:dev:desktop:ppt
+npm run start:dev:desktop:word
+npm run start:dev:desktop:outlook
 ```
 
-Leave this terminal open. The server handles both the Vite dev server (task pane UI) and the Copilot WebSocket proxy on port 3000.
+The server handles both the Vite dev server (task pane UI) and the Copilot WebSocket proxy on port 3000.
 
 ---
 
-### 5. Sideload into Office
+### 5. Sideload into Office without starting the server
 
-Open a **second terminal** and run the sideload command for your target host:
+If the dev server is already running, you can sideload only:
 
 ```bash
 # Excel
@@ -122,7 +124,11 @@ To stop the sideload session:
 npm run stop
 ```
 
-To stop the proxy server, press `Ctrl+C` in the terminal where `npm run dev` is running.
+To stop the proxy server, close the dev server window or run:
+
+```bash
+npm run dev:stop
+```
 
 ---
 
