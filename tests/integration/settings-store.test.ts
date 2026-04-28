@@ -43,33 +43,6 @@ describe('settingsStore — model', () => {
   });
 });
 
-// ─── Agent management ───
-
-describe('settingsStore — agents', () => {
-  it('starts with "Excel" as the default active agent', () => {
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
-  });
-
-  it('setActiveAgent changes the active agent', () => {
-    useSettingsStore.getState().setActiveAgent('Excel');
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
-  });
-
-  it('setActiveAgent ignores invalid agent names', () => {
-    useSettingsStore.getState().setActiveAgent('NonExistentAgent');
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
-  });
-
-  it('getActiveAgent returns the current agent id', () => {
-    expect(useSettingsStore.getState().getActiveAgent()).toBe('Excel');
-  });
-
-  it('reset restores the default agent', () => {
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
-  });
-});
-
 // ─── Skill management ───
 
 describe('settingsStore — skills', () => {

@@ -63,7 +63,6 @@ Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is r
 - **GitHub Copilot authentication** — sign in once with your GitHub account; no API keys or endpoint config
 - **VS Code–style chat UI** — identical look and feel to GitHub Copilot in VS Code (design tokens, codicons, shimmer thinking indicator, per-phase Working boxes)
 - **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
-- **Agent picker** — switch between host-targeted agents owned by the task pane
 - **Slash skills and prompts** — type `/skill-name` or `/prompt-name` to invoke installed CLI skills and `.prompt.md` prompt files
 - **MCP picker** — enable, disable, and sign in to MCP servers from the user's Copilot CLI config
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
@@ -300,20 +299,19 @@ src/server.mjs (Express HTTPS, port 3000)
 src/copilotProxy.mjs → @github/copilot-sdk → GitHub Copilot API
 ```
 
-### Agent System
+### Prompt System
 
-The AI agent uses a **split system prompt** architecture:
+The Office host prompt uses a split architecture:
 
 - **`src/services/ai/BASE_PROMPT.md`** — universal base prompt (progress narration, presenting choices)
 - **`src/services/ai/prompts/*_APP_PROMPT.md`** — host-level app prompts
-- **`src/agents/*/AGENT.md`** — agent-specific instructions with YAML frontmatter
-- Instructions = `buildSystemPrompt(host) + resolvedAgent.instructions + skillContext`
+- Instructions = `buildSystemPrompt(host) + memory context`
 
-`agentService` parses and filters agents by host. Agents are targeted via frontmatter `hosts` and can declare host defaults via `defaultForHosts`.
+Agents are not parsed, selected, or injected by the add-in. The Office default agents are delivered by the required Copilot CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) that the proxy installs and updates at startup.
 
 ### Skills, Agents, and CLI Plugins
 
-The add-in ships with bundled agents for each Office host. Copilot CLI plugins are installed into the user's normal CLI config and consumed by the CLI/SDK, not by an app-owned plugin management layer. The task pane can discover installed CLI plugin skills and `.prompt.md` prompt files so users can reference them as `/skill-name` or `/prompt-name`, matching Copilot slash invocation. Installation, updates, and removal stay in the CLI.
+Copilot CLI plugins are installed into the user's normal CLI config and consumed by the CLI/SDK, not by an app-owned plugin or agent management layer. The task pane can discover installed CLI plugin skills and `.prompt.md` prompt files so users can reference them as `/skill-name` or `/prompt-name`, matching Copilot slash invocation. Installation, updates, and removal stay in the CLI.
 
 #### Copilot CLI Plugins
 
@@ -360,11 +358,9 @@ copilot mcp remove <server-name>
 
 Remote HTTP/SSE servers that require authentication can be recovered from the task pane via SDK-owned OAuth prompts. The picker shows sign-in state and account-switching actions when available.
 
-#### Bundled Agents
+#### Agents
 
-Bundled agents ship with the add-in and are immutable (read-only in the UI). They live in:
-
-- `src/agents/*/AGENT.md` — agent definitions with YAML frontmatter
+Agents are CLI-owned. The add-in no longer ships `src/agents/*/AGENT.md`, no longer renders an Agent picker, and no longer passes browser-owned `customAgents` into `session.create`. The Office agents are installed with the required Office Coding Agent CLI plugins.
 
 ### Key Hooks and Components
 
@@ -372,14 +368,14 @@ Bundled agents ship with the add-in and are immutable (read-only in the UI). The
 - **`BrowserCopilotSession.query()`** — async generator yielding `SessionEvent` objects (assistant.message_delta, tool.execution_start, session.idle, etc.)
 - **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host (Excel: ~83 tools, PowerPoint: 24, Word: 35, Outlook: 22)
 
-State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill/MCP enablement; chat and MCP runtime auth/status state are ephemeral.
+State is minimal: `useSettingsStore` (Zustand) persists model, skill, and MCP enablement; chat and MCP runtime auth/status state are ephemeral.
 
 ## UI Layout
 
 The task pane is organized into three areas:
 
 - **ChatHeader** — Session History picker, Copilot CLI plugin help link, Permissions button, and New Conversation action
-- **ChatPanel** — thread/message stream, inline thinking indicator, composer, slash completions, and input toolbar with AgentPicker, ModelPicker, and MCP picker
+- **ChatPanel** — thread/message stream, inline thinking indicator, composer, slash completions, and input toolbar with ModelPicker and MCP picker
 - **App** — root shell that handles Office host detection, theme sync, and connection/session/permission banners
 
 ## Authentication

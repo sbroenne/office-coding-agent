@@ -108,7 +108,6 @@ This opens the Office application and injects the add-in. The task pane will app
 
 The task pane opens with an AI chat interface. Type a message to get started.
 
-- Use the **Agent picker** (bottom of the input bar) to switch task-pane agents when more than one is available.
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
 - Type `/skill-name` or `/prompt-name` to invoke installed Copilot CLI skills and `.prompt.md` prompt files.
 - Use the **MCP servers** picker (bottom of the input bar) to enable, disable, and sign in to MCP servers from `copilot mcp list`.

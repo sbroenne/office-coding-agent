@@ -24,8 +24,8 @@ test.describe('Chat UI (fresh launch)', () => {
     await expect(taskpane.getByPlaceholder('Send a message...')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('shows the default agent picker', async ({ taskpane }) => {
-    await expect(taskpane.getByRole('button', { name: 'Select agent' })).toBeVisible({
+  test('does not show an add-in-owned agent picker', async ({ taskpane }) => {
+    await expect(taskpane.getByRole('button', { name: 'Select agent' })).toHaveCount(0, {
       timeout: 10_000,
     });
   });
@@ -76,11 +76,8 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 5000 });
   });
 
-  test('displays the agent picker', async ({ configuredTaskpane: page }) => {
-    // The agent picker should show the active agent
-    await expect(page.getByRole('button', { name: 'Select agent' })).toContainText('Default', {
-      timeout: 5000,
-    });
+  test('does not display an add-in-owned agent picker', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Select agent' })).toHaveCount(0);
   });
 
   test('new conversation button is clickable', async ({ configuredTaskpane: page }) => {
@@ -91,13 +88,10 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('agent picker has no manage plugins button — plugin management is via CLI', async ({
+  test('does not show manage plugins button — plugin management is via CLI', async ({
     configuredTaskpane: page,
   }) => {
-    await page.getByRole('button', { name: 'Select agent' }).click();
     await expect(page.getByRole('button', { name: 'Manage plugins…' })).toHaveCount(0);
-    // Close the picker
-    await page.keyboard.press('Escape');
   });
 
   test('/skills does not expose management command suggestions', async ({

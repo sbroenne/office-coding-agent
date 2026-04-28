@@ -46,15 +46,6 @@ export interface PermissionRequestPayload {
   };
 }
 
-/** Custom agent config sent from browser to proxy. */
-export interface CustomAgentPayload {
-  name: string;
-  displayName?: string;
-  description?: string;
-  prompt: string;
-  tools?: string[] | null;
-}
-
 /** Extended session config for browser → proxy communication. */
 export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onPermissionRequest'> {
   tools?: Tool[];
@@ -62,8 +53,6 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   host?: string;
   /** Skill names to disable (SDK disabledSkills). */
   disabledSkills?: string[];
-  /** Custom agent configs passed natively to the SDK. */
-  customAgents?: CustomAgentPayload[];
 }
 
 /**
@@ -324,7 +313,6 @@ export class WebSocketCopilotClient {
       availableTools: config.availableTools,
       host: config.host,
       disabledSkills: config.disabledSkills,
-      customAgents: config.customAgents,
     });
 
     const sessionId = response.sessionId;

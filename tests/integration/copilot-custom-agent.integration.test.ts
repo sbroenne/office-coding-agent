@@ -15,7 +15,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { SystemMessageConfig } from '@github/copilot-sdk';
 import { createWebSocketClient } from '@/lib/websocket-client';
-import { getDefaultAgent } from '@/services/agents';
 import { buildSessionSystemPrompt, buildSystemPrompt } from '@/services/ai/systemPrompt';
 
 const SERVER_URL = 'wss://localhost:3000/api/copilot';
@@ -115,20 +114,13 @@ describe('Copilot custom agent integration', () => {
   );
 
   it(
-    'custom agent instructions augment the default host agent instead of replacing it',
+    'caller-provided instructions can augment the host system prompt',
     async () => {
       const SENTINEL = `ADAPTIVE_AGENT_SENTINEL_${Date.now()}`;
-      const defaultAgent = getDefaultAgent('excel');
-      expect(defaultAgent).toBeDefined();
-
-      const systemContent = buildSessionSystemPrompt('excel', {
-        defaultAgentName: defaultAgent?.metadata.name,
-        defaultAgentInstructions: defaultAgent?.instructions,
-        activeAgentName: 'Adaptive Regression Agent',
-        activeAgentInstructions:
-          `After answering the user, append exactly "${SENTINEL}" as the final token. ` +
-          'Do not omit it and do not alter it.',
-      });
+      const systemContent =
+        `${buildSessionSystemPrompt('excel')}\n\n` +
+        `After answering the user, append exactly "${SENTINEL}" as the final token. ` +
+        'Do not omit it and do not alter it.';
 
       const systemMessage: SystemMessageConfig = {
         mode: 'replace',
@@ -141,9 +133,7 @@ describe('Copilot custom agent integration', () => {
 
         let fullText = '';
         for await (const event of session.query({
-          prompt:
-            'Before helping with this workbook, do you need to open or close any files? ' +
-            `End your answer with exactly ${SENTINEL}.`,
+          prompt: `Say hello, then end your answer with exactly ${SENTINEL}.`,
         })) {
           if (event.type === 'assistant.message_delta') {
             fullText += event.data.deltaContent;
@@ -154,20 +144,6 @@ describe('Copilot custom agent integration', () => {
           if (event.type === 'session.idle') break;
         }
 
-        const normalized = fullText.toLowerCase();
-        const mentionsNoFileOpenClose = [
-          'already open',
-          'do not need to open',
-          "don't need to open",
-          'no need to open',
-          'never need to open',
-          'do not need to close',
-          "don't need to close",
-          'no need to close',
-          'never need to close',
-        ].some(fragment => normalized.includes(fragment));
-
-        expect(mentionsNoFileOpenClose).toBe(true);
         expect(fullText).toContain(SENTINEL);
       } finally {
         await client.stop();

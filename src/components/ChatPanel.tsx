@@ -1,6 +1,5 @@
 import React from 'react';
 import { MessageList } from '@/components/chat/MessageList';
-import { AgentPicker } from './AgentPicker';
 import { ModelPicker } from './ModelPicker';
 import { McpPicker } from './McpPicker';
 import type { McpOAuthPromptRequest } from './McpOAuthPrompt';
@@ -48,10 +47,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           /* TODO */
         }}
         leftToolbar={
-          <>
-            <AgentPicker />
-            <ModelPicker hasActiveSession={messages.length > 0} onSwitchModel={onSwitchModel} />
-          </>
+          <ModelPicker hasActiveSession={messages.length > 0} onSwitchModel={onSwitchModel} />
         }
         rightToolbar={
           <McpPicker

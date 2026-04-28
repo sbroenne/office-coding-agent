@@ -42,7 +42,6 @@ function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
     state: {
       activeModel: 'claude-sonnet-4',
       disabledSkillNames: [],
-      activeAgentId: 'Excel',
       disabledMcpServerNames: [],
       availableModels: [
         { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', provider: 'Anthropic' },

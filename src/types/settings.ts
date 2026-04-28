@@ -26,8 +26,6 @@ export function inferProvider(modelId: string): ModelProvider {
 export interface UserSettings {
   /** Currently selected Copilot model ID */
   activeModel: string;
-  /** ID of the currently selected agent (matches agent metadata name). */
-  activeAgentId: string;
   /** Skill names explicitly disabled by the user. Empty = all enabled. */
   disabledSkillNames: string[];
   /** MCP server names explicitly disabled by the user. Empty = all enabled. */
@@ -37,7 +35,6 @@ export interface UserSettings {
 /** Default settings applied on first run */
 export const DEFAULT_SETTINGS: UserSettings = {
   activeModel: 'claude-sonnet-4.6',
-  activeAgentId: 'Excel',
   disabledSkillNames: [],
   disabledMcpServerNames: [],
 };

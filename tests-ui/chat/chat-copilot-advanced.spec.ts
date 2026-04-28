@@ -4,22 +4,18 @@
  * Requires `npm run dev` to be running on https://localhost:3000.
  * GitHub Copilot is always available — no skip logic.
  *
- * These tests exercise the default host agent, tool progress UI, and multi-turn conversations.
+ * These tests exercise host prompt behavior, tool progress UI, and multi-turn conversations.
  */
 
 import { test, expect } from '../fixtures';
 
 const AI_TIMEOUT = 60_000;
 
-test.describe('Chat E2E — default agent behaviour (requires server)', () => {
-  test('default agent responds to a simple prompt', async ({
+test.describe('Chat E2E — host prompt behaviour (requires server)', () => {
+  test('assistant responds to a simple prompt', async ({
     configuredTaskpane: page,
   }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
-
-    const agentButton = page.getByRole('button', { name: 'Select agent' });
-    await expect(agentButton).toBeVisible({ timeout: 5000 });
-    await expect(agentButton).toContainText('Default', { timeout: 5000 });
 
     // Type a prompt
     const composer = page.getByPlaceholder('Send a message...');

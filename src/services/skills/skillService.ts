@@ -1,5 +1,5 @@
 import type { AgentSkill, SkillMetadata } from '@/types/skill';
-import type { AgentHost } from '@/types/agent';
+import type { SkillHost } from '@/types/skill';
 
 /**
  * Parse YAML frontmatter from a skill markdown file.
@@ -55,7 +55,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
           lower === 'word' ||
           lower === 'outlook'
         ) {
-          metadata.hosts.push(lower as AgentHost);
+          metadata.hosts.push(lower as SkillHost);
         }
       }
       continue;
@@ -93,7 +93,7 @@ export function parseFrontmatter(raw: string): { metadata: SkillMetadata; conten
         .map(h => h.toLowerCase())
         .filter(
           h => h === 'excel' || h === 'powerpoint' || h === 'word' || h === 'outlook'
-        ) as AgentHost[];
+        ) as SkillHost[];
     } else {
       setMetadataField(metadata, currentKey, value);
     }

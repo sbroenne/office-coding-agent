@@ -1,4 +1,4 @@
-import type { AgentHost } from './agent';
+export type SkillHost = 'excel' | 'powerpoint' | 'word' | 'outlook';
 
 /** Parsed metadata from a skill's YAML frontmatter. */
 export interface SkillMetadata {
@@ -7,7 +7,7 @@ export interface SkillMetadata {
   version: string;
   tags: string[];
   /** Office hosts where this skill is available. Empty = all hosts. */
-  hosts: AgentHost[];
+  hosts: SkillHost[];
   license?: string;
   repository?: string;
   documentation?: string;

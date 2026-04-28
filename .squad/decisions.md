@@ -197,8 +197,8 @@ Test infrastructure improvements:
 ### Ellis: Strengthen Outlook Host Support (2026-03-16)
 **Owner:** Ellis  
 **Status:** Proposed  
-Outlook expansion (2–3 sprint effort):
-1. Expand Outlook agent AGENT.md to detail level matching PowerPoint/Word (include use-case narratives)
+Outlook expansion:
+1. Expand the Outlook CLI plugin agent instructions to detail level matching PowerPoint/Word (include use-case narratives)
 2. Add 50+ E2E tests covering:
    - Reply chains and threading
    - Calendar lookups for scheduling

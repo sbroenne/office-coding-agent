@@ -822,9 +822,9 @@ describe('useOfficeChat', () => {
     expect(config.availableTools).toBeUndefined();
   });
 
-  // ─── Native SDK skills and agents ───────────────────────────────────────────
+  // ─── Native SDK skills and CLI-owned agents ────────────────────────────────
 
-  it('passes customAgents with resolved agent to createSession', async () => {
+  it('does not pass browser-owned custom agents into session creation', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -836,14 +836,10 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const agents = config.customAgents as { name: string; prompt: string }[];
-    expect(agents).toBeDefined();
-    expect(agents).toHaveLength(1);
-    expect(agents[0].name).toBe('Excel');
-    expect(agents[0].prompt).toContain('AI assistant');
+    expect(config.customAgents).toBeUndefined();
   });
 
-  it('systemMessage includes host default agent instructions', async () => {
+  it('systemMessage includes host prompt but not app-owned agent instructions', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -856,8 +852,8 @@ describe('useOfficeChat', () => {
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
     const sysMsg = config.systemMessage as { content: string };
-    expect(sysMsg.content).toContain('## Host Agent Instructions');
-    expect(sysMsg.content).toContain('The workbook is already open');
+    expect(sysMsg.content).not.toContain('## Host Agent Instructions');
+    expect(sysMsg.content).not.toContain('## Adaptive Agent Instructions');
     expect(sysMsg.content).toContain('Progress narration');
   });
 

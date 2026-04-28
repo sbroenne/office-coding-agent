@@ -80,44 +80,15 @@ GitHub Copilot API
 
 The `useOfficeChat` hook creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, and maps incoming `SessionEvent` objects to `ChatMessage[]` state with per-message `thinkingText` fields.
 
-### Agent System
+### Prompt and CLI Agent System
 
-The AI agent uses a split prompt architecture with host targeting:
+The add-in uses a split prompt architecture with host targeting:
 
 - **`src/services/ai/BASE_PROMPT.md`** — universal base prompt (progress narration + presenting choices)
-- **`src/services/ai/prompts/*_APP_PROMPT.md`** — host-level app prompt (Excel/PowerPoint)
-- **`src/agents/*/AGENT.md`** — agent-specific instructions (default + custom)
-- Instructions = `buildSystemPrompt(host) + resolvedAgent.instructions + skillContext`
+- **`src/services/ai/prompts/*_APP_PROMPT.md`** — host-level app prompt (Excel/PowerPoint/Word/Outlook)
+- Instructions = `buildSystemPrompt(host) + memory context`
 
-The `agentService` (`src/services/agents/agentService.ts`) parses agent YAML frontmatter to `AgentConfig` objects and filters by host.
-
-### Agent Frontmatter Contract (required)
-
-Agents are targeted per host via frontmatter fields:
-
-- `name`
-- `description`
-- `version`
-- `hosts` (array; supported values: `excel`, `powerpoint`, `word`)
-- `defaultForHosts` (array; subset of supported hosts)
-
-Example:
-
-```yaml
----
-name: Excel
-description: Default Excel agent
-version: 1.1.0
-hosts: [excel]
-defaultForHosts: [excel]
----
-```
-
-Rules:
-
-- If current host is not in `hosts`, the agent must not be shown/selected.
-- Invalid/unknown host values are ignored.
-- `resolveActiveAgent(activeAgentId, host)` should be used so host-default fallback is applied safely.
+Agents are owned by the Copilot CLI. The add-in does not ship `src/agents/*/AGENT.md`, parse agent frontmatter, render an Agent picker, persist an active agent, or pass browser-owned `customAgents` into `session.create`. The required Office agents are installed through the Office Coding Agent CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) during startup bootstrap.
 
 ### Skills System
 
@@ -136,12 +107,11 @@ Plugin-provided skills are managed by the Copilot CLI. The task pane does not re
 │    humanizeToolName, zipImportService)               │
 │  • Host routing (detectOfficeHost,                   │
 │    getToolsForHost, buildSystemPrompt)               │
-│  • Agent targeting and default resolution            │
 │  • Zustand store logic (settingsStore)               │
 │  • JSON Schema tool configs (toCopilotTools)         │
 │  • React component wiring (integration)              │
-│  • WebSocket client + session (mocked in unit tests) │
-│  • Agent/skill service parsing                       │
+│  • WebSocket client + session wiring                 │
+│  • Skill service parsing                             │
 ├──────────────────────────────────────────────────────┤
 │  Office.run() boundary (all hosts)                   │
 ├──────────────────────────────────────────────────────┤
@@ -161,7 +131,7 @@ Plugin-provided skills are managed by the Copilot CLI. The task pane does not re
 The task pane is split into three areas:
 
 - **ChatHeader** — session history, Copilot CLI plugin help link, permissions, compact conversation, and new conversation controls
-- **ChatPanel** — message list (MessageList), Copilot-style progress indicators, choice cards, error bar, ChatComposer, and an **input toolbar** below the input box with AgentPicker + ModelPicker (GitHub Copilot-style)
+- **ChatPanel** — message list (MessageList), Copilot-style progress indicators, choice cards, error bar, ChatComposer, and an input toolbar below the input box with ModelPicker + MCP picker
 - **App** — owns settings dialog state, detects system theme and Office host; no setup wizard (Copilot CLI handles auth)
 
 ## Testing Strategy
@@ -289,7 +259,7 @@ The task pane is split into three areas:
 - Single Zustand store: `useSettingsStore` in `src/stores/settingsStore.ts`
 - Persisted via `officeStorage` adapter (uses `OfficeRuntime.storage`; throws when unavailable — tests must mock it via `tests/setup.ts`)
 - Chat state is ephemeral (lives in `useOfficeChat` hook, not persisted)
-- `activeAgentId`, `activeSkillNames` (default: `null` = all ON), and `activeModel` are persisted
+- `activeModel`, `disabledSkillNames`, and `disabledMcpServerNames` are persisted
 - Persist storage key is `office-coding-agent-settings`
 
 ### Tool Definitions
@@ -306,7 +276,7 @@ The task pane is split into three areas:
 - **Copilot-style progress indicators** — VS Code shimmer effect (`chat-thinking-shimmer` CSS animation using `background-clip: text` gradient animation matching VS Code Copilot Chat) + phase labels (auto-derived via `humanizeToolName()`)
 - **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners
-- **Input toolbar** — AgentPicker + ModelPicker below ChatComposer (GitHub Copilot-style)
+- **Input toolbar** — ModelPicker below ChatComposer plus MCP picker on the right
 
 ### Styling
 
@@ -345,7 +315,7 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/server.mjs` — Express HTTPS server (port 3000): Vite dev middleware + Copilot WebSocket proxy
 - `src/copilotProxy.mjs` — bridges WebSocket to `@github/copilot-sdk` CopilotClient
 - `src/components/ChatHeader.tsx` — header: session history, plugin help, permissions, compact conversation, new conversation
-- `src/components/ChatPanel.tsx` — messages (MessageList), progress, input (ChatComposer), AgentPicker, ModelPicker
+- `src/components/ChatPanel.tsx` — messages (MessageList), progress, input (ChatComposer), ModelPicker, MCP picker
 - `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI
 - `src/components/chat/MessageList.tsx` — renders `ChatMessage[]` as AssistantMessage, UserMessage, or ToolProgress components
 - `src/components/chat/ChatComposer.tsx` — text input for user messages
@@ -354,18 +324,13 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/components/chat/MarkdownContent.tsx` — renders Markdown with syntax highlighting
 - `src/components/chat/ToolProgress.tsx` — tool execution progress and results
 - `src/components/chat/ActionBar.tsx` — action buttons (copy, retry, etc.)
-- `src/components/AgentPicker.tsx` — single-select agent dropdown (Radix Popover)
 - `src/components/ModelPicker.tsx` — model selection dropdown (dynamic, fetched from Copilot API)
 - `src/components/SettingsDialog.tsx` — settings/preferences dialog
 - `src/services/ai/BASE_PROMPT.md` — universal base system prompt
 - `src/services/ai/prompts/` — host-level app prompts (`EXCEL_APP_PROMPT.md`, `POWERPOINT_APP_PROMPT.md`, `WORD_APP_PROMPT.md`)
 - `src/services/office/host.ts` — Office host detection (`excel`, `powerpoint`, `word`, `unknown`)
-- `src/services/agents/agentService.ts` — parses/filters host-targeted agent frontmatter
-- `src/agents/excel/AGENT.md` — default Excel agent definition (host-targeted frontmatter)
-- `src/agents/powerpoint/AGENT.md` — default PowerPoint agent definition
-- `src/agents/word/AGENT.md` — default Word agent definition
 - `src/services/skills/skillService.ts` — parses bundled skill files + host filtering via `buildSkillContext(activeNames?, host?)`
-- `src/stores/settingsStore.ts` — Zustand store (activeModel, agent/skill CRUD, reset)
+- `src/stores/settingsStore.ts` — Zustand store (activeModel, skill/MCP enablement, reset)
 - `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
 - `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
 - `src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers` tools

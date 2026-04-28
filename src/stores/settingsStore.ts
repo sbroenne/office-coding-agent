@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CopilotModel, UserSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
-import { getAllAgents } from '@/services/agents';
 import { officeStorage } from './officeStorage';
 
 interface SettingsState extends UserSettings {
@@ -11,10 +10,6 @@ interface SettingsState extends UserSettings {
   availableModels: CopilotModel[] | null;
   setAvailableModels: (models: CopilotModel[]) => void;
   setActiveModel: (modelId: string) => void;
-
-  // ─── Agent management ───
-  setActiveAgent: (agentId: string) => void;
-  getActiveAgent: () => string;
 
   // ─── Skill management ───
   toggleSkill: (name: string) => void;
@@ -45,19 +40,6 @@ export const useSettingsStore = create<SettingsState>()(
         if (!models || models.some(m => m.id === modelId)) {
           set({ activeModel: modelId });
         }
-      },
-
-      // ─── Agent management ───
-      setActiveAgent: agentId => {
-        const agents = getAllAgents();
-        const exists = agents.some(a => a.metadata.name === agentId);
-        if (exists) {
-          set({ activeAgentId: agentId });
-        }
-      },
-
-      getActiveAgent: () => {
-        return get().activeAgentId;
       },
 
       // ─── Skill management ───
@@ -98,7 +80,6 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => officeStorage),
       partialize: state => ({
         activeModel: state.activeModel,
-        activeAgentId: state.activeAgentId,
         disabledSkillNames: state.disabledSkillNames,
         disabledMcpServerNames: state.disabledMcpServerNames,
       }),

@@ -4,7 +4,6 @@ import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websoc
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { resolveActiveAgent, getDefaultAgent, getAgents } from '@/services/agents';
 import { fetchConfiguredMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
@@ -75,7 +74,6 @@ function getWsUrl(): string {
 
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
-  const activeAgentId = useSettingsStore(s => s.activeAgentId);
   const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
   const sessions = useSessionHistoryStore(s => s.sessions);
@@ -102,13 +100,11 @@ export function useOfficeChat(host: OfficeHostApp) {
   // tear down and restart the Copilot session, losing all conversation context.
   // Model changes take effect on the next new conversation (same as VS Code Copilot).
   const activeModelRef = useRef(activeModel);
-  const activeAgentIdRef = useRef(activeAgentId);
   const disabledSkillNamesRef = useRef(disabledSkillNames);
   const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
-  activeAgentIdRef.current = activeAgentId;
   disabledSkillNamesRef.current = disabledSkillNames;
   disabledMcpServerNamesRef.current = disabledMcpServerNames;
   evaluatePermissionRef.current = evaluatePermission;
@@ -248,8 +244,6 @@ export function useOfficeChat(host: OfficeHostApp) {
         console.log('[chat] MCP OAuth completed:', payload.requestId);
       });
 
-      const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
-      const defaultAgent = getDefaultAgent(host);
       let memoryContext = '';
 
       // Inject persistent user memories if any exist
@@ -260,36 +254,10 @@ export function useOfficeChat(host: OfficeHostApp) {
         // Memory store not available — continue without memories
       }
 
-      const systemContent = buildSessionSystemPrompt(host, {
-        defaultAgentName: defaultAgent?.metadata.name,
-        defaultAgentInstructions: defaultAgent?.instructions,
-        activeAgentName: resolvedAgent?.metadata.name,
-        activeAgentInstructions: resolvedAgent?.instructions,
-        memoryContext,
-      });
+      const systemContent = buildSessionSystemPrompt(host, { memoryContext });
 
-      // Build custom agent configs for ALL agents in this host — this enables sub-agent
-      // delegation where the active agent can invoke other agents as sub-agents.
-      // Each agent carries its own tool allowlist so per-agent restrictions are enforced
-      // by the SDK rather than at the session level.
-      const allHostAgents = getAgents(host);
-      const customAgents =
-        allHostAgents.length > 0
-          ? allHostAgents.map(agent => ({
-              name: agent.metadata.name,
-              description: agent.metadata.description,
-              prompt: agent.instructions,
-              // null = all tools; undefined means the same but we use null for explicitness
-              tools: agent.metadata.tools ?? null,
-            }))
-          : undefined;
-
-      // Resolve active MCP servers from the Copilot CLI config, then apply agent/user filters.
+      // Resolve active MCP servers from the Copilot CLI config, then apply user disable filters.
       let activeServers = await fetchConfiguredMcpServers();
-      if (resolvedAgent?.metadata.mcpServers !== undefined) {
-        const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
-        activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
-      }
       activeServers = activeServers.filter(
         s => !disabledMcpServerNamesRef.current.includes(s.name)
       );
@@ -306,7 +274,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           mcpServers,
           host,
           disabledSkills,
-          customAgents,
         }),
         60_000,
         'session.create'

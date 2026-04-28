@@ -15,12 +15,11 @@ The single most important architectural concept for testing this project is the 
 │    humanizeToolName, zipImportService)               │
 │  • Host routing (detectOfficeHost,                   │
 │    getToolsForHost, buildSystemPrompt)               │
-│  • Agent targeting and default resolution            │
 │  • Zustand store logic (settingsStore)               │
 │  • JSON Schema tool configs (toCopilotTools)         │
 │  • React component wiring (integration)              │
-│  • WebSocket client + session (mocked in tests)      │
-│  • Agent/skill service parsing                       │
+│  • WebSocket client + session wiring                 │
+│  • Skill service parsing                             │
 ├──────────────────────────────────────────────────────┤
 │  Excel.run() / PowerPoint / Word boundary            │
 ├──────────────────────────────────────────────────────┤
