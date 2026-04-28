@@ -103,8 +103,8 @@ Plugin-provided skills are managed by the Copilot CLI. The task pane does not re
 │  Testable with Vitest/Playwright (no Excel host)     │
 │  ─────────────────────────────                       │
 │  • Pure functions (parseFrontmatter,                 │
-│    buildSkillContext, toolResultSummary, generateId,  │
-│    humanizeToolName, zipImportService)               │
+│    toolResultSummary, generateId, humanizeToolName,   │
+│    zipImportService)                                 │
 │  • Host routing (detectOfficeHost,                   │
 │    getToolsForHost, buildSystemPrompt)               │
 │  • Zustand store logic (settingsStore)               │
@@ -190,43 +190,57 @@ The task pane is split into three areas:
 
 > `tests/unit/` is **empty** — all logic has been migrated to `tests/integration/`. There are no unit tests in this codebase.
 
-### Current Integration Test Files (40)
+### Current Integration Test Files (49)
 
 | File                                       | Category                            | Requires server?           |
 | ------------------------------------------ | ----------------------------------- | -------------------------- |
-| `agent-manager-dialog.test.tsx`            | Component wiring                    | No                         |
-| `agent-picker.test.tsx`                    | Component wiring                    | No                         |
-| `agent-service.test.ts`                    | Agent service + frontmatter parsing | No                         |
 | `app-error-boundary.test.tsx`              | Component wiring                    | No                         |
 | `app-session-error.test.tsx`               | Component wiring                    | No                         |
 | `app-state.test.tsx`                       | Component wiring                    | No                         |
+| `chat-composer.test.tsx`                   | Slash suggestions / composer UX     | No                         |
 | `chat-error-boundary.test.tsx`             | Component wiring                    | No                         |
 | `chat-header-settings-flow.test.tsx`       | Component wiring                    | No                         |
 | `chat-panel.test.tsx`                      | Component wiring                    | No                         |
 | `chat-store.test.ts`                       | Chat message store                  | No                         |
+| `cli-mcp-servers.test.ts`                  | CLI MCP config parsing              | No                         |
+| `cli-plugin-bootstrap.test.ts`             | CLI plugin startup bootstrap        | No                         |
+| `cli-slash-items.test.ts`                  | CLI slash skill/prompt discovery    | No                         |
 | `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills  | Yes (fails without server) |
 | `copilot-websocket.integration.test.ts`    | Live Copilot WebSocket E2E          | Yes (fails without server) |
 | `excel-tools.test.ts`                      | Tool schema + factory (Excel)       | No                         |
 | `host-tools-limit.test.ts`                 | Host tool count limits              | No                         |
 | `humanize-tool-name.test.ts`               | Tool-name → human-readable labels   | No                         |
 | `id.test.ts`                               | `generateId` utility                | No                         |
-| `management-tools.test.ts`                 | Management tool schemas + handlers  | No                         |
+| `infer-provider.test.ts`                   | Model provider inference            | No                         |
+| `management-tools.test.ts`                 | Memory management tool schema       | No                         |
 | `manifest.test.ts`                         | Office manifest / host assumptions  | No                         |
-| `mcp-manager-dialog.test.tsx`              | Component wiring                    | No                         |
-| `mcp-service.test.ts`                      | MCP server config parsing           | No                         |
-| `model-manager.test.tsx`                   | Component wiring                    | No                         |
+| `mcp-oauth-prompt.test.tsx`                | MCP OAuth prompt UX                 | No                         |
+| `mcp-oauth-proxy.test.ts`                  | MCP OAuth proxy helpers             | No                         |
+| `mcp-picker.test.tsx`                      | MCP picker UX                       | No                         |
+| `mcp-server-key.test.ts`                   | MCP server key normalization        | No                         |
+| `mcp-status-store.test.ts`                 | MCP status store                    | No                         |
+| `model-manager.test.tsx`                   | Model manager wiring                | No                         |
 | `model-picker-interactions.test.tsx`       | Component wiring                    | No                         |
 | `office-storage.test.ts`                   | `officeStorage` with OfficeRuntime  | No                         |
+| `outlook-tools.test.ts`                    | Tool schema + factory (Outlook)     | No                         |
+| `permission-manager-dialog.test.tsx`       | Permission UI wiring                | No                         |
+| `permission-store.test.ts`                 | Permission store                    | No                         |
 | `powerpoint-tools.test.ts`                 | Tool schema + factory (PPT)         | No                         |
-| `settings-dialog.test.tsx`                 | Component wiring                    | No                         |
-| `settings-store.test.ts`                   | Zustand store (model/agent/skills)  | No                         |
-| `skill-manager-dialog.test.tsx`            | Component wiring                    | No                         |
-| `skill-service.test.ts`                    | Skill service + context building    | No                         |
+| `queued-prompts.test.tsx`                  | Queued prompt UX                    | No                         |
+| `server-security.test.ts`                  | Local proxy origin checks           | No                         |
+| `session-history-dialog.test.tsx`          | Session history dialog wiring       | No                         |
+| `session-history-picker.test.tsx`          | Session history picker wiring       | No                         |
+| `session-history-store.test.ts`            | Session history store               | No                         |
+| `settings-store.test.ts`                   | Zustand store (model/agent/MCP)     | No                         |
+| `skill-service.test.ts`                    | Skill markdown parse/serialize      | No                         |
+| `slide-panel.test.tsx`                     | Slide panel wiring                  | No                         |
 | `stale-state.test.tsx`                     | Store hydration                     | No                         |
-| `thread-message-rendering.test.tsx`        | Component wiring                    | No                         |
+| `system-prompt.test.ts`                    | Host system prompt construction     | No                         |
+| `thread-message-rendering.test.tsx`        | Chat thread rendering               | No                         |
+| `tool-result-summary.test.ts`              | Tool result summaries               | No                         |
 | `use-office-chat.test.tsx`                 | useOfficeChat hook                  | No                         |
-| `use-tool-invocations-patch.test.tsx`      | Tool invocation argument streaming  | No                         |
 | `word-tools.test.ts`                       | Tool schema + factory (Word)        | No                         |
+| `wordPlanner.test.ts`                      | Word planner helpers                | No                         |
 | `zip-export-service.test.ts`               | ZIP export service                  | No                         |
 | `zip-import-service.test.ts`               | ZIP import service                  | No                         |
 
@@ -267,7 +281,7 @@ The task pane is split into three areas:
 - Excel tools are defined across 9 config modules (range, table, chart, sheet, workbook, comment, conditionalFormat, dataValidation, pivotTable)
 - Each config module in `src/tools/configs/` defines tool schemas and handlers
 - Tool factory in `src/tools/codegen/factory.ts` generates JSON Schema `Tool[]` for the Copilot SDK
-- **Management tools** (`src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers`) are included for all hosts
+- **Management tools** (`src/tools/management.ts`) currently expose memory management only (`manage_memory`) and are included for all hosts
 - Host routing is in `src/tools/index.ts` via `getToolsForHost(host)` → `Tool[]` (host tools + general tools)
 
 ### UX Patterns
@@ -276,7 +290,7 @@ The task pane is split into three areas:
 - **Copilot-style progress indicators** — VS Code shimmer effect (`chat-thinking-shimmer` CSS animation using `background-clip: text` gradient animation matching VS Code Copilot Chat) + phase labels (auto-derived via `humanizeToolName()`)
 - **Choice cards** — `PromptStarterV2` renders ` ```choices ` blocks as clickable cards
 - **Tool result summaries** — collapsible progress sections with `toolResultSummary()` one-liners
-- **Input toolbar** — ModelPicker below ChatComposer plus MCP picker on the right
+- **Input toolbar** — AgentPicker and ModelPicker below ChatComposer plus MCP picker on the right
 
 ### Styling
 
@@ -315,7 +329,7 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/server.mjs` — Express HTTPS server (port 3000): Vite dev middleware + Copilot WebSocket proxy
 - `src/copilotProxy.mjs` — bridges WebSocket to `@github/copilot-sdk` CopilotClient
 - `src/components/ChatHeader.tsx` — header: session history, plugin help, permissions, compact conversation, new conversation
-- `src/components/ChatPanel.tsx` — messages (MessageList), progress, input (ChatComposer), ModelPicker, MCP picker
+- `src/components/ChatPanel.tsx` — messages (MessageList), progress, input (ChatComposer), AgentPicker, ModelPicker, MCP picker
 - `src/components/ChatErrorBoundary.tsx` — error boundary around chat UI
 - `src/components/chat/MessageList.tsx` — renders `ChatMessage[]` as AssistantMessage, UserMessage, or ToolProgress components
 - `src/components/chat/ChatComposer.tsx` — text input for user messages
@@ -324,16 +338,17 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/components/chat/MarkdownContent.tsx` — renders Markdown with syntax highlighting
 - `src/components/chat/ToolProgress.tsx` — tool execution progress and results
 - `src/components/chat/ActionBar.tsx` — action buttons (copy, retry, etc.)
+- `src/components/AgentPicker.tsx` — CLI-owned agent selection dropdown (dynamic, fetched through SDK session agent RPC)
 - `src/components/ModelPicker.tsx` — model selection dropdown (dynamic, fetched from Copilot API)
 - `src/components/SettingsDialog.tsx` — settings/preferences dialog
 - `src/services/ai/BASE_PROMPT.md` — universal base system prompt
 - `src/services/ai/prompts/` — host-level app prompts (`EXCEL_APP_PROMPT.md`, `POWERPOINT_APP_PROMPT.md`, `WORD_APP_PROMPT.md`)
 - `src/services/office/host.ts` — Office host detection (`excel`, `powerpoint`, `word`, `unknown`)
-- `src/services/skills/skillService.ts` — parses bundled skill files + host filtering via `buildSkillContext(activeNames?, host?)`
-- `src/stores/settingsStore.ts` — Zustand store (activeModel, skill/MCP enablement, reset)
+- `src/services/skills/skillService.ts` — parses/serializes skill markdown files for ZIP import/export helpers
+- `src/stores/settingsStore.ts` — Zustand store (activeModel, activeAgentName, MCP enablement, reset)
 - `src/stores/officeStorage.ts` — OfficeRuntime.storage adapter (throws when unavailable)
 - `src/tools/` — 9 tool config modules + codegen factory (`Tool[]` for Copilot SDK)
-- `src/tools/management.ts` — `manage_skills`, `manage_agents`, `manage_mcp_servers` tools
+- `src/tools/management.ts` — general management tools (`manage_memory`)
 - `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`, `ChatMessage` (stores `thinkingText` per message)
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
 - `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)

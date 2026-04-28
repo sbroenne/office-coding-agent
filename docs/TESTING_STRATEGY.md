@@ -11,8 +11,8 @@ The single most important architectural concept for testing this project is the 
 │  Testable with Vitest/Playwright (no Office host)    │
 │  ─────────────────────────────                       │
 │  • Pure functions (parseFrontmatter,                 │
-│    buildSkillContext, toolResultSummary, generateId,  │
-│    humanizeToolName, zipImportService)               │
+│    toolResultSummary, generateId, humanizeToolName,   │
+│    zipImportService)                                 │
 │  • Host routing (detectOfficeHost,                   │
 │    getToolsForHost, buildSystemPrompt)               │
 │  • Zustand store logic (settingsStore)               │
@@ -54,36 +54,53 @@ Unit tests that mock Office APIs or fabricate fake contexts provide zero confide
 
 | File                                       | Category                            | Requires server? |
 | ------------------------------------------ | ----------------------------------- | ---------------- |
-| `agent-manager-dialog.test.tsx`            | Component wiring                    | No               |
-| `agent-picker.test.tsx`                    | Component wiring                    | No               |
-| `agent-service.test.ts`                    | Agent service + frontmatter parsing | No               |
 | `app-error-boundary.test.tsx`              | Component wiring                    | No               |
 | `app-session-error.test.tsx`               | Component wiring                    | No               |
 | `app-state.test.tsx`                       | Component wiring                    | No               |
+| `chat-composer.test.tsx`                   | Slash suggestions / composer UX     | No               |
 | `chat-error-boundary.test.tsx`             | Component wiring                    | No               |
 | `chat-header-settings-flow.test.tsx`       | Component wiring                    | No               |
 | `chat-panel.test.tsx`                      | Component wiring                    | No               |
-| `cli-plugin-bootstrap.test.ts`             | CLI plugin startup bootstrap        | No               |
 | `chat-store.test.ts`                       | Chat message store                  | No               |
+| `cli-mcp-servers.test.ts`                  | CLI MCP config parsing              | No               |
+| `cli-plugin-bootstrap.test.ts`             | CLI plugin startup bootstrap        | No               |
+| `cli-slash-items.test.ts`                  | CLI slash skill/prompt discovery    | No               |
 | `copilot-custom-agent.integration.test.ts` | Live Copilot custom agent + skills  | Yes              |
 | `copilot-websocket.integration.test.ts`    | Live Copilot WebSocket E2E          | Yes              |
 | `excel-tools.test.ts`                      | Tool schema + factory (Excel)       | No               |
 | `host-tools-limit.test.ts`                 | Host tool count limits              | No               |
 | `humanize-tool-name.test.ts`               | Tool-name → human-readable labels   | No               |
 | `id.test.ts`                               | `generateId` utility                | No               |
-| `management-tools.test.ts`                 | Management tool schemas + handlers  | No               |
+| `infer-provider.test.ts`                   | Model provider inference            | No               |
+| `management-tools.test.ts`                 | Memory management tool schema       | No               |
 | `manifest.test.ts`                         | Office manifest / host assumptions  | No               |
-| `model-manager.test.tsx`                   | Component wiring                    | No               |
+| `mcp-oauth-prompt.test.tsx`                | MCP OAuth prompt UX                 | No               |
+| `mcp-oauth-proxy.test.ts`                  | MCP OAuth proxy helpers             | No               |
+| `mcp-picker.test.tsx`                      | MCP picker UX                       | No               |
+| `mcp-server-key.test.ts`                   | MCP server key normalization        | No               |
+| `mcp-status-store.test.ts`                 | MCP status store                    | No               |
+| `model-manager.test.tsx`                   | Model manager wiring                | No               |
 | `model-picker-interactions.test.tsx`       | Component wiring                    | No               |
 | `office-storage.test.ts`                   | `officeStorage` with OfficeRuntime  | No               |
+| `outlook-tools.test.ts`                    | Tool schema + factory (Outlook)     | No               |
+| `permission-manager-dialog.test.tsx`       | Permission UI wiring                | No               |
+| `permission-store.test.ts`                 | Permission store                    | No               |
 | `powerpoint-tools.test.ts`                 | Tool schema + factory (PPT)         | No               |
-| `settings-dialog.test.tsx`                 | Component wiring                    | No               |
-| `settings-store.test.ts`                   | Zustand store (model/agent/skills)  | No               |
-| `skill-service.test.ts`                    | Skill service + context building    | No               |
+| `queued-prompts.test.tsx`                  | Queued prompt UX                    | No               |
+| `server-security.test.ts`                  | Local proxy origin checks           | No               |
+| `session-history-dialog.test.tsx`          | Session history dialog wiring       | No               |
+| `session-history-picker.test.tsx`          | Session history picker wiring       | No               |
+| `session-history-store.test.ts`            | Session history store               | No               |
+| `settings-store.test.ts`                   | Zustand store (model/agent/MCP)     | No               |
+| `skill-service.test.ts`                    | Skill markdown parse/serialize      | No               |
+| `slide-panel.test.tsx`                     | Slide panel wiring                  | No               |
 | `stale-state.test.tsx`                     | Store hydration                     | No               |
+| `system-prompt.test.ts`                    | Host system prompt construction     | No               |
+| `thread-message-rendering.test.tsx`        | Chat thread rendering               | No               |
+| `tool-result-summary.test.ts`              | Tool result summaries               | No               |
 | `use-office-chat.test.tsx`                 | useOfficeChat hook                  | No               |
-| `use-tool-invocations-patch.test.tsx`      | Tool invocation argument streaming  | No               |
 | `word-tools.test.ts`                       | Tool schema + factory (Word)        | No               |
+| `wordPlanner.test.ts`                      | Word planner helpers                | No               |
 | `zip-export-service.test.ts`               | ZIP export service                  | No               |
 | `zip-import-service.test.ts`               | ZIP import service                  | No               |
 

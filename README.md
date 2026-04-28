@@ -307,7 +307,7 @@ The Office host prompt uses a split architecture:
 - **`src/services/ai/prompts/*_APP_PROMPT.md`** — host-level app prompts
 - Instructions = `buildSystemPrompt(host) + memory context`
 
-Agents are not parsed, selected, or injected by the add-in. The Office default agents are delivered by the required Copilot CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) that the proxy installs and updates at startup.
+Agent definitions are not parsed or injected by the add-in. The Office agents are delivered by the required Copilot CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) that the proxy installs and updates at startup. The task pane Agent picker only selects CLI-owned agents through SDK session agent RPC.
 
 ### Skills, Agents, and CLI Plugins
 

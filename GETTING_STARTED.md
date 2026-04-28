@@ -109,6 +109,7 @@ This opens the Office application and injects the add-in. The task pane will app
 The task pane opens with an AI chat interface. Type a message to get started.
 
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
+- Use the **Agent picker** (bottom of the input bar) to select a CLI-owned Copilot agent.
 - Type `/skill-name` or `/prompt-name` to invoke installed Copilot CLI skills and `.prompt.md` prompt files.
 - Use the **MCP servers** picker (bottom of the input bar) to enable, disable, and sign in to MCP servers from `copilot mcp list`.
 - Use `copilot plugin` CLI commands to install, update, or remove user plugins. On startup, the proxy automatically ensures the Office Coding Agent marketplace plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) are installed and updated in your normal Copilot CLI config.
