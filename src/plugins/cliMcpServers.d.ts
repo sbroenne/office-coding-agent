@@ -17,6 +17,7 @@ declare module '*/cliMcpServers.mjs' {
   export interface CopilotMcpServerOptions {
     command?: string;
     timeoutMs?: number;
+    installedPluginsDir?: string;
     runCommand?: (options: CopilotMcpServerOptions) => Promise<CopilotCommandResult>;
   }
 
@@ -24,6 +25,14 @@ declare module '*/cliMcpServers.mjs' {
     options?: CopilotMcpServerOptions
   ): Promise<CopilotCommandResult>;
   export function parseCopilotMcpListJson(stdout: string): McpServerConfig[];
+  export function parseMcpServerDocument(
+    parsed: unknown,
+    options?: { source?: string }
+  ): McpServerConfig[];
+  export function getPluginMcpServers(options?: CopilotMcpServerOptions): Promise<{
+    servers: McpServerConfig[];
+    errors: string[];
+  }>;
   export function getCliMcpServers(
     options?: CopilotMcpServerOptions
   ): Promise<CopilotMcpServerListResult>;

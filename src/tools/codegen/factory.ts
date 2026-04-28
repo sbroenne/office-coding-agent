@@ -40,7 +40,15 @@ function jsonSchemaForType(type: ParamType, enumValues?: readonly string[]): JSO
     case 'string[]':
       return { type: 'array', items: { type: 'string' } };
     case 'any[][]':
-      return { type: 'array', items: { type: 'array' } };
+      return {
+        type: 'array',
+        items: {
+          type: 'array',
+          items: {
+            anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }],
+          },
+        },
+      };
     case 'string[][]':
       return { type: 'array', items: { type: 'array', items: { type: 'string' } } };
   }
