@@ -2,7 +2,7 @@
 
 > **First time?** See [GETTING_STARTED.md](../GETTING_STARTED.md) for the full setup walkthrough including authentication, proxy server startup, and add-in registration.
 >
-> The proxy server (`npm run dev`) must be running on `https://localhost:3000` before any of the sideload commands below will work.
+> For normal local development, use `npm run start:dev:desktop`. It starts the proxy server, waits for `https://localhost:3000`, then sideloads Excel.
 
 This project supports three sideloading lanes:
 
@@ -26,6 +26,14 @@ The add-in web app (task pane HTML/JS/CSS) must be hosted at the HTTPS URLs in t
 - For testing from other machines, use `manifests/manifest.staging.xml` that points to GitHub Pages.
 
 ## Lane 1: Local Desktop Dev
+
+```bash
+npm run start:dev:desktop
+npm run start:dev:desktop:ppt
+npm run start:dev:desktop:word
+```
+
+If the dev server is already running, you can sideload only:
 
 ```bash
 npm run start:desktop:excel
@@ -104,54 +112,31 @@ Committed file:
 
 - `manifests/manifest.staging.xml`
 
-## Import Checklist (Skills & Agents)
+## CLI Plugin and MCP Checklist
 
-Use this after the add-in is loaded (desktop or staging) to verify ZIP import flows.
+Use this after the add-in is loaded (desktop or staging) to verify the CLI-owned plugin and MCP flows.
 
-1. Generate sample ZIPs
+1. Confirm required Office plugins are installed by the startup bootstrap:
 
 ```bash
-npm run extensions:samples
+copilot plugin list
 ```
 
-Expected files:
+2. Manage user plugins with the Copilot CLI:
 
-- `samples/extensions/sample-skills.zip`
-- `samples/extensions/sample-agents.zip`
+```bash
+copilot plugin install <local-path-or-name@marketplace>
+copilot plugin update <plugin-name@marketplace-name>
+copilot plugin uninstall <plugin-name>
+```
 
-2. Open the task pane and open picker management
+3. Confirm MCP servers match the Copilot CLI config:
 
-- In Excel, open the add-in task pane.
-- For agents: open **Agent picker** in the input toolbar, then click **Manage agents…**
-- For skills: open **Skill picker** in the header, then click **Manage skills…**
+```bash
+copilot mcp list
+```
 
-3. Import agents ZIP
-
-- Click **Import Agents ZIP**.
-- Select `sample-agents.zip`.
-- Verify success message appears.
-- Verify imported agents appear under **Imported** list.
-- Verify bundled agents remain under **Bundled (read-only)**.
-
-4. Import skills ZIP
-
-- Click **Import Skills ZIP**.
-- Select `sample-skills.zip`.
-- Verify success message appears.
-- Verify imported skills appear under **Imported** list.
-- Verify bundled skills remain under **Bundled (read-only)**.
-
-5. Verify pickers
-
-- Agent picker and Skill picker should show grouped sections:
-  - **Bundled**
-  - **Imported**
-
-6. Verify remove behavior
-
-- Remove one imported agent and one imported skill from Settings.
-- Confirm they disappear from Imported lists and pickers.
-- Confirm bundled entries cannot be removed.
+The task pane no longer imports agent/skill ZIP files or owns a separate MCP registry. Agents, skills, prompts, MCP servers, and plugin updates are owned by the Copilot CLI. On startup, the proxy automatically registers the Office Coding Agent marketplace when missing and ensures the required `office-excel`, `office-powerpoint`, `office-word`, and `office-outlook` plugins are installed and updated.
 
 ## Troubleshooting
 

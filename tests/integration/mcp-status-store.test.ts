@@ -44,6 +44,25 @@ describe('mcpStatusStore — status', () => {
     expect(useMcpStatusStore.getState().servers['s1'].error).toBeUndefined();
   });
 
+  it('supports OAuth auth-required and failed statuses', () => {
+    useMcpStatusStore.getState().setStatus('powerbi', 'needs-auth');
+    expect(useMcpStatusStore.getState().servers['powerbi'].status).toBe('needs-auth');
+
+    useMcpStatusStore.getState().setStatus('powerbi', 'failed', 'Authentication required');
+    expect(useMcpStatusStore.getState().servers['powerbi'].status).toBe('failed');
+    expect(useMcpStatusStore.getState().servers['powerbi'].error).toBe('Authentication required');
+  });
+
+  it('tracks OAuth UI state and alias by normalized server key', () => {
+    useMcpStatusStore.getState().setStatus('Power BI MCP', 'needs-auth');
+    useMcpStatusStore.getState().setOAuthState('power_bi_mcp', 'connecting', 'jane');
+    useMcpStatusStore.getState().setOAuthState('Power BI MCP', 'connected', 'jane@microsoft.com');
+
+    const server = useMcpStatusStore.getState().servers['power_bi_mcp'];
+    expect(server.oauthState).toBe('connected');
+    expect(server.oauthAlias).toBe('jane@microsoft.com');
+  });
+
   it('handles multiple servers independently', () => {
     useMcpStatusStore.getState().setStatus('a', 'connected');
     useMcpStatusStore.getState().setStatus('b', 'error', 'fail');

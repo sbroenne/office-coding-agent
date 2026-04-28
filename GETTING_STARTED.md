@@ -62,28 +62,30 @@ npm run register:mac
 
 ---
 
-### 4. Start the proxy server
+### 4. Start the dev server and sideload
 
 The proxy server bridges the browser task pane to the GitHub Copilot API via WebSocket. It must be running whenever you use the add-in.
 
 ```bash
-npm run dev
+npm run start:dev:desktop
 ```
 
-You should see output like:
+This starts the dev server, waits for `https://localhost:3000`, then sideloads the add-in into Excel Desktop. Use a host-specific variant for other Office apps:
 
-```
-  Copilot Office Add-in server running on https://localhost:3000
-  API: https://localhost:3000/api
+```bash
+npm run start:dev:desktop:excel
+npm run start:dev:desktop:ppt
+npm run start:dev:desktop:word
+npm run start:dev:desktop:outlook
 ```
 
-Leave this terminal open. The server handles both the Vite dev server (task pane UI) and the Copilot WebSocket proxy on port 3000.
+The server handles both the Vite dev server (task pane UI) and the Copilot WebSocket proxy on port 3000.
 
 ---
 
-### 5. Sideload into Office
+### 5. Sideload into Office without starting the server
 
-Open a **second terminal** and run the sideload command for your target host:
+If the dev server is already running, you can sideload only:
 
 ```bash
 # Excel
@@ -106,10 +108,11 @@ This opens the Office application and injects the add-in. The task pane will app
 
 The task pane opens with an AI chat interface. Type a message to get started.
 
-- Use the **Agent picker** (bottom of the input bar) to switch agents — includes agents from any installed Copilot CLI plugins.
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
-- Use the **Skill picker** (header icon) to toggle context skills on/off — includes skills from installed plugins.
-- Use the `copilot plugin` CLI commands to install, update, or remove Copilot CLI plugins.
+- Use the **Agent picker** (bottom of the input bar) to select a CLI-owned Copilot agent.
+- Type `/skill-name` or `/prompt-name` to invoke installed Copilot CLI skills and `.prompt.md` prompt files.
+- Use the **MCP servers** picker (bottom of the input bar) to enable, disable, and sign in to MCP servers from `copilot mcp list`.
+- Use `copilot plugin` CLI commands to install, update, or remove user plugins. On startup, the proxy automatically ensures the Office Coding Agent marketplace plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) are installed and updated in your normal Copilot CLI config.
 - Use the **New Conversation** button (header) to reset the chat.
 
 ---
@@ -122,7 +125,11 @@ To stop the sideload session:
 npm run stop
 ```
 
-To stop the proxy server, press `Ctrl+C` in the terminal where `npm run dev` is running.
+To stop the proxy server, close the dev server window or run:
+
+```bash
+npm run dev:stop
+```
 
 ---
 
@@ -166,6 +173,13 @@ This removes the manifest registration and cleans up the trusted certificate ent
 
 - Run `gh auth status` to confirm you are signed in.
 - Run `gh auth login` to re-authenticate if needed.
+
+### MCP servers do not appear as expected
+
+- Run `copilot mcp list` to see the source of truth used by the add-in.
+- Add or remove servers with `copilot mcp add` and `copilot mcp remove`.
+- Reload the task pane or start a new conversation after changing MCP config so the next session uses the updated CLI list.
+- If a remote MCP server needs sign-in, use the **MCP servers** picker action or follow the foreground sign-in prompt.
 
 ### Tray mode (alternative to `npm run dev`)
 

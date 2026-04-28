@@ -17,13 +17,21 @@ async function waitForCompletedToolCard(page: import('@playwright/test').Page) {
   await expect(page.getByText('Connection failed')).not.toBeVisible();
 
   await composer.fill(
-    'Use the manage_skills tool with action "list". After the tool completes, briefly summarize the result.'
+    'Use the manage_memory tool with action "list". After the tool completes, briefly summarize the result.'
   );
   await composer.press('Enter');
 
   const toolCard = page.locator('[data-slot="tool-fallback-root"]').first();
   const workingBox = page.locator('.chat-thinking-box').first();
-  await expect(toolCard.or(workingBox)).toBeVisible({ timeout: AI_TIMEOUT });
+  await page.waitForFunction(
+    () =>
+      Boolean(
+        document.querySelector('[data-slot="tool-fallback-root"]') ||
+          document.querySelector('.chat-thinking-box')
+      ),
+    undefined,
+    { timeout: AI_TIMEOUT }
+  );
 
   await expect(page.getByRole('button', { name: /^(Stop|Cancel)$/ })).not.toBeVisible({
     timeout: AI_TIMEOUT,
@@ -62,7 +70,7 @@ test.describe('Tool card UX (live Copilot)', () => {
     await expect(trigger).not.toContainText(/\bUsed:\s/i);
     await expect(trigger).not.toContainText(/\bRunning:\s/i);
     await expect(trigger).not.toContainText(/\bCancelled:\s/i);
-    await expect(trigger).toContainText(/manage skills/i);
+    await expect(trigger).toContainText(/manage memory/i);
   });
 
   test('trigger shows a result summary after tool completes', async ({
@@ -119,3 +127,4 @@ test.describe('Tool card UX (live Copilot)', () => {
     }
   });
 });
+

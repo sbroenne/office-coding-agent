@@ -1,6 +1,6 @@
 # Office Coding Agent
 
-An Office add-in that brings GitHub Copilot directly into Excel, PowerPoint, Word, and Outlook — with full support for **[Copilot CLI plugins](https://docs.github.com/en/copilot/reference/cli-plugin-reference)**. Install any plugin and its agents, skills, prompts, and MCP servers instantly appear in the task pane. No API keys, no configuration — just sign in with your GitHub account.
+An Office add-in that brings GitHub Copilot directly into Excel, PowerPoint, Word, and Outlook. It uses the **[Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli)** as the single source of truth for authentication, models, plugins, skills, prompts, and MCP servers. No API keys, no endpoint configuration — just sign in with your GitHub account.
 
 Built with React, Tailwind CSS, and the [GitHub Copilot SDK](https://www.npmjs.com/package/@github/copilot-sdk). Architecture based on [patniko/github-copilot-office](https://github.com/patniko/github-copilot-office).
 
@@ -22,27 +22,49 @@ The proxy server uses the `@github/copilot-sdk` to manage the Copilot CLI lifecy
 
 ## Features
 
-### 🔌 Copilot CLI Plugin Support
+### 🔌 CLI-Owned Office Plugins
 
-The add-in is a first-class **Copilot CLI plugin host**. Install any plugin and its content surfaces automatically in the UI — no restart, no configuration:
+On startup, the local proxy uses the user's normal Copilot CLI environment to keep the required Office Coding Agent plugins installed and current:
 
 ```bash
-copilot plugin add <plugin-name>
+copilot plugin marketplace add sbroenne/office-coding-agent-plugins
+copilot plugin install office-excel@office-coding-agent
+copilot plugin install office-powerpoint@office-coding-agent
+copilot plugin install office-word@office-coding-agent
+copilot plugin install office-outlook@office-coding-agent
 ```
 
-- **Agents** from plugins appear in the **Agent picker**
-- **Skills** from plugins appear in the **Skill picker** and are injected as context
-- **Prompts** from plugins appear in the **`/` slash command menu**
-- **MCP servers** from plugins are connected automatically
-- **Plugin content auto-discovery** — installed plugin agents, skills, prompts, and MCP servers appear automatically in the task pane
+The app does not maintain a separate plugin registry, sandbox, marketplace browser, or plugin management UI. User-created and third-party plugins should be installed, updated, and removed with `copilot plugin` commands directly. For plugin authoring and local installs, see GitHub's Copilot CLI plugin docs:
+
+- [About Copilot CLI plugins](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-cli-plugins)
+- [Customize Copilot CLI with plugins and marketplaces](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-marketplace)
+
+### 🔌 CLI-Owned MCP Servers
+
+MCP server configuration is read from the Copilot CLI, not from an app-owned or bundled list. The task pane picker and Copilot session creation both use:
+
+```bash
+copilot mcp list --json
+```
+
+That means servers from user, workspace, plugin, and builtin CLI sources are reflected in the add-in. Manage MCP servers in the terminal:
+
+```bash
+copilot mcp list
+copilot mcp get <server-name>
+copilot mcp add <server-name> <url-or-command-and-args>
+copilot mcp remove <server-name>
+```
+
+Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is required, the task pane shows a foreground prompt and the MCP picker offers **Sign in**, **Retry sign in**, or **Switch account** actions with login-hint support.
 
 ### 🤖 AI Chat in Office
 
 - **GitHub Copilot authentication** — sign in once with your GitHub account; no API keys or endpoint config
 - **VS Code–style chat UI** — identical look and feel to GitHub Copilot in VS Code (design tokens, codicons, shimmer thinking indicator, per-phase Working boxes)
 - **Model picker** — switch between supported Copilot models (Claude Sonnet, GPT-4.1, Gemini, etc.)
-- **Agent picker** — switch between host-targeted agents (bundled + from plugins)
-- **Skill picker** — toggle context skills on/off from installed plugins
+- **Slash skills and prompts** — type `/skill-name` or `/prompt-name` to invoke installed CLI skills and `.prompt.md` prompt files
+- **MCP picker** — enable, disable, and sign in to MCP servers from the user's Copilot CLI config
 - **Streaming responses** — real-time token streaming with Copilot-style progress indicators
 
 ### 📊 Office Host Tools
@@ -78,11 +100,8 @@ gh auth login
 npm run register:win    # Windows
 npm run register:mac    # macOS
 
-# 4. Terminal 1 — start the proxy server (keep this running)
-npm run dev
-
-# 5. Terminal 2 — sideload into Office
-npm run start:desktop:excel   # or :ppt / :word
+# 4. Start the dev server and sideload into Office
+npm run start:dev:desktop   # Excel; or :ppt / :word / :outlook
 ```
 
 The proxy server runs on `https://localhost:3000` and handles both the Vite dev server UI and the Copilot WebSocket proxy. It must be running whenever you use the add-in.
@@ -108,53 +127,56 @@ Run it from the Actions tab in one step:
 
 ## Available Scripts
 
-## Available Scripts
-
-| Script                           | Description                                                           |
-| -------------------------------- | --------------------------------------------------------------------- |
-| `npm run dev`                    | Start Copilot proxy + Vite dev server (port 3000)                     |
-| `npm run start:prod-server`      | Start production HTTPS server from `dist/`                            |
-| `npm run start:tray`             | Build + run Electron system tray app                                  |
-| `npm run start:tray:desktop`     | Start tray app (if needed) then sideload Excel desktop (legacy alias) |
-| `npm run start:tray:excel`       | Start tray app (if needed) then sideload Excel desktop                |
-| `npm run start:tray:ppt`         | Start tray app (if needed) then sideload PowerPoint desktop           |
-| `npm run start:tray:word`        | Start tray app (if needed) then sideload Word desktop                 |
-| `npm run stop:tray:desktop`      | Stop desktop sideload/debug session and server port 3000              |
-| `npm run build:installer`        | Build desktop installer artifacts via electron-builder                |
-| `npm run build:installer:win`    | Build Windows installer (NSIS)                                        |
-| `npm run build:installer:dir`    | Build unpacked desktop app directory                                  |
-| `npm run build`                  | Production build to `dist/`                                           |
-| `npm run build:dev`              | Development build to `dist/`                                          |
-| `npm run start:desktop`          | Sideload into Excel Desktop (legacy alias)                            |
-| `npm run start:desktop:excel`    | Sideload into Excel Desktop                                           |
-| `npm run start:desktop:ppt`      | Sideload into PowerPoint Desktop                                      |
-| `npm run start:desktop:word`     | Sideload into Word Desktop                                            |
-| `npm run stop`                   | Stop debugging / unload the add-in                                    |
-| `npm run extensions:samples`     | Generate sample `agents` and `skills` ZIP files                       |
-| `npm run sideload:share:setup`   | Create local shared-folder catalog on Windows                         |
-| `npm run sideload:share:trust`   | Register local share as trusted Office catalog                        |
-| `npm run sideload:share:publish` | Copy staging manifest into local shared folder                        |
-| `npm run sideload:share:cleanup` | Remove local share and trusted-catalog setup                          |
-| `npm run register:win`           | Trust cert and register manifest for Word/PPT/Excel (Windows)         |
-| `npm run unregister:win`         | Remove registered manifest entry (Windows)                            |
-| `npm run register:mac`           | Trust cert and register manifest for Word/PPT/Excel (macOS)           |
-| `npm run unregister:mac`         | Remove manifest from Word/PPT/Excel WEF folders (macOS)               |
-| `npm run lint`                   | Run ESLint                                                            |
-| `npm run lint:fix`               | Auto-fix ESLint issues                                                |
-| `npm run format`                 | Format code with Prettier                                             |
-| `npm run typecheck`              | Type-check without emitting                                           |
-| `npm test`                       | Run all Vitest suites                                                 |
-| `npm run test:integration`       | Run integration test suite                                            |
-| `npm run test:ui`                | Run Playwright UI tests                                               |
-| `npm run test:watch`             | Run tests in watch mode                                               |
-| `npm run test:coverage`          | Run tests with coverage                                               |
-| `npm run test:e2e`               | Run E2E tests in Excel Desktop                                        |
-| `npm run test:e2e:ppt`           | Run E2E tests in PowerPoint Desktop                                   |
-| `npm run test:e2e:word`          | Run E2E tests in Word Desktop                                         |
-| `npm run test:e2e:outlook`       | Run E2E tests in Outlook Desktop                                      |
-| `npm run test:e2e:all`           | Run all four E2E suites in sequence                                   |
-| `npm run validate`               | Validate `manifests/manifest.dev.xml`                                 |
-| `npm run validate:outlook`       | Validate `manifests/manifest.outlook.dev.xml`                         |
+| Script                              | Description                                                           |
+| ----------------------------------- | --------------------------------------------------------------------- |
+| `npm run dev`                       | Start Copilot proxy + Vite dev server (port 3000)                     |
+| `npm run start:dev:desktop`         | Start dev server, wait for readiness, then sideload Excel Desktop     |
+| `npm run start:dev:desktop:ppt`     | Start dev server, wait for readiness, then sideload PowerPoint        |
+| `npm run start:dev:desktop:word`    | Start dev server, wait for readiness, then sideload Word              |
+| `npm run start:dev:desktop:outlook` | Start dev server, wait for readiness, then sideload Outlook           |
+| `npm run start:prod-server`         | Start production HTTPS server from `dist/`                            |
+| `npm run start:tray`                | Build + run Electron system tray app                                  |
+| `npm run start:tray:desktop`        | Start tray app (if needed) then sideload Excel desktop (legacy alias) |
+| `npm run start:tray:excel`          | Start tray app (if needed) then sideload Excel desktop                |
+| `npm run start:tray:ppt`            | Start tray app (if needed) then sideload PowerPoint desktop           |
+| `npm run start:tray:word`           | Start tray app (if needed) then sideload Word desktop                 |
+| `npm run stop:tray:desktop`         | Stop desktop sideload/debug session and server port 3000              |
+| `npm run build:installer`           | Build desktop installer artifacts via electron-builder                |
+| `npm run build:installer:win`       | Build Windows installer (NSIS)                                        |
+| `npm run build:installer:dir`       | Build unpacked desktop app directory                                  |
+| `npm run build`                     | Production build to `dist/`                                           |
+| `npm run build:dev`                 | Development build to `dist/`                                          |
+| `npm run start:desktop`             | Sideload into Excel Desktop (legacy alias)                            |
+| `npm run start:desktop:excel`       | Sideload into Excel Desktop                                           |
+| `npm run start:desktop:ppt`         | Sideload into PowerPoint Desktop                                      |
+| `npm run start:desktop:word`        | Sideload into Word Desktop                                            |
+| `npm run start:desktop:outlook`     | Sideload into Outlook Desktop                                         |
+| `npm run stop`                      | Stop debugging / unload the add-in                                    |
+| `npm run extensions:samples`        | Generate sample extension ZIP files                                   |
+| `npm run sideload:share:setup`      | Create local shared-folder catalog on Windows                         |
+| `npm run sideload:share:trust`      | Register local share as trusted Office catalog                        |
+| `npm run sideload:share:publish`    | Copy staging manifest into local shared folder                        |
+| `npm run sideload:share:cleanup`    | Remove local share and trusted-catalog setup                          |
+| `npm run register:win`              | Trust cert and register manifest for Word/PPT/Excel (Windows)         |
+| `npm run unregister:win`            | Remove registered manifest entry (Windows)                            |
+| `npm run register:mac`              | Trust cert and register manifest for Word/PPT/Excel (macOS)           |
+| `npm run unregister:mac`            | Remove manifest from Word/PPT/Excel WEF folders (macOS)               |
+| `npm run lint`                      | Run ESLint                                                            |
+| `npm run lint:fix`                  | Auto-fix ESLint issues                                                |
+| `npm run format`                    | Format code with Prettier                                             |
+| `npm run typecheck`                 | Type-check without emitting                                           |
+| `npm test`                          | Run the Vitest unit project                                           |
+| `npm run test:integration`          | Run integration test suite                                            |
+| `npm run test:ui`                   | Run Playwright UI tests                                               |
+| `npm run test:watch`                | Run tests in watch mode                                               |
+| `npm run test:coverage`             | Run tests with coverage                                               |
+| `npm run test:e2e`                  | Run E2E tests in Excel Desktop                                        |
+| `npm run test:e2e:ppt`              | Run E2E tests in PowerPoint Desktop                                   |
+| `npm run test:e2e:word`             | Run E2E tests in Word Desktop                                         |
+| `npm run test:e2e:outlook`          | Run E2E tests in Outlook Desktop                                      |
+| `npm run test:e2e:all`              | Run all four E2E suites in sequence                                   |
+| `npm run validate`                  | Validate `manifests/manifest.dev.xml`                                 |
+| `npm run validate:outlook`          | Validate `manifests/manifest.outlook.dev.xml`                         |
 
 ## Testing
 
@@ -169,8 +191,11 @@ Unit tests are intentionally not used for new work in this repository.
 ### Running Tests
 
 ```bash
-# All Vitest tests
+# Default Vitest project
 npm test
+
+# Integration tests
+npm run test:integration
 
 # Watch mode
 npm run test:watch
@@ -191,7 +216,7 @@ npm run test:e2e:outlook
 npm run validate
 ```
 
-Integration tests run as part of the default `npm test` suite.
+Use `npm run test:integration` for the main integration suite.
 
 ## E2E Testing
 
@@ -274,58 +299,68 @@ src/server.mjs (Express HTTPS, port 3000)
 src/copilotProxy.mjs → @github/copilot-sdk → GitHub Copilot API
 ```
 
-### Agent System
+### Prompt System
 
-The AI agent uses a **split system prompt** architecture:
+The Office host prompt uses a split architecture:
 
 - **`src/services/ai/BASE_PROMPT.md`** — universal base prompt (progress narration, presenting choices)
 - **`src/services/ai/prompts/*_APP_PROMPT.md`** — host-level app prompts
-- **`src/agents/*/AGENT.md`** — agent-specific instructions with YAML frontmatter
-- Instructions = `buildSystemPrompt(host) + resolvedAgent.instructions + skillContext`
+- Instructions = `buildSystemPrompt(host) + memory context`
 
-`agentService` parses and filters agents by host. Agents are targeted via frontmatter `hosts` and can declare host defaults via `defaultForHosts`.
+Agent definitions are not parsed or injected by the add-in. The Office agents are delivered by the required Copilot CLI plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) that the proxy installs and updates at startup. The task pane Agent picker only selects CLI-owned agents through SDK session agent RPC.
 
-### Skills and Agents
+### Skills, Agents, and CLI Plugins
 
-The add-in ships with bundled agents for each Office host. Additional skills, prompts, MCP servers, and extra agents are distributed as **Copilot CLI plugins**.
+Copilot CLI plugins are installed into the user's normal CLI config and consumed by the CLI/SDK, not by an app-owned plugin or agent management layer. The task pane can discover installed CLI plugin skills and `.prompt.md` prompt files so users can reference them as `/skill-name` or `/prompt-name`, matching Copilot slash invocation. Installation, updates, and removal stay in the CLI.
 
 #### Copilot CLI Plugins
 
-Install any Copilot CLI plugin and its content automatically appears in the add-in UI:
+Office Coding Agent ensures these required marketplace plugins at startup:
 
 ```bash
-# Install a plugin
-copilot plugin add <plugin-name>
+# Registered automatically when missing
+copilot plugin marketplace add sbroenne/office-coding-agent-plugins
 
-# List installed plugins
-copilot plugin list
+# Installed automatically when missing
+copilot plugin install office-excel@office-coding-agent
+copilot plugin install office-powerpoint@office-coding-agent
+copilot plugin install office-word@office-coding-agent
+copilot plugin install office-outlook@office-coding-agent
 
-# Update a plugin
-copilot plugin update <plugin-name>
-
-# Remove a plugin
-copilot plugin remove <plugin-name>
+# Updated automatically on startup
+copilot plugin update office-excel@office-coding-agent
 ```
 
-Plugin file conventions (required by the Copilot CLI spec):
+For user-created plugins, use the Copilot CLI directly:
 
-| Content type           | File pattern               | Notes                                            |
-| ---------------------- | -------------------------- | ------------------------------------------------ |
-| Agent                  | `agents/<name>.agent.md`   | YAML frontmatter with `hosts`, `defaultForHosts` |
-| Skill                  | `skills/<name>/SKILL.md`   | YAML frontmatter with optional `hosts`           |
-| Prompt (slash command) | `prompts/<name>.prompt.md` | Appears in `/` slash menu                        |
-| MCP server config      | `mcp.json`                 | Servers discovered automatically                 |
-| Plugin-level agent     | `agents/AGENT.md`          | Uses the plugin name as agent ID                 |
+```bash
+copilot plugin list
+copilot plugin install <source-or-name@marketplace>
+copilot plugin update <plugin-name@marketplace-name>
+copilot plugin uninstall <plugin-name>
+```
 
-> **Note:** Files with the wrong extension (e.g. `agents/my-agent.md` instead of `agents/my-agent.agent.md`) are silently ignored by the Copilot CLI.
+See GitHub's current docs for plugin structure, local plugin creation, and marketplace publishing:
 
-Plugin agents are automatically surfaced in the AgentPicker alongside bundled agents, and plugin skills appear in the SkillPicker. Manage plugins with the `copilot plugin` CLI commands shown above.
+- [About Copilot CLI plugins](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-cli-plugins)
+- [Customize Copilot CLI with plugins and marketplaces](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-marketplace)
 
-#### Bundled Agents
+#### MCP Servers
 
-Bundled agents ship with the add-in and are immutable (read-only in the UI). They live in:
+MCP servers are also CLI-owned. The add-in does not ship or merge a separate MCP registry. The local proxy serves `/api/mcp-servers` from `copilot mcp list --json`, and `useOfficeChat` uses the same data for SDK session creation. To change what appears in the MCP picker, change the CLI config:
 
-- `src/agents/*/AGENT.md` — agent definitions with YAML frontmatter
+```bash
+copilot mcp list
+copilot mcp get <server-name>
+copilot mcp add <server-name> <url-or-command-and-args>
+copilot mcp remove <server-name>
+```
+
+Remote HTTP/SSE servers that require authentication can be recovered from the task pane via SDK-owned OAuth prompts. The picker shows sign-in state and account-switching actions when available.
+
+#### Agents
+
+Agents are CLI-owned. The add-in no longer ships `src/agents/*/AGENT.md` and no longer passes browser-owned `customAgents` into `session.create`. The task pane Agent picker lists/selects CLI-owned agents through the SDK session agent RPC; the Office agents are installed with the required Office Coding Agent CLI plugins.
 
 ### Key Hooks and Components
 
@@ -333,14 +368,14 @@ Bundled agents ship with the add-in and are immutable (read-only in the UI). The
 - **`BrowserCopilotSession.query()`** — async generator yielding `SessionEvent` objects (assistant.message_delta, tool.execution_start, session.idle, etc.)
 - **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host (Excel: ~83 tools, PowerPoint: 24, Word: 35, Outlook: 22)
 
-State is minimal: `useSettingsStore` (Zustand) persists model/agent/skill configuration; chat state is ephemeral.
+State is minimal: `useSettingsStore` (Zustand) persists model, skill, and MCP enablement; chat and MCP runtime auth/status state are ephemeral.
 
 ## UI Layout
 
 The task pane is organized into three areas:
 
-- **ChatHeader** — SkillPicker, Session History picker, Permissions button, and New Conversation action
-- **ChatPanel** — thread/message stream, inline thinking indicator, composer, and input toolbar with AgentPicker + ModelPicker
+- **ChatHeader** — Session History picker, Copilot CLI plugin help link, Permissions button, and New Conversation action
+- **ChatPanel** — thread/message stream, inline thinking indicator, composer, slash completions, and input toolbar with ModelPicker and MCP picker
 - **App** — root shell that handles Office host detection, theme sync, and connection/session/permission banners
 
 ## Authentication

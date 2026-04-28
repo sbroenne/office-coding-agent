@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { CopilotModel } from '@/types';
+import type { CopilotAgent, CopilotModel } from '@/types';
 
 const TEST_MODELS: CopilotModel[] = [
   { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
   { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
+];
+
+const TEST_AGENTS: CopilotAgent[] = [
+  { name: 'office-excel', displayName: 'Office Excel', description: 'Excel agent' },
+  { name: 'office-word', displayName: 'Office Word', description: 'Word agent' },
 ];
 
 beforeEach(() => {
@@ -43,113 +48,35 @@ describe('settingsStore — model', () => {
   });
 });
 
-// ─── Agent management ───
+// ─── CLI agent management ───
 
-describe('settingsStore — agents', () => {
-  it('starts with "Excel" as the default active agent', () => {
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
+describe('settingsStore — CLI agents', () => {
+  it('starts with the default agent selected', () => {
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
   });
 
-  it('setActiveAgent changes the active agent', () => {
-    useSettingsStore.getState().setActiveAgent('Excel');
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
+  it('setActiveAgent accepts any agent when availableAgents is null', () => {
+    useSettingsStore.getState().setActiveAgent('office-excel');
+    expect(useSettingsStore.getState().activeAgentName).toBe('office-excel');
   });
 
-  it('setActiveAgent ignores invalid agent names', () => {
-    useSettingsStore.getState().setActiveAgent('NonExistentAgent');
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
+  it('setActiveAgent validates against availableAgents when set', () => {
+    useSettingsStore.getState().setAvailableAgents(TEST_AGENTS);
+    useSettingsStore.getState().setActiveAgent('unknown-agent');
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
   });
 
-  it('setPluginAgents filters built-in Office plugin agents from store state', () => {
-    useSettingsStore.getState().setPluginAgents([
-      {
-        metadata: {
-          name: 'office-excel',
-          description: 'Built-in Office plugin agent',
-          version: '1.0.0',
-          hosts: ['excel'],
-          defaultForHosts: [],
-        },
-        instructions: 'Built-in instructions.',
-      },
-      {
-        metadata: {
-          name: 'Contoso Excel Agent',
-          description: 'External plugin agent',
-          version: '1.0.0',
-          hosts: ['excel'],
-          defaultForHosts: [],
-        },
-        instructions: 'External instructions.',
-      },
-    ]);
-
-    expect(useSettingsStore.getState().pluginAgents.map(agent => agent.metadata.name)).toEqual([
-      'Contoso Excel Agent',
-    ]);
+  it('setActiveAgent accepts a valid CLI agent name from availableAgents', () => {
+    useSettingsStore.getState().setAvailableAgents(TEST_AGENTS);
+    useSettingsStore.getState().setActiveAgent('office-word');
+    expect(useSettingsStore.getState().activeAgentName).toBe('office-word');
   });
 
-  it('getActiveAgent returns the current agent id', () => {
-    expect(useSettingsStore.getState().getActiveAgent()).toBe('Excel');
-  });
-
-  it('reset restores the default agent', () => {
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().activeAgentId).toBe('Excel');
-  });
-});
-
-// ─── Skill management ───
-
-describe('settingsStore — skills', () => {
-  it('starts with no disabled skills', () => {
-    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
-  });
-
-  it('toggleSkill disables an enabled skill', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    expect(useSettingsStore.getState().disabledSkillNames).toContain('excel');
-  });
-
-  it('toggleSkill re-enables a disabled skill', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    useSettingsStore.getState().toggleSkill('excel');
-    expect(useSettingsStore.getState().disabledSkillNames).not.toContain('excel');
-  });
-
-  it('isSkillEnabled returns true for enabled skills', () => {
-    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(true);
-  });
-
-  it('isSkillEnabled returns false for disabled skills', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(false);
-  });
-
-  it('reset clears disabled skills', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
-  });
-
-  it('setPluginSkills populates pluginSkills', () => {
-    const skill = {
-      metadata: { name: 'test-skill', description: 'A skill', version: '1.0.0', tags: [], hosts: [] as import('@/types/agent').AgentHost[] },
-      content: 'content',
-    };
-    useSettingsStore.getState().setPluginSkills([skill]);
-    expect(useSettingsStore.getState().pluginSkills).toHaveLength(1);
-    expect(useSettingsStore.getState().pluginSkills[0].metadata.name).toBe('test-skill');
-  });
-
-  it('reset clears pluginSkills', () => {
-    const skill = {
-      metadata: { name: 'test-skill', description: 'A skill', version: '1.0.0', tags: [], hosts: [] as import('@/types/agent').AgentHost[] },
-      content: 'content',
-    };
-    useSettingsStore.getState().setPluginSkills([skill]);
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().pluginSkills).toHaveLength(0);
+  it('setActiveAgent(null) returns to default agent', () => {
+    useSettingsStore.getState().setAvailableAgents(TEST_AGENTS);
+    useSettingsStore.getState().setActiveAgent('office-excel');
+    useSettingsStore.getState().setActiveAgent(null);
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
   });
 });
 

@@ -7,15 +7,12 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { SessionEvent } from '@github/copilot-sdk';
 import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSessionHistoryStore } from '@/stores/sessionHistoryStore';
-import { setImportedAgents } from '@/services/agents';
-import { getToolsForHost } from '@/tools';
-import type { AgentConfig } from '@/types/agent';
 
 // ─── Fake session builder ─────────────────────────────────────────────────────
 
@@ -39,13 +36,20 @@ function makeFakeSession(events: SessionEvent[]) {
     getToolHandler: vi.fn(),
     respondPermission: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
+    listAgents: vi.fn().mockResolvedValue([]),
+    selectAgent: vi.fn().mockResolvedValue({
+      name: 'office-excel',
+      displayName: 'Office Excel',
+      description: 'Excel agent',
+    }),
+    deselectAgent: vi.fn().mockResolvedValue(undefined),
     compact: vi.fn().mockResolvedValue(undefined),
     _dispatchEvent: vi.fn() as EventEmitter,
   };
 }
 
 function makeFakeClient(
-  session: ReturnType<typeof makeFakeSession>,
+  session: unknown,
   models: { id: string; name: string }[] = []
 ) {
   return {
@@ -56,9 +60,6 @@ function makeFakeClient(
     onMcpStatus: vi.fn(() => () => undefined),
     onMcpLog: vi.fn(() => () => undefined),
     onMcpTools: vi.fn(() => () => undefined),
-    onPluginAgents: vi.fn(() => () => undefined),
-    onPluginSkills: vi.fn(() => () => undefined),
-    onPluginPrompts: vi.fn(() => () => undefined),
   };
 }
 
@@ -97,13 +98,12 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe('useOfficeChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ servers: [] }),
+    } as Response);
     useSettingsStore.getState().reset();
     useSessionHistoryStore.setState({ sessions: [], activeSessionId: null });
-    setImportedAgents([]);
-  });
-
-  afterEach(() => {
-    setImportedAgents([]);
   });
 
   it('starts in idle state with no messages', async () => {
@@ -777,7 +777,20 @@ describe('useOfficeChat', () => {
 
   // ─── MCP wiring ────────────────────────────────────────────────────────────
 
-  it('includes bundled MCP servers by default (even with no imported servers)', async () => {
+  it('passes Copilot CLI MCP servers into session creation', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        servers: [
+          {
+            name: 's360-breeze',
+            transport: 'stdio',
+            command: 'C:\\Users\\me\\agency.exe',
+            args: ['mcp', 'remote', '--url', 'https://mcp.example.com'],
+          },
+        ],
+      }),
+    } as Response);
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -789,8 +802,14 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    // Bundled servers (e.g. WorkIQ) are included by default
-    expect(config.mcpServers).toBeDefined();
+    expect(config.mcpServers).toEqual({
+      's360-breeze': {
+        type: 'stdio',
+        command: 'C:\\Users\\me\\agency.exe',
+        args: ['mcp', 'remote', '--url', 'https://mcp.example.com'],
+        tools: ['*'],
+      },
+    });
   });
 
   // ─── Per-agent tool scoping ─────────────────────────────────────────────────
@@ -810,9 +829,9 @@ describe('useOfficeChat', () => {
     expect(config.availableTools).toBeUndefined();
   });
 
-  // ─── Native SDK skills and agents ───────────────────────────────────────────
+  // ─── Native SDK skills and CLI-owned agents ────────────────────────────────
 
-  it('passes customAgents with resolved agent to createSession', async () => {
+  it('does not pass browser-owned custom agents into session creation', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -824,30 +843,14 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const agents = config.customAgents as { name: string; prompt: string }[];
-    expect(agents).toBeDefined();
-    expect(agents).toHaveLength(1);
-    expect(agents[0].name).toBe('Excel');
-    expect(agents[0].prompt).toContain('AI assistant');
+    expect(config.customAgents).toBeUndefined();
   });
 
-  it('external plugin agents keep access to the built-in Office tool set', async () => {
+  it('passes selected CLI-owned agent name into session creation', async () => {
+    useSettingsStore.getState().setActiveAgent('office-excel');
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
-
-    useSettingsStore.getState().setPluginAgents([
-      {
-        metadata: {
-          name: 'Contoso Excel Agent',
-          description: 'External plugin agent',
-          version: '1.0.0',
-          hosts: ['excel'],
-          defaultForHosts: [],
-        },
-        instructions: 'External plugin instructions.',
-      },
-    ]);
 
     renderHook(() => useOfficeChat('excel'), { wrapper });
 
@@ -856,15 +859,11 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const customAgents = config.customAgents as { name: string; tools: string[] | null }[];
-    const pluginAgent = customAgents.find(agent => agent.name === 'Contoso Excel Agent');
-
-    expect(pluginAgent).toBeDefined();
-    expect(pluginAgent?.tools).toBeNull();
-    expect(config.tools).toEqual(getToolsForHost('excel'));
+    expect(config.agent).toBe('office-excel');
+    expect(config.customAgents).toBeUndefined();
   });
 
-  it('systemMessage includes host default agent instructions', async () => {
+  it('systemMessage includes host prompt but not app-owned agent instructions', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -877,222 +876,9 @@ describe('useOfficeChat', () => {
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
     const sysMsg = config.systemMessage as { content: string };
-    expect(sysMsg.content).toContain('## Host Agent Instructions');
-    expect(sysMsg.content).toContain('The workbook is already open');
+    expect(sysMsg.content).not.toContain('## Host Agent Instructions');
+    expect(sysMsg.content).not.toContain('## Adaptive Agent Instructions');
     expect(sysMsg.content).toContain('Progress narration');
-  });
-
-  it('systemMessage layers custom agent instructions on top of the host default agent', async () => {
-    const importedAgent: AgentConfig = {
-      metadata: {
-        name: 'Adaptive Excel Coach',
-        description: 'Adds presentation coaching on top of Excel behavior',
-        version: '1.0.0',
-        hosts: ['excel'],
-        defaultForHosts: [],
-      },
-      instructions: 'Always explain insights with an executive-summary tone.',
-    };
-
-    setImportedAgents([importedAgent]);
-    useSettingsStore.getState().setActiveAgent('Adaptive Excel Coach');
-
-    const session = makeFakeSession([IDLE_EVENT]);
-    const client = makeFakeClient(session);
-    mockCreate.mockResolvedValue(client as never);
-
-    renderHook(() => useOfficeChat('excel'), { wrapper });
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 100));
-    });
-
-    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const sysMsg = config.systemMessage as { content: string };
-
-    expect(sysMsg.content).toContain('## Host Agent Instructions');
-    expect(sysMsg.content).toContain('The workbook is already open');
-    expect(sysMsg.content).toContain('## Adaptive Agent Instructions (Adaptive Excel Coach)');
-    expect(sysMsg.content).toContain('Always explain insights with an executive-summary tone.');
-  });
-
-  it('plugin.agents notification registers plugin agents as imported agents', async () => {
-    /**
-     * Regression test: when the proxy sends a plugin.agents notification,
-     * the hook must call setImportedAgents() so plugin agents appear in
-     * the AgentPicker and are included in the next session's customAgents.
-     */
-    const session = makeFakeSession([IDLE_EVENT]);
-    let capturedPluginAgentsHandler: ((payload: unknown) => void) | undefined;
-
-    const client = {
-      ...makeFakeClient(session),
-      onPluginAgents: vi.fn((handler: (payload: unknown) => void) => {
-        capturedPluginAgentsHandler = handler;
-        return () => undefined;
-      }),
-    };
-    mockCreate.mockResolvedValue(client as never);
-
-    renderHook(() => useOfficeChat('excel'), { wrapper });
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 100));
-    });
-
-    // Simulate proxy sending plugin.agents notification
-    expect(capturedPluginAgentsHandler).toBeDefined();
-    await act(async () => {
-      capturedPluginAgentsHandler!({
-        agents: [
-          {
-            name: 'Plugin Agent',
-            description: 'From a plugin',
-            prompt: 'Plugin instructions.',
-            hosts: [],
-          },
-        ],
-      });
-      await new Promise(r => setTimeout(r, 50));
-    });
-
-    // The plugin agents should now be in the store's pluginAgents
-    const pluginAgents = useSettingsStore.getState().pluginAgents;
-    expect(pluginAgents.some(a => a.metadata.name === 'Plugin Agent')).toBe(true);
-
-    // Cleanup
-    useSettingsStore.getState().setPluginAgents([]);
-  });
-
-  it('plugin.agents notification filters built-in Office plugin agents from the picker state', async () => {
-    const session = makeFakeSession([IDLE_EVENT]);
-    let capturedPluginAgentsHandler: ((payload: unknown) => void) | undefined;
-
-    const client = {
-      ...makeFakeClient(session),
-      onPluginAgents: vi.fn((handler: (payload: unknown) => void) => {
-        capturedPluginAgentsHandler = handler;
-        return () => undefined;
-      }),
-    };
-    mockCreate.mockResolvedValue(client as never);
-
-    renderHook(() => useOfficeChat('excel'), { wrapper });
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 100));
-    });
-
-    await act(async () => {
-      capturedPluginAgentsHandler?.({
-        agents: [
-          {
-            name: 'office-excel',
-            description: 'Built-in Office plugin agent',
-            prompt: 'Built-in instructions.',
-            hosts: ['excel'],
-          },
-          {
-            name: 'Contoso Excel Agent',
-            description: 'External plugin agent',
-            prompt: 'External instructions.',
-            hosts: ['excel'],
-          },
-        ],
-      });
-      await new Promise(r => setTimeout(r, 50));
-    });
-
-    expect(useSettingsStore.getState().pluginAgents.map(agent => agent.metadata.name)).toEqual([
-      'Contoso Excel Agent',
-    ]);
-
-    useSettingsStore.getState().setPluginAgents([]);
-  });
-
-  it('plugin.skills notification populates store.pluginSkills', async () => {
-    const session = makeFakeSession([IDLE_EVENT]);
-    let capturedPluginSkillsHandler: ((payload: unknown) => void) | undefined;
-
-    const client = {
-      ...makeFakeClient(session),
-      onPluginSkills: vi.fn((handler: (payload: unknown) => void) => {
-        capturedPluginSkillsHandler = handler;
-        return () => undefined;
-      }),
-    };
-    mockCreate.mockResolvedValue(client as never);
-
-    renderHook(() => useOfficeChat('excel'), { wrapper });
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 100));
-    });
-
-    expect(capturedPluginSkillsHandler).toBeDefined();
-    await act(async () => {
-      capturedPluginSkillsHandler!({
-        skills: [
-          {
-            name: 'SPT IQ Preflight',
-            description: 'Preflight skill',
-            version: '1.0.0',
-            hosts: [],
-            content: 'Skill body content',
-          },
-        ],
-      });
-      await new Promise(r => setTimeout(r, 50));
-    });
-
-    const pluginSkills = useSettingsStore.getState().pluginSkills;
-    expect(pluginSkills.some(s => s.metadata.name === 'SPT IQ Preflight')).toBe(true);
-
-    // Cleanup
-    useSettingsStore.getState().setPluginSkills([]);
-  });
-
-  it('plugin.prompts notification populates store.pluginPrompts', async () => {
-    const session = makeFakeSession([IDLE_EVENT]);
-    let capturedPluginPromptsHandler: ((payload: unknown) => void) | undefined;
-
-    const client = {
-      ...makeFakeClient(session),
-      onPluginPrompts: vi.fn((handler: (payload: unknown) => void) => {
-        capturedPluginPromptsHandler = handler;
-        return () => undefined;
-      }),
-    };
-    mockCreate.mockResolvedValue(client as never);
-
-    renderHook(() => useOfficeChat('excel'), { wrapper });
-
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 100));
-    });
-
-    expect(capturedPluginPromptsHandler).toBeDefined();
-    await act(async () => {
-      capturedPluginPromptsHandler!({
-        prompts: [
-          {
-            name: 'preflight',
-            description: 'Run preflight assessment',
-            agent: 'SPT IQ Preflight',
-            argumentHint: 'TPID',
-            body: 'Run preflight for ${input:tpid}',
-          },
-        ],
-      });
-      await new Promise(r => setTimeout(r, 50));
-    });
-
-    const pluginPrompts = useSettingsStore.getState().pluginPrompts;
-    expect(pluginPrompts.some(p => p.name === 'preflight')).toBe(true);
-    expect(pluginPrompts[0].agent).toBe('SPT IQ Preflight');
-
-    // Cleanup
-    useSettingsStore.getState().setPluginPrompts([]);
   });
 
   it('does not include empty text parts in intermediate message content', async () => {

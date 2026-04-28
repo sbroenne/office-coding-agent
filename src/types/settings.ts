@@ -1,5 +1,3 @@
-import type { McpServerConfig } from './mcp';
-
 /** Provider labels for grouping models in the picker */
 export type ModelProvider = 'Anthropic' | 'OpenAI' | 'Google' | 'Other';
 
@@ -8,6 +6,13 @@ export interface CopilotModel {
   id: string;
   name: string;
   provider: ModelProvider;
+}
+
+/** A Copilot CLI-owned agent option */
+export interface CopilotAgent {
+  name: string;
+  displayName: string;
+  description: string;
 }
 
 /** Infer provider from model ID prefix */
@@ -28,10 +33,8 @@ export function inferProvider(modelId: string): ModelProvider {
 export interface UserSettings {
   /** Currently selected Copilot model ID */
   activeModel: string;
-  /** ID of the currently selected agent (matches agent metadata name). */
-  activeAgentId: string;
-  /** Skill names explicitly disabled by the user. Empty = all enabled. */
-  disabledSkillNames: string[];
+  /** Currently selected Copilot CLI agent name. Null = default agent. */
+  activeAgentName: string | null;
   /** MCP server names explicitly disabled by the user. Empty = all enabled. */
   disabledMcpServerNames: string[];
 }
@@ -39,24 +42,6 @@ export interface UserSettings {
 /** Default settings applied on first run */
 export const DEFAULT_SETTINGS: UserSettings = {
   activeModel: 'claude-sonnet-4.6',
-  activeAgentId: 'Excel',
-  disabledSkillNames: [],
+  activeAgentName: null,
   disabledMcpServerNames: [],
 };
-
-/** Built-in MCP servers that ship with the add-in. Non-removable, but toggleable. */
-export const BUNDLED_MCP_SERVERS: McpServerConfig[] = [
-  {
-    name: 'workiq',
-    description: 'Microsoft 365 Copilot — emails, meetings, documents, Teams',
-    transport: 'stdio',
-    command: 'npx',
-    args: ['-y', '@microsoft/workiq', 'mcp'],
-  },
-  {
-    name: 'powerbi',
-    description: 'Power BI — query semantic models, generate DAX, explore data',
-    transport: 'http',
-    url: 'https://api.fabric.microsoft.com/v1/mcp/powerbi',
-  },
-];

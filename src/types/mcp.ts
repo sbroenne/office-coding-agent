@@ -2,7 +2,16 @@
 export type McpTransportType = 'http' | 'sse' | 'stdio';
 
 /** Lifecycle status of an MCP server */
-export type McpServerStatus = 'stopped' | 'starting' | 'connected' | 'error';
+export type McpServerStatus =
+  | 'stopped'
+  | 'starting'
+  | 'connected'
+  | 'needs-auth'
+  | 'pending'
+  | 'disabled'
+  | 'not_configured'
+  | 'failed'
+  | 'error';
 
 /** A single log entry from an MCP server */
 export interface McpLogEntry {
@@ -15,6 +24,8 @@ export interface McpLogEntry {
 export interface McpServerState {
   status: McpServerStatus;
   error?: string;
+  oauthState?: 'idle' | 'connecting' | 'connected' | 'failed';
+  oauthAlias?: string;
   tools: { name: string; description: string }[];
   logs: McpLogEntry[];
 }
@@ -31,10 +42,14 @@ export interface McpServerConfig {
   url?: string;
   /** Optional HTTP headers (e.g. Authorization) — for http/sse transport */
   headers?: Record<string, string>;
+  /** Optional last OAuth account alias for UI recovery actions */
+  oauthAlias?: string;
   /** Executable command (required for stdio transport, e.g. "npx") */
   command?: string;
   /** Command arguments (for stdio transport) */
   args?: string[];
   /** Optional environment variables (for stdio transport) */
   env?: Record<string, string>;
+  /** Source reported by the Copilot CLI (user, workspace, plugin, builtin). */
+  source?: string;
 }

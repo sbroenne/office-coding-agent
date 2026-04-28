@@ -1,8 +1,18 @@
+import { execFileSync } from 'node:child_process';
 import { test, expect } from '../fixtures';
+
+function getCliMcpServerNames(): string[] {
+  const stdout = execFileSync('copilot', ['mcp', 'list', '--json'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const parsed = JSON.parse(stdout) as { mcpServers?: Record<string, unknown> };
+  return Object.keys(parsed.mcpServers ?? {});
+}
 
 test.describe('Chat UI (fresh launch)', () => {
   test('renders header controls with no pre-seeded settings', async ({ taskpane }) => {
-    await expect(taskpane.getByRole('button', { name: 'Agent skills' })).toBeVisible({
+    await expect(taskpane.getByRole('link', { name: 'Copilot CLI plugin help' })).toBeVisible({
       timeout: 10_000,
     });
     await expect(taskpane.getByRole('button', { name: 'New conversation' })).toBeVisible({
@@ -14,7 +24,7 @@ test.describe('Chat UI (fresh launch)', () => {
     await expect(taskpane.getByPlaceholder('Send a message...')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('shows the default agent picker', async ({ taskpane }) => {
+  test('shows the CLI-backed agent picker', async ({ taskpane }) => {
     await expect(taskpane.getByRole('button', { name: 'Select agent' })).toBeVisible({
       timeout: 10_000,
     });
@@ -23,7 +33,7 @@ test.describe('Chat UI (fresh launch)', () => {
 
 test.describe('Chat UI (configured state)', () => {
   test('renders the chat header controls', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Copilot CLI plugin help' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
@@ -43,17 +53,22 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'MCP servers' })).toBeVisible();
   });
 
-  test('MCP servers popover lists workiq and powerbi bundled servers', async ({
-    configuredTaskpane: page,
-  }) => {
+  test('MCP servers popover matches the Copilot CLI config', async ({ configuredTaskpane: page }) => {
+    const cliServerNames = getCliMcpServerNames();
+
     await page.getByRole('button', { name: 'MCP servers' }).click();
-    // Both bundled MCP servers must appear in the popover
-    await expect(page.getByRole('button', { name: 'workiq' })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('button', { name: 'powerbi' })).toBeVisible({ timeout: 5000 });
+    if (cliServerNames.length === 0) {
+      await expect(page.getByText('No MCP servers available.')).toBeVisible({ timeout: 5000 });
+      return;
+    }
+
+    for (const serverName of cliServerNames) {
+      await expect(page.getByRole('button', { name: serverName })).toBeVisible({ timeout: 5000 });
+    }
   });
 
-  test('shows the skill picker button', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByRole('button', { name: 'Agent skills' })).toBeVisible();
+  test('does not show the removed skill picker button', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Agent skills' })).toHaveCount(0);
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
@@ -61,9 +76,10 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 5000 });
   });
 
-  test('displays the agent picker', async ({ configuredTaskpane: page }) => {
-    // The agent picker should show the active agent
-    await expect(page.getByText('Excel')).toBeVisible({ timeout: 5000 });
+  test('displays the CLI-backed agent picker', async ({ configuredTaskpane: page }) => {
+    await expect(page.getByRole('button', { name: 'Select agent' })).toBeVisible();
+    await page.getByRole('button', { name: 'Select agent' }).click();
+    await expect(page.getByText('Agents')).toBeVisible();
   });
 
   test('new conversation button is clickable', async ({ configuredTaskpane: page }) => {
@@ -74,22 +90,28 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByPlaceholder('Send a message...')).toBeVisible();
   });
 
-  test('agent picker has no manage plugins button — plugin management is via CLI', async ({
+  test('does not show manage plugins button — plugin management is via CLI', async ({
     configuredTaskpane: page,
   }) => {
-    await page.getByRole('button', { name: 'Select agent' }).click();
     await expect(page.getByRole('button', { name: 'Manage plugins…' })).toHaveCount(0);
-    // Close the picker
-    await page.keyboard.press('Escape');
   });
 
-  test('skill picker has no manage plugins button — plugin management is via CLI', async ({
+  test('/skills does not expose management command suggestions', async ({
     configuredTaskpane: page,
   }) => {
-    await page.getByRole('button', { name: 'Agent skills' }).click();
-    await expect(page.getByRole('button', { name: 'Manage plugins…' })).toHaveCount(0);
-    // Close the picker
-    await page.keyboard.press('Escape');
+    const composer = page.getByRole('textbox', { name: 'Message input' });
+    await composer.fill('/skills');
+    await expect(page.getByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
+    await expect(page.getByRole('option', { name: /\/skills list/i })).toHaveCount(0);
+  });
+
+  test('direct slash suggestions include installed Copilot CLI skills', async ({
+    configuredTaskpane: page,
+  }) => {
+    const composer = page.getByRole('textbox', { name: 'Message input' });
+    await composer.fill('/exc');
+    await expect(page.getByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
+    await expect(page.getByRole('option').filter({ hasText: /\/excel/i }).first()).toBeVisible();
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({

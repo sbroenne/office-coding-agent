@@ -46,30 +46,17 @@ export interface PermissionRequestPayload {
   };
 }
 
-/** Custom agent config sent from browser to proxy. */
-export interface CustomAgentPayload {
-  name: string;
-  displayName?: string;
-  description?: string;
-  prompt: string;
-  tools?: string[] | null;
-}
-
 /** Extended session config for browser → proxy communication. */
 export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onPermissionRequest'> {
   tools?: Tool[];
   /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
   host?: string;
-  /** Skill names to disable (SDK disabledSkills). */
-  disabledSkills?: string[];
-  /** Custom agent configs passed natively to the SDK. */
-  customAgents?: CustomAgentPayload[];
-  /**
-   * Override path to the Copilot CLI config file used for plugin discovery.
-   * Used in integration tests to inject a synthetic plugin config without
-   * touching the real ~/.copilot/config.json.
-   */
-  pluginConfigPath?: string;
+}
+
+export interface AgentInfo {
+  name: string;
+  displayName: string;
+  description: string;
 }
 
 /**
@@ -196,9 +183,45 @@ export class BrowserCopilotSession {
     });
   }
 
+  async listAgents(): Promise<AgentInfo[]> {
+    const result = await this.connection.sendRequest<{ agents: AgentInfo[] }>('agent.list', {
+      sessionId: this.sessionId,
+    });
+    return result.agents;
+  }
+
+  async selectAgent(agentName: string): Promise<AgentInfo> {
+    const result = await this.connection.sendRequest<{ agent: AgentInfo }>('agent.select', {
+      sessionId: this.sessionId,
+      name: agentName,
+    });
+    return result.agent;
+  }
+
+  async deselectAgent(): Promise<void> {
+    await this.connection.sendRequest('agent.deselect', {
+      sessionId: this.sessionId,
+    });
+  }
+
   async compact(): Promise<void> {
     await this.connection.sendRequest('session.compact', {
       sessionId: this.sessionId,
+    });
+  }
+
+  async initiateMcpOAuth(serverName: string): Promise<McpOAuthResult> {
+    return this.connection.sendRequest<McpOAuthResult>('mcp.initiateOAuth', {
+      sessionId: this.sessionId,
+      serverName,
+    });
+  }
+
+  async initiateMcpOAuthWithHint(serverName: string, loginHint?: string): Promise<McpOAuthResult> {
+    return this.connection.sendRequest<McpOAuthResult>('mcp.initiateOAuth', {
+      sessionId: this.sessionId,
+      serverName,
+      loginHint,
     });
   }
 
@@ -215,8 +238,32 @@ export class BrowserCopilotSession {
 /** MCP status notification payload */
 export interface McpStatusPayload {
   server: string;
-  status: 'stopped' | 'starting' | 'connected' | 'error';
+  status:
+    | 'stopped'
+    | 'starting'
+    | 'connected'
+    | 'needs-auth'
+    | 'pending'
+    | 'disabled'
+    | 'not_configured'
+    | 'failed'
+    | 'error';
   error?: string;
+}
+
+export type McpOAuthResult =
+  | { status: 'success'; authorizationUrl?: string; oauthAlias?: string }
+  | { status: 'public' }
+  | { status: 'error'; message: string };
+
+export interface McpOAuthRequiredPayload {
+  requestId: string;
+  serverName: string;
+  serverUrl?: string;
+}
+
+export interface McpOAuthCompletedPayload {
+  requestId: string;
 }
 
 /** MCP log notification payload */
@@ -233,48 +280,6 @@ export interface McpToolsPayload {
   tools: { name: string; description: string }[];
 }
 
-/** A single agent descriptor from a plugin, as sent in the plugin.agents notification. */
-export interface PluginAgentDescriptor {
-  name: string;
-  description: string;
-  prompt: string;
-  /** Empty array means the agent is universal (all hosts). */
-  hosts: string[];
-}
-
-/** Payload for the plugin.agents notification sent by the proxy after session.create. */
-export interface PluginAgentsPayload {
-  agents: PluginAgentDescriptor[];
-}
-
-/** A single skill descriptor from a plugin, as sent in the plugin.skills notification. */
-export interface PluginSkillDescriptor {
-  name: string;
-  description: string;
-  version: string;
-  hosts: string[];
-  content: string;
-}
-
-/** Payload for the plugin.skills notification. */
-export interface PluginSkillsPayload {
-  skills: PluginSkillDescriptor[];
-}
-
-/** A single prompt/slash-command descriptor from a plugin's prompts/*.prompt.md. */
-export interface PluginPromptDescriptor {
-  name: string;
-  description: string;
-  agent: string;
-  argumentHint: string;
-  body: string;
-}
-
-/** Payload for the plugin.prompts notification. */
-export interface PluginPromptsPayload {
-  prompts: PluginPromptDescriptor[];
-}
-
 /**
  * Browser-compatible Copilot client connected via WebSocket proxy.
  */
@@ -285,9 +290,8 @@ export class WebSocketCopilotClient {
   private mcpStatusHandlers = new Set<(payload: McpStatusPayload) => void>();
   private mcpLogHandlers = new Set<(payload: McpLogPayload) => void>();
   private mcpToolsHandlers = new Set<(payload: McpToolsPayload) => void>();
-  private pluginAgentsHandlers = new Set<(payload: PluginAgentsPayload) => void>();
-  private pluginSkillsHandlers = new Set<(payload: PluginSkillsPayload) => void>();
-  private pluginPromptsHandlers = new Set<(payload: PluginPromptsPayload) => void>();
+  private mcpOAuthRequiredHandlers = new Set<(payload: McpOAuthRequiredPayload) => void>();
+  private mcpOAuthCompletedHandlers = new Set<(payload: McpOAuthCompletedPayload) => void>();
 
   constructor(private url: string) {}
 
@@ -333,9 +337,7 @@ export class WebSocketCopilotClient {
       mcpServers: config.mcpServers,
       availableTools: config.availableTools,
       host: config.host,
-      disabledSkills: config.disabledSkills,
-      customAgents: config.customAgents,
-      pluginConfigPath: config.pluginConfigPath,
+      agent: config.agent,
     });
 
     const sessionId = response.sessionId;
@@ -377,24 +379,17 @@ export class WebSocketCopilotClient {
     };
   }
 
-  onPluginAgents(handler: (payload: PluginAgentsPayload) => void): () => void {
-    this.pluginAgentsHandlers.add(handler);
+  onMcpOAuthRequired(handler: (payload: McpOAuthRequiredPayload) => void): () => void {
+    this.mcpOAuthRequiredHandlers.add(handler);
     return () => {
-      this.pluginAgentsHandlers.delete(handler);
+      this.mcpOAuthRequiredHandlers.delete(handler);
     };
   }
 
-  onPluginSkills(handler: (payload: PluginSkillsPayload) => void): () => void {
-    this.pluginSkillsHandlers.add(handler);
+  onMcpOAuthCompleted(handler: (payload: McpOAuthCompletedPayload) => void): () => void {
+    this.mcpOAuthCompletedHandlers.add(handler);
     return () => {
-      this.pluginSkillsHandlers.delete(handler);
-    };
-  }
-
-  onPluginPrompts(handler: (payload: PluginPromptsPayload) => void): () => void {
-    this.pluginPromptsHandlers.add(handler);
-    return () => {
-      this.pluginPromptsHandlers.delete(handler);
+      this.mcpOAuthCompletedHandlers.delete(handler);
     };
   }
 
@@ -468,9 +463,9 @@ export class WebSocketCopilotClient {
       }
     });
 
-    this.connection.onNotification('plugin.agents', (notification: unknown) => {
-      const payload = notification as PluginAgentsPayload;
-      for (const handler of this.pluginAgentsHandlers) {
+    this.connection.onNotification('mcp.oauth-required', (notification: unknown) => {
+      const payload = notification as McpOAuthRequiredPayload;
+      for (const handler of this.mcpOAuthRequiredHandlers) {
         try {
           handler(payload);
         } catch {
@@ -479,20 +474,9 @@ export class WebSocketCopilotClient {
       }
     });
 
-    this.connection.onNotification('plugin.skills', (notification: unknown) => {
-      const payload = notification as PluginSkillsPayload;
-      for (const handler of this.pluginSkillsHandlers) {
-        try {
-          handler(payload);
-        } catch {
-          /* ignore */
-        }
-      }
-    });
-
-    this.connection.onNotification('plugin.prompts', (notification: unknown) => {
-      const payload = notification as PluginPromptsPayload;
-      for (const handler of this.pluginPromptsHandlers) {
+    this.connection.onNotification('mcp.oauth-completed', (notification: unknown) => {
+      const payload = notification as McpOAuthCompletedPayload;
+      for (const handler of this.mcpOAuthCompletedHandlers) {
         try {
           handler(payload);
         } catch {

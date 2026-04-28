@@ -1,11 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { CopilotModel, UserSettings } from '@/types';
+import type { CopilotAgent, CopilotModel, UserSettings } from '@/types';
 import { DEFAULT_SETTINGS } from '@/types';
-import { getAllAgents, setImportedAgents, sanitizeImportedAgents } from '@/services/agents';
-import type { AgentSkill } from '@/types/skill';
-import type { AgentConfig } from '@/types/agent';
-import type { PluginPrompt } from '@/types/plugin';
 import { officeStorage } from './officeStorage';
 
 interface SettingsState extends UserSettings {
@@ -15,36 +11,11 @@ interface SettingsState extends UserSettings {
   setAvailableModels: (models: CopilotModel[]) => void;
   setActiveModel: (modelId: string) => void;
 
-  // ─── Agent management ───
-  setActiveAgent: (agentId: string) => void;
-  getActiveAgent: () => string;
-  /**
-   * Plugin agents discovered from the Copilot CLI config at session start.
-   * Ephemeral — NOT persisted. Populated by the plugin.agents notification.
-   */
-  pluginAgents: AgentConfig[];
-  /** Replace the current plugin agent list (called on each session.create). */
-  setPluginAgents: (agents: AgentConfig[]) => void;
-
-  /**
-   * Plugin skills discovered from the Copilot CLI config at session start.
-   * Ephemeral — NOT persisted. Populated by the plugin.skills notification.
-   */
-  pluginSkills: AgentSkill[];
-  /** Replace the current plugin skill list (called on each session.create). */
-  setPluginSkills: (skills: AgentSkill[]) => void;
-
-  /**
-   * Plugin prompts (slash commands) discovered from plugin prompts/ directories.
-   * Ephemeral — NOT persisted. Populated by the plugin.prompts notification.
-   */
-  pluginPrompts: PluginPrompt[];
-  /** Replace the current plugin prompt list (called on each session.create). */
-  setPluginPrompts: (prompts: PluginPrompt[]) => void;
-
-  // ─── Skill management ───
-  toggleSkill: (name: string) => void;
-  isSkillEnabled: (name: string) => boolean;
+  // ─── CLI agent management ───
+  /** Agents discovered from the Copilot CLI (cached across sessions) */
+  availableAgents: CopilotAgent[] | null;
+  setAvailableAgents: (agents: CopilotAgent[]) => void;
+  setActiveAgent: (agentName: string | null) => void;
 
   // ─── MCP server management ───
   toggleMcpServer: (name: string) => void;
@@ -60,9 +31,7 @@ export const useSettingsStore = create<SettingsState>()(
       // ─── Initial state ───
       ...DEFAULT_SETTINGS,
       availableModels: null,
-      pluginAgents: [],
-      pluginSkills: [],
-      pluginPrompts: [],
+      availableAgents: null,
 
       // ─── Model management ───
       setAvailableModels: models => {
@@ -76,45 +45,16 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
-      // ─── Agent management ───
-      setActiveAgent: agentId => {
-        const agents = getAllAgents();
-        const exists = agents.some(a => a.metadata.name === agentId);
-        if (exists) {
-          set({ activeAgentId: agentId });
+      // ─── CLI agent management ───
+      setAvailableAgents: agents => {
+        set({ availableAgents: agents });
+      },
+
+      setActiveAgent: agentName => {
+        const agents = get().availableAgents;
+        if (agentName === null || !agents || agents.some(a => a.name === agentName)) {
+          set({ activeAgentName: agentName });
         }
-      },
-
-      getActiveAgent: () => {
-        return get().activeAgentId;
-      },
-
-      setPluginAgents: agents => {
-        const visibleAgents = sanitizeImportedAgents(agents);
-        set({ pluginAgents: visibleAgents });
-        setImportedAgents(visibleAgents);
-      },
-
-      setPluginSkills: skills => {
-        set({ pluginSkills: skills });
-      },
-
-      setPluginPrompts: prompts => {
-        set({ pluginPrompts: prompts });
-      },
-
-      // ─── Skill management ───
-      toggleSkill: name => {
-        const disabled = get().disabledSkillNames;
-        if (disabled.includes(name)) {
-          set({ disabledSkillNames: disabled.filter(n => n !== name) });
-        } else {
-          set({ disabledSkillNames: [...disabled, name] });
-        }
-      },
-
-      isSkillEnabled: name => {
-        return !get().disabledSkillNames.includes(name);
       },
 
       // ─── MCP server management ───
@@ -133,8 +73,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       // ─── Reset ───
       reset: () => {
-        set({ ...DEFAULT_SETTINGS, pluginAgents: [], pluginSkills: [], pluginPrompts: [] });
-        setImportedAgents([]);
+        set({ ...DEFAULT_SETTINGS, availableModels: null, availableAgents: null });
       },
     }),
     {
@@ -142,8 +81,7 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => officeStorage),
       partialize: state => ({
         activeModel: state.activeModel,
-        activeAgentId: state.activeAgentId,
-        disabledSkillNames: state.disabledSkillNames,
+        activeAgentName: state.activeAgentName,
         disabledMcpServerNames: state.disabledMcpServerNames,
       }),
     }

@@ -1,8 +1,6 @@
 import JSZip from 'jszip';
 import { parseFrontmatter } from '@/services/skills';
-import { parseAgentFrontmatter } from '@/services/agents';
 import type { AgentSkill } from '@/types/skill';
-import type { AgentConfig } from '@/types/agent';
 
 const MAX_ZIP_BYTES = 5 * 1024 * 1024;
 const MAX_TOTAL_MARKDOWN_BYTES = 2 * 1024 * 1024;
@@ -23,7 +21,7 @@ function validateZipPath(path: string): void {
   }
 }
 
-async function getMarkdownFilesFromFolder(file: File, folderName: 'skills' | 'agents') {
+async function getMarkdownFilesFromFolder(file: File, folderName: 'skills') {
   if (file.size > MAX_ZIP_BYTES) {
     throw new Error(`ZIP file is too large. Maximum size is ${MAX_ZIP_BYTES / (1024 * 1024)}MB.`);
   }
@@ -73,49 +71,6 @@ export async function parseSkillsZipFile(file: File): Promise<AgentSkill[]> {
   });
 
   return skills;
-}
-
-export async function parseAgentsZipFile(file: File): Promise<AgentConfig[]> {
-  const entries = await getMarkdownFilesFromFolder(file, 'agents');
-
-  const agents = entries.map(entry => {
-    const parsed = parseAgentFrontmatter(entry.content);
-    const name = parsed.metadata.name.trim();
-
-    if (!name || name === 'unknown') {
-      throw new Error(`Agent file '${entry.path}' is missing a valid frontmatter name.`);
-    }
-
-    if (parsed.metadata.hosts.length === 0) {
-      throw new Error(`Agent file '${entry.path}' must include at least one supported host.`);
-    }
-
-    return parsed;
-  });
-
-  return agents;
-}
-
-/** Parse a single agent `.md` file (max 1 MB). */
-export async function parseAgentMarkdownFile(file: File): Promise<AgentConfig> {
-  if (file.size > MAX_SINGLE_FILE_BYTES) {
-    throw new Error('File is too large. Maximum size is 1 MB.');
-  }
-  if (!file.name.toLowerCase().endsWith('.md')) {
-    throw new Error('File must be a .md (Markdown) file.');
-  }
-
-  const content = await file.text();
-  const parsed = parseAgentFrontmatter(content);
-
-  if (!parsed.metadata.name.trim() || parsed.metadata.name === 'unknown') {
-    throw new Error('Agent file is missing a valid frontmatter name.');
-  }
-  if (parsed.metadata.hosts.length === 0) {
-    throw new Error('Agent file must include at least one supported host.');
-  }
-
-  return parsed;
 }
 
 /** Parse a single skill `.md` file (max 1 MB). */

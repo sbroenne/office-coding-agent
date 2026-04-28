@@ -7,7 +7,6 @@ import { ChatComposer } from './ChatComposer';
 import { useChatActions } from '@/contexts/ChatActionsContext';
 import { detectOfficeHost } from '@/services/office/host';
 import type { ChatMessage } from '@/types';
-import type { PluginPrompt } from '@/types/plugin';
 
 // ─── Welcome Screen ───────────────────────────────────────────────────────────
 
@@ -130,10 +129,6 @@ interface MessageListProps {
   onFeedback?: (messageId: string, kind: 'positive' | 'negative') => void;
   leftToolbar?: ReactNode;
   rightToolbar?: ReactNode;
-  /** Plugin prompt templates for the slash command menu in the composer. */
-  slashCommands?: PluginPrompt[];
-  /** Called when the slash menu selects an agent-bound prompt. */
-  onAgentSelect?: (agentName: string) => void;
 }
 
 export const MessageList: FC<MessageListProps> = ({
@@ -149,8 +144,6 @@ export const MessageList: FC<MessageListProps> = ({
   onFeedback,
   leftToolbar,
   rightToolbar,
-  slashCommands = [],
-  onAgentSelect,
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -281,8 +274,6 @@ export const MessageList: FC<MessageListProps> = ({
             history={userHistory}
             leftToolbar={leftToolbar}
             rightToolbar={rightToolbar}
-            slashCommands={slashCommands}
-            onAgentSelect={onAgentSelect}
           />
         </div>
       </div>

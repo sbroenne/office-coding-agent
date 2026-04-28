@@ -1,27 +1,24 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
-import type { WebSocketCopilotClient, BrowserCopilotSession } from '@/lib/websocket-client';
+import type {
+  AgentInfo,
+  WebSocketCopilotClient,
+  BrowserCopilotSession,
+} from '@/lib/websocket-client';
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import {
-  resolveActiveAgent,
-  getDefaultAgent,
-  getAgents,
-  SUPPORTED_AGENT_HOSTS,
-} from '@/services/agents';
-import { toSdkMcpServers } from '@/services/mcp';
+import { fetchConfiguredMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
 import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
 import { buildSessionSystemPrompt } from '@/services/ai/systemPrompt';
-import { inferProvider, BUNDLED_MCP_SERVERS } from '@/types';
+import { inferProvider } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
-import type { AgentHost } from '@/types/agent';
-import type { AgentSkill } from '@/types/skill';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
+import type { McpOAuthPromptRequest } from '@/components/McpOAuthPrompt';
 
 const MODEL_FETCH_TIMEOUT_MS = 10_000;
 const DEFAULT_THINKING_TEXT = 'Thinking…';
@@ -67,6 +64,29 @@ async function loadAvailableModels(client: WebSocketCopilotClient): Promise<void
   }
 }
 
+/** Fetch CLI-owned agents from the active Copilot session and update the store. */
+async function loadAvailableAgents(session: BrowserCopilotSession): Promise<void> {
+  try {
+    if (typeof session.listAgents !== 'function') {
+      useSettingsStore.getState().setAvailableAgents([]);
+      return;
+    }
+    const agents = await withTimeout(session.listAgents(), MODEL_FETCH_TIMEOUT_MS, 'agent.list');
+    useSettingsStore.getState().setAvailableAgents(agents);
+
+    const { activeAgentName } = useSettingsStore.getState();
+    if (activeAgentName && !agents.some(agent => agent.name === activeAgentName)) {
+      console.warn(
+        `[useOfficeChat] activeAgent '${activeAgentName}' not in available CLI agents, switching to default`
+      );
+      useSettingsStore.getState().setActiveAgent(null);
+    }
+  } catch (err) {
+    console.warn('[useOfficeChat] Failed to load available agents:', err);
+    useSettingsStore.getState().setAvailableAgents([]);
+  }
+}
+
 function getWsUrl(): string {
   if (typeof window === 'undefined') return 'wss://localhost:3000/api/copilot';
   const { hostname, protocol, host } = window.location;
@@ -81,8 +101,7 @@ function getWsUrl(): string {
 
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
-  const activeAgentId = useSettingsStore(s => s.activeAgentId);
-  const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
+  const activeAgentName = useSettingsStore(s => s.activeAgentName);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
@@ -103,19 +122,17 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   // Stable refs for settings that should NOT trigger session re-init when they change.
   // initSession reads from these refs so the useCallback only re-creates when host
-  // changes — not on every skill/agent/MCP/model toggle mid-conversation.
+  // changes — not on every agent/MCP/model toggle mid-conversation.
   // Without this, any store update (e.g. WorkIQ connecting, switching model) would
   // tear down and restart the Copilot session, losing all conversation context.
   // Model changes take effect on the next new conversation (same as VS Code Copilot).
   const activeModelRef = useRef(activeModel);
-  const activeAgentIdRef = useRef(activeAgentId);
-  const disabledSkillNamesRef = useRef(disabledSkillNames);
+  const activeAgentNameRef = useRef(activeAgentName);
   const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
-  activeAgentIdRef.current = activeAgentId;
-  disabledSkillNamesRef.current = disabledSkillNames;
+  activeAgentNameRef.current = activeAgentName;
   disabledMcpServerNamesRef.current = disabledMcpServerNames;
   evaluatePermissionRef.current = evaluatePermission;
 
@@ -134,7 +151,14 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
+  const [pendingMcpOAuthPrompt, setPendingMcpOAuthPrompt] = useState<McpOAuthPromptRequest | null>(
+    null
+  );
   const activePermissionRequestRef = useRef<string | null>(null);
+  const sessionErrorRef = useRef<Error | null>(sessionError);
+  const isConnectingRef = useRef(isConnecting);
+  sessionErrorRef.current = sessionError;
+  isConnectingRef.current = isConnecting;
 
   // Prompt queue: prompts enqueued via Ctrl+Q while a response is in flight.
   // Ref is the source of truth (avoids stale closures in send); state drives UI.
@@ -218,6 +242,11 @@ export function useOfficeChat(host: OfficeHostApp) {
       mcpStore.clearAll();
       client.onMcpStatus(payload => {
         useMcpStatusStore.getState().setStatus(payload.server, payload.status, payload.error);
+        if (payload.status === 'connected') {
+          setPendingMcpOAuthPrompt(current =>
+            current?.serverName === payload.server ? null : current
+          );
+        }
       });
       client.onMcpLog(payload => {
         useMcpStatusStore.getState().addLog(payload.server, {
@@ -229,53 +258,19 @@ export function useOfficeChat(host: OfficeHostApp) {
       client.onMcpTools(payload => {
         useMcpStatusStore.getState().setTools(payload.server, payload.tools);
       });
-
-      // Register plugin.agents notification handler so discovered plugin agents are
-      // reflected in the browser-side agentService (AgentPicker). Agents without hosts
-      // keep hosts:[] which getAgents() treats as "all hosts" (universal agent).
-      client.onPluginAgents(({ agents }) => {
-        const agentConfigs = agents.map(agent => ({
-          metadata: {
-            name: agent.name,
-            description: agent.description,
-            version: '0.0.0',
-            hosts: agent.hosts.filter((h): h is AgentHost =>
-              SUPPORTED_AGENT_HOSTS.includes(h as AgentHost)
-            ),
-            defaultForHosts: [] as AgentHost[],
-          },
-          instructions: agent.prompt,
-        }));
-        // Update the store — this syncs agentService AND triggers AgentPicker re-render
-        useSettingsStore.getState().setPluginAgents(agentConfigs);
+      client.onMcpOAuthRequired?.(payload => {
+        useMcpStatusStore.getState().setStatus(payload.serverName, 'needs-auth');
+        setPendingMcpOAuthPrompt({
+          serverName: payload.serverName,
+          reason: 'chat-required',
+          blocking: true,
+        });
+      });
+      client.onMcpOAuthCompleted?.(payload => {
+        setPendingMcpOAuthPrompt(null);
+        console.log('[chat] MCP OAuth completed:', payload.requestId);
       });
 
-      // Register plugin.skills notification — adds plugin skills to SkillPicker and
-      // the skill context injected into the system prompt.
-      client.onPluginSkills(({ skills }) => {
-        const skillObjects: AgentSkill[] = skills.map(s => ({
-          metadata: {
-            name: s.name,
-            description: s.description,
-            version: s.version,
-            tags: [],
-            hosts: s.hosts.filter((h): h is AgentHost =>
-              SUPPORTED_AGENT_HOSTS.includes(h as AgentHost)
-            ),
-          },
-          content: s.content,
-        }));
-        useSettingsStore.getState().setPluginSkills(skillObjects);
-      });
-
-      // Register plugin.prompts notification — populates the slash command menu
-      // in ChatComposer.
-      client.onPluginPrompts(({ prompts }) => {
-        useSettingsStore.getState().setPluginPrompts(prompts);
-      });
-
-      const resolvedAgent = resolveActiveAgent(activeAgentIdRef.current, host);
-      const defaultAgent = getDefaultAgent(host);
       let memoryContext = '';
 
       // Inject persistent user memories if any exist
@@ -286,43 +281,14 @@ export function useOfficeChat(host: OfficeHostApp) {
         // Memory store not available — continue without memories
       }
 
-      const systemContent = buildSessionSystemPrompt(host, {
-        defaultAgentName: defaultAgent?.metadata.name,
-        defaultAgentInstructions: defaultAgent?.instructions,
-        activeAgentName: resolvedAgent?.metadata.name,
-        activeAgentInstructions: resolvedAgent?.instructions,
-        memoryContext,
-      });
+      const systemContent = buildSessionSystemPrompt(host, { memoryContext });
 
-      // Build custom agent configs for ALL agents in this host — this enables sub-agent
-      // delegation where the active agent can invoke other agents as sub-agents.
-      // Each agent carries its own tool allowlist so per-agent restrictions are enforced
-      // by the SDK rather than at the session level.
-      const allHostAgents = getAgents(host);
-      const customAgents =
-        allHostAgents.length > 0
-          ? allHostAgents.map(agent => ({
-              name: agent.metadata.name,
-              description: agent.metadata.description,
-              prompt: agent.instructions,
-              // null = all tools; undefined means the same but we use null for explicitness
-              tools: agent.metadata.tools ?? null,
-            }))
-          : undefined;
-
-      // Resolve active MCP servers: bundled list → agent allowlist filter → user disable filter.
-      let activeServers = [...BUNDLED_MCP_SERVERS];
-      if (resolvedAgent?.metadata.mcpServers !== undefined) {
-        const agentMcpAllowlist = new Set(resolvedAgent.metadata.mcpServers);
-        activeServers = activeServers.filter(s => agentMcpAllowlist.has(s.name));
-      }
+      // Resolve active MCP servers from the Copilot CLI config, then apply user disable filters.
+      let activeServers = await fetchConfiguredMcpServers();
       activeServers = activeServers.filter(
         s => !disabledMcpServerNamesRef.current.includes(s.name)
       );
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
-
-      const disabledSkills =
-        disabledSkillNamesRef.current.length > 0 ? disabledSkillNamesRef.current : undefined;
 
       const session = await withTimeout(
         client.createSession({
@@ -331,8 +297,7 @@ export function useOfficeChat(host: OfficeHostApp) {
           tools: getToolsForHost(host),
           mcpServers,
           host,
-          disabledSkills,
-          customAgents,
+          agent: activeAgentNameRef.current ?? undefined,
         }),
         60_000,
         'session.create'
@@ -364,6 +329,7 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       // Fetch available models (non-blocking, with timeout)
       void loadAvailableModels(client);
+      void loadAvailableAgents(session);
     } catch (err) {
       // If superseded by a newer init, silently bail
       if (initCounterRef.current !== thisInit) return;
@@ -425,421 +391,448 @@ export function useOfficeChat(host: OfficeHostApp) {
     };
   }, [initSession]);
 
-  const send = useCallback(async (userText: string) => {
-    if (!userText.trim()) return;
-
-    const client = clientRef.current;
-    if (!sessionRef.current || !client) {
-      const errorMsg: ChatMessage = {
-        id: generateId(),
-        role: 'assistant',
-        content: [
-          {
-            type: 'text',
-            text: 'Not connected to Copilot. Check that the server is running and try clicking **Retry** above, or start a new conversation.',
-          },
-        ],
-        status: { type: 'incomplete', reason: 'error' },
-        createdAt: new Date(),
-      };
-      setMessages(prev => [
-        ...prev,
-        {
-          id: generateId(),
-          role: 'user',
-          content: [{ type: 'text', text: userText }],
-          createdAt: new Date(),
-        },
-        errorMsg,
-      ]);
-      return;
+  const waitForActiveSession = useCallback(async () => {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      if (sessionRef.current && clientRef.current) return true;
+      if (sessionErrorRef.current || !isConnectingRef.current) return false;
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
+    return Boolean(sessionRef.current && clientRef.current);
+  }, []);
 
-    // Detect multi-slide PowerPoint requests → use orchestrator
-    const isMultiSlideRequest =
-      host === 'powerpoint' &&
-      /\b(\d+)\s*(slides?|folien?|seiten?)\b/i.test(userText) &&
-      !userText.toLowerCase().includes('this slide');
+  const send = useCallback(
+    async (userText: string) => {
+      const trimmed = userText.trim();
+      if (!trimmed) return;
 
-    // Detect deep-mode Word document requests → use document orchestrator
-    // Triggers on: deep keywords OR multi-section requests (like "write a report with 5 sections")
-    const isDeepWordRequest =
-      host === 'word' &&
-      (/\b(deep|gründlich|ausführlich|thoroughly|think|go\s*deep|detail(liert)?|qualit)/i.test(
-        userText
-      ) ||
-        /\b(\d+)\s*(sections?|abschnitt(e|en)?|kapitel|teil(e|en)?|chapters?)\b/i.test(userText) ||
-        /\b(erstell|schreib|create|write|build|generate|verfass)\w*\b.{0,30}\b(report|bericht|dokument|document|paper|aufsatz|memo|proposal|angebot|zusammenfassung)\b/i.test(
+      let client = clientRef.current;
+      if ((!sessionRef.current || !client) && isConnectingRef.current && !sessionErrorRef.current) {
+        await waitForActiveSession();
+        client = clientRef.current;
+      }
+
+      if (!sessionRef.current || !client) {
+        const errorMsg: ChatMessage = {
+          id: generateId(),
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: 'Not connected to Copilot. Check that the server is running and try clicking **Retry** above, or start a new conversation.',
+            },
+          ],
+          status: { type: 'incomplete', reason: 'error' },
+          createdAt: new Date(),
+        };
+        setMessages(prev => [
+          ...prev,
+          {
+            id: generateId(),
+            role: 'user',
+            content: [{ type: 'text', text: userText }],
+            createdAt: new Date(),
+          },
+          errorMsg,
+        ]);
+        return;
+      }
+
+      // Detect multi-slide PowerPoint requests → use orchestrator
+      const isMultiSlideRequest =
+        host === 'powerpoint' &&
+        /\b(\d+)\s*(slides?|folien?|seiten?)\b/i.test(userText) &&
+        !userText.toLowerCase().includes('this slide');
+
+      // Detect deep-mode Word document requests → use document orchestrator
+      // Triggers on: deep keywords OR multi-section requests (like "write a report with 5 sections")
+      const isDeepWordRequest =
+        host === 'word' &&
+        (/\b(deep|gründlich|ausführlich|thoroughly|think|go\s*deep|detail(liert)?|qualit)/i.test(
           userText
-        ));
-
-    if (isDeepWordRequest) {
-      const assistantId = generateId();
-      cancelRef.current = false;
-
-      setMessages(prev => [
-        ...prev,
-        {
-          id: generateId(),
-          role: 'user',
-          content: [{ type: 'text', text: userText }],
-          createdAt: new Date(),
-        },
-        {
-          id: assistantId,
-          role: 'assistant',
-          content: [{ type: 'text', text: '' }],
-          status: { type: 'running' },
-          createdAt: new Date(),
-        },
-      ]);
-      setIsRunning(true);
-
-      let streamText = '';
-      const updateText = (extra?: Partial<Pick<ChatMessage, 'status'>>) => {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantId
-              ? { ...m, content: [{ type: 'text', text: streamText }], ...extra }
-              : m
-          )
-        );
-      };
-
-      const abortController = new AbortController();
-      const origCancel = cancelRef.current;
-      const cancelCheck = setInterval(() => {
-        if (cancelRef.current && !origCancel) abortController.abort();
-      }, 500);
-
-      try {
-        const { orchestrateDocument } = await import('@/hooks/useDocumentOrchestrator');
-        const docMode =
-          /\b(deep|gründlich|ausführlich|thoroughly|think|go\s*deep|detail(liert)?|qualit)/i.test(
+        ) ||
+          /\b(\d+)\s*(sections?|abschnitt(e|en)?|kapitel|teil(e|en)?|chapters?)\b/i.test(
             userText
-          )
-            ? ('deep' as const)
-            : ('fast' as const);
-        const currentModelForDoc = useSettingsStore.getState().activeModel;
-        await orchestrateDocument(
-          client,
-          currentModelForDoc,
-          userText,
+          ) ||
+          /\b(erstell|schreib|create|write|build|generate|verfass)\w*\b.{0,30}\b(report|bericht|dokument|document|paper|aufsatz|memo|proposal|angebot|zusammenfassung)\b/i.test(
+            userText
+          ));
+
+      if (isDeepWordRequest) {
+        const assistantId = generateId();
+        cancelRef.current = false;
+
+        setMessages(prev => [
+          ...prev,
           {
-            onPlan: () => {
-              /* plan received */
-            },
-            onSectionProgress: () => {
-              /* section status changed */
-            },
-            onText: (text: string) => {
-              streamText += text;
-              updateText();
-            },
-            onWorkerEvent: () => {
-              /* worker tool events */
-            },
-            onComplete: () => {
-              updateText({ status: { type: 'complete', reason: 'stop' } });
-            },
-            onError: (error: string) => {
-              streamText += `\n\n❌ Error: ${error}`;
-              updateText({ status: { type: 'incomplete', reason: 'error', error } });
-            },
+            id: generateId(),
+            role: 'user',
+            content: [{ type: 'text', text: userText }],
+            createdAt: new Date(),
           },
-          abortController.signal,
-          docMode
-        );
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        streamText += `\n\n❌ ${errMsg}`;
-        updateText({ status: { type: 'incomplete', reason: 'error', error: errMsg } });
-      } finally {
-        clearInterval(cancelCheck);
-        setIsRunning(false);
-      }
-      return;
-    }
-
-    if (isMultiSlideRequest) {
-      const assistantId = generateId();
-      cancelRef.current = false;
-
-      setMessages(prev => [
-        ...prev,
-        {
-          id: generateId(),
-          role: 'user',
-          content: [{ type: 'text', text: userText }],
-          createdAt: new Date(),
-        },
-        {
-          id: assistantId,
-          role: 'assistant',
-          content: [{ type: 'text', text: '' }],
-          status: { type: 'running' },
-          createdAt: new Date(),
-        },
-      ]);
-      setIsRunning(true);
-
-      let streamText = '';
-      const updateText = (extra?: Partial<Pick<ChatMessage, 'status'>>) => {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantId
-              ? { ...m, content: [{ type: 'text', text: streamText }], ...extra }
-              : m
-          )
-        );
-      };
-
-      const abortController = new AbortController();
-      const origCancel = cancelRef.current;
-      // Check cancel periodically
-      const cancelCheck = setInterval(() => {
-        if (cancelRef.current && !origCancel) abortController.abort();
-      }, 500);
-
-      try {
-        const { orchestrateDeck } = await import('@/hooks/useDeckOrchestrator');
-        const deckMode = /\b(deep|detail|qualit)/i.test(userText)
-          ? ('deep' as const)
-          : ('fast' as const);
-        const currentModelForDeck = useSettingsStore.getState().activeModel;
-        await orchestrateDeck(
-          client,
-          currentModelForDeck,
-          userText,
           {
-            onPlan: () => {
-              /* plan received */
-            },
-            onSlideProgress: () => {
-              /* slide status changed */
-            },
-            onText: (text: string) => {
-              streamText += text;
-              updateText();
-            },
-            onWorkerEvent: () => {
-              /* worker tool events */
-            },
-            onComplete: () => {
-              updateText({ status: { type: 'complete', reason: 'stop' } });
-            },
-            onError: (error: string) => {
-              streamText += `\n\n❌ Error: ${error}`;
-              updateText({ status: { type: 'incomplete', reason: 'error', error } });
-            },
-          },
-          abortController.signal,
-          deckMode
-        );
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        streamText += `\n\n❌ ${errMsg}`;
-        updateText({ status: { type: 'incomplete', reason: 'error', error: errMsg } });
-      } finally {
-        clearInterval(cancelCheck);
-        setIsRunning(false);
-      }
-      return;
-    }
-
-    const assistantId = generateId();
-    cancelRef.current = false;
-
-    const userMsg: ChatMessage = {
-      id: generateId(),
-      role: 'user',
-      content: [{ type: 'text', text: userText }],
-      createdAt: new Date(),
-    };
-
-    const assistantMsg: ChatMessage = {
-      id: assistantId,
-      role: 'assistant',
-      content: [],
-      status: { type: 'running' },
-      thinkingText: DEFAULT_THINKING_TEXT,
-      createdAt: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMsg, assistantMsg]);
-    setIsRunning(true);
-
-    /** Update thinkingText on the specific assistant message */
-    const setThinkingForAssistant = (text: string | null) => {
-      setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, thinkingText: text } : m)));
-    };
-
-    const toolParts = new Map<string, ToolCallPart>();
-    let streamText = '';
-    // Tracks the current phase index. Increments each time report_intent fires
-    // AFTER at least one tool has been added, creating a new Working box segment.
-    let currentPhase = 0;
-    // Tracks the current phase label (from report_intent). This becomes the
-    // Working box header text — matching VS Code's IChatTask.content behavior.
-    let currentPhaseLabel: string | undefined = undefined;
-
-    const updateAssistant = (extra?: Partial<Pick<ChatMessage, 'status' | 'thinkingText'>>) => {
-      // Text part is ALWAYS at index 0 — even when empty — to prevent tearing.
-      // Tool cards appear visually above text via CSS order (ToolGroup has order: -1).
-      const content: ChatMessage['content'] = [
-        { type: 'text' as const, text: streamText },
-        ...Array.from(toolParts.values()),
-      ];
-      setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m)));
-    };
-
-    // Stale-response watchdog: if no event arrives within 30s, warn the user.
-    // Reset on every event; cleared when the stream ends.
-    // Declared outside `try` so the `finally` block can clear it.
-    const STALE_TIMEOUT = 30_000;
-    let staleTimer: ReturnType<typeof setTimeout> | null = null;
-
-    try {
-      const session = sessionRef.current;
-      const resetStaleTimer = () => {
-        if (staleTimer) clearTimeout(staleTimer);
-        staleTimer = setTimeout(() => {
-          setThinkingForAssistant('Still waiting for a response…');
-        }, STALE_TIMEOUT);
-      };
-      resetStaleTimer();
-
-      for await (const event of session.query({ prompt: userText })) {
-        resetStaleTimer();
-        if (cancelRef.current) break;
-
-        if (event.type === 'assistant.message_delta') {
-          // First streaming delta clears the thinking indicator
-          streamText += event.data.deltaContent;
-          updateAssistant({ thinkingText: null });
-        } else if (event.type === 'tool.execution_start') {
-          const { toolCallId, toolName, arguments: args } = event.data;
-          // report_intent is an internal SDK tool — surface intent as thinking text
-          if (toolName === 'report_intent') {
-            const intent = (args as Record<string, unknown> | undefined)?.intent;
-            if (typeof intent === 'string' && intent) {
-              // If tools have already been added, this intent starts a NEW phase
-              if (toolParts.size > 0) {
-                currentPhase++;
-              }
-              // The intent text labels the Working box (VS Code: IChatTask.content)
-              currentPhaseLabel = intent;
-              flushSync(() => setThinkingForAssistant(intent));
-            }
-            continue;
-          }
-          toolParts.set(toolCallId, {
-            type: 'tool-call',
-            toolCallId,
-            toolName,
-            argsText: JSON.stringify(args ?? {}),
+            id: assistantId,
+            role: 'assistant',
+            content: [{ type: 'text', text: '' }],
             status: { type: 'running' },
-            phaseIndex: currentPhase,
-            phaseLabel: currentPhaseLabel,
-          });
-          updateAssistant();
-        } else if (event.type === 'tool.execution_complete') {
-          const { toolCallId, result } = event.data;
-          const existing = toolParts.get(toolCallId);
-          if (existing) {
-            const resultText = result
-              ? typeof result.content === 'string'
-                ? result.content
-                : JSON.stringify(result)
-              : '';
-            toolParts.set(toolCallId, {
-              ...existing,
-              result: resultText,
-              status: { type: 'complete' },
-            });
-            updateAssistant();
-          }
-          // Reset thinking text to "Thinking…" so the shimmer reappears
-          // in the gap between this tool completing and the next action.
-          setThinkingForAssistant(DEFAULT_THINKING_TEXT);
-        } else if (event.type === 'assistant.message') {
-          // Update text content but DON'T clear thinking or mark complete here.
-          // The SDK sends assistant.message BEFORE tool calls (model's initial
-          // response) AND after (final response). Only session.idle reliably
-          // indicates the response is truly finished.
-          streamText = event.data.content;
-          updateAssistant();
-        } else if (event.type === 'session.idle') {
-          // Stream truly ended — clear thinking and finalize
-          updateAssistant({ status: { type: 'complete', reason: 'stop' }, thinkingText: null });
-        } else if (event.type === 'session.error') {
-          updateAssistant({
-            status: { type: 'incomplete', reason: 'error', error: event.data.message },
-            thinkingText: null,
-          });
-          break;
-        } else if (event.type === 'subagent.started') {
-          // A sub-agent has been invoked — show which agent is being asked
-          flushSync(() =>
-            setThinkingForAssistant(
-              `Asking ${event.data.agentDisplayName || event.data.agentName}…`
+            createdAt: new Date(),
+          },
+        ]);
+        setIsRunning(true);
+
+        let streamText = '';
+        const updateText = (extra?: Partial<Pick<ChatMessage, 'status'>>) => {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, content: [{ type: 'text', text: streamText }], ...extra }
+                : m
             )
           );
-        } else if (event.type === 'subagent.completed' || event.type === 'subagent.failed') {
-          // Sub-agent finished — return to generic thinking indicator
-          setThinkingForAssistant(DEFAULT_THINKING_TEXT);
+        };
+
+        const abortController = new AbortController();
+        const origCancel = cancelRef.current;
+        const cancelCheck = setInterval(() => {
+          if (cancelRef.current && !origCancel) abortController.abort();
+        }, 500);
+
+        try {
+          const { orchestrateDocument } = await import('@/hooks/useDocumentOrchestrator');
+          const docMode =
+            /\b(deep|gründlich|ausführlich|thoroughly|think|go\s*deep|detail(liert)?|qualit)/i.test(
+              userText
+            )
+              ? ('deep' as const)
+              : ('fast' as const);
+          const currentModelForDoc = useSettingsStore.getState().activeModel;
+          await orchestrateDocument(
+            client,
+            currentModelForDoc,
+            userText,
+            {
+              onPlan: () => {
+                /* plan received */
+              },
+              onSectionProgress: () => {
+                /* section status changed */
+              },
+              onText: (text: string) => {
+                streamText += text;
+                updateText();
+              },
+              onWorkerEvent: () => {
+                /* worker tool events */
+              },
+              onComplete: () => {
+                updateText({ status: { type: 'complete', reason: 'stop' } });
+              },
+              onError: (error: string) => {
+                streamText += `\n\n❌ Error: ${error}`;
+                updateText({ status: { type: 'incomplete', reason: 'error', error } });
+              },
+            },
+            abortController.signal,
+            docMode
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          streamText += `\n\n❌ ${errMsg}`;
+          updateText({ status: { type: 'incomplete', reason: 'error', error: errMsg } });
+        } finally {
+          clearInterval(cancelCheck);
+          setIsRunning(false);
+        }
+        return;
+      }
+
+      if (isMultiSlideRequest) {
+        const assistantId = generateId();
+        cancelRef.current = false;
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: generateId(),
+            role: 'user',
+            content: [{ type: 'text', text: userText }],
+            createdAt: new Date(),
+          },
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: [{ type: 'text', text: '' }],
+            status: { type: 'running' },
+            createdAt: new Date(),
+          },
+        ]);
+        setIsRunning(true);
+
+        let streamText = '';
+        const updateText = (extra?: Partial<Pick<ChatMessage, 'status'>>) => {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? { ...m, content: [{ type: 'text', text: streamText }], ...extra }
+                : m
+            )
+          );
+        };
+
+        const abortController = new AbortController();
+        const origCancel = cancelRef.current;
+        // Check cancel periodically
+        const cancelCheck = setInterval(() => {
+          if (cancelRef.current && !origCancel) abortController.abort();
+        }, 500);
+
+        try {
+          const { orchestrateDeck } = await import('@/hooks/useDeckOrchestrator');
+          const deckMode = /\b(deep|detail|qualit)/i.test(userText)
+            ? ('deep' as const)
+            : ('fast' as const);
+          const currentModelForDeck = useSettingsStore.getState().activeModel;
+          await orchestrateDeck(
+            client,
+            currentModelForDeck,
+            userText,
+            {
+              onPlan: () => {
+                /* plan received */
+              },
+              onSlideProgress: () => {
+                /* slide status changed */
+              },
+              onText: (text: string) => {
+                streamText += text;
+                updateText();
+              },
+              onWorkerEvent: () => {
+                /* worker tool events */
+              },
+              onComplete: () => {
+                updateText({ status: { type: 'complete', reason: 'stop' } });
+              },
+              onError: (error: string) => {
+                streamText += `\n\n❌ Error: ${error}`;
+                updateText({ status: { type: 'incomplete', reason: 'error', error } });
+              },
+            },
+            abortController.signal,
+            deckMode
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          streamText += `\n\n❌ ${errMsg}`;
+          updateText({ status: { type: 'incomplete', reason: 'error', error: errMsg } });
+        } finally {
+          clearInterval(cancelCheck);
+          setIsRunning(false);
+        }
+        return;
+      }
+
+      const assistantId = generateId();
+      cancelRef.current = false;
+
+      const userMsg: ChatMessage = {
+        id: generateId(),
+        role: 'user',
+        content: [{ type: 'text', text: userText }],
+        createdAt: new Date(),
+      };
+
+      const assistantMsg: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: [],
+        status: { type: 'running' },
+        thinkingText: DEFAULT_THINKING_TEXT,
+        createdAt: new Date(),
+      };
+
+      setMessages(prev => [...prev, userMsg, assistantMsg]);
+      setIsRunning(true);
+
+      /** Update thinkingText on the specific assistant message */
+      const setThinkingForAssistant = (text: string | null) => {
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? { ...m, thinkingText: text } : m))
+        );
+      };
+
+      const toolParts = new Map<string, ToolCallPart>();
+      let streamText = '';
+      // Tracks the current phase index. Increments each time report_intent fires
+      // AFTER at least one tool has been added, creating a new Working box segment.
+      let currentPhase = 0;
+      // Tracks the current phase label (from report_intent). This becomes the
+      // Working box header text — matching VS Code's IChatTask.content behavior.
+      let currentPhaseLabel: string | undefined = undefined;
+
+      const updateAssistant = (extra?: Partial<Pick<ChatMessage, 'status' | 'thinkingText'>>) => {
+        // Text part is ALWAYS at index 0 — even when empty — to prevent tearing.
+        // Tool cards appear visually above text via CSS order (ToolGroup has order: -1).
+        const content: ChatMessage['content'] = [
+          { type: 'text' as const, text: streamText },
+          ...Array.from(toolParts.values()),
+        ];
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? { ...m, content, ...extra } : m))
+        );
+      };
+
+      // Stale-response watchdog: if no event arrives within 30s, warn the user.
+      // Reset on every event; cleared when the stream ends.
+      // Declared outside `try` so the `finally` block can clear it.
+      const STALE_TIMEOUT = 30_000;
+      let staleTimer: ReturnType<typeof setTimeout> | null = null;
+
+      try {
+        const session = sessionRef.current;
+        const resetStaleTimer = () => {
+          if (staleTimer) clearTimeout(staleTimer);
+          staleTimer = setTimeout(() => {
+            setThinkingForAssistant('Still waiting for a response…');
+          }, STALE_TIMEOUT);
+        };
+        resetStaleTimer();
+
+        for await (const event of session.query({ prompt: userText })) {
+          resetStaleTimer();
+          if (cancelRef.current) break;
+
+          if (event.type === 'assistant.message_delta') {
+            // First streaming delta clears the thinking indicator
+            streamText += event.data.deltaContent;
+            updateAssistant({ thinkingText: null });
+          } else if (event.type === 'tool.execution_start') {
+            const { toolCallId, toolName, arguments: args } = event.data;
+            // report_intent is an internal SDK tool — surface intent as thinking text
+            if (toolName === 'report_intent') {
+              const intent = (args as Record<string, unknown> | undefined)?.intent;
+              if (typeof intent === 'string' && intent) {
+                // If tools have already been added, this intent starts a NEW phase
+                if (toolParts.size > 0) {
+                  currentPhase++;
+                }
+                // The intent text labels the Working box (VS Code: IChatTask.content)
+                currentPhaseLabel = intent;
+                flushSync(() => setThinkingForAssistant(intent));
+              }
+              continue;
+            }
+            toolParts.set(toolCallId, {
+              type: 'tool-call',
+              toolCallId,
+              toolName,
+              argsText: JSON.stringify(args ?? {}),
+              status: { type: 'running' },
+              phaseIndex: currentPhase,
+              phaseLabel: currentPhaseLabel,
+            });
+            updateAssistant();
+          } else if (event.type === 'tool.execution_complete') {
+            const { toolCallId, result } = event.data;
+            const existing = toolParts.get(toolCallId);
+            if (existing) {
+              const resultText = result
+                ? typeof result.content === 'string'
+                  ? result.content
+                  : JSON.stringify(result)
+                : '';
+              toolParts.set(toolCallId, {
+                ...existing,
+                result: resultText,
+                status: { type: 'complete' },
+              });
+              updateAssistant();
+            }
+            // Reset thinking text to "Thinking…" so the shimmer reappears
+            // in the gap between this tool completing and the next action.
+            setThinkingForAssistant(DEFAULT_THINKING_TEXT);
+          } else if (event.type === 'assistant.message') {
+            // Update text content but DON'T clear thinking or mark complete here.
+            // The SDK sends assistant.message BEFORE tool calls (model's initial
+            // response) AND after (final response). Only session.idle reliably
+            // indicates the response is truly finished.
+            streamText = event.data.content;
+            updateAssistant();
+          } else if (event.type === 'session.idle') {
+            // Stream truly ended — clear thinking and finalize
+            updateAssistant({ status: { type: 'complete', reason: 'stop' }, thinkingText: null });
+          } else if (event.type === 'session.error') {
+            updateAssistant({
+              status: { type: 'incomplete', reason: 'error', error: event.data.message },
+              thinkingText: null,
+            });
+            break;
+          } else if (event.type === 'subagent.started') {
+            // A sub-agent has been invoked — show which agent is being asked
+            flushSync(() =>
+              setThinkingForAssistant(
+                `Asking ${event.data.agentDisplayName || event.data.agentName}…`
+              )
+            );
+          } else if (event.type === 'subagent.completed' || event.type === 'subagent.failed') {
+            // Sub-agent finished — return to generic thinking indicator
+            setThinkingForAssistant(DEFAULT_THINKING_TEXT);
+          }
+        }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        // Auto-reconnect if the Copilot session was lost (e.g. proxy restart, laptop sleep)
+        const isSessionLost =
+          errMsg.includes('Session') ||
+          errMsg.includes('not connected') ||
+          errMsg.includes('disconnected') ||
+          errMsg.includes('WebSocket closed');
+        if (isSessionLost) {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    content: [{ type: 'text', text: '🔄 Session lost — reconnecting…' }],
+                    status: { type: 'complete', reason: 'stop' },
+                    thinkingText: null,
+                  }
+                : m
+            )
+          );
+          void initSessionRef.current();
+        } else {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    status: { type: 'incomplete', reason: 'error', error: errMsg },
+                    thinkingText: null,
+                  }
+                : m
+            )
+          );
+        }
+      } finally {
+        if (staleTimer) clearTimeout(staleTimer);
+        // Ensure thinkingText is cleared and isRunning is reset
+        setMessages(prev =>
+          prev.map(m => (m.id === assistantId ? { ...m, thinkingText: null } : m))
+        );
+        setIsRunning(false);
+
+        // Auto-dequeue: if prompts were enqueued via Ctrl+Q, send the next one.
+        const next = queueRef.current.shift();
+        if (next !== undefined) {
+          setQueuedPrompts([...queueRef.current]);
+          // Defer to avoid re-entering send() synchronously from its own finally
+          setTimeout(() => void sendRef.current(next), 0);
         }
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      // Auto-reconnect if the Copilot session was lost (e.g. proxy restart, laptop sleep)
-      const isSessionLost =
-        errMsg.includes('Session') ||
-        errMsg.includes('not connected') ||
-        errMsg.includes('disconnected') ||
-        errMsg.includes('WebSocket closed');
-      if (isSessionLost) {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  content: [{ type: 'text', text: '🔄 Session lost — reconnecting…' }],
-                  status: { type: 'complete', reason: 'stop' },
-                  thinkingText: null,
-                }
-              : m
-          )
-        );
-        void initSessionRef.current();
-      } else {
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  status: { type: 'incomplete', reason: 'error', error: errMsg },
-                  thinkingText: null,
-                }
-              : m
-          )
-        );
-      }
-    } finally {
-      if (staleTimer) clearTimeout(staleTimer);
-      // Ensure thinkingText is cleared and isRunning is reset
-      setMessages(prev => prev.map(m => (m.id === assistantId ? { ...m, thinkingText: null } : m)));
-      setIsRunning(false);
-
-      // Auto-dequeue: if prompts were enqueued via Ctrl+Q, send the next one.
-      const next = queueRef.current.shift();
-      if (next !== undefined) {
-        setQueuedPrompts([...queueRef.current]);
-        // Defer to avoid re-entering send() synchronously from its own finally
-        setTimeout(() => void sendRef.current(next), 0);
-      }
-    }
-  }, []);
+    },
+    [waitForActiveSession]
+  );
 
   // Keep sendRef in sync so auto-dequeue can call the latest send()
   sendRef.current = send;
@@ -1001,6 +994,45 @@ export function useOfficeChat(host: OfficeHostApp) {
     void respondPermission('approved');
   }, [addPermissionRule, pendingPermission, respondPermission]);
 
+  const initiateMcpOAuth = useCallback(async (serverName: string, loginHint?: string) => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Open a chat session before signing in to an MCP server.');
+    }
+
+    const trimmedLoginHint = loginHint?.trim();
+    const requestedAlias = trimmedLoginHint === '' ? undefined : trimmedLoginHint;
+    useMcpStatusStore.getState().setOAuthState(serverName, 'connecting', requestedAlias);
+    const result = await session.initiateMcpOAuthWithHint(serverName, requestedAlias);
+    if (result.status === 'error') {
+      useMcpStatusStore
+        .getState()
+        .setOAuthState(serverName, 'failed', requestedAlias, result.message);
+      throw new Error(result.message);
+    }
+    if (result.status === 'success' && result.authorizationUrl) {
+      window.open(result.authorizationUrl, '_blank', 'noopener,noreferrer');
+    }
+    const signedInAlias =
+      result.status === 'success' ? (result.oauthAlias ?? requestedAlias) : requestedAlias;
+    useMcpStatusStore
+      .getState()
+      .setOAuthState(
+        serverName,
+        result.status === 'success' && result.authorizationUrl ? 'connecting' : 'connected',
+        signedInAlias
+      );
+    return signedInAlias;
+  }, []);
+
+  const openMcpOAuthPrompt = useCallback((request: McpOAuthPromptRequest) => {
+    setPendingMcpOAuthPrompt(request);
+  }, []);
+
+  const dismissMcpOAuthPrompt = useCallback(() => {
+    setPendingMcpOAuthPrompt(null);
+  }, []);
+
   const compactSession = useCallback(async () => {
     const session = sessionRef.current;
     if (session) {
@@ -1042,6 +1074,33 @@ export function useOfficeChat(host: OfficeHostApp) {
     [activeModel]
   );
 
+  /**
+   * Switch to a different Copilot CLI-owned agent mid-session.
+   * Passing null returns to the default agent.
+   */
+  const switchAgent = useCallback(async (agentName: string | null) => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Cannot switch agent: no active session');
+    }
+
+    try {
+      let selected: AgentInfo | null = null;
+      if (agentName === null) {
+        console.log('[chat] Switching agent to default');
+        await session.deselectAgent();
+      } else {
+        console.log(`[chat] Switching agent to ${agentName}`);
+        selected = await session.selectAgent(agentName);
+      }
+      useSettingsStore.getState().setActiveAgent(selected?.name ?? null);
+      console.log(`[chat] Agent switched successfully to ${selected?.name ?? 'default'}`);
+    } catch (err) {
+      console.error('[chat] Failed to switch agent:', err);
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }, []);
+
   return {
     messages,
     isRunning,
@@ -1059,8 +1118,13 @@ export function useOfficeChat(host: OfficeHostApp) {
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    initiateMcpOAuth,
+    pendingMcpOAuthPrompt,
+    openMcpOAuthPrompt,
+    dismissMcpOAuthPrompt,
     compactSession,
     switchModel,
+    switchAgent,
     enqueue,
     queuedPrompts,
     dequeue,

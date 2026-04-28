@@ -1,6 +1,2 @@
-export {
-  parseMcpJsonFile,
-  resolveActiveMcpServers,
-  toSdkMcpServers,
-  getAllMcpServers,
-} from './mcpService';
+export { toSdkMcpServers } from './mcpService';
+export { fetchConfiguredMcpServers } from './mcpServerConfig';

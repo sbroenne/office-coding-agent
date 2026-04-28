@@ -4,26 +4,18 @@
  * Requires `npm run dev` to be running on https://localhost:3000.
  * GitHub Copilot is always available — no skip logic.
  *
- * These tests exercise custom agent instructions, skill injection,
- * the thinking indicator, tool progress UI, and multi-turn conversations.
+ * These tests exercise host prompt behavior, tool progress UI, and multi-turn conversations.
  */
 
 import { test, expect } from '../fixtures';
 
 const AI_TIMEOUT = 60_000;
 
-test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
-  test('custom agent instructions change the model response personality', async ({
+test.describe('Chat E2E — host prompt behaviour (requires server)', () => {
+  test('assistant responds to a simple prompt', async ({
     configuredTaskpane: page,
   }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
-
-    // Switch to a custom agent via the agent picker
-    const agentButton = page.getByRole('button', { name: 'Select agent' });
-    await expect(agentButton).toBeVisible({ timeout: 5000 });
-
-    // The default "Excel" agent should be active
-    await expect(page.getByText('Excel')).toBeVisible({ timeout: 5000 });
 
     // Type a prompt
     const composer = page.getByPlaceholder('Send a message...');
@@ -78,13 +70,17 @@ test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
     }) => {
       test.setTimeout(AI_TIMEOUT * 2 + 30_000);
 
-    const composer = page.getByPlaceholder('Send a message...');
+    const composer = page.getByRole('textbox', { name: 'Message input' });
     await expect(composer).toBeVisible({ timeout: 5000 });
 
     // Turn 1: send a prompt
     await composer.fill('Reply with exactly one word: ALPHA');
     await composer.press('Enter');
-    await expect(page.getByText(/alpha/i).first()).toBeVisible({ timeout: AI_TIMEOUT });
+    const messages = page.locator('[data-role="assistant"]');
+    await expect(messages.first()).toContainText(/alpha/i, { timeout: AI_TIMEOUT });
+    await expect(page.getByRole('button', { name: /^(Stop|Cancel)$/ })).not.toBeVisible({
+      timeout: AI_TIMEOUT,
+    });
 
     // Wait for the composer to be ready for turn 2
     await expect(composer).toBeVisible({ timeout: 5000 });
@@ -95,7 +91,6 @@ test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
     await page.getByRole('button', { name: 'Send' }).click();
 
     // Both assistant responses should be present in the thread
-    const messages = page.locator('[data-role="assistant"]');
     await expect(messages).toHaveCount(2, { timeout: AI_TIMEOUT });
     await expect(messages.nth(1)).toContainText(/bravo/i, { timeout: AI_TIMEOUT });
     });
@@ -106,13 +101,18 @@ test.describe('Chat E2E — custom agent behaviour (requires server)', () => {
   }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
 
-    const composer = page.getByPlaceholder('Send a message...');
+    const composer = page.getByRole('textbox', { name: 'Message input' });
     await expect(composer).toBeVisible({ timeout: 5000 });
 
     // Send an initial message
     await composer.fill('Reply with exactly one word: PONG');
     await composer.press('Enter');
-    await expect(page.getByText(/pong/i).first()).toBeVisible({ timeout: AI_TIMEOUT });
+    await expect(page.locator('[data-role="assistant"]').first()).toContainText(/pong/i, {
+      timeout: AI_TIMEOUT,
+    });
+    await expect(page.getByRole('button', { name: /^(Stop|Cancel)$/ })).not.toBeVisible({
+      timeout: AI_TIMEOUT,
+    });
 
     // Click new conversation
     await page.getByRole('button', { name: 'New conversation' }).click();

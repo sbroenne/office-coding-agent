@@ -11,6 +11,7 @@ import { useOfficeChat } from '@/hooks/useOfficeChat';
 import { ChatActionsContext } from '@/contexts/ChatActionsContext';
 import { detectOfficeHost } from '@/services/office/host';
 import type { OfficeHostApp } from '@/services/office/host';
+import { McpOAuthPrompt } from '@/components/McpOAuthPrompt';
 
 const bannerBaseStyle: React.CSSProperties = {
   borderBottomColor: 'var(--vscode-widget-border)',
@@ -164,14 +165,19 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     clearMessages,
     compactSession,
     switchModel,
+    switchAgent,
     restoreSession,
     deleteSession,
     sessions,
     activeSessionId,
     pendingPermission,
+    pendingMcpOAuthPrompt,
     approvePermission,
     denyPermission,
     allowPermissionAlways,
+    initiateMcpOAuth,
+    openMcpOAuthPrompt,
+    dismissMcpOAuthPrompt,
     enqueue,
     queuedPrompts,
     dequeue,
@@ -227,11 +233,19 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               onSend={send}
               onCancel={cancel}
               onSwitchModel={switchModel}
+              onSwitchAgent={switchAgent}
+              onInitiateMcpOAuth={initiateMcpOAuth}
+              onOpenMcpOAuthPrompt={openMcpOAuthPrompt}
               onEnqueue={enqueue}
               queuedPrompts={queuedPrompts}
               onDequeue={dequeue}
             />
           </ChatErrorBoundary>
+          <McpOAuthPrompt
+            request={pendingMcpOAuthPrompt}
+            onClose={dismissMcpOAuthPrompt}
+            onSignIn={initiateMcpOAuth}
+          />
         </div>
 
         {/* Slide panels */}

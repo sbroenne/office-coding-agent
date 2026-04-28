@@ -10,97 +10,140 @@
 
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
-import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import {
-  slugify,
-  discoverPluginSkillDirs,
-  discoverPluginSkillObjects,
-  discoverPluginAgents,
-  discoverPluginPrompts,
-} from './pluginDiscovery.mjs';
 import { isTrustedRequestOrigin } from './serverSecurity.mjs';
 
-const execFileAsync = promisify(execFile);
-/** On Windows, npm is npm.cmd — use the .cmd variant when on win32. */
-const NPM_CMD = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-/** execFileAsync options for npm: shell:true is required on Windows for .cmd files. */
-const NPM_EXEC_OPTS = process.platform === 'win32' ? { shell: true } : {};
+const MCP_STATUSES = new Set([
+  'connected',
+  'failed',
+  'needs-auth',
+  'pending',
+  'disabled',
+  'not_configured',
+]);
 
-// ── LSP framing helpers ─────────────────────────────────────────────────────
-
-/**
- * Scan a node_modules directory for skillpm-compatible skill directories.
- * The skillpm spec places skills at: node_modules/<pkg>/skills/<name>/SKILL.md
- * Returns an array of skill subdirectory paths (the directory containing SKILL.md).
- *
- * @param {string} nodeModulesDir - path to node_modules
- * @returns {Promise<string[]>}
- */
-async function findSkillDirs(nodeModulesDir) {
-  const skillDirs = [];
-  let pkgEntries;
-  try {
-    pkgEntries = await readdir(nodeModulesDir, { withFileTypes: true });
-  } catch {
-    return skillDirs; // node_modules doesn't exist
-  }
-
-  for (const entry of pkgEntries) {
-    // Handle scoped packages (@org/...)
-    if (entry.isDirectory() && entry.name.startsWith('@')) {
-      const scopeDir = join(nodeModulesDir, entry.name);
-      let scopedEntries;
-      try {
-        scopedEntries = await readdir(scopeDir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const scopedEntry of scopedEntries) {
-        if (scopedEntry.isDirectory()) {
-          const pkgDir = join(scopeDir, scopedEntry.name);
-          const dirs = await findSkillDirsInPackage(pkgDir);
-          skillDirs.push(...dirs);
-        }
-      }
-    } else if (entry.isDirectory()) {
-      const pkgDir = join(nodeModulesDir, entry.name);
-      const dirs = await findSkillDirsInPackage(pkgDir);
-      skillDirs.push(...dirs);
-    }
-  }
-  return skillDirs;
+export function toMcpServerKey(name) {
+  return String(name ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
 }
 
-/**
- * Within a single package directory, find all skills/<name>/ subdirs that contain SKILL.md.
- *
- * @param {string} pkgDir
- * @returns {Promise<string[]>}
- */
-async function findSkillDirsInPackage(pkgDir) {
-  const skillsRoot = join(pkgDir, 'skills');
-  const result = [];
-  let skillSubdirs;
+export function normalizeMcpOAuthLoginHint(loginHint) {
+  const trimmed = typeof loginHint === 'string' ? loginHint.trim() : '';
+  if (!trimmed) return undefined;
+  return trimmed.includes('@') ? trimmed : `${trimmed}@microsoft.com`;
+}
+
+export function addLoginHintToAuthorizationUrl(authorizationUrl, loginHint) {
+  const normalizedLoginHint = normalizeMcpOAuthLoginHint(loginHint);
+  if (!authorizationUrl || !normalizedLoginHint) return authorizationUrl;
+
+  const url = new URL(authorizationUrl);
+  url.searchParams.set('login_hint', normalizedLoginHint);
+  return url.toString();
+}
+
+function str(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+function toRecord(value) {
+  return typeof value === 'object' && value !== null ? value : {};
+}
+
+export function normalizeMcpStatus(value) {
+  return MCP_STATUSES.has(value) ? value : 'not_configured';
+}
+
+export async function initiateMcpOAuthForSession(session, serverName, loginHint) {
+  const oauthRpc = session.rpc?.mcp?.oauth;
+  if (!oauthRpc?.login) {
+    return {
+      status: 'error',
+      message: 'Current Copilot SDK session does not support MCP OAuth.',
+    };
+  }
+
   try {
-    skillSubdirs = await readdir(skillsRoot, { withFileTypes: true });
-  } catch {
-    return result; // no skills/ directory in this package
+    const normalizedLoginHint = normalizeMcpOAuthLoginHint(loginHint);
+    const result = await oauthRpc.login({
+      serverName: toMcpServerKey(serverName),
+      forceReauth: !!normalizedLoginHint,
+      clientName: 'office-coding-agent',
+      callbackSuccessMessage: 'You can return to Office Coding Agent.',
+    });
+    return {
+      status: 'success',
+      authorizationUrl: addLoginHintToAuthorizationUrl(
+        result?.authorizationUrl,
+        normalizedLoginHint
+      ),
+      ...(normalizedLoginHint !== undefined && { oauthAlias: normalizedLoginHint }),
+    };
+  } catch (err) {
+    return { status: 'error', message: err.message || String(err) };
   }
-  for (const sub of skillSubdirs) {
-    if (sub.isDirectory()) {
-      const skillDir = join(skillsRoot, sub.name);
-      if (existsSync(join(skillDir, 'SKILL.md'))) {
-        result.push(skillDir);
-      }
+}
+
+export function normalizeMcpEvent(event) {
+  const data = toRecord(event?.data);
+  switch (event?.type) {
+    case 'session.mcp_servers_loaded': {
+      const servers = Array.isArray(data.servers) ? data.servers : [];
+      return servers.map(server => {
+        const serverData = toRecord(server);
+        return {
+          method: 'mcp.status',
+          params: {
+            server: str(serverData.name),
+            status: normalizeMcpStatus(serverData.status),
+            error: str(serverData.error) || undefined,
+          },
+        };
+      });
     }
+    case 'session.mcp_server_status_changed':
+      return [
+        {
+          method: 'mcp.status',
+          params: {
+            server: str(data.serverName),
+            status: normalizeMcpStatus(data.status),
+            error: str(data.error) || undefined,
+          },
+        },
+      ];
+    case 'mcp.oauth_required':
+      return [
+        {
+          method: 'mcp.oauth-required',
+          params: {
+            requestId: str(data.requestId),
+            serverName: str(data.serverName),
+            serverUrl: str(data.serverUrl),
+          },
+        },
+        {
+          method: 'mcp.status',
+          params: {
+            server: str(data.serverName),
+            status: 'needs-auth',
+          },
+        },
+      ];
+    case 'mcp.oauth_completed':
+      return [
+        {
+          method: 'mcp.oauth-completed',
+          params: {
+            requestId: str(data.requestId),
+          },
+        },
+      ];
+    default:
+      return [];
   }
-  return result;
 }
 
 /** Wrap a JSON payload in an LSP Content-Length frame. */
@@ -108,74 +151,6 @@ function lspFrame(obj) {
   const body = JSON.stringify(obj);
   const len = Buffer.byteLength(body, 'utf8');
   return `Content-Length: ${len}\r\n\r\n${body}`;
-}
-
-/**
- * Return the set of tool names actually active for this session.
- *
- * If availableTools is provided, it narrows the session-level tool list.
- *
- * @param {Array<{name?: string}>} [toolDefs]
- * @param {string[]} [availableTools]
- * @returns {string[]}
- */
-export function getRegisteredToolNames(toolDefs = [], availableTools) {
-  const definedToolNames = toolDefs
-    .map(tool => (typeof tool?.name === 'string' ? tool.name : ''))
-    .filter(Boolean);
-  const uniqueToolNames = Array.from(new Set(definedToolNames));
-
-  if (!Array.isArray(availableTools) || availableTools.length === 0) {
-    return uniqueToolNames;
-  }
-
-  const allowedToolNames = new Set(
-    availableTools.filter(toolName => typeof toolName === 'string' && toolName.length > 0)
-  );
-  return uniqueToolNames.filter(toolName => allowedToolNames.has(toolName));
-}
-
-/**
- * Ensure every custom agent gets an explicit tool allowlist before it reaches the SDK.
- *
- * Plugin- and browser-provided agents often omit `tools`, intending "all active session
- * tools". The SDK expects an explicit allowlist for custom agents, so we expand omitted,
- * null, empty, or "*" values to the current session tool names here.
- *
- * @param {Array<{tools?: string[] | null}>} [customAgents]
- * @param {string[]} [sessionToolNames]
- * @returns {Array<{tools?: string[]}>}
- */
-export function applySessionToolAccessToCustomAgents(customAgents = [], sessionToolNames = []) {
-  const fallbackToolNames = Array.from(
-    new Set(sessionToolNames.filter(toolName => typeof toolName === 'string' && toolName.length > 0))
-  );
-
-  return customAgents.map(agent => {
-    const requestedTools = Array.isArray(agent?.tools)
-      ? Array.from(
-          new Set(
-            agent.tools.filter(toolName => typeof toolName === 'string' && toolName.length > 0)
-          )
-        )
-      : null;
-
-    if (!requestedTools || requestedTools.length === 0 || requestedTools.includes('*')) {
-      return {
-        ...agent,
-        tools: fallbackToolNames.length > 0 ? fallbackToolNames : undefined,
-      };
-    }
-
-    if (fallbackToolNames.length === 0) {
-      return { ...agent, tools: requestedTools };
-    }
-
-    return {
-      ...agent,
-      tools: requestedTools.filter(toolName => fallbackToolNames.includes(toolName)),
-    };
-  });
 }
 
 // ── Singleton CopilotClient ───────────────────────────────────────────────
@@ -247,6 +222,7 @@ async function handleConnection(ws) {
 
   /** @type {Map<string, string[]>} MCP server names keyed by sessionId for stop notifications. */
   const sessionMcpServerNames = new Map();
+  let currentSessionId = null;
 
   /** Send a JSON-RPC response back to the browser. */
   function sendResponse(id, result) {
@@ -266,6 +242,12 @@ async function handleConnection(ws) {
   function sendNotification(method, params) {
     if (ws.readyState === ws.OPEN) {
       ws.send(lspFrame({ jsonrpc: '2.0', method, params }));
+    }
+  }
+
+  function forwardMcpEvent(event) {
+    for (const notification of normalizeMcpEvent(event)) {
+      sendNotification(notification.method, notification.params);
     }
   }
 
@@ -389,15 +371,12 @@ async function handleConnection(ws) {
           tools: toolDefs,
           mcpServers,
           availableTools,
-          disabledSkills,
-          customAgents,
-          pluginConfigPath,
+          agent,
         } = params || {};
-        let systemMessage = systemMessageParam;
+        const systemMessage = systemMessageParam;
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length}, customAgents=${(customAgents || []).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length})`
         );
-        const sessionToolNames = getRegisteredToolNames(toolDefs || [], availableTools);
         // Build SDK Tool[] with handlers that forward tool calls to the browser
         const tools = (toolDefs || []).map(t => ({
           name: t.name,
@@ -413,99 +392,6 @@ async function handleConnection(ws) {
             return response.result;
           },
         }));
-
-        const skillDirectories = [];
-
-        // Discover skills from installed Copilot CLI plugins (~/.copilot/config.json)
-        try {
-          const pluginSkillDirs = await discoverPluginSkillDirs(host, pluginConfigPath);
-          if (pluginSkillDirs.length > 0) {
-            skillDirectories.push(...pluginSkillDirs);
-            console.log(`[proxy] Added ${pluginSkillDirs.length} skill dir(s) from installed plugins`);
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin skill discovery failed:', err.message);
-        }
-
-        // Discover agents from installed Copilot CLI plugins and merge into systemMessage.
-        // The SDK's customAgents are VS Code agent-picker entries, NOT auto-applied system
-        // prompts — they require explicit @mention. To guarantee plugin agent instructions
-        // reach the model, we append them to the systemMessage content instead.
-        //
-        // We also send a plugin.agents notification so the browser-side agentService can
-        // register these agents in the AgentPicker without requiring a manual import.
-        const allCustomAgents = applySessionToolAccessToCustomAgents(
-          customAgents || [],
-          sessionToolNames
-        );
-        try {
-          const pluginAgents = await discoverPluginAgents(host, pluginConfigPath);
-          if (pluginAgents.length > 0) {
-            console.log(`[proxy] Merging ${pluginAgents.length} plugin agent(s) into system message`);
-
-            // Notify the browser about discovered plugin agents so they can be shown
-            // in the AgentPicker. Send before the session.create response so the browser
-            // can update its agentService state promptly.
-            sendNotification('plugin.agents', {
-              agents: pluginAgents.map(a => ({
-                name: a.name,
-                description: a.description,
-                prompt: a.prompt,
-                hosts: a.hosts,
-              })),
-            });
-
-            // Pick the first plugin agent as the default; additional ones go into customAgents
-            // for agent-picker UI (future @mention support).
-            const [defaultPluginAgent, ...extraAgents] = pluginAgents;
-            if (defaultPluginAgent?.prompt) {
-              const existingContent = systemMessage?.content ?? '';
-              const merged = existingContent
-                ? `${existingContent}\n\n${defaultPluginAgent.prompt}`
-                : defaultPluginAgent.prompt;
-              systemMessage = {
-                mode: systemMessage?.mode ?? 'replace',
-                content: merged,
-              };
-            }
-            // Deduplicate: only add extra agents that are not already in allCustomAgents
-            // (they may be present if the browser already registered them from a previous
-            // plugin.agents notification).
-            const existingNames = new Set(allCustomAgents.map(a => a.name));
-            const registeredExtraAgents = applySessionToolAccessToCustomAgents(
-              extraAgents,
-              sessionToolNames
-            );
-            allCustomAgents.push(
-              ...registeredExtraAgents.filter(a => !existingNames.has(a.name))
-            );
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin agent discovery failed:', err.message);
-        }
-
-        // Discover plugin skills and notify the browser so SkillPicker can show them.
-        try {
-          const pluginSkills = await discoverPluginSkillObjects(host, pluginConfigPath);
-          if (pluginSkills.length > 0) {
-            console.log(`[proxy] Sending ${pluginSkills.length} plugin skill(s) to browser`);
-            sendNotification('plugin.skills', { skills: pluginSkills });
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin skill discovery failed:', err.message);
-        }
-
-        // Discover plugin prompts (slash commands) and notify the browser.
-        try {
-          const pluginPrompts = await discoverPluginPrompts(host, pluginConfigPath);
-          if (pluginPrompts.length > 0) {
-            console.log(`[proxy] Sending ${pluginPrompts.length} plugin prompt(s) to browser`);
-            sendNotification('plugin.prompts', { prompts: pluginPrompts });
-          }
-        } catch (err) {
-          console.warn('[proxy] Plugin prompt discovery failed:', err.message);
-        }
-
         // Emit 'starting' status for each configured MCP server
         const mcpServerNames = Object.keys(mcpServers || {});
         for (const name of mcpServerNames) {
@@ -529,22 +415,20 @@ async function handleConnection(ws) {
             tools,
             mcpServers,
             availableTools,
-            skillDirectories,
-            disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
-            customAgents: allCustomAgents.length > 0 ? allCustomAgents : undefined,
+            agent: typeof agent === 'string' && agent.length > 0 ? agent : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               // Auto-approve custom-tool permissions — these are tools explicitly
               // registered by the session creator, not built-in filesystem tools.
-              // The SDK v0.1.28+ denies all permissions by default; our own tools
+              // The SDK denies permissions by default; our own tools
               // should always be allowed to execute.
               if (request.kind === 'custom-tool') {
                 console.log(`[proxy] permission.request auto-approved: ${request.kind}`);
-                return { kind: 'approved' };
+                return { kind: 'approve-once' };
               }
               const decision = await requestPermissionDecision(session.sessionId, request);
               console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision}`);
-              return { kind: decision };
+              return decision === 'approved' ? { kind: 'approve-once' } : { kind: 'reject' };
             },
           });
         } catch (err) {
@@ -567,18 +451,8 @@ async function handleConnection(ws) {
           break;
         }
 
-        // Emit 'connected' status for each MCP server on success
-        for (const name of mcpServerNames) {
-          sendNotification('mcp.status', { server: name, status: 'connected' });
-          sendNotification('mcp.log', {
-            server: name,
-            timestamp: new Date().toISOString(),
-            level: 'info',
-            message: `Server '${name}' connected successfully`,
-          });
-        }
-
         sessions.set(session.sessionId, session);
+        currentSessionId = session.sessionId;
         if (mcpServerNames.length > 0) {
           sessionMcpServerNames.set(session.sessionId, mcpServerNames);
         }
@@ -587,6 +461,7 @@ async function handleConnection(ws) {
 
         // Subscribe to all session events and forward them to the browser
         const unsub = session.on(event => {
+          forwardMcpEvent(event);
           sendNotification('session.event', {
             sessionId: session.sessionId,
             event,
@@ -595,6 +470,76 @@ async function handleConnection(ws) {
         eventUnsubs.set(session.sessionId, unsub);
 
         sendResponse(id, { sessionId: session.sessionId });
+        break;
+      }
+
+      case 'agent.list': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.agent.list());
+        } catch (err) {
+          console.error('[proxy] agent.list failed:', err);
+          sendError(id, -32603, err.message || 'Failed to list agents');
+        }
+        break;
+      }
+
+      case 'agent.select': {
+        const { sessionId, name } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        if (typeof name !== 'string' || name.trim().length === 0) {
+          sendError(id, -32602, 'Agent name is required');
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.agent.select({ name }));
+        } catch (err) {
+          console.error('[proxy] agent.select failed:', err);
+          sendError(id, -32603, err.message || 'Failed to select agent');
+        }
+        break;
+      }
+
+      case 'agent.deselect': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.rpc.agent.deselect();
+          sendResponse(id, {});
+        } catch (err) {
+          console.error('[proxy] agent.deselect failed:', err);
+          sendError(id, -32603, err.message || 'Failed to deselect agent');
+        }
+        break;
+      }
+
+      case 'mcp.initiateOAuth': {
+        const { sessionId, serverName, loginHint } = params || {};
+        const targetSessionId = sessionId || currentSessionId;
+        const session = targetSessionId ? sessions.get(targetSessionId) : null;
+        if (!session) {
+          sendResponse(id, { status: 'error', message: 'Open a chat session before signing in.' });
+          return;
+        }
+        if (typeof serverName !== 'string' || serverName.trim().length === 0) {
+          sendResponse(id, { status: 'error', message: 'MCP server name is required.' });
+          return;
+        }
+
+        sendResponse(id, await initiateMcpOAuthForSession(session, serverName, loginHint));
         break;
       }
 
@@ -655,6 +600,9 @@ async function handleConnection(ws) {
           eventUnsubs.delete(sessionId);
           await session.destroy();
           sessions.delete(sessionId);
+          if (currentSessionId === sessionId) {
+            currentSessionId = null;
+          }
           // Emit 'stopped' status for MCP servers in this session
           const mcpNames = sessionMcpServerNames.get(sessionId);
           if (mcpNames) {
@@ -755,6 +703,7 @@ async function handleConnection(ws) {
       }
     }
     sessions.clear();
+    currentSessionId = null;
 
     // Clear MCP server tracking
     sessionMcpServerNames.clear();
