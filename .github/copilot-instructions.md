@@ -259,7 +259,7 @@ The task pane is split into three areas:
 - Single Zustand store: `useSettingsStore` in `src/stores/settingsStore.ts`
 - Persisted via `officeStorage` adapter (uses `OfficeRuntime.storage`; throws when unavailable — tests must mock it via `tests/setup.ts`)
 - Chat state is ephemeral (lives in `useOfficeChat` hook, not persisted)
-- `activeModel`, `disabledSkillNames`, and `disabledMcpServerNames` are persisted
+- `activeModel`, `activeAgentName`, and `disabledMcpServerNames` are persisted
 - Persist storage key is `office-coding-agent-settings`
 
 ### Tool Definitions

@@ -80,40 +80,6 @@ describe('settingsStore — CLI agents', () => {
   });
 });
 
-// ─── Skill management ───
-
-describe('settingsStore — skills', () => {
-  it('starts with no disabled skills', () => {
-    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
-  });
-
-  it('toggleSkill disables an enabled skill', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    expect(useSettingsStore.getState().disabledSkillNames).toContain('excel');
-  });
-
-  it('toggleSkill re-enables a disabled skill', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    useSettingsStore.getState().toggleSkill('excel');
-    expect(useSettingsStore.getState().disabledSkillNames).not.toContain('excel');
-  });
-
-  it('isSkillEnabled returns true for enabled skills', () => {
-    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(true);
-  });
-
-  it('isSkillEnabled returns false for disabled skills', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    expect(useSettingsStore.getState().isSkillEnabled('excel')).toBe(false);
-  });
-
-  it('reset clears disabled skills', () => {
-    useSettingsStore.getState().toggleSkill('excel');
-    useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().disabledSkillNames).toEqual([]);
-  });
-});
-
 // ─── MCP server management ───
 
 describe('settingsStore — mcp servers', () => {

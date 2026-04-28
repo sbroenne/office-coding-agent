@@ -371,7 +371,6 @@ async function handleConnection(ws) {
           tools: toolDefs,
           mcpServers,
           availableTools,
-          disabledSkills,
           agent,
         } = params || {};
         const systemMessage = systemMessageParam;
@@ -417,7 +416,6 @@ async function handleConnection(ws) {
             mcpServers,
             availableTools,
             agent: typeof agent === 'string' && agent.length > 0 ? agent : undefined,
-            disabledSkills: disabledSkills?.length > 0 ? disabledSkills : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               // Auto-approve custom-tool permissions — these are tools explicitly

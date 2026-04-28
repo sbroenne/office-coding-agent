@@ -15,7 +15,7 @@
 - Chat UI: MessageList, ChatComposer, AssistantMessage, UserMessage, MarkdownContent, ToolProgress, ActionBar
 - VS Code design token compliance (`src/styles/vscode-theme.css`, `--vscode-*` properties)
 - Tailwind utility classes and responsive layout
-- ModelPicker, McpPicker, SkillPicker, SettingsDialog
+- AgentPicker, ModelPicker, McpPicker, SettingsDialog
 
 ## How I Work
 

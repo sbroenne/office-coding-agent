@@ -51,8 +51,6 @@ export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onP
   tools?: Tool[];
   /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
   host?: string;
-  /** Skill names to disable (SDK disabledSkills). */
-  disabledSkills?: string[];
 }
 
 export interface AgentInfo {
@@ -339,7 +337,6 @@ export class WebSocketCopilotClient {
       mcpServers: config.mcpServers,
       availableTools: config.availableTools,
       host: config.host,
-      disabledSkills: config.disabledSkills,
       agent: config.agent,
     });
 

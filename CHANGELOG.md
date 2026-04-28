@@ -10,3 +10,4 @@
 - Added authenticated remote MCP server recovery with SDK-owned OAuth, login-hint support, foreground sign-in prompts, and MCP picker Sign in/Retry/Switch account actions.
 - Switched MCP server discovery and session wiring to `copilot mcp list --json` so the picker and active Copilot session match the user's CLI MCP config.
 - Removed app-owned agent files, local agent frontmatter parsing, agent ZIP import/export helpers, and browser-provided `customAgents`; the Agent picker now selects CLI-owned agents installed by the Copilot CLI plugins.
+- Removed leftover disabled-skill picker/toggle state; CLI plugin skills are invoked directly through `/skill-name` slash commands.

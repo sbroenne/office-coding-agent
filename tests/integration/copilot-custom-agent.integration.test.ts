@@ -153,43 +153,6 @@ describe('Copilot custom agent integration', () => {
   );
 
   it(
-    'session with disabledSkills still creates and responds',
-    async () => {
-      const client = await createWebSocketClient(SERVER_URL);
-      try {
-        const session = await client.createSession({
-          host: 'excel',
-          disabledSkills: ['excel'],
-          systemMessage: {
-            mode: 'replace',
-            content: 'You are a helpful assistant. Reply with exactly one word: PONG',
-          },
-        });
-
-        session.onPermissionRequest(async payload => {
-          await session.respondPermission(payload.requestId, 'approved');
-        });
-
-        let fullText = '';
-        for await (const event of session.query({ prompt: 'Ping' })) {
-          if (event.type === 'assistant.message_delta') {
-            fullText += event.data.deltaContent;
-          }
-          if (event.type === 'assistant.message') {
-            fullText = event.data.content;
-          }
-          if (event.type === 'session.idle') break;
-        }
-
-        expect(fullText.toLowerCase()).toContain('pong');
-      } finally {
-        await client.stop();
-      }
-    },
-    TIMEOUT_MS
-  );
-
-  it(
     'tool scoping via availableTools restricts which tools are offered',
     async () => {
       // Register two tools but restrict availableTools to only one

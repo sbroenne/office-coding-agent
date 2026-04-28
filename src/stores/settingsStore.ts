@@ -17,10 +17,6 @@ interface SettingsState extends UserSettings {
   setAvailableAgents: (agents: CopilotAgent[]) => void;
   setActiveAgent: (agentName: string | null) => void;
 
-  // ─── Skill management ───
-  toggleSkill: (name: string) => void;
-  isSkillEnabled: (name: string) => boolean;
-
   // ─── MCP server management ───
   toggleMcpServer: (name: string) => void;
   isMcpServerEnabled: (name: string) => boolean;
@@ -61,20 +57,6 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
-      // ─── Skill management ───
-      toggleSkill: name => {
-        const disabled = get().disabledSkillNames;
-        if (disabled.includes(name)) {
-          set({ disabledSkillNames: disabled.filter(n => n !== name) });
-        } else {
-          set({ disabledSkillNames: [...disabled, name] });
-        }
-      },
-
-      isSkillEnabled: name => {
-        return !get().disabledSkillNames.includes(name);
-      },
-
       // ─── MCP server management ───
       toggleMcpServer: name => {
         const disabled = get().disabledMcpServerNames;
@@ -100,7 +82,6 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: state => ({
         activeModel: state.activeModel,
         activeAgentName: state.activeAgentName,
-        disabledSkillNames: state.disabledSkillNames,
         disabledMcpServerNames: state.disabledMcpServerNames,
       }),
     }

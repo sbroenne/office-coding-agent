@@ -102,7 +102,6 @@ function getWsUrl(): string {
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
   const activeAgentName = useSettingsStore(s => s.activeAgentName);
-  const disabledSkillNames = useSettingsStore(s => s.disabledSkillNames);
   const disabledMcpServerNames = useSettingsStore(s => s.disabledMcpServerNames);
   const sessions = useSessionHistoryStore(s => s.sessions);
   const activeSessionId = useSessionHistoryStore(s => s.activeSessionId);
@@ -123,19 +122,17 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   // Stable refs for settings that should NOT trigger session re-init when they change.
   // initSession reads from these refs so the useCallback only re-creates when host
-  // changes — not on every skill/agent/MCP/model toggle mid-conversation.
+  // changes — not on every agent/MCP/model toggle mid-conversation.
   // Without this, any store update (e.g. WorkIQ connecting, switching model) would
   // tear down and restart the Copilot session, losing all conversation context.
   // Model changes take effect on the next new conversation (same as VS Code Copilot).
   const activeModelRef = useRef(activeModel);
   const activeAgentNameRef = useRef(activeAgentName);
-  const disabledSkillNamesRef = useRef(disabledSkillNames);
   const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
   const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
   activeAgentNameRef.current = activeAgentName;
-  disabledSkillNamesRef.current = disabledSkillNames;
   disabledMcpServerNamesRef.current = disabledMcpServerNames;
   evaluatePermissionRef.current = evaluatePermission;
 
@@ -293,9 +290,6 @@ export function useOfficeChat(host: OfficeHostApp) {
       );
       const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
 
-      const disabledSkills =
-        disabledSkillNamesRef.current.length > 0 ? disabledSkillNamesRef.current : undefined;
-
       const session = await withTimeout(
         client.createSession({
           model: activeModelRef.current,
@@ -303,7 +297,6 @@ export function useOfficeChat(host: OfficeHostApp) {
           tools: getToolsForHost(host),
           mcpServers,
           host,
-          disabledSkills,
           agent: activeAgentNameRef.current ?? undefined,
         }),
         60_000,

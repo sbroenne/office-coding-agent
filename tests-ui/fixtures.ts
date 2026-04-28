@@ -39,10 +39,9 @@ function officeRuntimePolyfill() {
 /** Minimal settings blob matching the current UserSettings shape. */
 function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
-    state: {
-      activeModel: 'claude-sonnet-4',
-      disabledSkillNames: [],
-      disabledMcpServerNames: [],
+      state: {
+        activeModel: 'claude-sonnet-4',
+        disabledMcpServerNames: [],
       availableModels: [
         { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', provider: 'Anthropic' },
         { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },

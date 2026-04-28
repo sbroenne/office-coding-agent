@@ -35,8 +35,6 @@ export interface UserSettings {
   activeModel: string;
   /** Currently selected Copilot CLI agent name. Null = default agent. */
   activeAgentName: string | null;
-  /** Skill names explicitly disabled by the user. Empty = all enabled. */
-  disabledSkillNames: string[];
   /** MCP server names explicitly disabled by the user. Empty = all enabled. */
   disabledMcpServerNames: string[];
 }
@@ -45,6 +43,5 @@ export interface UserSettings {
 export const DEFAULT_SETTINGS: UserSettings = {
   activeModel: 'claude-sonnet-4.6',
   activeAgentName: null,
-  disabledSkillNames: [],
   disabledMcpServerNames: [],
 };
