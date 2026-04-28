@@ -112,26 +112,31 @@ Committed file:
 
 - `manifests/manifest.staging.xml`
 
-## Import Checklist (Skills & Agents)
+## CLI Plugin and MCP Checklist
 
-Use this after the add-in is loaded (desktop or staging) to verify ZIP import flows.
+Use this after the add-in is loaded (desktop or staging) to verify the CLI-owned plugin and MCP flows.
 
-1. Generate sample ZIPs
-
-```bash
-npm run extensions:samples
-```
-
-The task pane no longer imports agent/skill ZIP files. Agents, skills, prompts, MCP servers, and plugin updates are owned by the Copilot CLI. Use `copilot plugin` commands for local plugin development and installation:
+1. Confirm required Office plugins are installed by the startup bootstrap:
 
 ```bash
 copilot plugin list
+```
+
+2. Manage user plugins with the Copilot CLI:
+
+```bash
 copilot plugin install <local-path-or-name@marketplace>
 copilot plugin update <plugin-name@marketplace-name>
 copilot plugin uninstall <plugin-name>
 ```
 
-On startup, the proxy automatically registers the Office Coding Agent marketplace when missing and ensures the required `office-excel`, `office-powerpoint`, `office-word`, and `office-outlook` plugins are installed and updated.
+3. Confirm MCP servers match the Copilot CLI config:
+
+```bash
+copilot mcp list
+```
+
+The task pane no longer imports agent/skill ZIP files or owns a separate MCP registry. Agents, skills, prompts, MCP servers, and plugin updates are owned by the Copilot CLI. On startup, the proxy automatically registers the Office Coding Agent marketplace when missing and ensures the required `office-excel`, `office-powerpoint`, `office-word`, and `office-outlook` plugins are installed and updated.
 
 ## Troubleshooting
 

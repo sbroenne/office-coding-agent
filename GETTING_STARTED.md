@@ -110,7 +110,8 @@ The task pane opens with an AI chat interface. Type a message to get started.
 
 - Use the **Agent picker** (bottom of the input bar) to switch task-pane agents when more than one is available.
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
-- Use the **Skill picker** (header icon) for SDK-provided skill toggles when available.
+- Type `/skill-name` or `/prompt-name` to invoke installed Copilot CLI skills and `.prompt.md` prompt files.
+- Use the **MCP servers** picker (bottom of the input bar) to enable, disable, and sign in to MCP servers from `copilot mcp list`.
 - Use `copilot plugin` CLI commands to install, update, or remove user plugins. On startup, the proxy automatically ensures the Office Coding Agent marketplace plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) are installed and updated in your normal Copilot CLI config.
 - Use the **New Conversation** button (header) to reset the chat.
 
@@ -172,6 +173,13 @@ This removes the manifest registration and cleans up the trusted certificate ent
 
 - Run `gh auth status` to confirm you are signed in.
 - Run `gh auth login` to re-authenticate if needed.
+
+### MCP servers do not appear as expected
+
+- Run `copilot mcp list` to see the source of truth used by the add-in.
+- Add or remove servers with `copilot mcp add` and `copilot mcp remove`.
+- Reload the task pane or start a new conversation after changing MCP config so the next session uses the updated CLI list.
+- If a remote MCP server needs sign-in, use the **MCP servers** picker action or follow the foreground sign-in prompt.
 
 ### Tray mode (alternative to `npm run dev`)
 

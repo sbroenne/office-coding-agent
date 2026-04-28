@@ -79,6 +79,13 @@ vi.mock('@/lib/websocket-client', () => ({
 import { createWebSocketClient } from '@/lib/websocket-client';
 const mockCreate = vi.mocked(createWebSocketClient);
 
+beforeEach(() => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ servers: [] }),
+  } as Response);
+});
+
 // ─── Shared test wrapper ──────────────────────────────────────────────────────
 
 /**
