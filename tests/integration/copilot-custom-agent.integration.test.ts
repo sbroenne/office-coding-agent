@@ -374,7 +374,7 @@ function handleRequest(req) {
         // MCP tool calls require permission approval. Auto-approve all requests
         // so the model can call get_secret_word without waiting for a human decision.
         session.onPermissionRequest(async payload => {
-          await session.respondPermission(payload.requestId, 'approved');
+          await session.respondPermission(payload.requestId, { kind: 'approve-once' });
         });
 
         let fullText = '';

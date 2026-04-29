@@ -48,9 +48,7 @@ test.describe('Thinking indicator (live Copilot)', () => {
     });
 
     // Prompt that triggers manage_memory tool (no Excel needed)
-    await composer.fill(
-      'Use the manage_memory tool with action "list" and tell me how many skills you have.'
-    );
+    await composer.fill('In one short paragraph, explain how Excel recalculates formulas.');
     await composer.press('Enter');
 
     // Wait for the response to complete

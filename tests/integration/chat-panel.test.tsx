@@ -37,6 +37,9 @@ const DEFAULT_PROPS = {
   isRunning: false,
   onSend: vi.fn(),
   onCancel: vi.fn(),
+  sessionMode: 'interactive' as const,
+  onSwitchSessionMode: vi.fn(),
+  onOpenPlan: vi.fn(),
 };
 
 // ─── Tests ───
@@ -62,6 +65,7 @@ describe('ChatPanel — integration', () => {
     expect(screen.getByLabelText('Select agent')).toBeInTheDocument();
     // ModelPicker renders with its aria-label in the left toolbar
     expect(screen.getByLabelText('Select model')).toBeInTheDocument();
+    expect(screen.getByLabelText('Enter Plan mode')).toBeInTheDocument();
     // McpPicker renders with server icon in the right toolbar (NOT the Plugins button)
     expect(screen.getByLabelText('MCP servers')).toBeInTheDocument();
     // No duplicate Plugins button in the toolbar (it lives in the header only)

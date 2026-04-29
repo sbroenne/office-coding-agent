@@ -12,6 +12,7 @@ import { ChatActionsContext } from '@/contexts/ChatActionsContext';
 import { detectOfficeHost } from '@/services/office/host';
 import type { OfficeHostApp } from '@/services/office/host';
 import { McpOAuthPrompt } from '@/components/McpOAuthPrompt';
+import type { ExitPlanModeRequestPayload, PlanState } from '@/lib/websocket-client';
 
 const bannerBaseStyle: React.CSSProperties = {
   borderBottomColor: 'var(--vscode-widget-border)',
@@ -69,9 +70,10 @@ const PermissionBanner: React.FC<{
   kind: string;
   detail: string;
   onApprove: () => void;
+  onApproveForSession: () => void;
+  onApproveForLocation: () => void;
   onDeny: () => void;
-  onAlwaysAllow: () => void;
-}> = ({ kind, detail, onApprove, onDeny, onAlwaysAllow }) => (
+}> = ({ kind, detail, onApprove, onApproveForSession, onApproveForLocation, onDeny }) => (
   <div
     className="flex items-center gap-2 border-b px-3 py-2 text-sm"
     style={{
@@ -129,7 +131,7 @@ const PermissionBanner: React.FC<{
         Allow
       </button>
       <button
-        onClick={onAlwaysAllow}
+        onClick={onApproveForSession}
         className={buttonBaseClassName}
         style={{
           borderColor: 'var(--vscode-widget-border)',
@@ -143,15 +145,112 @@ const PermissionBanner: React.FC<{
           event.currentTarget.style.backgroundColor = 'transparent';
         }}
       >
-        Always allow
+        Allow session
+      </button>
+      <button
+        onClick={onApproveForLocation}
+        className={buttonBaseClassName}
+        style={{
+          borderColor: 'var(--vscode-widget-border)',
+          backgroundColor: 'transparent',
+          color: 'var(--vscode-foreground)',
+        }}
+        onMouseEnter={event => {
+          event.currentTarget.style.backgroundColor = 'var(--vscode-toolbar-hoverBackground)';
+        }}
+        onMouseLeave={event => {
+          event.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        Allow workspace
       </button>
     </div>
   </div>
 );
 
+const PlanPanel: React.FC<{
+  plan: PlanState;
+  workspacePath: string | null;
+  pendingExitPlanMode: ExitPlanModeRequestPayload | null;
+  onRefresh: () => void | Promise<void>;
+  onResolveExitPlanMode: (selectedAction: string, feedback?: string) => void | Promise<void>;
+}> = ({ plan, workspacePath, pendingExitPlanMode, onRefresh, onResolveExitPlanMode }) => (
+  <div className="flex h-full flex-col gap-3 p-3 text-sm">
+    {workspacePath && (
+      <div className="truncate text-xs" style={{ color: 'var(--vscode-descriptionForeground)' }}>
+        Workspace: {workspacePath}
+      </div>
+    )}
+    {pendingExitPlanMode && (
+      <div
+        className="rounded-[var(--vscode-cornerRadius-medium)] border p-3"
+        style={{ borderColor: 'var(--vscode-widget-border)' }}
+      >
+        <div className="mb-1 font-medium">Plan ready</div>
+        <div className="mb-3 text-xs" style={{ color: 'var(--vscode-descriptionForeground)' }}>
+          {pendingExitPlanMode.summary}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {pendingExitPlanMode.actions.map(action => (
+            <button
+              key={action}
+              type="button"
+              onClick={() => void onResolveExitPlanMode(action)}
+              className={buttonBaseClassName}
+              style={{
+                borderColor:
+                  action === pendingExitPlanMode.recommendedAction
+                    ? 'var(--vscode-button-background)'
+                    : 'var(--vscode-widget-border)',
+                backgroundColor:
+                  action === pendingExitPlanMode.recommendedAction
+                    ? 'var(--vscode-button-background)'
+                    : 'transparent',
+                color:
+                  action === pendingExitPlanMode.recommendedAction
+                    ? 'var(--vscode-button-foreground)'
+                    : 'var(--vscode-foreground)',
+              }}
+            >
+              {action.replace(/_/g, ' ')}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+    <div className="flex items-center justify-between">
+      <div className="font-medium">plan.md</div>
+      <button
+        type="button"
+        onClick={() => void onRefresh()}
+        className="inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-medium)] border px-2 py-1 text-xs"
+        style={{
+          borderColor: 'var(--vscode-widget-border)',
+          backgroundColor: 'transparent',
+          color: 'var(--vscode-foreground)',
+        }}
+      >
+        <Codicon name="refresh" className="text-xs" />
+        Refresh
+      </button>
+    </div>
+    <pre
+      className="min-h-0 flex-1 overflow-auto rounded-[var(--vscode-cornerRadius-medium)] border p-2 text-xs whitespace-pre-wrap"
+      style={{
+        borderColor: 'var(--vscode-widget-border)',
+        backgroundColor: 'var(--vscode-editor-background)',
+        color: 'var(--vscode-editor-foreground)',
+      }}
+    >
+      {plan.content ?? 'No plan has been created yet.'}
+    </pre>
+  </div>
+);
+
 const PANEL_TITLES: Record<string, { title: string; description?: string }> = {
   history: { title: 'Session History' },
-  permissions: { title: 'Permissions', description: 'Manage auto-approval and saved rules' },
+  permissions: { title: 'Permissions', description: 'Manage Copilot CLI approvals' },
+  plan: { title: 'Plan', description: 'Review the current SDK plan workspace' },
 };
 
 const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
@@ -171,13 +270,25 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
     sessions,
     activeSessionId,
     pendingPermission,
+    permissionDetail,
+    permissionApproveAll,
     pendingMcpOAuthPrompt,
     approvePermission,
+    approvePermissionForSession,
+    approvePermissionForLocation,
     denyPermission,
-    allowPermissionAlways,
+    setApproveAllPermissions,
+    resetSessionApprovals,
     initiateMcpOAuth,
     openMcpOAuthPrompt,
     dismissMcpOAuthPrompt,
+    sessionMode,
+    switchSessionMode,
+    planState,
+    workspacePath,
+    pendingExitPlanMode,
+    refreshPlan,
+    resolveExitPlanMode,
     enqueue,
     queuedPrompts,
     dequeue,
@@ -185,14 +296,6 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
 
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const closePanel = useCallback(() => setActivePanel(null), []);
-
-  const permissionDetail = pendingPermission
-    ? (pendingPermission.request.path ??
-      pendingPermission.request.fileName ??
-      pendingPermission.request.fullCommandText ??
-      pendingPermission.request.intention ??
-      'User approval required')
-    : '';
 
   return (
     <ChatActionsContext.Provider value={{ send, enqueue }}>
@@ -222,8 +325,9 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               kind={pendingPermission.request.kind}
               detail={permissionDetail}
               onApprove={approvePermission}
+              onApproveForSession={approvePermissionForSession}
+              onApproveForLocation={approvePermissionForLocation}
               onDeny={denyPermission}
-              onAlwaysAllow={allowPermissionAlways}
             />
           )}
           <ChatErrorBoundary>
@@ -236,6 +340,9 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
               onSwitchAgent={switchAgent}
               onInitiateMcpOAuth={initiateMcpOAuth}
               onOpenMcpOAuthPrompt={openMcpOAuthPrompt}
+              sessionMode={sessionMode}
+              onSwitchSessionMode={switchSessionMode}
+              onOpenPlan={() => setActivePanel('plan')}
               onEnqueue={enqueue}
               queuedPrompts={queuedPrompts}
               onDequeue={dequeue}
@@ -266,7 +373,22 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
                 onDeleteSession={deleteSession}
               />
             )}
-            {key === 'permissions' && <PermissionManagerPanel />}
+            {key === 'permissions' && (
+              <PermissionManagerPanel
+                approveAll={permissionApproveAll}
+                onSetApproveAll={setApproveAllPermissions}
+                onResetSessionApprovals={resetSessionApprovals}
+              />
+            )}
+            {key === 'plan' && (
+              <PlanPanel
+                plan={planState}
+                workspacePath={workspacePath}
+                pendingExitPlanMode={pendingExitPlanMode}
+                onRefresh={refreshPlan}
+                onResolveExitPlanMode={resolveExitPlanMode}
+              />
+            )}
           </SlidePanel>
         ))}
       </div>

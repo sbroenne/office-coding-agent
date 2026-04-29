@@ -16,7 +16,7 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onSwitchAgent }) => {
 
   const agents = availableAgents ?? [];
   const activeAgent = activeAgentName ? agents.find(agent => agent.name === activeAgentName) : null;
-  const displayName = activeAgent?.displayName ?? 'Default';
+  const displayName = activeAgent?.displayName ?? 'Office default';
 
   const selectAgent = (agentName: string | null) => {
     void (async () => {
@@ -96,8 +96,8 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onSwitchAgent }) => {
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Agents</div>
           {renderAgentOption(
             null,
-            'Default',
-            'Use the default Copilot CLI agent for this Office host.',
+            'Office default',
+            'Use the bundled Office CLI plugin agent for this host.',
             activeAgentName === null
           )}
           {availableAgents === null ? (
