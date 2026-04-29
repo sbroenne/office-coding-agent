@@ -15,6 +15,7 @@ import type {
   ToolHandler,
   ToolInvocation,
   ToolResultObject,
+  PermissionRequestResult,
 } from '@github/copilot-sdk';
 
 interface ToolCallRequestPayload {
@@ -44,6 +45,25 @@ export interface PermissionRequestPayload {
     args?: unknown;
     [key: string]: unknown;
   };
+  promptRequest?: Record<string, unknown>;
+  locationKey?: string;
+}
+
+export type SessionMode = 'interactive' | 'plan' | 'autopilot';
+
+export interface PlanState {
+  exists: boolean;
+  content: string | null;
+  path: string | null;
+}
+
+export interface ExitPlanModeRequestPayload {
+  sessionId: string;
+  requestId: string;
+  actions: string[];
+  planContent: string;
+  recommendedAction: string;
+  summary: string;
 }
 
 /** Extended session config for browser → proxy communication. */
@@ -69,7 +89,8 @@ export class BrowserCopilotSession {
 
   constructor(
     public readonly sessionId: string,
-    private connection: MessageConnection
+    private connection: MessageConnection,
+    public readonly workspacePath?: string
   ) {}
 
   async send(options: MessageOptions): Promise<string> {
@@ -168,7 +189,7 @@ export class BrowserCopilotSession {
     }
   }
 
-  async respondPermission(requestId: string, decision: 'approved' | 'denied'): Promise<void> {
+  async respondPermission(requestId: string, decision: PermissionRequestResult): Promise<void> {
     await this.connection.sendRequest('permission.respond', {
       sessionId: this.sessionId,
       requestId,
@@ -210,6 +231,67 @@ export class BrowserCopilotSession {
     });
   }
 
+  async abort(): Promise<void> {
+    await this.connection.sendRequest('session.abort', {
+      sessionId: this.sessionId,
+    });
+  }
+
+  async disconnect(): Promise<void> {
+    await this.connection.sendRequest('session.disconnect', {
+      sessionId: this.sessionId,
+    });
+    this.eventHandlers.clear();
+    this.toolHandlers.clear();
+    this.permissionHandlers.clear();
+  }
+
+  async getMode(): Promise<SessionMode> {
+    const result = await this.connection.sendRequest<{ mode: SessionMode }>('session.mode.get', {
+      sessionId: this.sessionId,
+    });
+    return result.mode;
+  }
+
+  async setMode(mode: SessionMode): Promise<void> {
+    await this.connection.sendRequest('session.mode.set', {
+      sessionId: this.sessionId,
+      mode,
+    });
+  }
+
+  async readPlan(): Promise<PlanState> {
+    return this.connection.sendRequest<PlanState>('session.plan.read', {
+      sessionId: this.sessionId,
+    });
+  }
+
+  async updatePlan(content: string): Promise<void> {
+    await this.connection.sendRequest('session.plan.update', {
+      sessionId: this.sessionId,
+      content,
+    });
+  }
+
+  async deletePlan(): Promise<void> {
+    await this.connection.sendRequest('session.plan.delete', {
+      sessionId: this.sessionId,
+    });
+  }
+
+  async setApproveAll(enabled: boolean): Promise<void> {
+    await this.connection.sendRequest('permissions.setApproveAll', {
+      sessionId: this.sessionId,
+      enabled,
+    });
+  }
+
+  async resetSessionApprovals(): Promise<void> {
+    await this.connection.sendRequest('permissions.resetSessionApprovals', {
+      sessionId: this.sessionId,
+    });
+  }
+
   async initiateMcpOAuth(serverName: string): Promise<McpOAuthResult> {
     return this.connection.sendRequest<McpOAuthResult>('mcp.initiateOAuth', {
       sessionId: this.sessionId,
@@ -226,12 +308,7 @@ export class BrowserCopilotSession {
   }
 
   async destroy(): Promise<void> {
-    await this.connection.sendRequest('session.destroy', {
-      sessionId: this.sessionId,
-    });
-    this.eventHandlers.clear();
-    this.toolHandlers.clear();
-    this.permissionHandlers.clear();
+    await this.disconnect();
   }
 }
 
@@ -325,7 +402,10 @@ export class WebSocketCopilotClient {
       throw new Error('Client not connected. Call start() first.');
     }
 
-    const response = await this.connection.sendRequest<{ sessionId: string }>('session.create', {
+    const response = await this.connection.sendRequest<{
+      sessionId: string;
+      workspacePath?: string;
+    }>('session.create', {
       model: config.model,
       sessionId: config.sessionId,
       systemMessage: config.systemMessage,
@@ -333,6 +413,7 @@ export class WebSocketCopilotClient {
         name: tool.name,
         description: tool.description,
         parameters: tool.parameters,
+        skipPermission: tool.skipPermission,
       })),
       mcpServers: config.mcpServers,
       availableTools: config.availableTools,
@@ -341,7 +422,7 @@ export class WebSocketCopilotClient {
     });
 
     const sessionId = response.sessionId;
-    const session = new BrowserCopilotSession(sessionId, this.connection);
+    const session = new BrowserCopilotSession(sessionId, this.connection, response.workspacePath);
     session.registerTools(config.tools);
     this.sessions.set(sessionId, session);
     return session;
@@ -396,7 +477,7 @@ export class WebSocketCopilotClient {
   async stop(): Promise<void> {
     for (const session of this.sessions.values()) {
       try {
-        await session.destroy();
+        await session.disconnect();
       } catch {
         // ignore
       }

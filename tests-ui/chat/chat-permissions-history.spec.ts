@@ -3,22 +3,23 @@ import { test, expect } from '../fixtures';
 test.describe('Permissions and session history UI', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('opens permissions panel and can set working directory via browser', async ({
+  test('opens permissions panel and can manage SDK approvals', async ({
     configuredTaskpane: page,
   }) => {
     await page.getByRole('button', { name: 'Permissions' }).click();
 
     await expect(page.getByRole('heading', { name: 'Permissions' })).toBeVisible();
     await expect(
-      page.getByText('Manage auto-approval and saved rules')
+      page.getByText('Manage Copilot CLI approvals')
     ).toBeVisible();
 
-    await page.getByRole('button', { name: /Browse/i }).click();
-    await expect(page.getByRole('button', { name: 'Select', exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Allow all')).toBeVisible();
+    await expect(page.getByText('Session approvals', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Select', exact: true }).click();
+    await page.getByRole('button', { name: 'Off' }).click();
+    await expect(page.getByRole('button', { name: 'On' })).toBeVisible();
 
-    await expect(page.getByText('Not set')).not.toBeVisible();
+    await page.getByRole('button', { name: 'Reset session approvals' }).click();
   });
 
   test('opens history manage panel and deletes a saved session', async ({

@@ -259,7 +259,7 @@ async function handleConnection(ws) {
   /** @type {Map<number, { resolve: Function, reject: Function }>} */
   const pendingRequests = new Map();
 
-  /** @type {Map<string, { sessionId: string, resolve: (decision: 'approved'|'denied') => void, timer: NodeJS.Timeout }>} */
+  /** @type {Map<string, { sessionId: string, resolve: (decision: import('@github/copilot-sdk').PermissionRequestResult) => void, timer: NodeJS.Timeout }>} */
   const pendingPermissionResponses = new Map();
 
   function sendRequest(method, params) {
@@ -282,13 +282,14 @@ async function handleConnection(ws) {
       sessionId,
       requestId,
       request,
+      locationKey: process.cwd(),
     });
 
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         pendingPermissionResponses.delete(requestId);
-        console.warn(`[proxy] permission.request timed out (${requestId}) — default deny`);
-        resolve('denied');
+        console.warn(`[proxy] permission.request timed out (${requestId}) — user not available`);
+        resolve({ kind: 'user-not-available' });
       }, 60_000);
 
       pendingPermissionResponses.set(requestId, {
@@ -378,11 +379,12 @@ async function handleConnection(ws) {
           `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
-        const tools = (toolDefs || []).map(t => ({
-          name: t.name,
-          description: t.description,
-          parameters: t.parameters,
-          handler: async (args, invocation) => {
+          const tools = (toolDefs || []).map(t => ({
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+            skipPermission: t.skipPermission !== false,
+            handler: async (args, invocation) => {
             const response = await sendRequest('tool.call', {
               sessionId: invocation.sessionId,
               toolCallId: invocation.toolCallId,
@@ -418,17 +420,9 @@ async function handleConnection(ws) {
             agent: typeof agent === 'string' && agent.length > 0 ? agent : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
-              // Auto-approve custom-tool permissions — these are tools explicitly
-              // registered by the session creator, not built-in filesystem tools.
-              // The SDK denies permissions by default; our own tools
-              // should always be allowed to execute.
-              if (request.kind === 'custom-tool') {
-                console.log(`[proxy] permission.request auto-approved: ${request.kind}`);
-                return { kind: 'approve-once' };
-              }
               const decision = await requestPermissionDecision(session.sessionId, request);
-              console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision}`);
-              return decision === 'approved' ? { kind: 'approve-once' } : { kind: 'reject' };
+              console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision.kind}`);
+              return decision;
             },
           });
         } catch (err) {
@@ -469,7 +463,7 @@ async function handleConnection(ws) {
         });
         eventUnsubs.set(session.sessionId, unsub);
 
-        sendResponse(id, { sessionId: session.sessionId });
+        sendResponse(id, { sessionId: session.sessionId, workspacePath: session.workspacePath });
         break;
       }
 
@@ -581,7 +575,7 @@ async function handleConnection(ws) {
           return;
         }
         try {
-          await session.compact();
+          await session.rpc.history.compact();
           console.log(`[proxy] session.compact: session ${sessionId} compacted`);
           sendResponse(id, {});
         } catch (err) {
@@ -591,6 +585,24 @@ async function handleConnection(ws) {
         break;
       }
 
+      case 'session.abort': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.abort();
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] session.abort failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to abort session');
+        }
+        break;
+      }
+
+      case 'session.disconnect':
       case 'session.destroy': {
         const { sessionId } = params || {};
         const session = sessions.get(sessionId);
@@ -598,7 +610,7 @@ async function handleConnection(ws) {
           const unsub = eventUnsubs.get(sessionId);
           unsub?.();
           eventUnsubs.delete(sessionId);
-          await session.destroy();
+          await session.disconnect();
           sessions.delete(sessionId);
           if (currentSessionId === sessionId) {
             currentSessionId = null;
@@ -619,6 +631,90 @@ async function handleConnection(ws) {
           }
         }
         sendResponse(id, {});
+        break;
+      }
+
+      case 'session.mode.get': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          const mode = await session.rpc.mode.get();
+          sendResponse(id, { mode });
+        } catch (err) {
+          console.error(`[proxy] session.mode.get failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to get session mode');
+        }
+        break;
+      }
+
+      case 'session.mode.set': {
+        const { sessionId, mode } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.rpc.mode.set({ mode });
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] session.mode.set failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to set session mode');
+        }
+        break;
+      }
+
+      case 'session.plan.read': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.plan.read());
+        } catch (err) {
+          console.error(`[proxy] session.plan.read failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to read plan');
+        }
+        break;
+      }
+
+      case 'session.plan.update': {
+        const { sessionId, content } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.rpc.plan.update({ content: String(content ?? '') });
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] session.plan.update failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to update plan');
+        }
+        break;
+      }
+
+      case 'session.plan.delete': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          await session.rpc.plan.delete();
+          sendResponse(id, {});
+        } catch (err) {
+          console.error(`[proxy] session.plan.delete failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to delete plan');
+        }
         break;
       }
 
@@ -655,11 +751,46 @@ async function handleConnection(ws) {
           );
           return;
         }
-        const normalizedDecision = decision === 'approved' ? 'approved' : 'denied';
         clearTimeout(pending.timer);
         pendingPermissionResponses.delete(requestId);
-        pending.resolve(normalizedDecision);
+        pending.resolve(
+          decision && typeof decision === 'object' && typeof decision.kind === 'string'
+            ? decision
+            : { kind: 'reject' }
+        );
         sendResponse(id, {});
+        break;
+      }
+
+      case 'permissions.setApproveAll': {
+        const { sessionId, enabled } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.permissions.setApproveAll({ enabled: enabled === true }));
+        } catch (err) {
+          console.error(`[proxy] permissions.setApproveAll failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to update approve-all setting');
+        }
+        break;
+      }
+
+      case 'permissions.resetSessionApprovals': {
+        const { sessionId } = params || {};
+        const session = sessions.get(sessionId);
+        if (!session) {
+          sendError(id, -32602, `Session '${sessionId}' not found`);
+          return;
+        }
+        try {
+          sendResponse(id, await session.rpc.permissions.resetSessionApprovals());
+        } catch (err) {
+          console.error(`[proxy] permissions.resetSessionApprovals failed:`, err);
+          sendError(id, -32603, err.message || 'Failed to reset session approvals');
+        }
         break;
       }
 
@@ -689,15 +820,15 @@ async function handleConnection(ws) {
 
     for (const pending of pendingPermissionResponses.values()) {
       clearTimeout(pending.timer);
-      pending.resolve('denied');
+      pending.resolve({ kind: 'user-not-available' });
     }
     pendingPermissionResponses.clear();
 
-    // Destroy server-side sessions so the shared CopilotClient doesn't
+    // Disconnect server-side sessions so the shared CopilotClient doesn't
     // accumulate open sessions across reconnects.
     for (const session of sessions.values()) {
       try {
-        await session.destroy();
+        await session.disconnect();
       } catch {
         // Session may already be gone — ignore.
       }

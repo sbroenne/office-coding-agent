@@ -14,44 +14,11 @@ import {
 
 describe('Integration: systemPrompt', () => {
   describe('getAppPromptForHost', () => {
-    it('returns non-empty prompt for excel', () => {
-      const prompt = getAppPromptForHost('excel');
-      expect(prompt).toBeTruthy();
-      expect(prompt.length).toBeGreaterThan(10);
-    });
-
-    it('returns non-empty prompt for powerpoint', () => {
-      const prompt = getAppPromptForHost('powerpoint');
-      expect(prompt).toBeTruthy();
-      expect(prompt.length).toBeGreaterThan(10);
-    });
-
-    it('returns non-empty prompt for word', () => {
-      const prompt = getAppPromptForHost('word');
-      expect(prompt).toBeTruthy();
-      expect(prompt.length).toBeGreaterThan(10);
-    });
-
-    it('returns non-empty prompt for outlook', () => {
-      const prompt = getAppPromptForHost('outlook');
-      expect(prompt).toBeTruthy();
-      expect(prompt.length).toBeGreaterThan(10);
-    });
-
-    it('returns a default fallback for unknown host', () => {
-      const prompt = getAppPromptForHost('unknown' as any);
-      expect(prompt).toContain('Office');
-    });
-
-    it('returns different prompts for different hosts', () => {
-      const excelPrompt = getAppPromptForHost('excel');
-      const pptPrompt = getAppPromptForHost('powerpoint');
-      const wordPrompt = getAppPromptForHost('word');
-      const outlookPrompt = getAppPromptForHost('outlook');
-
-      // All four host-specific prompts should be distinct
-      const prompts = new Set([excelPrompt, pptPrompt, wordPrompt, outlookPrompt]);
-      expect(prompts.size).toBe(4);
+    it('does not add app-owned host behavior for bundled plugin agents', () => {
+      const hosts = ['excel', 'powerpoint', 'word', 'outlook', 'unknown'] as const;
+      for (const host of hosts) {
+        expect(getAppPromptForHost(host as any)).toBe('');
+      }
     });
   });
 
@@ -68,29 +35,17 @@ describe('Integration: systemPrompt', () => {
       expect(prompt).toContain(BASE_PROMPT);
     });
 
-    it('includes host-specific prompt', () => {
-      const hostPrompt = getAppPromptForHost('excel');
-      const full = buildSystemPrompt('excel');
-      expect(full).toContain(hostPrompt);
-    });
-
-    it('joins BASE_PROMPT and host prompt with double newline', () => {
-      const full = buildSystemPrompt('powerpoint');
-      const hostPrompt = getAppPromptForHost('powerpoint');
-      expect(full).toBe(`${BASE_PROMPT}\n\n${hostPrompt}`);
-    });
-
-    it('works for every known host', () => {
+    it('uses the same app UI protocol prompt for every known host', () => {
       const hosts = ['excel', 'powerpoint', 'word', 'outlook'] as const;
       for (const host of hosts) {
         const prompt = buildSystemPrompt(host);
-        expect(prompt.length).toBeGreaterThan(BASE_PROMPT.length);
+        expect(prompt).toBe(BASE_PROMPT);
       }
     });
   });
 
   describe('buildSessionSystemPrompt', () => {
-    it('appends memory context after base and host instructions', () => {
+    it('appends memory context after app UI protocol instructions', () => {
       const prompt = buildSessionSystemPrompt('excel', {
         memoryContext: 'Remember: prefer concise summaries.',
       });

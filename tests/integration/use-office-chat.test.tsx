@@ -847,7 +847,7 @@ describe('useOfficeChat', () => {
   });
 
   it('passes selected CLI-owned agent name into session creation', async () => {
-    useSettingsStore.getState().setActiveAgent('office-excel');
+    useSettingsStore.getState().setActiveAgent('office-word:word');
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -859,11 +859,27 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    expect(config.agent).toBe('office-excel');
+    expect(config.agent).toBe('office-word:word');
     expect(config.customAgents).toBeUndefined();
   });
 
-  it('systemMessage includes host prompt but not app-owned agent instructions', async () => {
+  it('defaults to the bundled CLI agent for the active Office host', async () => {
+    const session = makeFakeSession([IDLE_EVENT]);
+    const client = makeFakeClient(session);
+    mockCreate.mockResolvedValue(client as never);
+
+    renderHook(() => useOfficeChat('powerpoint'), { wrapper });
+
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 100));
+    });
+
+    const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
+    expect(config.agent).toBe('office-powerpoint:powerpoint');
+    expect(useSettingsStore.getState().activeAgentName).toBeNull();
+  });
+
+  it('systemMessage includes app UI protocol but not host-owned plugin instructions', async () => {
     const session = makeFakeSession([IDLE_EVENT]);
     const client = makeFakeClient(session);
     mockCreate.mockResolvedValue(client as never);
@@ -875,7 +891,10 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    const sysMsg = config.systemMessage as { content: string };
+    const sysMsg = config.systemMessage as { mode: string; content: string };
+    expect(sysMsg.mode).toBe('customize');
+    expect(sysMsg.content).not.toContain('Microsoft Excel add-in');
+    expect(sysMsg.content).not.toContain('## Excel behavior');
     expect(sysMsg.content).not.toContain('## Host Agent Instructions');
     expect(sysMsg.content).not.toContain('## Adaptive Agent Instructions');
     expect(sysMsg.content).toContain('Progress narration');

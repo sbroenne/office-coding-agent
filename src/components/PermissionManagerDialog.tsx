@@ -1,190 +1,67 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { Codicon } from '@/components/Codicon';
-import { usePermissionStore } from '@/stores';
-import { getLocalApiBase } from '@/lib/api';
 
-interface BrowseResponse {
-  path: string;
-  parent: string | null;
-  dirs: string[];
-  error?: string;
+interface PermissionManagerPanelProps {
+  approveAll: boolean;
+  onSetApproveAll: (enabled: boolean) => void | Promise<void>;
+  onResetSessionApprovals: () => void | Promise<void>;
 }
 
-export const PermissionManagerPanel: React.FC = () => {
-  const [browseOpen, setBrowseOpen] = useState(false);
-  const [browsePath, setBrowsePath] = useState<string>('');
-  const [browseParent, setBrowseParent] = useState<string | null>(null);
-  const [browseDirs, setBrowseDirs] = useState<string[]>([]);
-  const [browseLoading, setBrowseLoading] = useState(false);
-
-  const allowAll = usePermissionStore(s => s.allowAll);
-  const workingDirectory = usePermissionStore(s => s.workingDirectory);
-  const rules = usePermissionStore(s => s.rules);
-  const setAllowAll = usePermissionStore(s => s.setAllowAll);
-  const setWorkingDirectory = usePermissionStore(s => s.setWorkingDirectory);
-  const removeRule = usePermissionStore(s => s.removeRule);
-  const clearRules = usePermissionStore(s => s.clearRules);
-
-  const sortedRules = useMemo(
-    () => [...rules].sort((a, b) => a.pathPrefix.localeCompare(b.pathPrefix)),
-    [rules]
-  );
-
-  const loadDir = async (pathValue?: string) => {
-    setBrowseLoading(true);
-    try {
-      const query = pathValue ? `?path=${encodeURIComponent(pathValue)}` : '';
-      const response = await fetch(`${getLocalApiBase()}/api/browse${query}`);
-      const data = (await response.json()) as BrowseResponse;
-      if (data.error) return;
-      setBrowsePath(data.path);
-      setBrowseParent(data.parent);
-      setBrowseDirs(data.dirs ?? []);
-    } catch {
-      // Network error — clear stale directories so the UI doesn't show old data
-      setBrowseDirs([]);
-    } finally {
-      setBrowseLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadDir(workingDirectory ?? undefined);
-  }, [workingDirectory]);
-
+export const PermissionManagerPanel: React.FC<PermissionManagerPanelProps> = ({
+  approveAll,
+  onSetApproveAll,
+  onResetSessionApprovals,
+}) => {
   return (
     <div className="space-y-4 p-3 text-sm">
-      <div className="flex items-center justify-between rounded-md border border-border p-3">
+      <div
+        className="flex items-center justify-between rounded-[var(--vscode-cornerRadius-medium)] border p-3"
+        style={{ borderColor: 'var(--vscode-widget-border)' }}
+      >
         <div>
           <div className="font-medium">Allow all</div>
-          <div className="text-xs text-muted-foreground">Auto-approve all permission requests.</div>
+          <div className="text-xs" style={{ color: 'var(--vscode-descriptionForeground)' }}>
+            Use the Copilot CLI session setting to auto-approve permission requests.
+          </div>
         </div>
         <button
           type="button"
-          onClick={() => setAllowAll(!allowAll)}
-          className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ${
-            allowAll ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-          }`}
+          onClick={() => void onSetApproveAll(!approveAll)}
+          className="inline-flex rounded-[var(--vscode-cornerRadius-medium)] px-2 py-1 text-xs font-medium"
+          style={{
+            color: approveAll
+              ? 'var(--vscode-button-foreground)'
+              : 'var(--vscode-button-secondaryForeground)',
+            backgroundColor: approveAll
+              ? 'var(--vscode-button-background)'
+              : 'var(--vscode-button-secondaryBackground)',
+          }}
         >
-          {allowAll ? 'On' : 'Off'}
+          {approveAll ? 'On' : 'Off'}
         </button>
       </div>
 
-      <div className="rounded-md border border-border p-3">
-        <div className="mb-1 font-medium">Working directory</div>
-        <div
-          className="text-xs text-muted-foreground truncate"
-          title={workingDirectory ?? undefined}
+      <div
+        className="rounded-[var(--vscode-cornerRadius-medium)] border p-3"
+        style={{ borderColor: 'var(--vscode-widget-border)' }}
+      >
+        <div className="mb-1 font-medium">Session approvals</div>
+        <div className="mb-3 text-xs" style={{ color: 'var(--vscode-descriptionForeground)' }}>
+          Approvals remembered for this Copilot session are owned by the SDK.
+        </div>
+        <button
+          type="button"
+          onClick={() => void onResetSessionApprovals()}
+          className="inline-flex items-center gap-1 rounded-[var(--vscode-cornerRadius-medium)] border px-2 py-1 text-xs"
+          style={{
+            borderColor: 'var(--vscode-widget-border)',
+            color: 'var(--vscode-foreground)',
+            backgroundColor: 'transparent',
+          }}
         >
-          {workingDirectory ?? 'Not set'}
-        </div>
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setBrowseOpen(v => !v)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-          >
-            <Codicon name="folder" className="text-xs" /> Browse
-          </button>
-          {workingDirectory && (
-            <button
-              type="button"
-              onClick={() => setWorkingDirectory(null)}
-              className="inline-flex rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        {browseOpen && (
-          <div className="mt-2 rounded-md border border-border p-2">
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="truncate pr-2">{browsePath || '(loading...)'}</span>
-              {browseParent && (
-                <button
-                  type="button"
-                  onClick={() => void loadDir(browseParent)}
-                  className="rounded border border-border px-2 py-0.5 hover:bg-accent"
-                >
-                  Up
-                </button>
-              )}
-            </div>
-            <div className="max-h-36 overflow-auto rounded border border-border">
-              {browseLoading ? (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</div>
-              ) : browseDirs.length === 0 ? (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">No subdirectories</div>
-              ) : (
-                browseDirs.map(dir => (
-                  <button
-                    type="button"
-                    key={dir}
-                    onClick={() => void loadDir(`${browsePath}/${dir}`)}
-                    className="flex w-full items-center gap-1 px-2 py-1 text-left text-xs hover:bg-accent"
-                  >
-                    <Codicon name="folder" className="text-xs" /> {dir}
-                  </button>
-                ))
-              )}
-            </div>
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setWorkingDirectory(browsePath || null);
-                  setBrowseOpen(false);
-                }}
-                className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90"
-              >
-                Select
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-md border border-border p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="font-medium">Saved rules</div>
-          {sortedRules.length > 0 && (
-            <button
-              type="button"
-              onClick={clearRules}
-              className="rounded-md border border-border px-2 py-1 text-xs hover:bg-accent"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-
-        {sortedRules.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No saved rules.</div>
-        ) : (
-          <div className="max-h-40 space-y-1 overflow-auto">
-            {sortedRules.map(rule => (
-              <div
-                key={rule.id}
-                className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1"
-              >
-                <div className="min-w-0 text-xs">
-                  <div className="font-medium">{rule.kind}</div>
-                  <div className="truncate text-muted-foreground">{rule.pathPrefix}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeRule(rule.id)}
-                  className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  aria-label="Remove rule"
-                  title="Remove rule"
-                >
-                  <Codicon name="trash" className="text-xs" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+          <Codicon name="discard" className="text-xs" />
+          Reset session approvals
+        </button>
       </div>
     </div>
   );

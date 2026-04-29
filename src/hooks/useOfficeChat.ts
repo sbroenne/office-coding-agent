@@ -2,6 +2,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import type {
   AgentInfo,
+  ExitPlanModeRequestPayload,
+  PlanState,
+  SessionMode,
   WebSocketCopilotClient,
   BrowserCopilotSession,
 } from '@/lib/websocket-client';
@@ -11,7 +14,6 @@ import { getToolsForHost } from '@/tools';
 import { fetchConfiguredMcpServers, toSdkMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
-import { usePermissionStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
 import { buildSessionSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider } from '@/types';
@@ -19,9 +21,15 @@ import type { ChatMessage, ToolCallPart } from '@/types';
 import type { OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
 import type { McpOAuthPromptRequest } from '@/components/McpOAuthPrompt';
+import type { PermissionRequestResult, SessionEvent } from '@github/copilot-sdk';
 
 const MODEL_FETCH_TIMEOUT_MS = 10_000;
 const DEFAULT_THINKING_TEXT = 'Thinking…';
+const EMPTY_PLAN: PlanState = { exists: false, content: null, path: null };
+type PermissionApproval = Extract<
+  PermissionRequestResult,
+  { kind: 'approve-for-session' }
+>['approval'];
 
 /** Race a promise against a timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -87,6 +95,21 @@ async function loadAvailableAgents(session: BrowserCopilotSession): Promise<void
   }
 }
 
+function getDefaultAgentForHost(host: OfficeHostApp): string | undefined {
+  switch (host) {
+    case 'excel':
+      return 'office-excel:excel';
+    case 'powerpoint':
+      return 'office-powerpoint:powerpoint';
+    case 'word':
+      return 'office-word:word';
+    case 'outlook':
+      return 'office-outlook:outlook';
+    default:
+      return undefined;
+  }
+}
+
 function getWsUrl(): string {
   if (typeof window === 'undefined') return 'wss://localhost:3000/api/copilot';
   const { hostname, protocol, host } = window.location;
@@ -99,6 +122,90 @@ function getWsUrl(): string {
   return `${proto}//${host}/api/copilot`;
 }
 
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function approvalForPermission(payload: PermissionRequestPayload): PermissionApproval | null {
+  const request = payload.request as Record<string, unknown>;
+  const prompt = payload.promptRequest ?? {};
+  const kind = stringValue(prompt.kind) || stringValue(request.kind);
+
+  if (kind === 'commands' || kind === 'shell') {
+    let commandIdentifiers = stringArray(prompt.commandIdentifiers);
+    if (commandIdentifiers.length === 0) {
+      commandIdentifiers = stringArray(request.commandIdentifiers);
+    }
+    if (commandIdentifiers.length === 0 && Array.isArray(request.commands)) {
+      commandIdentifiers = request.commands
+        .map(command =>
+          typeof command === 'object' && command !== null && 'identifier' in command
+            ? stringValue((command as { identifier?: unknown }).identifier)
+            : ''
+        )
+        .filter(Boolean);
+    }
+    return commandIdentifiers.length > 0 ? { kind: 'commands', commandIdentifiers } : null;
+  }
+
+  if (kind === 'read' || (kind === 'path' && prompt.accessKind === 'read')) {
+    return { kind: 'read' };
+  }
+
+  if (kind === 'write' || (kind === 'path' && prompt.accessKind === 'write')) {
+    return { kind: 'write' };
+  }
+
+  if (kind === 'mcp') {
+    const serverName = stringValue(prompt.serverName) || stringValue(request.serverName);
+    if (!serverName) return null;
+    const toolNameRaw = prompt.toolName ?? request.toolName;
+    return {
+      kind: 'mcp',
+      serverName,
+      toolName: typeof toolNameRaw === 'string' ? toolNameRaw : null,
+    };
+  }
+
+  if (kind === 'memory') {
+    return { kind: 'memory' };
+  }
+
+  if (kind === 'custom-tool') {
+    const toolName = stringValue(prompt.toolName) || stringValue(request.toolName);
+    return toolName ? { kind: 'custom-tool', toolName } : null;
+  }
+
+  return null;
+}
+
+function permissionDetail(payload: PermissionRequestPayload): string {
+  const request = payload.request as Record<string, unknown>;
+  const prompt = payload.promptRequest ?? {};
+  const candidates = [
+    prompt.fullCommandText,
+    prompt.fileName,
+    prompt.path,
+    prompt.url,
+    prompt.intention,
+    request.fullCommandText,
+    request.fileName,
+    request.path,
+    request.url,
+    request.intention,
+  ];
+  return (
+    candidates.find((value): value is string => typeof value === 'string' && value.length > 0) ??
+    'User approval required'
+  );
+}
+
 export function useOfficeChat(host: OfficeHostApp) {
   const activeModel = useSettingsStore(s => s.activeModel);
   const activeAgentName = useSettingsStore(s => s.activeAgentName);
@@ -109,9 +216,6 @@ export function useOfficeChat(host: OfficeHostApp) {
   const setActiveSession = useSessionHistoryStore(s => s.setActiveSession);
   const upsertActiveSession = useSessionHistoryStore(s => s.upsertActiveSession);
   const deleteSessionHistoryItem = useSessionHistoryStore(s => s.deleteSession);
-  const evaluatePermission = usePermissionStore(s => s.evaluate);
-  const addPermissionRule = usePermissionStore(s => s.addRule);
-  const allowAllPermissions = usePermissionStore(s => s.allowAll);
 
   const clientRef = useRef<WebSocketCopilotClient | null>(null);
   const sessionRef = useRef<BrowserCopilotSession | null>(null);
@@ -129,12 +233,10 @@ export function useOfficeChat(host: OfficeHostApp) {
   const activeModelRef = useRef(activeModel);
   const activeAgentNameRef = useRef(activeAgentName);
   const disabledMcpServerNamesRef = useRef(disabledMcpServerNames);
-  const evaluatePermissionRef = useRef(evaluatePermission);
   // Keep refs in sync on every render (runs synchronously, before any effects)
   activeModelRef.current = activeModel;
   activeAgentNameRef.current = activeAgentName;
   disabledMcpServerNamesRef.current = disabledMcpServerNames;
-  evaluatePermissionRef.current = evaluatePermission;
 
   // Switch model mid-session when the user picks a different model
   useEffect(() => {
@@ -151,6 +253,13 @@ export function useOfficeChat(host: OfficeHostApp) {
   const [sessionError, setSessionError] = useState<Error | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
   const [pendingPermission, setPendingPermission] = useState<PermissionRequestPayload | null>(null);
+  const [permissionApproveAll, setPermissionApproveAll] = useState(false);
+  const [sessionMode, setSessionMode] = useState<SessionMode>('interactive');
+  const [planState, setPlanState] = useState<PlanState>(EMPTY_PLAN);
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null);
+  const [pendingExitPlanMode, setPendingExitPlanMode] = useState<ExitPlanModeRequestPayload | null>(
+    null
+  );
   const [pendingMcpOAuthPrompt, setPendingMcpOAuthPrompt] = useState<McpOAuthPromptRequest | null>(
     null
   );
@@ -222,6 +331,10 @@ export function useOfficeChat(host: OfficeHostApp) {
     console.log('[chat] initSession: connecting to', wsUrl);
     setIsConnecting(true);
     setSessionError(null);
+    setSessionMode('interactive');
+    setPlanState(EMPTY_PLAN);
+    setWorkspacePath(null);
+    setPendingExitPlanMode(null);
 
     try {
       const client = await withTimeout(createWebSocketClient(wsUrl), 15_000, 'WebSocket connect');
@@ -293,11 +406,11 @@ export function useOfficeChat(host: OfficeHostApp) {
       const session = await withTimeout(
         client.createSession({
           model: activeModelRef.current,
-          systemMessage: { mode: 'replace', content: systemContent },
+          systemMessage: { mode: 'customize', content: systemContent },
           tools: getToolsForHost(host),
           mcpServers,
           host,
-          agent: activeAgentNameRef.current ?? undefined,
+          agent: activeAgentNameRef.current ?? getDefaultAgentForHost(host),
         }),
         60_000,
         'session.create'
@@ -314,15 +427,67 @@ export function useOfficeChat(host: OfficeHostApp) {
       sessionRef.current = session;
       setSessionError(null);
       setPendingPermission(null);
+      setPendingExitPlanMode(null);
+      setWorkspacePath(session.workspacePath ?? null);
       activePermissionRequestRef.current = null;
       console.log('[chat] Session created:', session.sessionId);
 
-      session.onPermissionRequest(payload => {
-        const autoDecision = evaluatePermissionRef.current(payload.request);
-        if (autoDecision === 'approved') {
-          void session.respondPermission(payload.requestId, 'approved');
-          return;
+      const refreshPlan = () => {
+        if (typeof session.readPlan !== 'function') return;
+        void session
+          .readPlan()
+          .then(nextPlan => setPlanState(nextPlan))
+          .catch(err => console.warn('[chat] session.plan.read failed:', err));
+      };
+
+      const handleSessionStateEvent = (event: SessionEvent) => {
+        if (event.type === 'session.mode_changed') {
+          const nextMode = event.data.newMode;
+          if (nextMode === 'interactive' || nextMode === 'plan' || nextMode === 'autopilot') {
+            setSessionMode(nextMode);
+          }
+        } else if (event.type === 'session.plan_changed') {
+          refreshPlan();
+        } else if (event.type === 'exit_plan_mode.requested') {
+          setPendingExitPlanMode({
+            sessionId: session.sessionId,
+            requestId: event.data.requestId,
+            actions: event.data.actions,
+            planContent: event.data.planContent,
+            recommendedAction: event.data.recommendedAction,
+            summary: event.data.summary,
+          });
+          setPlanState({
+            exists: true,
+            content: event.data.planContent,
+            path: session.workspacePath ? `${session.workspacePath}\\plan.md` : null,
+          });
+        } else if (event.type === 'exit_plan_mode.completed') {
+          setPendingExitPlanMode(current =>
+            current?.requestId === event.data.requestId ? null : current
+          );
+          const selectedMode = event.data.selectedAction;
+          if (
+            selectedMode === 'interactive' ||
+            selectedMode === 'plan' ||
+            selectedMode === 'autopilot'
+          ) {
+            setSessionMode(selectedMode);
+          }
         }
+      };
+
+      session.on(handleSessionStateEvent);
+
+      if (typeof session.getMode === 'function') {
+        void session
+          .getMode()
+          .then(mode => setSessionMode(mode))
+          .catch(err => console.warn('[chat] session.mode.get failed:', err));
+      }
+      refreshPlan();
+
+      session.onPermissionRequest(payload => {
         activePermissionRequestRef.current = payload.requestId;
         setPendingPermission(payload);
       });
@@ -880,22 +1045,19 @@ export function useOfficeChat(host: OfficeHostApp) {
       });
     });
 
-    // Also destroy and recreate the session to actually stop the SDK query.
-    // Without this, the proxy/SDK keeps processing events until the response
-    // finishes naturally.
+    // Abort the active SDK turn without tearing down the session.
     const session = sessionRef.current;
     if (session) {
-      void session.destroy().catch(() => {
+      void session.abort().catch(() => {
         /* ignore */
       });
-      sessionRef.current = null;
-      void initSessionRef.current();
     }
   }, []);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
     setPendingPermission(null);
+    setPendingExitPlanMode(null);
     activePermissionRequestRef.current = null;
     // Clear queued prompts on new conversation
     queueRef.current = [];
@@ -911,6 +1073,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       setActiveSession(sessionId);
       setMessages(deserializeMessages(session.messages));
       setPendingPermission(null);
+      setPendingExitPlanMode(null);
       activePermissionRequestRef.current = null;
       void initSession();
     },
@@ -930,6 +1093,7 @@ export function useOfficeChat(host: OfficeHostApp) {
       if (!deletedWasActive) return;
 
       setPendingPermission(null);
+      setPendingExitPlanMode(null);
       activePermissionRequestRef.current = null;
 
       if (nextHostSession) {
@@ -954,7 +1118,7 @@ export function useOfficeChat(host: OfficeHostApp) {
     ]
   );
 
-  const respondPermission = useCallback(async (decision: 'approved' | 'denied') => {
+  const respondPermission = useCallback(async (decision: PermissionRequestResult) => {
     const session = sessionRef.current;
     const requestId = activePermissionRequestRef.current;
     if (!session || !requestId) return;
@@ -969,30 +1133,48 @@ export function useOfficeChat(host: OfficeHostApp) {
   }, []);
 
   const approvePermission = useCallback(() => {
-    void respondPermission('approved');
+    void respondPermission({ kind: 'approve-once' });
   }, [respondPermission]);
 
   const denyPermission = useCallback(() => {
-    void respondPermission('denied');
+    void respondPermission({ kind: 'reject' });
   }, [respondPermission]);
 
-  const allowPermissionAlways = useCallback(() => {
-    const request = pendingPermission?.request;
-    if (!request) return;
-    const pathPrefix =
-      (typeof request.path === 'string' && request.path) ||
-      (typeof request.fileName === 'string' && request.fileName) ||
-      (typeof request.fullCommandText === 'string' && request.fullCommandText) ||
-      null;
+  const approvePermissionForSession = useCallback(() => {
+    if (!pendingPermission) return;
+    const approval = approvalForPermission(pendingPermission);
+    void respondPermission(
+      approval ? { kind: 'approve-for-session', approval } : { kind: 'approve-once' }
+    );
+  }, [pendingPermission, respondPermission]);
 
-    if (pathPrefix) {
-      addPermissionRule({
-        kind: request.kind,
-        pathPrefix,
-      });
+  const approvePermissionForLocation = useCallback(() => {
+    if (!pendingPermission) return;
+    const approval = approvalForPermission(pendingPermission);
+    const locationKey = pendingPermission.locationKey;
+    void respondPermission(
+      approval && locationKey
+        ? { kind: 'approve-for-location', approval, locationKey }
+        : { kind: 'approve-once' }
+    );
+  }, [pendingPermission, respondPermission]);
+
+  const setApproveAllPermissions = useCallback(async (enabled: boolean) => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Cannot update permissions: no active session');
     }
-    void respondPermission('approved');
-  }, [addPermissionRule, pendingPermission, respondPermission]);
+    await session.setApproveAll(enabled);
+    setPermissionApproveAll(enabled);
+  }, []);
+
+  const resetSessionApprovals = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Cannot reset permissions: no active session');
+    }
+    await session.resetSessionApprovals();
+  }, []);
 
   const initiateMcpOAuth = useCallback(async (serverName: string, loginHint?: string) => {
     const session = sessionRef.current;
@@ -1076,30 +1258,97 @@ export function useOfficeChat(host: OfficeHostApp) {
 
   /**
    * Switch to a different Copilot CLI-owned agent mid-session.
-   * Passing null returns to the default agent.
+   * Passing null returns to the bundled plugin agent for the active Office host.
    */
-  const switchAgent = useCallback(async (agentName: string | null) => {
+  const switchAgent = useCallback(
+    async (agentName: string | null) => {
+      const session = sessionRef.current;
+      if (!session) {
+        throw new Error('Cannot switch agent: no active session');
+      }
+
+      try {
+        let selected: AgentInfo | null = null;
+        if (agentName === null) {
+          const defaultAgentName = getDefaultAgentForHost(host);
+          if (defaultAgentName) {
+            console.log(`[chat] Switching agent to host default ${defaultAgentName}`);
+            selected = await session.selectAgent(defaultAgentName);
+          } else {
+            console.log('[chat] Switching agent to default');
+            await session.deselectAgent();
+          }
+        } else {
+          console.log(`[chat] Switching agent to ${agentName}`);
+          selected = await session.selectAgent(agentName);
+        }
+        useSettingsStore
+          .getState()
+          .setActiveAgent(agentName === null ? null : (selected?.name ?? null));
+        console.log(
+          `[chat] Agent switched successfully to ${agentName === null ? 'host default' : (selected?.name ?? 'default')}`
+        );
+      } catch (err) {
+        console.error('[chat] Failed to switch agent:', err);
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    },
+    [host]
+  );
+
+  const switchSessionMode = useCallback(async (mode: SessionMode) => {
     const session = sessionRef.current;
     if (!session) {
-      throw new Error('Cannot switch agent: no active session');
+      throw new Error('Cannot switch mode: no active session');
     }
-
-    try {
-      let selected: AgentInfo | null = null;
-      if (agentName === null) {
-        console.log('[chat] Switching agent to default');
-        await session.deselectAgent();
-      } else {
-        console.log(`[chat] Switching agent to ${agentName}`);
-        selected = await session.selectAgent(agentName);
-      }
-      useSettingsStore.getState().setActiveAgent(selected?.name ?? null);
-      console.log(`[chat] Agent switched successfully to ${selected?.name ?? 'default'}`);
-    } catch (err) {
-      console.error('[chat] Failed to switch agent:', err);
-      throw err instanceof Error ? err : new Error(String(err));
+    await session.setMode(mode);
+    setSessionMode(mode);
+    if (mode !== 'plan') {
+      setPendingExitPlanMode(null);
     }
   }, []);
+
+  const refreshPlan = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session) return;
+    setPlanState(await session.readPlan());
+  }, []);
+
+  const updatePlan = useCallback(async (content: string) => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Cannot update plan: no active session');
+    }
+    await session.updatePlan(content);
+    setPlanState(await session.readPlan());
+  }, []);
+
+  const deletePlan = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session) {
+      throw new Error('Cannot delete plan: no active session');
+    }
+    await session.deletePlan();
+    setPlanState(EMPTY_PLAN);
+  }, []);
+
+  const resolveExitPlanMode = useCallback(
+    async (selectedAction: string, feedback?: string) => {
+      const nextMode =
+        selectedAction === 'autopilot'
+          ? 'autopilot'
+          : selectedAction === 'interactive' || selectedAction === 'exit_only'
+            ? 'interactive'
+            : 'plan';
+
+      if (feedback?.trim()) {
+        await send(`Plan feedback: ${feedback.trim()}`);
+      }
+      await switchSessionMode(nextMode);
+      setPendingExitPlanMode(null);
+    },
+    [send, switchSessionMode]
+  );
 
   return {
     messages,
@@ -1114,10 +1363,23 @@ export function useOfficeChat(host: OfficeHostApp) {
     sessions,
     activeSessionId,
     pendingPermission,
-    allowAllPermissions,
+    permissionApproveAll,
+    setApproveAllPermissions,
+    resetSessionApprovals,
     approvePermission,
     denyPermission,
-    allowPermissionAlways,
+    approvePermissionForSession,
+    approvePermissionForLocation,
+    permissionDetail: pendingPermission ? permissionDetail(pendingPermission) : '',
+    sessionMode,
+    switchSessionMode,
+    planState,
+    workspacePath,
+    pendingExitPlanMode,
+    refreshPlan,
+    updatePlan,
+    deletePlan,
+    resolveExitPlanMode,
     initiateMcpOAuth,
     pendingMcpOAuthPrompt,
     openMcpOAuthPrompt,
