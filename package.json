@@ -80,7 +80,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@github/copilot": "^1.0.5",
+    "@github/copilot": "^1.0.45",
     "@github/copilot-sdk": "^0.3.0",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",
