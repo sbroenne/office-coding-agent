@@ -16,7 +16,7 @@ import type { ToolConfig, ParamType } from './types';
 interface ToolBinaryResult {
   data: string;
   mimeType: string;
-  type: string;
+  type: 'image' | 'resource';
   description?: string;
 }
 import { getSheet } from '@/services/excel/helpers';

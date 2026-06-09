@@ -29,7 +29,7 @@ export function getLastDocumentPlan(): DocumentPlan | null {
   return plan;
 }
 
-export const submitDocumentPlanTool: Tool = {
+export const submitDocumentPlanTool = {
   name: DOCUMENT_PLAN_TOOL_NAME,
   description:
     'Submit the structured document section plan. Call this exactly once with the complete plan for all sections.',
@@ -73,4 +73,4 @@ export const submitDocumentPlanTool: Tool = {
     }
     return `Document plan received: ${String(plan.sections?.length ?? 0)} sections.`;
   },
-};
+} satisfies Tool;

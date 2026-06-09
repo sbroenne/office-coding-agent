@@ -142,7 +142,7 @@ export async function orchestrateDeck(
   // --- Phase 2: Workers (batched) ---
   const results: SlideProgress[] = plan.slides.map(slide => ({
     plan: slide,
-    status: 'pending' as SlideStatus,
+    status: 'pending',
   }));
 
   const pptTools = getToolsForHost('powerpoint');

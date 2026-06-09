@@ -6,8 +6,6 @@ import {
 } from '@/tools/planner/wordPlanner';
 import type { DocumentPlan } from '@/tools/planner/wordPlanner';
 
-const mockInvocation = {} as Parameters<typeof submitDocumentPlanTool.handler>[1];
-
 describe('wordPlanner', () => {
   beforeEach(() => {
     // Clear any leftover plan
@@ -40,7 +38,7 @@ describe('wordPlanner', () => {
         ],
       };
 
-      const result = submitDocumentPlanTool.handler(plan, mockInvocation);
+      const result = submitDocumentPlanTool.handler(plan);
       expect(result).toContain('2 sections');
 
       const captured = getLastDocumentPlan();
@@ -54,7 +52,7 @@ describe('wordPlanner', () => {
       const plan: DocumentPlan = {
         sections: [{ index: 0, title: 'Test', type: 'paragraph', headingLevel: 1, content: 'Content' }],
       };
-      submitDocumentPlanTool.handler(plan, mockInvocation);
+      submitDocumentPlanTool.handler(plan);
 
       const first = getLastDocumentPlan();
       expect(first).not.toBeNull();
@@ -65,14 +63,14 @@ describe('wordPlanner', () => {
 
     it('handler ignores empty sections array', () => {
       const plan: DocumentPlan = { sections: [] };
-      submitDocumentPlanTool.handler(plan, mockInvocation);
+      submitDocumentPlanTool.handler(plan);
 
       const captured = getLastDocumentPlan();
       expect(captured).toBeNull();
     });
 
     it('handler ignores invalid input without sections', () => {
-      submitDocumentPlanTool.handler({}, mockInvocation);
+      submitDocumentPlanTool.handler({});
 
       const captured = getLastDocumentPlan();
       expect(captured).toBeNull();

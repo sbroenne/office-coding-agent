@@ -27,10 +27,9 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     // Path aliases
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     },
     // Types
