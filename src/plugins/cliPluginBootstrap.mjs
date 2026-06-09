@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 export const OFFICE_CODING_AGENT_MARKETPLACE = {
   name: 'office-coding-agent',
@@ -11,6 +14,28 @@ export const REQUIRED_OFFICE_PLUGINS = [
   'office-word',
   'office-outlook',
 ];
+
+/** Base directory the Copilot runtime uses for installed plugins (honors COPILOT_HOME). */
+export function copilotHomeDir() {
+  return process.env.COPILOT_HOME || path.join(os.homedir(), '.copilot');
+}
+
+/**
+ * Absolute paths to the installed Office CLI plugin directories that exist on
+ * disk. The Copilot SDK (>=1.0) no longer auto-discovers marketplace-installed
+ * plugins for SDK-created sessions, so these directories must be passed to
+ * `createSession({ pluginDirectories })` for the plugin agents (e.g.
+ * `office-excel:excel`) to resolve.
+ */
+export function getInstalledOfficePluginDirectories(options = {}) {
+  const home = options.home ?? copilotHomeDir();
+  const marketplace = options.marketplace ?? OFFICE_CODING_AGENT_MARKETPLACE;
+  const plugins = options.plugins ?? REQUIRED_OFFICE_PLUGINS;
+  const fileExists = options.fileExists ?? existsSync;
+  return plugins
+    .map(name => path.join(home, 'installed-plugins', marketplace.name, name))
+    .filter(dir => fileExists(dir));
+}
 
 export const REQUIRED_OFFICE_PLUGIN_SPECS = REQUIRED_OFFICE_PLUGINS.map(
   name => `${name}@${OFFICE_CODING_AGENT_MARKETPLACE.name}`

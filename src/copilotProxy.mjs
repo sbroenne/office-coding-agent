@@ -12,6 +12,25 @@ import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
 import { randomUUID } from 'node:crypto';
 import { isTrustedRequestOrigin } from './serverSecurity.mjs';
+import { getInstalledOfficePluginDirectories } from './plugins/cliPluginBootstrap.mjs';
+
+/**
+ * Installed Office CLI plugin directories, resolved once. Passed to every
+ * createSession so the SDK loads plugin-owned agents (office-excel:excel, …);
+ * SDK >=1.0 no longer auto-discovers marketplace-installed plugins.
+ */
+let _officePluginDirs = null;
+function officePluginDirectories() {
+  if (_officePluginDirs === null) {
+    _officePluginDirs = getInstalledOfficePluginDirectories();
+    console.log(
+      `[proxy] Office plugin directories: ${
+        _officePluginDirs.length ? _officePluginDirs.join(', ') : '(none found)'
+      }`
+    );
+  }
+  return _officePluginDirs;
+}
 
 const MCP_STATUSES = new Set([
   'connected',
@@ -417,6 +436,7 @@ async function handleConnection(ws) {
             tools,
             mcpServers,
             availableTools,
+            pluginDirectories: officePluginDirectories(),
             agent: typeof agent === 'string' && agent.length > 0 ? agent : undefined,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);

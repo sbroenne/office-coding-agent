@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   ensureOfficeCliPlugins,
+  getInstalledOfficePluginDirectories,
   hasMarketplace,
   installedPluginSpecs,
   OFFICE_CODING_AGENT_MARKETPLACE,
+  REQUIRED_OFFICE_PLUGINS,
   REQUIRED_OFFICE_PLUGIN_SPECS,
 } from '@/../src/plugins/cliPluginBootstrap.mjs';
 
@@ -96,5 +98,42 @@ describe('CLI plugin bootstrap', () => {
     });
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Marketplace list failed'));
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Plugin list failed'));
+  });
+
+  describe('getInstalledOfficePluginDirectories', () => {
+    it('resolves existing Office plugin dirs under the marketplace install path', () => {
+      const home = '/fake/home/.copilot';
+      const present = new Set(
+        REQUIRED_OFFICE_PLUGINS.map(
+          name => `${home}/installed-plugins/${OFFICE_CODING_AGENT_MARKETPLACE.name}/${name}`
+        )
+      );
+      const dirs = getInstalledOfficePluginDirectories({
+        home,
+        fileExists: (dir: string) => present.has(dir.replace(/\\/g, '/')),
+      });
+
+      expect(dirs).toHaveLength(REQUIRED_OFFICE_PLUGINS.length);
+      for (const name of REQUIRED_OFFICE_PLUGINS) {
+        expect(dirs.some(dir => dir.replace(/\\/g, '/').endsWith(`/${name}`))).toBe(true);
+      }
+    });
+
+    it('skips plugin dirs that are not installed on disk', () => {
+      const home = '/fake/home/.copilot';
+      const installed = `${home}/installed-plugins/${OFFICE_CODING_AGENT_MARKETPLACE.name}/office-excel`;
+      const dirs = getInstalledOfficePluginDirectories({
+        home,
+        fileExists: (dir: string) => dir.replace(/\\/g, '/') === installed,
+      });
+
+      expect(dirs.map(dir => dir.replace(/\\/g, '/'))).toEqual([installed]);
+    });
+
+    it('returns an empty list when no plugins are installed', () => {
+      expect(
+        getInstalledOfficePluginDirectories({ home: '/fake/home/.copilot', fileExists: () => false })
+      ).toEqual([]);
+    });
   });
 });
