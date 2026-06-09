@@ -12,6 +12,25 @@ import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
 import { randomUUID } from 'node:crypto';
 import { isTrustedRequestOrigin } from './serverSecurity.mjs';
+import { getInstalledOfficePluginDirectories } from './plugins/cliPluginBootstrap.mjs';
+
+/**
+ * Installed Office CLI plugin directories, resolved once. Passed to every
+ * createSession so the SDK loads plugin-owned agents (office-excel:excel, …);
+ * SDK >=1.0 no longer auto-discovers marketplace-installed plugins.
+ */
+let _officePluginDirs = null;
+function officePluginDirectories() {
+  if (_officePluginDirs === null) {
+    _officePluginDirs = getInstalledOfficePluginDirectories();
+    console.log(
+      `[proxy] Office plugin directories: ${
+        _officePluginDirs.length ? _officePluginDirs.join(', ') : '(none found)'
+      }`
+    );
+  }
+  return _officePluginDirs;
+}
 
 const MCP_STATUSES = new Set([
   'connected',
@@ -409,6 +428,21 @@ async function handleConnection(ws) {
         let session;
         try {
           await ensureStarted();
+          const pluginDirectories = officePluginDirectories();
+          const requestedAgent =
+            typeof agent === 'string' && agent.length > 0 ? agent : undefined;
+          // SDK >=1.0 only loads plugin-owned agents (office-excel:excel, …)
+          // from explicit pluginDirectories. If an agent is requested but no
+          // plugin directories were found, createSession fails with a cryptic
+          // "Custom agent '…' not found" — surface the real cause up front.
+          if (requestedAgent && pluginDirectories.length === 0) {
+            console.warn(
+              `[proxy] Agent '${requestedAgent}' was requested but no Office plugin ` +
+                `directories were found. Plugin-owned agents will not resolve. ` +
+                `Ensure the required CLI plugins are installed (startup bootstrap), ` +
+                `and check COPILOT_HOME if set.`
+            );
+          }
           session = await client.createSession({
             clientName: 'office-coding-agent',
             model,
@@ -417,7 +451,8 @@ async function handleConnection(ws) {
             tools,
             mcpServers,
             availableTools,
-            agent: typeof agent === 'string' && agent.length > 0 ? agent : undefined,
+            pluginDirectories,
+            agent: requestedAgent,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               const decision = await requestPermissionDecision(session.sessionId, request);

@@ -107,7 +107,7 @@ export async function orchestrateDocument(
   // --- Phase 2: Workers (batched) ---
   const results: SectionProgress[] = plan.sections.map(section => ({
     plan: section,
-    status: 'pending' as SectionStatus,
+    status: 'pending',
   }));
 
   const wordTools = getToolsForHost('word');

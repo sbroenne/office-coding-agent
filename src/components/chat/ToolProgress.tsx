@@ -85,9 +85,7 @@ const ToolProgressImpl: React.FC<ToolProgressProps> = ({ part }) => {
                 {isCancelled ? 'Cancelled:' : 'Error:'}
               </p>
               <p style={{ color: 'var(--vscode-errorForeground)' }}>
-                {typeof status.error === 'string'
-                  ? status.error
-                  : JSON.stringify(status.error as object)}
+                {typeof status.error === 'string' ? status.error : JSON.stringify(status.error)}
               </p>
             </div>
           )}
@@ -103,7 +101,7 @@ const ToolProgressImpl: React.FC<ToolProgressProps> = ({ part }) => {
             <div className="tool-details-section">
               <p className="tool-details-label">Output</p>
               <pre className="tool-details-code">
-                {typeof result === 'string' ? result : JSON.stringify(result as object, null, 2)}
+                {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
               </pre>
             </div>
           )}

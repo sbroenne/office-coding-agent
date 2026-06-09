@@ -163,7 +163,9 @@ export class BrowserCopilotSession {
     this.toolHandlers.clear();
     if (tools) {
       for (const tool of tools) {
-        this.toolHandlers.set(tool.name, tool.handler);
+        if (tool.handler) {
+          this.toolHandlers.set(tool.name, tool.handler);
+        }
       }
     }
   }

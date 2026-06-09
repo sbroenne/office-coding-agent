@@ -467,12 +467,10 @@ export function useOfficeChat(host: OfficeHostApp) {
             current?.requestId === event.data.requestId ? null : current
           );
           const selectedMode = event.data.selectedAction;
-          if (
-            selectedMode === 'interactive' ||
-            selectedMode === 'plan' ||
-            selectedMode === 'autopilot'
-          ) {
-            setSessionMode(selectedMode);
+          if (selectedMode === 'autopilot' || selectedMode === 'autopilot_fleet') {
+            setSessionMode('autopilot');
+          } else if (selectedMode === 'interactive' || selectedMode === 'exit_only') {
+            setSessionMode('interactive');
           }
         }
       };
@@ -875,7 +873,7 @@ export function useOfficeChat(host: OfficeHostApp) {
             const { toolCallId, toolName, arguments: args } = event.data;
             // report_intent is an internal SDK tool — surface intent as thinking text
             if (toolName === 'report_intent') {
-              const intent = (args as Record<string, unknown> | undefined)?.intent;
+              const intent = args?.intent;
               if (typeof intent === 'string' && intent) {
                 // If tools have already been added, this intent starts a NEW phase
                 if (toolParts.size > 0) {

@@ -16,9 +16,9 @@ test.describe('Model Picker', () => {
 
   test('can select a different model', async ({ configuredTaskpane: page }) => {
     await page.getByText('Claude Sonnet 4').click();
-    await page.getByText('GPT-4.1').click();
+    await page.getByText('GPT-5.4').click();
 
     // Picker now shows the newly selected model
-    await expect(page.getByText('GPT-4.1')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('GPT-5.4')).toBeVisible({ timeout: 3000 });
   });
 });

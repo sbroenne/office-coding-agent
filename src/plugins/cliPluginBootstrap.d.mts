@@ -15,6 +15,15 @@ export const OFFICE_CODING_AGENT_MARKETPLACE: OfficeCliPluginMarketplace;
 export const REQUIRED_OFFICE_PLUGINS: string[];
 export const REQUIRED_OFFICE_PLUGIN_SPECS: string[];
 
+export function copilotHomeDir(): string;
+
+export function getInstalledOfficePluginDirectories(options?: {
+  home?: string;
+  marketplace?: OfficeCliPluginMarketplace;
+  plugins?: string[];
+  fileExists?: (dir: string) => boolean;
+}): string[];
+
 export function runCopilotPluginCommand(
   args: string[],
   options?: { timeoutMs?: number; command?: string }

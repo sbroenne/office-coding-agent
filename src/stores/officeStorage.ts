@@ -51,7 +51,7 @@ function getStorage(): OfficeRuntimeStorage {
   if (typeof OfficeRuntime === 'undefined' || !OfficeRuntime?.storage) {
     return localFallbackStorage();
   }
-  return OfficeRuntime.storage as OfficeRuntimeStorage;
+  return OfficeRuntime.storage;
 }
 
 export const officeStorage: StateStorage = {

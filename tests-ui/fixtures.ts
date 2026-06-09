@@ -40,12 +40,12 @@ function officeRuntimePolyfill() {
 function makeSettingsJSON(overrides: Record<string, unknown> = {}) {
   return JSON.stringify({
       state: {
-        activeModel: 'claude-sonnet-4',
+        activeModel: 'claude-sonnet-4.6',
         disabledMcpServerNames: [],
       availableModels: [
-        { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', provider: 'Anthropic' },
-        { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
-        { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'Google' },
+        { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+        { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'OpenAI' },
+        { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'Google' },
       ],
       ...overrides,
     },
