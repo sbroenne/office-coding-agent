@@ -161,8 +161,8 @@ Run it from the Actions tab in one step:
 | `npm run unregister:win`            | Remove registered manifest entry (Windows)                            |
 | `npm run register:mac`              | Trust cert and register manifest for Word/PPT/Excel (macOS)           |
 | `npm run unregister:mac`            | Remove manifest from Word/PPT/Excel WEF folders (macOS)               |
-| `npm run lint`                      | Run ESLint                                                            |
-| `npm run lint:fix`                  | Auto-fix ESLint issues                                                |
+| `npm run lint`                      | Run oxlint                                                            |
+| `npm run lint:fix`                  | Auto-fix oxlint issues                                                |
 | `npm run format`                    | Format code with Prettier                                             |
 | `npm run typecheck`                 | Type-check without emitting                                           |
 | `npm test`                          | Run the Vitest unit project                                           |
@@ -396,7 +396,7 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 - **Playwright** — browser UI testing for task pane flows
 - **Mocha** — E2E testing inside Excel Desktop (~233 tests)
 - **Testing Library** — React component testing (`@testing-library/react`, `user-event`)
-- **ESLint + Prettier** — code quality
+- **oxlint + Prettier** — code quality
 
 ## Project History
 
