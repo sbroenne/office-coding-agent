@@ -54,8 +54,8 @@
     "validate:staging": "office-addin-manifest validate manifests/manifest.staging.xml",
     "validate:outlook:staging": "office-addin-manifest validate manifests/manifest.outlook.staging.xml",
     "validate:prod": "office-addin-manifest validate manifests/manifest.prod.xml",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
+    "lint": "oxlint --config .oxlintrc.json src/",
+    "lint:fix": "oxlint --config .oxlintrc.json --fix src/",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "typecheck": "tsc --noEmit",
@@ -107,7 +107,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.3.0",
@@ -123,14 +122,10 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^4.1.8",
-    "@vitest/eslint-plugin": "^1.6.19",
     "@vscode/codicons": "^0.0.45",
     "dotenv": "^17.4.2",
     "electron": "^42.3.3",
     "electron-builder": "^26.15.2",
-    "eslint": "^10.4.1",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.6.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.7",
@@ -139,6 +134,7 @@
     "office-addin-dev-certs": "^2.0.9",
     "office-addin-dev-settings": "^3.1.1",
     "office-addin-mock": "^3.0.9",
+    "oxlint": "^1.69.0",
     "patch-package": "^8.0.1",
     "postcss": "^8.5.15",
     "prettier": "^3.8.4",
@@ -146,7 +142,6 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.0",
     "vite": "^8.0.16",
     "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.8"
@@ -192,7 +187,7 @@
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
-      "eslint --fix",
+      "oxlint --config .oxlintrc.json --fix",
       "prettier --write"
     ],
     "src/**/*.css": [
