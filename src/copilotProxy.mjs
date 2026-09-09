@@ -452,7 +452,6 @@ async function handleConnection(ws) {
             mcpServers,
             availableTools,
             pluginDirectories,
-            agent: requestedAgent,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               const decision = await requestPermissionDecision(session.sessionId, request);
@@ -460,6 +459,9 @@ async function handleConnection(ws) {
               return decision;
             },
           });
+          if (requestedAgent) {
+            await session.rpc.agent.select({ name: requestedAgent });
+          }
         } catch (err) {
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
