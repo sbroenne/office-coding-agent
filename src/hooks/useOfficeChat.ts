@@ -873,7 +873,10 @@ export function useOfficeChat(host: OfficeHostApp) {
             const { toolCallId, toolName, arguments: args } = event.data;
             // report_intent is an internal SDK tool — surface intent as thinking text
             if (toolName === 'report_intent') {
-              const intent = args?.intent;
+              const intent =
+                typeof args === 'object' && args !== null && !Array.isArray(args)
+                  ? args.intent
+                  : undefined;
               if (typeof intent === 'string' && intent) {
                 // If tools have already been added, this intent starts a NEW phase
                 if (toolParts.size > 0) {
