@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 from typing import Annotated, Any, get_args, get_origin, get_type_hints
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from excel_sim import ExcelSimulator
@@ -33,7 +33,7 @@ from tool_result import ToolResult
 # Server & simulator
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP("excel-ai-addin-test-server")
+mcp = MCPServer("excel-ai-addin-test-server")
 _sim = ExcelSimulator()
 
 # ---------------------------------------------------------------------------
@@ -543,7 +543,7 @@ def _remap_params(params: dict[str, Any], remap: dict[str, str] | None) -> dict[
 def _coerce_array_params(params: dict[str, Any], tool_name: str) -> dict[str, Any]:
     """Parse JSON strings back to Python lists for array-typed params.
 
-    FastMCP may deliver array values as JSON strings when the Pydantic schema
+    MCPServer may deliver array values as JSON strings when the Pydantic schema
     uses ``list`` but the LLM sends a serialised array.
     """
     result = dict(params)
@@ -787,14 +787,18 @@ def main() -> None:
     register_tools_from_routes(args.manifest)
     print(f"Registered {len(mcp._tool_manager._tools)} tools", file=sys.stderr)
 
-    mcp.settings.host = args.host
-    mcp.settings.port = args.port
-
-    if args.transport == "streamable-http":
-        mcp.settings.stateless_http = True
-        mcp.settings.json_response = True
-
-    mcp.run(transport=args.transport)
+    if args.transport == "stdio":
+        mcp.run()
+    elif args.transport == "streamable-http":
+        mcp.run(
+            transport=args.transport,
+            host=args.host,
+            port=args.port,
+            stateless_http=True,
+            json_response=True,
+        )
+    else:
+        mcp.run(transport=args.transport, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

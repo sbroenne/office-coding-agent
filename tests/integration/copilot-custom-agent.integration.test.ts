@@ -224,7 +224,7 @@ describe('Copilot custom agent integration', () => {
   );
 
   it(
-    'report_intent events are emitted during tool-calling turns',
+    'assistant intent events are emitted during tool-calling turns',
     async () => {
       const client = await createWebSocketClient(SERVER_URL);
       try {
@@ -261,8 +261,10 @@ describe('Copilot custom agent integration', () => {
           prompt: 'Please call the echo tool with "hello".',
         })) {
           eventTypes.push(event.type);
-          // Capture report_intent tool calls (before they're filtered by the hook)
-          if (event.type === 'tool.execution_start') {
+          // Current SDKs emit assistant.intent; older ones use report_intent tool calls.
+          if (event.type === 'assistant.intent') {
+            intentTexts.push(event.data.intent);
+          } else if (event.type === 'tool.execution_start') {
             const data = event.data as { toolName: string; arguments?: Record<string, unknown> };
             if (data.toolName === 'report_intent' && typeof data.arguments?.intent === 'string') {
               intentTexts.push(data.arguments.intent);
@@ -271,7 +273,7 @@ describe('Copilot custom agent integration', () => {
           if (event.type === 'session.idle') break;
         }
 
-        // report_intent should fire at least once during a tool-calling turn
+        // An intent should arrive at least once during a tool-calling turn.
         expect(intentTexts.length).toBeGreaterThanOrEqual(1);
         // Intent text should be a non-empty descriptive string
         expect(intentTexts[0].length).toBeGreaterThan(0);

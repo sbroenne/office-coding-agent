@@ -48,6 +48,24 @@ describe('Copilot WebSocket integration', () => {
   );
 
   it(
+    'creates a session with the installed Excel plugin agent',
+    async () => {
+      const client = await createWebSocketClient(SERVER_URL);
+      try {
+        const session = await client.createSession({
+          host: 'excel',
+          agent: 'office-excel:excel',
+          systemMessage: SYSTEM,
+        });
+        expect(session.sessionId).toBeTruthy();
+      } finally {
+        await client.stop();
+      }
+    },
+    TIMEOUT_MS
+  );
+
+  it(
     'creates a session and gets a response to a simple prompt',
     async () => {
       const client = await createWebSocketClient(SERVER_URL);

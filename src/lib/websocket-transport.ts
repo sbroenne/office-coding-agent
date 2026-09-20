@@ -12,7 +12,7 @@ import {
   type Message,
   type MessageReader,
   type MessageWriter,
-} from 'vscode-jsonrpc';
+} from '#vscode-jsonrpc';
 
 export class WebSocketMessageReader extends AbstractMessageReader implements MessageReader {
   private buffer = new Uint8Array(0);

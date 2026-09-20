@@ -78,7 +78,7 @@ Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is r
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 20
+- [Node.js](https://nodejs.org/) 22.22.2+ or 24.15.0+ (supported LTS releases)
 - Microsoft Office (Excel, PowerPoint, Word, or Outlook — desktop or Microsoft 365 web)
 - An active **GitHub Copilot** subscription (individual, business, or enterprise)
 - The `@github/copilot` CLI authenticated (`gh auth login` or equivalent)
@@ -87,7 +87,7 @@ Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is r
 
 **👉 See [GETTING_STARTED.md](./GETTING_STARTED.md) for full setup instructions** — including authentication, starting the proxy server, registering the add-in, and sideloading into Office.
 
-**Quick start** (requires [Node.js 20+](https://nodejs.org/), [GitHub CLI](https://cli.github.com/), and an active [GitHub Copilot](https://github.com/features/copilot) subscription):
+**Quick start** (requires [Node.js 22.22.2+ or 24.15.0+](https://nodejs.org/), [GitHub CLI](https://cli.github.com/), and an active [GitHub Copilot](https://github.com/features/copilot) subscription):
 
 ```bash
 # 1. Install dependencies

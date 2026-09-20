@@ -8,22 +8,12 @@ Run with: uv run pytest tests-aitest/ -v
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
 import pytest
 
-from pytest_skill_engineering import MCPServer, Wait
-
-# ---------------------------------------------------------------------------
-# Environment setup
-# ---------------------------------------------------------------------------
-
-# LiteLLM bug workaround: their logging code expects AZURE_API_BASE but
-# Azure SDK uses AZURE_OPENAI_ENDPOINT. Set both to silence the warning.
-if os.environ.get("AZURE_OPENAI_ENDPOINT") and not os.environ.get("AZURE_API_BASE"):
-    os.environ["AZURE_API_BASE"] = os.environ["AZURE_OPENAI_ENDPOINT"]
+from pytest_skill_engineering import CopilotEval, MCPServer, Wait
 
 
 # ---------------------------------------------------------------------------
@@ -31,8 +21,6 @@ if os.environ.get("AZURE_OPENAI_ENDPOINT") and not os.environ.get("AZURE_API_BAS
 # ---------------------------------------------------------------------------
 
 DEFAULT_MODEL = "gpt-5-mini"
-DEFAULT_RPM = 10
-DEFAULT_TPM = 10000
 DEFAULT_MAX_TURNS = 10
 
 _PROJECT_ROOT = Path(__file__).parent.parent
@@ -62,6 +50,56 @@ def load_system_prompt(host: str) -> str:
 SYSTEM_PROMPTS = {host: load_system_prompt(host) for host in APP_PROMPT_PATHS}
 
 
+def make_copilot_eval(
+    server: MCPServer,
+    name: str,
+    *,
+    system_prompt: str,
+    max_turns: int,
+    allowed_tools: list[str] | None,
+) -> CopilotEval:
+    """Run the production prompt with only the selected Office MCP tools."""
+    return CopilotEval(
+        name=name,
+        model=DEFAULT_MODEL,
+        instructions=system_prompt,
+        system_message_mode="replace",
+        max_turns=max_turns,
+        mcp_servers={
+            "office": {
+                "type": "local",
+                "command": server.command[0],
+                "args": server.command[1:] + server.args,
+                "tools": allowed_tools if allowed_tools is not None else ["*"],
+            },
+        },
+        allowed_tools=(
+            [f"office-{tool}" for tool in allowed_tools]
+            if allowed_tools is not None
+            else None
+        ),
+    )
+
+
+@pytest.fixture
+def eval_run(copilot_eval):
+    """Keep assertions on manifest tool names rather than SDK-qualified names."""
+    async def run(agent: CopilotEval, prompt: str):
+        result = await copilot_eval(agent, prompt)
+        names = {
+            event.data.tool_name: event.data.mcp_tool_name
+            for event in result.raw_events
+            if event.type.value == "tool.execution_start"
+            and event.data.mcp_server_name in agent.mcp_servers
+            and event.data.mcp_tool_name
+        }
+        for call in result.all_tool_calls:
+            call.name = names.get(call.name, call.name)
+        return result
+
+    return run
+
+
 # ---------------------------------------------------------------------------
 # Pytest configuration
 # ---------------------------------------------------------------------------
@@ -88,7 +126,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def _build_server(script_name: str, manifest_path: Path, wait_for: list[str]) -> MCPServer:
     if not manifest_path.exists():
-        pytest.skip(f"Manifest not found: {manifest_path}. Run 'npm run manifest' first.")
+        pytest.fail(f"Manifest not found: {manifest_path}. Run 'npm run manifest' first.")
 
     return MCPServer(
         command=[
@@ -140,4 +178,3 @@ def outlook_server() -> MCPServer:
         OUTLOOK_MANIFEST_PATH,
         ["get_mail_item", "display_new_message", "reply_to_mail"],
     )
-

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from typing import Annotated, Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
 from tool_result import ToolResult
@@ -144,10 +144,10 @@ def create_manifest_server(
     simulator: Any,
     *,
     routes: dict[str, str] | None = None,
-) -> tuple[FastMCP, callable]:
-    """Create a FastMCP server that exposes manifest-defined tools."""
+) -> tuple[MCPServer, callable]:
+    """Create an MCP server that exposes manifest-defined tools."""
 
-    mcp = FastMCP(server_name)
+    mcp = MCPServer(server_name)
     route_map = routes or {}
 
     def dispatch(tool_name: str, params: dict[str, Any]) -> str:
@@ -217,11 +217,15 @@ def run_manifest_server(
     register_tools(args.manifest)
     print(f"Registered {len(mcp._tool_manager._tools)} tools from {args.manifest}", file=sys.stderr)
 
-    mcp.settings.host = args.host
-    mcp.settings.port = args.port
-
-    if args.transport == "streamable-http":
-        mcp.settings.stateless_http = True
-        mcp.settings.json_response = True
-
-    mcp.run(transport=args.transport)
+    if args.transport == "stdio":
+        mcp.run()
+    elif args.transport == "streamable-http":
+        mcp.run(
+            transport=args.transport,
+            host=args.host,
+            port=args.port,
+            stateless_http=True,
+            json_response=True,
+        )
+    else:
+        mcp.run(transport=args.transport, host=args.host, port=args.port)

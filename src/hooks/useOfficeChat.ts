@@ -826,12 +826,21 @@ export function useOfficeChat(host: OfficeHostApp) {
 
       const toolParts = new Map<string, ToolCallPart>();
       let streamText = '';
-      // Tracks the current phase index. Increments each time report_intent fires
+      // Tracks the current phase index. Increments each time an intent arrives
       // AFTER at least one tool has been added, creating a new Working box segment.
       let currentPhase = 0;
-      // Tracks the current phase label (from report_intent). This becomes the
+      // Tracks the current phase label (from the assistant's intent). This becomes the
       // Working box header text — matching VS Code's IChatTask.content behavior.
       let currentPhaseLabel: string | undefined = undefined;
+
+      const reportIntent = (intent: unknown) => {
+        if (typeof intent !== 'string' || !intent) return;
+        if (toolParts.size > 0) {
+          currentPhase++;
+        }
+        currentPhaseLabel = intent;
+        flushSync(() => setThinkingForAssistant(intent));
+      };
 
       const updateAssistant = (extra?: Partial<Pick<ChatMessage, 'status' | 'thinkingText'>>) => {
         // Text part is ALWAYS at index 0 — even when empty — to prevent tearing.
@@ -869,20 +878,15 @@ export function useOfficeChat(host: OfficeHostApp) {
             // First streaming delta clears the thinking indicator
             streamText += event.data.deltaContent;
             updateAssistant({ thinkingText: null });
+          } else if (event.type === 'assistant.intent') {
+            reportIntent(event.data.intent);
           } else if (event.type === 'tool.execution_start') {
             const { toolCallId, toolName, arguments: args } = event.data;
             // report_intent is an internal SDK tool — surface intent as thinking text
             if (toolName === 'report_intent') {
-              const intent = args?.intent;
-              if (typeof intent === 'string' && intent) {
-                // If tools have already been added, this intent starts a NEW phase
-                if (toolParts.size > 0) {
-                  currentPhase++;
-                }
-                // The intent text labels the Working box (VS Code: IChatTask.content)
-                currentPhaseLabel = intent;
-                flushSync(() => setThinkingForAssistant(intent));
-              }
+              const intent =
+                args && typeof args === 'object' && !Array.isArray(args) ? args.intent : undefined;
+              reportIntent(intent);
               continue;
             }
             toolParts.set(toolCallId, {

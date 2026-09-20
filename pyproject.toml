@@ -4,8 +4,8 @@ version = "0.0.0"
 description = "Skill engineering evals for Office Coding Agent host tool suites"
 requires-python = ">=3.11"
 dependencies = [
-    "pytest-skill-engineering>=0.1.0",
-    "pytest-asyncio>=1.0.0",
+    "pytest-skill-engineering>=0.6.19",
+    "pytest-asyncio>=1.4.0",
 ]
 
 [tool.pytest.ini_options]

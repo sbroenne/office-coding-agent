@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import pytest
 
-from pytest_skill_engineering import Eval, MCPServer, Provider
+from pytest_skill_engineering import CopilotEval, MCPServer
 
-from conftest import DEFAULT_MAX_TURNS, DEFAULT_MODEL, DEFAULT_RPM, DEFAULT_TPM, SYSTEM_PROMPTS
+from conftest import DEFAULT_MAX_TURNS, SYSTEM_PROMPTS, make_copilot_eval
 
 pytestmark = [pytest.mark.integration, pytest.mark.excel]
 
@@ -29,16 +29,15 @@ def _make_eval(
     *,
     allowed_tools: list[str] | None = None,
     max_turns: int = DEFAULT_MAX_TURNS,
-) -> Eval:
+) -> CopilotEval:
     """Create an Excel agent with standard config.
 
     Use allowed_tools to limit which tools the LLM sees, reducing token usage
     from ~50k (all 59 tools) to ~2-5k (focused set).
     """
-    return Eval(
+    return make_copilot_eval(
+        excel_server,
         name=name,
-        provider=Provider(model=f"azure/{DEFAULT_MODEL}", rpm=DEFAULT_RPM, tpm=DEFAULT_TPM),
-        mcp_servers=[excel_server],
         system_prompt=EXCEL_PROMPT,
         max_turns=max_turns,
         allowed_tools=allowed_tools,

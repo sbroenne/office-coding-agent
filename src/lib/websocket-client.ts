@@ -4,7 +4,7 @@
  *  Source: https://github.com/patniko/github-copilot-office
  *--------------------------------------------------------------------------------------------*/
 
-import { createMessageConnection, type MessageConnection } from 'vscode-jsonrpc';
+import { createMessageConnection, type MessageConnection } from '#vscode-jsonrpc';
 import { WebSocketMessageReader, WebSocketMessageWriter } from './websocket-transport';
 import type {
   SessionConfig,

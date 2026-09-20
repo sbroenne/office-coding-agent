@@ -412,7 +412,19 @@ describe('useOfficeChat', () => {
     expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
-  it('report_intent overrides tool name in thinkingText', async () => {
+  it.each([
+    { args: { intent: 'Reading the spreadsheet' }, expected: 'Reading the spreadsheet', native: true },
+    { args: { intent: 'Reading the spreadsheet' }, expected: 'Reading the spreadsheet' },
+    { args: undefined, expected: 'Thinking…' },
+    { args: null, expected: 'Thinking…' },
+    { args: 'Reading the spreadsheet', expected: 'Thinking…' },
+    { args: 1, expected: 'Thinking…' },
+    { args: true, expected: 'Thinking…' },
+    { args: [], expected: 'Thinking…' },
+    { args: { intent: 1 }, expected: 'Thinking…' },
+    { args: { intent: '' }, expected: 'Thinking…' },
+  ])('assistant intent handles JSON arguments $args (native: $native)', async testCase => {
+    const { args, expected } = testCase;
     let resolveIdle: () => void;
     const idlePromise = new Promise<void>(r => {
       resolveIdle = r;
@@ -421,11 +433,15 @@ describe('useOfficeChat', () => {
     const session = {
       sessionId: 'test-session-id',
       async *query() {
-        yield makeEvent('tool.execution_start', {
-          toolCallId: 'ri1',
-          toolName: 'report_intent',
-          arguments: { intent: 'Reading the spreadsheet' },
-        });
+        if ('native' in testCase && testCase.native) {
+          yield makeEvent('assistant.intent', { intent: expected });
+        } else {
+          yield makeEvent('tool.execution_start', {
+            toolCallId: 'ri1',
+            toolName: 'report_intent',
+            arguments: args,
+          });
+        }
         // Pause so the test can observe thinkingText
         await idlePromise;
         yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Here you go' });
@@ -456,8 +472,8 @@ describe('useOfficeChat', () => {
       await new Promise(r => setTimeout(r, 50));
     });
 
-    // report_intent should surface the raw intent text
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Reading the spreadsheet');
+    // Only a non-empty string intent should replace the default thinking text.
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe(expected);
 
     // Release the stream to complete
     await act(async () => {

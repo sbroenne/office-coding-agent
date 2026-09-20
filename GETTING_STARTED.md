@@ -8,7 +8,7 @@ Run Office Coding Agent locally — no installers required.
 
 | Software                        | Notes                                                      | Download                                                           |
 | ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Node.js 20+**                 | Required to run the proxy server and build the add-in      | [nodejs.org](https://nodejs.org/)                                  |
+| **Node.js 22.22.2+ or 24.15.0+** | Required to run the proxy server and build the add-in      | [nodejs.org](https://nodejs.org/)                                  |
 | **Git**                         | Required to clone the repo                                 | [git-scm.com](https://git-scm.com/downloads)                       |
 | **GitHub CLI**                  | Required for Copilot authentication                        | [cli.github.com](https://cli.github.com/)                          |
 | **GitHub Copilot subscription** | Individual, Business, or Enterprise                        | [github.com/features/copilot](https://github.com/features/copilot) |

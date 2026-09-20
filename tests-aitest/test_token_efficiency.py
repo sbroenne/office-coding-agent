@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import pytest
 
-from pytest_skill_engineering import Eval, MCPServer, Provider
+from pytest_skill_engineering import CopilotEval, MCPServer
 
-from conftest import DEFAULT_MAX_TURNS, DEFAULT_MODEL, DEFAULT_RPM, DEFAULT_TPM, SYSTEM_PROMPTS
+from conftest import DEFAULT_MAX_TURNS, SYSTEM_PROMPTS, make_copilot_eval
 
 pytestmark = [pytest.mark.integration, pytest.mark.token_efficiency]
 
@@ -49,11 +49,10 @@ def _end_cell(num_rows: int, num_cols: int = 6) -> str:
     return f"A1:{col}{num_rows + 1}"  # +1 for header
 
 
-def _make_eval(excel_server: MCPServer, name: str, allowed_tools: list[str]) -> Eval:
-    return Eval(
+def _make_eval(excel_server: MCPServer, name: str, allowed_tools: list[str]) -> CopilotEval:
+    return make_copilot_eval(
+        excel_server,
         name=name,
-        provider=Provider(model=f"azure/{DEFAULT_MODEL}", rpm=DEFAULT_RPM, tpm=DEFAULT_TPM),
-        mcp_servers=[excel_server],
         system_prompt=EXCEL_PROMPT,
         max_turns=DEFAULT_MAX_TURNS,
         allowed_tools=allowed_tools,
@@ -241,8 +240,8 @@ class TestMaxRowsPreview:
         assert result_full.success
         _print_tokens("Full read (get_range_values only, 50 rows)", result_full.token_usage)
 
-        paged_total = sum(result_paged.token_usage.values())
-        full_total = sum(result_full.token_usage.values())
+        paged_total = result_paged.total_tokens
+        full_total = result_full.total_tokens
         saving_pct = (full_total - paged_total) / full_total * 100 if full_total else 0
         print(f"\n  [DELTA] paged={paged_total:,} vs full={full_total:,} → {saving_pct:.0f}% saving")
 
