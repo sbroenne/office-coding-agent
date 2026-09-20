@@ -2,7 +2,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import ts from 'typescript';
+import * as ts from 'typescript/unstable/ast';
+import { API } from 'typescript/unstable/sync';
 
 interface ManifestTool {
   name: string;
@@ -138,57 +139,67 @@ function findExcelNamespace(sourceFile: ts.SourceFile): ts.ModuleBlock | null {
 
 function extractExcelMembers(): ExcelMember[] {
   const typesPath = resolveOfficeTypesPath();
-  const sourceText = fs.readFileSync(typesPath, 'utf-8');
-  const sourceFile = ts.createSourceFile(typesPath, sourceText, ts.ScriptTarget.Latest, true);
+  const api = new API();
+  try {
+    const snapshot = api.updateSnapshot({ openFiles: [typesPath] });
+    const sourceFile = snapshot
+      .getDefaultProjectForFile(typesPath)
+      ?.program.getSourceFile(typesPath);
+    if (!sourceFile) {
+      throw new Error(`Could not load Office type declarations: ${typesPath}`);
+    }
 
-  const excelNamespace = findExcelNamespace(sourceFile);
-  if (!excelNamespace) {
-    throw new Error('Could not find Excel namespace in @types/office-js/index.d.ts');
-  }
+    const excelNamespace = findExcelNamespace(sourceFile);
+    if (!excelNamespace) {
+      throw new Error('Could not find Excel namespace in @types/office-js/index.d.ts');
+    }
 
-  const seen = new Set<string>();
-  const members: ExcelMember[] = [];
+    const seen = new Set<string>();
+    const members: ExcelMember[] = [];
 
-  for (const stmt of excelNamespace.statements) {
-    if (!(ts.isInterfaceDeclaration(stmt) || ts.isClassDeclaration(stmt))) continue;
-    if (!stmt.name) continue;
-    const typeName = stmt.name.text;
-    if (!typeName || isIgnoredType(typeName)) continue;
+    for (const stmt of excelNamespace.statements) {
+      if (!(ts.isInterfaceDeclaration(stmt) || ts.isClassDeclaration(stmt))) continue;
+      if (!stmt.name) continue;
+      const typeName = stmt.name.text;
+      if (!typeName || isIgnoredType(typeName)) continue;
 
-    for (const member of stmt.members) {
-      if (
-        ts.isMethodSignature(member) ||
-        ts.isMethodDeclaration(member) ||
-        ts.isPropertySignature(member) ||
-        ts.isPropertyDeclaration(member) ||
-        ts.isGetAccessorDeclaration(member) ||
-        ts.isSetAccessorDeclaration(member)
-      ) {
-        const memberName = getMemberName(member.name);
-        if (!memberName || IGNORE_MEMBERS.has(memberName) || memberName.startsWith('_')) continue;
-
-        const isMethod =
-          ts.isMethodSignature(member) ||
+      for (const member of stmt.members) {
+        if (
+          ts.isMethodSignatureDeclaration(member) ||
           ts.isMethodDeclaration(member) ||
+          ts.isPropertySignatureDeclaration(member) ||
+          ts.isPropertyDeclaration(member) ||
           ts.isGetAccessorDeclaration(member) ||
-          ts.isSetAccessorDeclaration(member);
+          ts.isSetAccessorDeclaration(member)
+        ) {
+          const memberName = getMemberName(member.name);
+          if (!memberName || IGNORE_MEMBERS.has(memberName) || memberName.startsWith('_')) continue;
 
-        const signature = `${typeName}.${memberName}${isMethod ? '()' : ''}`;
-        if (seen.has(signature)) continue;
-        seen.add(signature);
+          const isMethod =
+            ts.isMethodSignatureDeclaration(member) ||
+            ts.isMethodDeclaration(member) ||
+            ts.isGetAccessorDeclaration(member) ||
+            ts.isSetAccessorDeclaration(member);
 
-        members.push({
-          typeName,
-          memberName,
-          memberKind: isMethod ? 'method' : 'property',
-          signature,
-        });
+          const signature = `${typeName}.${memberName}${isMethod ? '()' : ''}`;
+          if (seen.has(signature)) continue;
+          seen.add(signature);
+
+          members.push({
+            typeName,
+            memberName,
+            memberKind: isMethod ? 'method' : 'property',
+            signature,
+          });
+        }
       }
     }
-  }
 
-  members.sort((a, b) => a.signature.localeCompare(b.signature));
-  return members;
+    members.sort((a, b) => a.signature.localeCompare(b.signature));
+    return members;
+  } finally {
+    api.close();
+  }
 }
 
 function loadManifestTools(): ManifestTool[] {

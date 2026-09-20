@@ -148,7 +148,8 @@
     "tailwindcss": "^4.3.3",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^6.0.3",
+    "tsx": "^4.23.15",
+    "typescript": "7.0.2",
     "vite": "^8.3.0",
     "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^5.0.1"

@@ -19,7 +19,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
-import ts from 'typescript';
+import * as ts from 'typescript/unstable/ast';
+import { API } from 'typescript/unstable/sync';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -151,9 +152,9 @@ function extractMembersFromInterfaceOrClass(typeName: string, node: ts.Node): Ex
 
   for (const member of nodeMembers) {
     if (
-      ts.isMethodSignature(member) ||
+      ts.isMethodSignatureDeclaration(member) ||
       ts.isMethodDeclaration(member) ||
-      ts.isPropertySignature(member) ||
+      ts.isPropertySignatureDeclaration(member) ||
       ts.isPropertyDeclaration(member) ||
       ts.isGetAccessorDeclaration(member) ||
       ts.isSetAccessorDeclaration(member)
@@ -162,7 +163,7 @@ function extractMembersFromInterfaceOrClass(typeName: string, node: ts.Node): Ex
       if (!memberName || IGNORE_MEMBERS.has(memberName) || memberName.startsWith('_')) continue;
 
       const isMethod =
-        ts.isMethodSignature(member) ||
+        ts.isMethodSignatureDeclaration(member) ||
         ts.isMethodDeclaration(member) ||
         ts.isGetAccessorDeclaration(member) ||
         ts.isSetAccessorDeclaration(member);
@@ -191,26 +192,36 @@ function findExcelNamespace(sourceFile: ts.SourceFile): ts.ModuleBlock | null {
 
 function extractExcelMembers(): ExcelMember[] {
   const typesPath = resolveOfficeTypesPath();
-  const sourceText = fs.readFileSync(typesPath, 'utf-8');
-  const sourceFile = ts.createSourceFile(typesPath, sourceText, ts.ScriptTarget.Latest, true);
+  const api = new API();
+  try {
+    const snapshot = api.updateSnapshot({ openFiles: [typesPath] });
+    const sourceFile = snapshot
+      .getDefaultProjectForFile(typesPath)
+      ?.program.getSourceFile(typesPath);
+    if (!sourceFile) {
+      throw new Error(`Could not load Office type declarations: ${typesPath}`);
+    }
 
-  const excelNamespace = findExcelNamespace(sourceFile);
-  if (!excelNamespace) {
-    throw new Error('Could not find `declare namespace Excel` in @types/office-js/index.d.ts.');
+    const excelNamespace = findExcelNamespace(sourceFile);
+    if (!excelNamespace) {
+      throw new Error('Could not find `declare namespace Excel` in @types/office-js/index.d.ts.');
+    }
+
+    const members: ExcelMember[] = [];
+    for (const stmt of excelNamespace.statements) {
+      if (!(ts.isInterfaceDeclaration(stmt) || ts.isClassDeclaration(stmt))) continue;
+      if (!stmt.name) continue;
+      const typeName = stmt.name.text;
+      if (!typeName || isIgnoredType(typeName)) continue;
+
+      members.push(...extractMembersFromInterfaceOrClass(typeName, stmt));
+    }
+
+    members.sort((a, b) => a.signature.localeCompare(b.signature));
+    return members;
+  } finally {
+    api.close();
   }
-
-  const members: ExcelMember[] = [];
-  for (const stmt of excelNamespace.statements) {
-    if (!(ts.isInterfaceDeclaration(stmt) || ts.isClassDeclaration(stmt))) continue;
-    if (!stmt.name) continue;
-    const typeName = stmt.name.text;
-    if (!typeName || isIgnoredType(typeName)) continue;
-
-    members.push(...extractMembersFromInterfaceOrClass(typeName, stmt));
-  }
-
-  members.sort((a, b) => a.signature.localeCompare(b.signature));
-  return members;
 }
 
 function analyze(): CoverageResult {
@@ -309,7 +320,8 @@ function main(): void {
 
   if (options.strict && result.uncoveredMembers > 0) {
     console.log(`\n❌ ${result.uncoveredMembers} uncovered Excel API member(s) remain.\n`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (!options.json) {
