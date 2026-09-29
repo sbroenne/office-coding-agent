@@ -124,7 +124,7 @@
     "@vitest/coverage-v8": "^4.1.8",
     "@vscode/codicons": "^0.0.45",
     "dotenv": "^17.4.2",
-    "electron": "^42.3.3",
+    "electron": "^42.10.0",
     "electron-builder": "^26.15.2",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
