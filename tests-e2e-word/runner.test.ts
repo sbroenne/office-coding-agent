@@ -12,13 +12,15 @@
  *
  * Auto-start: The manifest uses LaunchEvent (OnNewDocument) to start the
  * shared runtime automatically when Word opens a new document.
+ * On Windows, also invoke the test ribbon button for fresh documents.
  */
 /* eslint-disable vitest/expect-expect, vitest/valid-title */
 
 import * as assert from 'assert';
 import { AppType, startDebugging, stopDebugging } from 'office-addin-debugging';
 import { toOfficeApp } from 'office-addin-manifest';
-import { closeDesktopApplication } from './src/node-helpers';
+import { targetedTestNames } from './src/targeted-test-names';
+import { openTestTaskpane } from './src/node-helpers';
 import * as path from 'path';
 import * as https from 'https';
 import express from 'express';
@@ -134,6 +136,7 @@ const wordToolNames = [
   'apply_style_to_selection',
   'apply_style_to_selection:font',
   'set_document_content',
+  ...targetedTestNames,
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────
@@ -177,9 +180,24 @@ describe('Word AI E2E Tests', function () {
     console.log('Starting dev server and sideloading add-in into Word...');
     await startDebugging(manifestPath, options);
     console.log('Add-in sideloaded into Word');
+    await openTestTaskpane();
 
     console.log('Waiting for test results from add-in...');
-    const results = await testServer.getResults();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const results = await Promise.race([
+      testServer.getResults(),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(
+          () =>
+            reject(
+              new Error(
+                'Word did not return results within 180 seconds. Check that the test add-in opened in Word Desktop.'
+              )
+            ),
+          180000
+        );
+      }),
+    ]).finally(() => clearTimeout(timeout));
     e2eContext.setResults(results);
     console.log(`Received ${results.length} test results`);
 
@@ -192,13 +210,6 @@ describe('Word AI E2E Tests', function () {
   after('Teardown: stop server, close Word, unregister add-in', async () => {
     console.log('Tearing down...');
     await testServer.stop();
-
-    console.log('Closing Word...');
-    try {
-      await closeDesktopApplication();
-    } catch (error) {
-      console.log(`Note: Word may already be closed: ${String(error)}`);
-    }
 
     console.log('Stopping debugging...');
     await stopDebugging(manifestPath);
@@ -216,7 +227,7 @@ describe('Word AI E2E Tests', function () {
 
   // ─── Tool Tests ────────────────────────────────────────────────
 
-  describe('Word Tools (12)', () => {
+  describe('Word Tools', () => {
     for (const name of wordToolNames) {
       it(name, () => {
         assertToolResult(name);

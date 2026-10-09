@@ -53,6 +53,7 @@ import { commentConfigs } from '@/tools/configs/comment.config';
 import { conditionalFormatConfigs } from '@/tools/configs/conditionalFormat.config';
 import { dataValidationConfigs } from '@/tools/configs/dataValidation.config';
 import { pivotTableConfigs } from '@/tools/configs/pivotTable.config';
+import { slicerConfigs } from '@/tools/configs/slicer.config';
 import type { ToolConfig } from '@/tools/codegen/types';
 
 /* global Office, document, Excel, navigator, console, window, OfficeRuntime */
@@ -1262,6 +1263,251 @@ async function testRangeToolVariants(): Promise<void> {
 }
 
 // ─── Table Tools (11) ─────────────────────────────────────────────
+
+async function testExcelFiltersAndSlicers(): Promise<void> {
+  const tableName = 'E2E_FilterSource';
+  const pivotName = 'E2E_SlicerPivot';
+  const slicerName = 'E2E_RegionSlicer';
+  const sheetName = 'E2E_FilterSlicers';
+  async function check(name: string, execute: () => Promise<void>): Promise<void> {
+    try {
+      await execute();
+      pass(name, { verified: true });
+    } catch (error) {
+      fail(name, String(error));
+    }
+  }
+  function equal(actual: unknown, expected: unknown): void {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    }
+  }
+  async function visibleRegions(): Promise<string[]> {
+    return Excel.run(async context => {
+      const view = context.workbook.tables.getItem(tableName).getDataBodyRange().getVisibleView();
+      view.load('values');
+      await context.sync();
+      return view.values.map(row => String(row[0]));
+    });
+  }
+  async function rejected(
+    args: Record<string, unknown>,
+    configs = slicerConfigs,
+    name = 'slicer'
+  ): Promise<void> {
+    let message = '';
+    try {
+      await callTool(configs, name, args);
+    } catch (error) {
+      message = String(error);
+    }
+    if (!message) throw new Error('Expected invalid input to fail before changing filters.');
+  }
+  await Excel.run(async context => {
+    const sheet = context.workbook.worksheets.add(sheetName);
+    const today = new Date();
+    const serial =
+      Math.floor(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) / 86400000) +
+      25569;
+    sheet.getRange('A1:C5').values = [
+      ['Region', 'Sales', 'Date'],
+      ['North', 5000, serial],
+      ['South', 15000, serial - 400],
+      ['East', 25000, serial],
+      ['West', 18000, serial - 400],
+    ];
+    sheet.getRange('C2:C5').numberFormat = [['yyyy-mm-dd']];
+    sheet.tables.add('A1:C5', true).name = tableName;
+    await context.sync();
+  });
+  try {
+    await check('table_filter_numeric_comparison', async () => {
+      await callTool(tableConfigs, 'table', {
+        action: 'filter',
+        tableName,
+        column: 1,
+        filterType: 'custom',
+        criteria1: '>10000',
+      });
+      equal(await visibleRegions(), ['South', 'East', 'West']);
+    });
+    await check('table_filter_numeric_between', async () => {
+      await callTool(tableConfigs, 'table', {
+        action: 'filter',
+        tableName,
+        column: 1,
+        filterType: 'custom',
+        criteria1: '>10000',
+        criteria2: '<20000',
+        filterOperator: 'And',
+      });
+      equal(await visibleRegions(), ['South', 'West']);
+    });
+    await check('table_filter_numeric_or', async () => {
+      await callTool(tableConfigs, 'table', {
+        action: 'filter',
+        tableName,
+        column: 1,
+        filterType: 'custom',
+        criteria1: '<10000',
+        criteria2: '>20000',
+        filterOperator: 'Or',
+      });
+      equal(await visibleRegions(), ['North', 'East']);
+    });
+    await check('table_filter_invalid_preserves_existing', async () => {
+      for (const args of [
+        { filterType: 'custom', criteria1: '' },
+        { filterType: 'dynamic', dynamicCriteria: 'Unknown' },
+        { filterType: 'values', filterValues: [] },
+        { filterType: 'custom', criteria1: '>0', filterValues: ['North'] },
+        { filterType: 'custom', criteria1: '>0', column: -1 },
+      ])
+        await rejected({ action: 'filter', tableName, column: 1, ...args }, tableConfigs, 'table');
+      equal(await visibleRegions(), ['North', 'East']);
+    });
+    await check('table_filter_text_wildcard', async () => {
+      await callTool(tableConfigs, 'table', { action: 'clear_filters', tableName });
+      await callTool(tableConfigs, 'table', {
+        action: 'filter',
+        tableName,
+        column: 0,
+        filterType: 'custom',
+        criteria1: '=*th',
+      });
+      equal(await visibleRegions(), ['North', 'South']);
+    });
+    await check('table_filter_dynamic_quarter', async () => {
+      await callTool(tableConfigs, 'table', { action: 'clear_filters', tableName });
+      await callTool(tableConfigs, 'table', {
+        action: 'filter',
+        tableName,
+        column: 2,
+        filterType: 'dynamic',
+        dynamicCriteria: 'ThisQuarter',
+      });
+      equal(await visibleRegions(), ['North', 'East']);
+    });
+    await callTool(tableConfigs, 'table', { action: 'clear_filters', tableName });
+    await check('slicer_create_table_and_list', async () => {
+      const result = (await callTool(slicerConfigs, 'slicer', {
+        action: 'create',
+        sourceType: 'table',
+        sourceName: tableName,
+        sourceField: 'Region',
+        sheetName,
+        name: slicerName,
+        left: 300,
+        top: 20,
+        width: 140,
+        height: 200,
+      })) as { name: string; sheetName: string; items: { name: string }[] };
+      equal(result.name, slicerName);
+      equal(result.sheetName, sheetName);
+      equal(result.items.map(item => item.name).sort(), ['East', 'North', 'South', 'West']);
+      const list = (await callTool(slicerConfigs, 'slicer', { action: 'list', sheetName })) as {
+        slicers: { name: string }[];
+      };
+      equal(
+        list.slicers.map(item => item.name),
+        [slicerName]
+      );
+    });
+    await check('slicer_select_filters_actual_table', async () => {
+      const info = (await callTool(slicerConfigs, 'slicer', {
+        action: 'get_info',
+        slicerName,
+      })) as { items: { key: string; name: string }[] };
+      const key = info.items.find(item => item.name === 'North')?.key;
+      if (!key) throw new Error('North key missing');
+      const result = (await callTool(slicerConfigs, 'slicer', {
+        action: 'select_items',
+        slicerName,
+        itemKeys: [key],
+      })) as { selectedKeys: string[] };
+      equal(result.selectedKeys, [key]);
+      equal(await visibleRegions(), ['North']);
+    });
+    await check('slicer_invalid_keys_preserve_selection', async () => {
+      await rejected({ action: 'select_items', slicerName, itemKeys: ['not-a-key'] });
+      await rejected({ action: 'select_items', slicerName, itemKeys: [] });
+      await rejected({ action: 'configure', slicerName, width: -1 });
+      equal(await visibleRegions(), ['North']);
+    });
+    await check('slicer_configure_and_clear', async () => {
+      const result = (await callTool(slicerConfigs, 'slicer', {
+        action: 'configure',
+        slicerName,
+        caption: 'Regions',
+        left: 350,
+        top: 30,
+        width: 160,
+        height: 220,
+        style: 'SlicerStyleLight2',
+      })) as { caption: string; left: number; width: number; style: string };
+      equal(
+        [result.caption, result.left, result.width, result.style],
+        ['Regions', 350, 160, 'SlicerStyleLight2']
+      );
+      await callTool(slicerConfigs, 'slicer', { action: 'clear_filters', slicerName });
+      equal(await visibleRegions(), ['North', 'South', 'East', 'West']);
+    });
+    await check('slicer_delete', async () => {
+      await callTool(slicerConfigs, 'slicer', { action: 'delete', slicerName });
+      const result = (await callTool(slicerConfigs, 'slicer', { action: 'list', sheetName })) as {
+        count: number;
+      };
+      equal(result.count, 0);
+    });
+    await check('slicer_pivot_create_select_clear_delete', async () => {
+      await callTool(pivotTableConfigs, 'pivot', {
+        action: 'create',
+        name: pivotName,
+        sourceAddress: 'A1:C5',
+        destinationAddress: 'E1',
+        rowFields: ['Region'],
+        valueFields: ['Sales'],
+        sourceSheetName: sheetName,
+        destinationSheetName: sheetName,
+      });
+      const result = (await callTool(slicerConfigs, 'slicer', {
+        action: 'create',
+        sourceType: 'pivot',
+        sourceName: pivotName,
+        sourceField: 'Region',
+        sheetName,
+        name: slicerName,
+      })) as { items: { key: string; name: string }[] };
+      const key = result.items.find(item => item.name === 'East')?.key;
+      if (!key) throw new Error('East pivot key missing');
+      await callTool(slicerConfigs, 'slicer', {
+        action: 'select_items',
+        slicerName,
+        itemKeys: [key],
+      });
+      await Excel.run(async context => {
+        const range = context.workbook.pivotTables.getItem(pivotName).layout.getRange();
+        range.load('values');
+        await context.sync();
+        const content = JSON.stringify(range.values);
+        if (
+          !content.includes('East') ||
+          content.includes('North') ||
+          content.includes('South') ||
+          content.includes('West')
+        )
+          throw new Error(`Pivot not filtered: ${content}`);
+      });
+      await callTool(slicerConfigs, 'slicer', { action: 'clear_filters', slicerName });
+      await callTool(slicerConfigs, 'slicer', { action: 'delete', slicerName });
+    });
+  } finally {
+    await Excel.run(async context => {
+      context.workbook.worksheets.getItem(sheetName).delete();
+      await context.sync();
+    });
+  }
+}
 
 async function testTableTools(): Promise<void> {
   log('── Table Tools (11) ──');
@@ -4663,6 +4909,7 @@ if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
       await testRangeToolVariants();
       await testTableTools();
       await testTableToolVariants();
+      await testExcelFiltersAndSlicers();
       await testChartTools();
       await testChartToolVariants();
       await testSheetTools();

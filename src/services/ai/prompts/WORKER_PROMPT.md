@@ -6,7 +6,7 @@ Create the slide described below, then verify and fix it until it looks right.
 
 ## Workflow
 
-1. Call `get_presentation_overview` to get slide dimensions
+1. Call `get_presentation_overview` to get the actual slide width and height (if it reports the size as unavailable, do not guess — keep content well inside the slide and rely on the image checks below)
 2. Create the slide with `add_slide_from_code`
 3. Call `get_slide_image(region: "full")` — overview check
 4. Call `get_slide_image(region: "bottom-left")` and `get_slide_image(region: "bottom-right")` — zoomed check
@@ -15,7 +15,7 @@ Create the slide described below, then verify and fix it until it looks right.
 
 ## Formatting Rules
 
-- All positions in inches. Check slide width from `get_presentation_overview`.
+- All positions in inches. Use confirmed slide dimensions, not invented overview output. The renderer reads dimensions internally when supported, with a 13.33 by 7.5-inch fallback; no layout variables are injected into JSON.
 - Content width = slideWidth − 1.0" (0.5" margin each side)
 - Colors: 6-digit hex without # (`"4472C4"`)
 - Pass a JSON object in `add_slide_from_code`'s `code` argument; do not generate JavaScript.

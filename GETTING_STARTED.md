@@ -6,13 +6,13 @@ Run Office Coding Agent locally — no installers required.
 
 ## Prerequisites
 
-| Software                        | Notes                                                      | Download                                                           |
-| ------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Node.js 20+**                 | Required to run the proxy server and build the add-in      | [nodejs.org](https://nodejs.org/)                                  |
-| **Git**                         | Required to clone the repo                                 | [git-scm.com](https://git-scm.com/downloads)                       |
-| **GitHub CLI**                  | Required for Copilot authentication                        | [cli.github.com](https://cli.github.com/)                          |
-| **GitHub Copilot subscription** | Individual, Business, or Enterprise                        | [github.com/features/copilot](https://github.com/features/copilot) |
-| **Microsoft Office**            | Excel, PowerPoint, or Word (Microsoft 365 or Office 2019+) | —                                                                  |
+| Software                        | Notes                                                        | Download                                                           |
+| ------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| **Node.js 24.15+**              | Recommended; also supports 22.22.2+ in the 22.x line, or 26+ | [nodejs.org](https://nodejs.org/)                                  |
+| **Git**                         | Required to clone the repo                                   | [git-scm.com](https://git-scm.com/downloads)                       |
+| **GitHub CLI**                  | Required for Copilot authentication                          | [cli.github.com](https://cli.github.com/)                          |
+| **GitHub Copilot subscription** | Individual, Business, or Enterprise                          | [github.com/features/copilot](https://github.com/features/copilot) |
+| **Microsoft Office**            | Excel, PowerPoint, or Word (Microsoft 365 or Office 2019+)   | —                                                                  |
 
 ---
 
@@ -110,10 +110,26 @@ The task pane opens with an AI chat interface. Type a message to get started.
 
 - Use the **Model picker** (bottom of the input bar) to choose a Copilot model.
 - Use the **Agent picker** (bottom of the input bar) to select a CLI-owned Copilot agent.
+- The current Office host's agent is selected by default. New conversations start in **Interactive** mode; use the mode picker to choose **Plan** or **Autopilot**. Permission approvals still apply in Autopilot.
 - Type `/skill-name` or `/prompt-name` to invoke installed Copilot CLI skills and `.prompt.md` prompt files.
 - Use the **MCP servers** picker (bottom of the input bar) to enable, disable, and sign in to MCP servers from `copilot mcp list`.
 - Use `copilot plugin` CLI commands to install, update, or remove user plugins. On startup, the proxy automatically ensures the Office Coding Agent marketplace plugins (`office-excel`, `office-powerpoint`, `office-word`, `office-outlook`) are installed and updated in your normal Copilot CLI config.
 - Use the **New Conversation** button (header) to reset the chat.
+
+### Getting plugin updates
+
+The local server refreshes the marketplace and installs or updates required Office plugins on every startup, before chats connect. It does not check for updates continuously. Once plugin fixes are merged, restart the local server to receive them; reloading the task pane alone does not run the update step. Plugin-only updates do not require a new add-in release.
+
+To update manually:
+
+```bash
+copilot plugin marketplace update office-coding-agent
+copilot plugin update office-excel@office-coding-agent
+copilot plugin update office-powerpoint@office-coding-agent
+copilot plugin update office-word@office-coding-agent
+```
+
+Check the local server terminal for update failures. Failed updates are logged but do not prevent the server from starting.
 
 ---
 

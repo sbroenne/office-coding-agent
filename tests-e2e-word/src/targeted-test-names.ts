@@ -1,0 +1,17 @@
+export const targetedTestNames = [
+  'section:read-boundaries',
+  'section:insert-start-end',
+  'section:replace-preserves-neighbours',
+  'section:empty-last-section',
+  'section:invalid-targets-no-mutation',
+  'section:stale-text-no-mutation',
+  'section:heading-only-document',
+  'section:physical-boundaries',
+  'tracking:mode',
+  'tracking:inspect',
+  'tracking:invalid-targets-no-mutation',
+  'tracking:stale-snapshot-no-mutation',
+  'tracking:accept-explicit-target',
+  'tracking:reject-explicit-target',
+  'tracking:batch-deletions',
+] as const;

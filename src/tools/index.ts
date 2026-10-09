@@ -10,6 +10,7 @@ import {
   conditionalFormatConfigs,
   dataValidationConfigs,
   pivotTableConfigs,
+  slicerConfigs,
 } from './configs';
 import type { ToolConfig, ToolConfigBase } from './codegen/types';
 import type { Tool } from '@github/copilot-sdk';
@@ -35,6 +36,7 @@ export const allConfigs: readonly (readonly ToolConfig[])[] = [
   conditionalFormatConfigs,
   dataValidationConfigs,
   pivotTableConfigs,
+  slicerConfigs,
 ];
 
 /** All tool configs across all hosts — for manifest generation */

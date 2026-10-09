@@ -248,6 +248,75 @@ async function testPptTools(): Promise<void> {
     return `Expected structured result with text and slides, got: ${s.substring(0, 100)}`;
   });
 
+  // 1b. get_presentation_overview:slide_size — the reported size must match what
+  // PowerPoint itself returns via pageSetup, or be explicitly marked unavailable.
+  {
+    const label = 'get_presentation_overview:slide_size';
+    try {
+      const pageSetupSupported = Office.context.requirements.isSetSupported(
+        'PowerPointApi',
+        '1.10'
+      );
+      let hostW = 0;
+      let hostH = 0;
+      if (pageSetupSupported) {
+        await PowerPoint.run(async context => {
+          const ps = context.presentation.pageSetup;
+          ps.load('slideWidth,slideHeight');
+          await context.sync();
+          hostW = ps.slideWidth;
+          hostH = ps.slideHeight;
+        });
+      }
+      addTestResult(
+        testValues,
+        'SlideSizeFromHost',
+        pageSetupSupported
+          ? `${String(hostW)}x${String(hostH)}pt`
+          : 'PowerPointApi 1.10 unsupported',
+        'info'
+      );
+      const r = await callTool(powerPointConfigs, 'get_presentation_overview', {});
+      const text = r && typeof r === 'object' ? (r as { text: string }).text : safeString(r);
+      const sizeLine = text.split('\n').find(l => l.startsWith('Slide size:')) ?? '';
+      if (!pageSetupSupported) {
+        if (sizeLine.includes('unavailable')) pass(label);
+        else fail(label, `Host lacks PowerPointApi 1.10 but tool claimed a size: ${sizeLine}`);
+      } else {
+        const expected = `${(hostW / 72).toFixed(2)}" wide × ${(hostH / 72).toFixed(2)}" tall`;
+        if (!sizeLine.includes(expected) || !sizeLine.includes('reported by PowerPoint')) {
+          fail(
+            label,
+            `Expected "${expected}" in size line, got: ${sizeLine || text.substring(0, 150)}`
+          );
+        } else {
+          // Prove the size is read live, not a default: switch to 4:3, check, restore.
+          const setSize = (w: number, h: number): Promise<void> =>
+            PowerPoint.run(async context => {
+              const ps = context.presentation.pageSetup;
+              ps.slideWidth = w;
+              ps.slideHeight = h;
+              await context.sync();
+            });
+          let resized = '';
+          try {
+            await setSize(720, 540);
+            const r2 = await callTool(powerPointConfigs, 'get_presentation_overview', {});
+            const t2 =
+              r2 && typeof r2 === 'object' ? (r2 as { text: string }).text : safeString(r2);
+            resized = t2.split('\n').find(l => l.startsWith('Slide size:')) ?? '';
+          } finally {
+            await setSize(hostW, hostH);
+          }
+          if (resized.includes('10.00" wide × 7.50" tall')) pass(label);
+          else fail(label, `After resizing to 4:3 expected 10.00" × 7.50", got: ${resized}`);
+        }
+      }
+    } catch (error) {
+      fail(label, String(error));
+    }
+  }
+
   // 2. get_presentation_content (all slides)
   await runTool(powerPointConfigs, 'get_presentation_content', {}, r => {
     const s = safeString(r);
@@ -602,6 +671,68 @@ async function testPptTools(): Promise<void> {
     log('  ⚠ group_shapes: skipped — could not locate test shapes');
     addTestResult(testValues, 'group_shapes', 'conditional_pass', 'pass');
     addTestResult(testValues, 'ungroup_shapes', 'conditional_pass', 'pass');
+  }
+
+  await testSelectedShapes();
+}
+
+// get_selected_shapes: select a known shape for real, then check the tool reports its
+// slide index, shape index, ID, name, and exact bounds in inches.
+async function testSelectedShapes(): Promise<void> {
+  const label = 'get_selected_shapes';
+  if (!Office.context.requirements.isSetSupported('PowerPointApi', '1.5')) {
+    try {
+      await callTool(powerPointConfigs, label, {});
+      fail(label, 'Host lacks PowerPointApi 1.5 but the tool did not report it as unsupported');
+    } catch (error) {
+      if (String(error).includes('PowerPointApi 1.5')) pass(label);
+      else fail(label, `Unexpected error: ${String(error)}`);
+    }
+    return;
+  }
+
+  try {
+    let shapeId = '';
+    let shapeIndex = -1;
+    await PowerPoint.run(async context => {
+      const slides = context.presentation.slides;
+      slides.load('items');
+      await context.sync();
+      const slide = slides.items[0];
+      const shape = slide.shapes.addGeometricShape(PowerPoint.GeometricShapeType.rectangle, {
+        left: 72,
+        top: 108,
+        width: 144,
+        height: 72,
+      });
+      shape.name = 'SelectionTestShape';
+      shape.load('id');
+      await context.sync();
+      shapeId = shape.id;
+
+      slide.shapes.load('items/id');
+      await context.sync();
+      shapeIndex = slide.shapes.items.findIndex(s => s.id === shapeId);
+
+      context.presentation.setSelectedSlides([slide.id]);
+      slide.setSelectedShapes([shapeId]);
+      await context.sync();
+    });
+
+    const s = safeString(await callTool(powerPointConfigs, label, {}));
+    const expectedParts = [
+      '1 selected shape(s)',
+      `slideIndex 0, shapeIndex ${String(shapeIndex)}`,
+      `id:${shapeId}`,
+      '"SelectionTestShape"',
+      'x:1.00" y:1.50" w:2.00" h:1.00"',
+      'Slide size:',
+    ];
+    const missing = expectedParts.filter(p => !s.includes(p));
+    if (missing.length === 0) pass(label);
+    else fail(label, `Missing ${missing.join(', ')} in: ${s.substring(0, 200)}`);
+  } catch (error) {
+    fail(label, String(error));
   }
 }
 

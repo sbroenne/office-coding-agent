@@ -58,6 +58,55 @@ export const tableConfigs: readonly ToolConfig[] = [
       ascending: { type: 'boolean', required: false, description: 'Ascending sort. Default true.' },
       // filter
       filterValues: { type: 'string[]', required: false, description: 'Values to show (filter).' },
+      filterType: {
+        type: 'string',
+        required: false,
+        enum: ['values', 'custom', 'dynamic'],
+        description:
+          'Filter mode. Default values. custom supports comparisons and wildcards; dynamic supports relative dates and averages.',
+      },
+      criteria1: {
+        type: 'string',
+        required: false,
+        description:
+          'First custom criterion, e.g. ">10000", "=North*", or ">=46023" for an Excel date serial.',
+      },
+      criteria2: {
+        type: 'string',
+        required: false,
+        description: 'Optional second custom criterion, e.g. "<=20000".',
+      },
+      filterOperator: {
+        type: 'string',
+        required: false,
+        enum: ['And', 'Or'],
+        description: 'How to combine two custom criteria. Default And.',
+      },
+      dynamicCriteria: {
+        type: 'string',
+        required: false,
+        enum: [
+          'AboveAverage',
+          'BelowAverage',
+          'Today',
+          'Tomorrow',
+          'Yesterday',
+          'ThisWeek',
+          'LastWeek',
+          'NextWeek',
+          'ThisMonth',
+          'LastMonth',
+          'NextMonth',
+          'ThisQuarter',
+          'LastQuarter',
+          'NextQuarter',
+          'ThisYear',
+          'LastYear',
+          'NextYear',
+          'YearToDate',
+        ],
+        description: 'Dynamic filter criterion; date filters require real Excel dates, not text.',
+      },
       // add_column
       columnName: {
         type: 'string',
@@ -178,11 +227,99 @@ export const tableConfigs: readonly ToolConfig[] = [
 
       if (action === 'filter') {
         const col = args.column as number;
-        const values = args.filterValues as string[];
-        table.columns.getItemAt(col).filter.applyValuesFilter(values);
+        if (!Number.isInteger(col) || col < 0)
+          throw new Error('filter requires a nonnegative integer column.');
+        const filterType = args.filterType ?? 'values';
+        const filter = table.columns.getItemAt(col).filter;
+        if (filterType === 'values') {
+          if (
+            !Array.isArray(args.filterValues) ||
+            args.filterValues.length === 0 ||
+            !args.filterValues.every(v => typeof v === 'string')
+          ) {
+            throw new Error(
+              'values filter requires a nonempty filterValues array. Use clear_filters to remove filters.'
+            );
+          }
+          if (
+            args.criteria1 !== undefined ||
+            args.criteria2 !== undefined ||
+            args.dynamicCriteria !== undefined ||
+            args.filterOperator !== undefined
+          ) {
+            throw new Error('values filter does not accept custom or dynamic criteria.');
+          }
+          filter.applyValuesFilter(args.filterValues);
+        } else if (filterType === 'custom') {
+          if (
+            typeof args.criteria1 !== 'string' ||
+            !args.criteria1.trim() ||
+            (args.criteria2 !== undefined &&
+              (typeof args.criteria2 !== 'string' || !args.criteria2.trim()))
+          ) {
+            throw new Error('custom filter requires criteria1 and an optional nonempty criteria2.');
+          }
+          if (args.filterValues !== undefined || args.dynamicCriteria !== undefined)
+            throw new Error('custom filter does not accept value or dynamic criteria.');
+          if (
+            args.filterOperator !== undefined &&
+            args.filterOperator !== 'And' &&
+            args.filterOperator !== 'Or'
+          )
+            throw new Error('filterOperator must be And or Or.');
+          if (args.filterOperator !== undefined && args.criteria2 === undefined)
+            throw new Error('filterOperator requires criteria2.');
+          filter.applyCustomFilter(
+            args.criteria1,
+            args.criteria2 as string | undefined,
+            (args.filterOperator ?? 'And') as 'And' | 'Or'
+          );
+        } else if (filterType === 'dynamic') {
+          if (
+            args.filterValues !== undefined ||
+            args.criteria1 !== undefined ||
+            args.criteria2 !== undefined ||
+            args.filterOperator !== undefined
+          )
+            throw new Error('dynamic filter does not accept value or custom criteria.');
+          const allowed = [
+            'AboveAverage',
+            'BelowAverage',
+            'Today',
+            'Tomorrow',
+            'Yesterday',
+            'ThisWeek',
+            'LastWeek',
+            'NextWeek',
+            'ThisMonth',
+            'LastMonth',
+            'NextMonth',
+            'ThisQuarter',
+            'LastQuarter',
+            'NextQuarter',
+            'ThisYear',
+            'LastYear',
+            'NextYear',
+            'YearToDate',
+          ] as const;
+          const criterion = allowed.find(value => value === args.dynamicCriteria);
+          if (!criterion) throw new Error('dynamic filter requires a supported dynamicCriteria.');
+          filter.applyDynamicFilter(criterion);
+        } else {
+          throw new Error('filterType must be values, custom, or dynamic.');
+        }
         table.load('name');
         await context.sync();
-        return { tableName: table.name, filteredColumn: col, filterValues: values };
+        return {
+          tableName: table.name,
+          filteredColumn: col,
+          filterType,
+          filterValues: args.filterValues,
+          criteria1: args.criteria1,
+          criteria2: args.criteria2,
+          filterOperator: filterType === 'custom' ? (args.filterOperator ?? 'And') : undefined,
+          dynamicCriteria: args.dynamicCriteria,
+        };
       }
 
       if (action === 'clear_filters') {

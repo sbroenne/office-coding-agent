@@ -69,9 +69,9 @@ Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is r
 
 ### 📊 Office Host Tools
 
-- **10 Excel tool groups** — range, table, chart, sheet, workbook, comment, conditional format, data validation, pivot table, range format — covering ~83 actions
-- **24 PowerPoint tools** — slides, shapes, text, images, tables, charts, notes, layouts; includes visual QA with `get_slide_image` region cropping for overflow detection
-- **35 Word tools** — documents, paragraphs, tables, images, headers/footers, styles, comments, sections, fields, content controls
+- **Excel tools** — ranges, tables, charts, sheets, workbooks, comments, conditional formatting, validation, PivotTables, formatting, and slicers. Table filters support value lists, numeric/text conditions, and relative dates. Slicers support table and PivotTable sources, item selection, appearance, clearing, and deletion (ExcelApi 1.10).
+- **PowerPoint tools** — slides, shapes, text, images, tables, charts, notes, layouts, actual page dimensions where supported, and selected-shape inspection; includes visual QA with `get_slide_image` region cropping for overflow detection.
+- **Word tools** — documents, paragraphs, tables, images, headers/footers, styles, comments, sections, fields, content controls, targeted section editing, and tracked-change review. Targeted edits require matching current content; revision decisions require a matching review snapshot.
 - **22 Outlook tools** — emails, calendar, contacts, folders, attachments, categories, search, flags, drafts
 - **Host-routed tools** — the correct toolset is selected automatically based on the current Office host
 - **Web fetch tool** — proxied through the local server to avoid CORS restrictions
@@ -296,7 +296,7 @@ BrowserCopilotSession.query({ prompt, tools })
       ↓ SessionEvent stream
 assistant.message_delta / tool.* / session.idle
       ↓
-ThreadMessage[] → useExternalStoreRuntime
+ChatMessage[] → React message components
       ↓ wss://localhost:3000/api/copilot
 src/server.mjs (Express HTTPS, port 3000)
 src/copilotProxy.mjs → @github/copilot-sdk → GitHub Copilot API
@@ -318,7 +318,7 @@ Copilot CLI plugins are installed into the user's normal CLI config and consumed
 
 #### Copilot CLI Plugins
 
-Office Coding Agent ensures these required marketplace plugins at startup:
+On every local server startup, it refreshes the marketplace, installs missing Office plugins, and updates installed Office plugins before accepting chats. It does not check continuously while running. After plugin fixes are merged into [office-coding-agent-plugins](https://github.com/sbroenne/office-coding-agent-plugins), restart the local server to pick them up; refreshing only the task pane is not enough. A plugin-only update does not require a new add-in release.
 
 ```bash
 # Registered automatically when missing
@@ -331,7 +331,11 @@ copilot plugin install office-word@office-coding-agent
 copilot plugin install office-outlook@office-coding-agent
 
 # Updated automatically on startup
+copilot plugin marketplace update office-coding-agent
 copilot plugin update office-excel@office-coding-agent
+copilot plugin update office-powerpoint@office-coding-agent
+copilot plugin update office-word@office-coding-agent
+copilot plugin update office-outlook@office-coding-agent
 ```
 
 For user-created plugins, use the Copilot CLI directly:
@@ -343,6 +347,8 @@ copilot plugin update <plugin-name@marketplace-name>
 copilot plugin uninstall <plugin-name>
 ```
 
+Plugin update failures are logged in the local server terminal. Startup continues after a failed update, so check that output if an agent or skill is missing or appears outdated.
+
 See GitHub's current docs for plugin structure, local plugin creation, and marketplace publishing:
 
 - [About Copilot CLI plugins](https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-cli-plugins)
@@ -350,7 +356,9 @@ See GitHub's current docs for plugin structure, local plugin creation, and marke
 
 #### MCP Servers
 
-MCP servers are also CLI-owned. The add-in does not ship or merge a separate MCP registry. The local proxy serves `/api/mcp-servers` from `copilot mcp list --json`, and `useOfficeChat` uses the same data for SDK session creation.
+External MCP servers come from CLI configuration and installed plugin manifests. The proxy combines both sources, keeping execution settings and credentials server-side. `/api/mcp-servers` provides display summaries for the task pane's picker, and the proxy resolves enabled servers when creating an SDK session.
+
+Built-in Office tools are not MCP servers. They are registered directly with the Copilot SDK for the current Office host. Each tool's operation and arguments are hand-written in configuration; shared factories generate the SDK definitions and execution wrappers. Tool calls travel back to the task pane, where Office.js accesses the active document. Only supported operations are exposed, not the entire Office.js API. Plugins provide agent and skill guidance rather than the built-in Office tool implementation.
 
 The proxy completes Office plugin setup and loads MCP settings before announcing that it is ready. This keeps plugin updates from competing with new chats and ensures newly installed agents are available to the SDK. Concurrent requests share one CLI lookup, and successful results are reused for up to 30 seconds to avoid launching duplicate CLI processes during chat startup. Terminal configuration changes appear after that cache expires.
 
@@ -371,11 +379,11 @@ Agents are CLI-owned. The add-in no longer ships `src/agents/*/AGENT.md` and no 
 
 ### Key Hooks and Components
 
-- **`useOfficeChat`** — creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, maps `SessionEvent` stream to `ThreadMessage[]` for `useExternalStoreRuntime`
+- **`useOfficeChat`** — creates a `WebSocketCopilotClient`, opens a `BrowserCopilotSession`, and maps the `SessionEvent` stream to `ChatMessage[]` for the React message components
 - **`BrowserCopilotSession.query()`** — async generator yielding `SessionEvent` objects (assistant.message_delta, tool.execution_start, session.idle, etc.)
-- **`getToolsForHost(host)`** — returns `Tool[]` (Copilot SDK format) for the current Office host (Excel: ~83 tools, PowerPoint: 24, Word: 35, Outlook: 22)
+- **`getToolsForHost(host)`** — returns built-in `Tool[]` definitions in Copilot SDK format for the current Office host, plus shared management tools. Excel uses consolidated tools with action arguments; other hosts have their own tool definitions.
 
-State is minimal: `useSettingsStore` (Zustand) persists model, skill, and MCP enablement; chat and MCP runtime auth/status state are ephemeral.
+State is minimal: `useSettingsStore` (Zustand) persists the model, selected CLI agent name, and MCP enablement; chat and MCP runtime auth/status state are ephemeral.
 
 ## UI Layout
 

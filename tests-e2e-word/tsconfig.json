@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "..",
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
@@ -13,15 +13,14 @@
     "lib": ["ES2022", "DOM"],
     "types": ["mocha", "node", "office-js"],
     "jsx": "react-jsx",
-    "baseUrl": "..",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["../src/*"]
     }
   },
   "ts-node": {
     "compilerOptions": {
-      "module": "commonjs",
-      "moduleResolution": "node"
+      "module": "ESNext",
+      "moduleResolution": "bundler"
     }
   },
   "include": ["**/*.ts"],

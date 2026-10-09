@@ -138,6 +138,8 @@ copilot mcp list
 
 The task pane no longer imports agent/skill ZIP files or owns a separate MCP registry. Agents, skills, prompts, MCP servers, and plugin updates are owned by the Copilot CLI. On startup, the proxy automatically registers the Office Coding Agent marketplace when missing and ensures the required `office-excel`, `office-powerpoint`, `office-word`, and `office-outlook` plugins are installed and updated.
 
+This setup finishes before the server accepts chats. Updates run on server startup, not continuously or when the task pane reloads. Restart the local server after plugin fixes are merged to receive them; plugin-only changes do not require a new add-in release. Check the server terminal for update errors, which are logged without preventing startup.
+
 ## Troubleshooting
 
 - **Add-in not visible in Shared Folder**
