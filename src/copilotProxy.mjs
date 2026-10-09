@@ -481,6 +481,7 @@ async function handleConnection(ws) {
               throw error;
             }
           }
+          await session.rpc.mode.set({ mode: 'interactive' });
         } catch (err) {
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
@@ -720,6 +721,12 @@ async function handleConnection(ws) {
         }
         try {
           await session.rpc.mode.set({ mode });
+          const appliedMode = await session.rpc.mode.get();
+          if (appliedMode !== mode) {
+            throw new Error(
+              `Conversation mode did not change to '${mode}' (current: '${appliedMode}').`
+            );
+          }
           sendResponse(id, {});
         } catch (err) {
           console.error(`[proxy] session.mode.set failed:`, err);

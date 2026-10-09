@@ -381,8 +381,11 @@ State is minimal: `useSettingsStore` (Zustand) persists model, skill, and MCP en
 
 The task pane is organized into three areas:
 
-- **ChatHeader** — Session History picker, Copilot CLI plugin help link, Permissions button, and New Conversation action
-- **ChatPanel** — thread/message stream, inline thinking indicator, composer, slash completions, and input toolbar with ModelPicker and MCP picker
+- **ChatHeader** — Session History picker, plugin-management documentation link (install, update, and remove plugins using Copilot CLI in the terminal), Permissions button, and New Conversation action
+- **ChatPanel** — thread/message stream, inline thinking indicator, composer, slash completions, and input toolbar with AgentPicker, ModelPicker, and MCP picker. The Agent picker shows the current host's Office agent by default; compact controls wrap in narrow task panes instead of clipping.
+
+New conversations start in **Interactive** mode. The conversation mode picker offers **Interactive**, **Plan**, and **Autopilot**. Plan prepares a plan before making changes; Autopilot continues working until the task is complete, with permission approvals still enforced. The picker shows the current mode; switching failures appear above the conversation rather than being ignored. The adjacent note icon opens the plan document.
+
 - **App** — root shell that handles Office host detection, theme sync, and connection/session/permission banners
 
 ## Authentication

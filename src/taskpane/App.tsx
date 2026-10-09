@@ -332,6 +332,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
           )}
           <ChatErrorBoundary>
             <ChatPanel
+              host={host}
               messages={messages}
               isRunning={isRunning}
               onSend={send}

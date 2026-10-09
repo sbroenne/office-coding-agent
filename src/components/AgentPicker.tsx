@@ -3,20 +3,28 @@ import * as Popover from '@radix-ui/react-popover';
 import { Codicon } from '@/components/Codicon';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores';
+import { getDefaultAgentForHost, type OfficeHostApp } from '@/services/office/host';
 
 interface AgentPickerProps {
+  host: OfficeHostApp;
   onSwitchAgent?: (agentName: string | null) => Promise<void>;
 }
 
-export const AgentPicker: React.FC<AgentPickerProps> = ({ onSwitchAgent }) => {
+export const AgentPicker: React.FC<AgentPickerProps> = ({ host, onSwitchAgent }) => {
   const [open, setOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const { activeAgentName, availableAgents, setActiveAgent } = useSettingsStore();
 
   const agents = availableAgents ?? [];
-  const activeAgent = activeAgentName ? agents.find(agent => agent.name === activeAgentName) : null;
-  const displayName = activeAgent?.displayName ?? 'Office default';
+  const defaultAgentName = getDefaultAgentForHost(host);
+  const defaultAgent = agents.find(agent => agent.name === defaultAgentName);
+  const hostLabel =
+    host === 'powerpoint' ? 'PowerPoint' : host.charAt(0).toUpperCase() + host.slice(1);
+  const defaultLabel = defaultAgent?.displayName ?? (defaultAgentName ? hostLabel : 'Default');
+  const selectedAgentName = activeAgentName ?? defaultAgentName;
+  const activeAgent = agents.find(agent => agent.name === selectedAgentName);
+  const displayName = activeAgent?.displayName ?? activeAgentName ?? defaultLabel;
 
   const selectAgent = (agentName: string | null) => {
     void (async () => {
@@ -69,12 +77,12 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onSwitchAgent }) => {
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
-          className="relative inline-flex h-7 items-center gap-1 rounded px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          className="relative inline-flex min-w-0 max-w-full h-[22px] items-center gap-1 rounded-[var(--vscode-cornerRadius-small)] px-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           aria-label="Select agent"
           title={`Agent: ${displayName}`}
         >
-          <Codicon name="robot" className="text-base" />
-          <span className="max-w-[110px] truncate text-xs">{displayName}</span>
+          <Codicon name="robot" className="shrink-0 text-base" />
+          <span className="min-w-0 max-w-[110px] truncate text-xs">{displayName}</span>
           <Codicon name="chevron-down" className="text-[12px] shrink-0 opacity-60" />
         </button>
       </Popover.Trigger>
@@ -96,9 +104,9 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onSwitchAgent }) => {
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Agents</div>
           {renderAgentOption(
             null,
-            'Office default',
-            'Use the bundled Office CLI plugin agent for this host.',
-            activeAgentName === null
+            `${defaultLabel} (default)`,
+            defaultAgent?.description ?? `Use the ${hostLabel} agent from the Office CLI plugin.`,
+            activeAgentName === null || activeAgentName === defaultAgentName
           )}
           {availableAgents === null ? (
             <div className="px-3 py-3 text-center text-xs text-muted-foreground">
@@ -109,14 +117,16 @@ export const AgentPicker: React.FC<AgentPickerProps> = ({ onSwitchAgent }) => {
               No CLI agents found.
             </div>
           ) : (
-            agents.map(agent =>
-              renderAgentOption(
-                agent.name,
-                agent.displayName,
-                agent.description.split('.')[0] || agent.description,
-                agent.name === activeAgentName
+            agents
+              .filter(agent => agent.name !== defaultAgentName)
+              .map(agent =>
+                renderAgentOption(
+                  agent.name,
+                  agent.displayName,
+                  agent.description.split('.')[0] || agent.description,
+                  agent.name === activeAgentName
+                )
               )
-            )
           )}
         </Popover.Content>
       </Popover.Portal>

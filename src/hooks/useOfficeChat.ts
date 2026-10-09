@@ -19,7 +19,7 @@ import { useMemoryStore } from '@/stores';
 import { buildSessionSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
-import type { OfficeHostApp } from '@/services/office/host';
+import { getDefaultAgentForHost, type OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
 import type { McpOAuthPromptRequest } from '@/components/McpOAuthPrompt';
 import type { PermissionRequestResult, SessionEvent } from '@github/copilot-sdk';
@@ -93,21 +93,6 @@ async function loadAvailableAgents(session: BrowserCopilotSession): Promise<void
   } catch (err) {
     console.warn('[useOfficeChat] Failed to load available agents:', err);
     useSettingsStore.getState().setAvailableAgents([]);
-  }
-}
-
-function getDefaultAgentForHost(host: OfficeHostApp): string | undefined {
-  switch (host) {
-    case 'excel':
-      return 'office-excel:excel';
-    case 'powerpoint':
-      return 'office-powerpoint:powerpoint';
-    case 'word':
-      return 'office-word:word';
-    case 'outlook':
-      return 'office-outlook:outlook';
-    default:
-      return undefined;
   }
 }
 
