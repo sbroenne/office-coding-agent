@@ -2,7 +2,7 @@ import type { PptToolConfig } from '../codegen';
 import { createPptTools } from '../codegen';
 import { renderSlideSpecToBase64 } from './slideSpec';
 
-/* global PowerPoint */
+/* global PowerPoint, Office */
 
 // ─── Internal helper (within a PowerPoint.run context — no inner runs) ────────
 async function loadSlideTexts(
@@ -43,13 +43,75 @@ async function loadSlideTexts(
   return results;
 }
 
+const PTS_PER_INCH = 72;
+
+export type SlideDimensions =
+  | { available: true; widthIn: number; heightIn: number; widthPt: number; heightPt: number }
+  | { available: false; reason: string };
+
+/**
+ * Read the real slide size from `presentation.pageSetup` (PowerPointApi 1.10).
+ * Never guesses: when the host cannot report the size, returns `available: false`.
+ */
+export async function getSlideDimensions(
+  context: PowerPoint.RequestContext
+): Promise<SlideDimensions> {
+  const unsupported =
+    'this PowerPoint version does not support reading the slide size (requires PowerPointApi 1.10 pageSetup)';
+  if (
+    typeof Office !== 'undefined' &&
+    !Office.context?.requirements?.isSetSupported('PowerPointApi', '1.10')
+  ) {
+    return { available: false, reason: unsupported };
+  }
+  try {
+    const pageSetup = context.presentation.pageSetup;
+    pageSetup.load('slideWidth,slideHeight');
+    await context.sync();
+    const widthPt = pageSetup.slideWidth;
+    const heightPt = pageSetup.slideHeight;
+    if (
+      typeof widthPt !== 'number' ||
+      typeof heightPt !== 'number' ||
+      widthPt <= 0 ||
+      heightPt <= 0
+    ) {
+      return { available: false, reason: 'PowerPoint returned no usable slide size' };
+    }
+    return {
+      available: true,
+      widthPt,
+      heightPt,
+      widthIn: widthPt / PTS_PER_INCH,
+      heightIn: heightPt / PTS_PER_INCH,
+    };
+  } catch (error) {
+    return { available: false, reason: `${unsupported} (${String(error)})` };
+  }
+}
+
+function describeSlideDimensions(dims: SlideDimensions): string {
+  if (!dims.available) {
+    return `Slide size: unavailable — ${dims.reason}. Do not assume a size; inspect slides with get_slide_image and get_slide_shapes instead.`;
+  }
+  return `Slide size: ${dims.widthIn.toFixed(2)}" wide × ${dims.heightIn.toFixed(2)}" tall (${String(Math.round(dims.widthPt))} × ${String(Math.round(dims.heightPt))} pt), reported by PowerPoint`;
+}
+
+function formatBounds(shape: { left: number; top: number; width: number; height: number }): string {
+  const x = (shape.left / PTS_PER_INCH).toFixed(2);
+  const y = (shape.top / PTS_PER_INCH).toFixed(2);
+  const w = (shape.width / PTS_PER_INCH).toFixed(2);
+  const h = (shape.height / PTS_PER_INCH).toFixed(2);
+  return `x:${x}" y:${y}" w:${w}" h:${h}"`;
+}
+
 // ─── Tool Configs ──────────────────────────────────────────────────────────────
 
 export const powerPointConfigs: readonly PptToolConfig[] = [
   {
     name: 'get_presentation_overview',
     description:
-      "Get a full overview of the PowerPoint presentation: total slide count, a text preview of each slide's shapes, AND a PNG thumbnail image of every slide. " +
+      "Get a full overview of the PowerPoint presentation: the actual slide width and height in inches (or an explicit note when this PowerPoint version cannot report them), total slide count, a text preview of each slide's shapes, AND a PNG thumbnail image of every slide. " +
       'Call this FIRST before making any changes. The thumbnail images let you see the exact visual layout, design, and positioning of each slide — ' +
       'without them you cannot know the slide layout. Requires PowerPoint on Windows (16.0.17628+), Mac (16.85+), or PowerPoint on the web for images.',
     params: {
@@ -62,12 +124,14 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
     execute: async (context, args) => {
       const { thumbnailWidth = 600 } = args as { thumbnailWidth?: number };
 
+      const sizeLine = describeSlideDimensions(await getSlideDimensions(context));
+
       const slides = context.presentation.slides;
       slides.load('items');
       await context.sync();
 
       const slideCount = slides.items.length;
-      if (slideCount === 0) return 'Presentation has no slides.';
+      if (slideCount === 0) return `Presentation has no slides.\n${sizeLine}`;
 
       const textLines = await loadSlideTexts(slides, 0, slideCount - 1, context);
 
@@ -91,6 +155,7 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
       const overview = [
         `Presentation Overview`,
         `${'='.repeat(40)}`,
+        sizeLine,
         `Total slides: ${String(slideCount)}`,
         ``,
         ...textLines,
@@ -421,23 +486,14 @@ All colors are 6-digit hex without '#'. Elements are validated, limited in size,
         replaceSlideIndex?: number;
       };
 
-      // Read actual slide dimensions from the presentation.
-      // Default to standard 16:9 (13.33" × 7.5") if API unavailable.
-      const PTS_PER_INCH = 72;
-      let W = 13.33;
-      let H = 7.5;
-      try {
-        /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call */
-        (context.presentation as any).load('slideWidth,slideHeight');
-        await context.sync();
-        const rawW = (context.presentation as any).slideWidth as number | undefined;
-        const rawH = (context.presentation as any).slideHeight as number | undefined;
-        /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
-        if (typeof rawW === 'number' && rawW > 0) W = rawW / PTS_PER_INCH;
-        if (typeof rawH === 'number' && rawH > 0) H = rawH / PTS_PER_INCH;
-      } catch {
-        // slideWidth/slideHeight not available on this Office version — use defaults
-      }
+      // Use the real slide size when PowerPoint reports it. Otherwise validate against the
+      // standard 16:9 size and say so in the result — it is an assumption, not a measurement.
+      const dims = await getSlideDimensions(context);
+      const W = dims.available ? dims.widthIn : 13.33;
+      const H = dims.available ? dims.heightIn : 7.5;
+      const sizeNote = dims.available
+        ? ''
+        : ` Note: the slide size could not be read (${dims.reason}); elements were checked against an assumed 13.33" × 7.5" slide — verify with get_slide_image.`;
 
       const base64 = await renderSlideSpecToBase64(code, W, H);
 
@@ -484,8 +540,8 @@ All colors are 6-digit hex without '#'. Elements are validated, limited in size,
       }
 
       return replaceSlideIndex !== undefined
-        ? `Successfully replaced slide ${String(replaceSlideIndex + 1)}.`
-        : 'Successfully added new slide to the presentation.';
+        ? `Successfully replaced slide ${String(replaceSlideIndex + 1)}.${sizeNote}`
+        : `Successfully added new slide to the presentation.${sizeNote}`;
     },
   },
 
@@ -703,6 +759,101 @@ All colors are 6-digit hex without '#'. Elements are validated, limited in size,
 
       if (matches.length === 0) return 'No slides currently selected.';
       return `Selected slide(s): ${matches.map(r => `Slide ${r.index + 1} (index ${r.index})`).join(', ')}`;
+    },
+  },
+
+  {
+    name: 'get_selected_shapes',
+    description:
+      'Inspect the shape(s) the user currently has selected. For each one returns the slide index, the shape index on that slide ' +
+      '(use it with move_resize_shape, set_shape_text, update_shape_style, delete_shape), the shape ID, name, type, ' +
+      'position and size in inches, and a text preview. Also reports the slide size. ' +
+      'Use this when the user says "this shape", "the selected box", "move this", etc. Requires PowerPointApi 1.5.',
+    params: {},
+    execute: async context => {
+      if (
+        typeof Office !== 'undefined' &&
+        !Office.context?.requirements?.isSetSupported('PowerPointApi', '1.5')
+      ) {
+        throw new Error(
+          'Inspecting selected shapes is not supported in this PowerPoint version (requires PowerPointApi 1.5). ' +
+            'Ask the user which slide and shape they mean, then use get_slide_shapes.'
+        );
+      }
+
+      const selected = context.presentation.getSelectedShapes();
+      selected.load('items/id,items/name,items/type,items/left,items/top,items/width,items/height');
+      await context.sync();
+
+      const sizeLine = describeSlideDimensions(await getSlideDimensions(context));
+      if (selected.items.length === 0) {
+        return `No shapes are currently selected. Ask the user to select the shape(s) first.\n${sizeLine}`;
+      }
+
+      const allSlides = context.presentation.slides;
+      allSlides.load('items/id');
+      const parents = selected.items.map(shape => {
+        const parent = shape.getParentSlideOrNullObject();
+        parent.load('id');
+        return parent;
+      });
+      await context.sync();
+
+      const slideIndexById = new Map(allSlides.items.map((s, i) => [s.id, i]));
+
+      // Top-level shape order per parent slide, so we can report indexes usable by other tools.
+      const shapeIdsBySlide = new Map<string, string[]>();
+      const parentShapeCollections = new Map<string, PowerPoint.ShapeCollection>();
+      for (const parent of parents) {
+        if (parent.isNullObject || parentShapeCollections.has(parent.id)) continue;
+        const shapes = parent.shapes;
+        shapes.load('items/id');
+        parentShapeCollections.set(parent.id, shapes);
+      }
+      await context.sync();
+      for (const [slideId, shapes] of parentShapeCollections) {
+        shapeIdsBySlide.set(
+          slideId,
+          shapes.items.map(s => s.id)
+        );
+      }
+
+      // Text is loaded one shape at a time: shapes without a text frame (pictures, groups)
+      // fail on sync, and that must not hide the other shapes.
+      const texts: string[] = [];
+      for (const shape of selected.items) {
+        try {
+          const range = shape.textFrame.textRange;
+          range.load('text');
+          await context.sync();
+          texts.push(range.text?.trim() ?? '');
+        } catch {
+          texts.push('');
+        }
+      }
+
+      const lines = selected.items.map((shape, i) => {
+        const parent = parents[i];
+        let location = 'slide unknown';
+        if (!parent.isNullObject) {
+          const slideIndex = slideIndexById.get(parent.id);
+          const shapeIndex = shapeIdsBySlide.get(parent.id)?.indexOf(shape.id) ?? -1;
+          const slidePart =
+            slideIndex === undefined ? 'slide unknown' : `slideIndex ${String(slideIndex)}`;
+          const shapePart =
+            shapeIndex >= 0
+              ? `shapeIndex ${String(shapeIndex)}`
+              : 'shapeIndex n/a (inside a group)';
+          location = `${slidePart}, ${shapePart}`;
+        }
+        const text = texts[i];
+        const textPart = text
+          ? ` | text: "${text.length > 60 ? `${text.substring(0, 60)}\u2026` : text}"`
+          : '';
+        return `- ${location} | id:${shape.id} "${shape.name}" type:${String(shape.type)} — ${formatBounds(shape)}${textPart}`;
+      });
+
+      return `${String(selected.items.length)} selected shape(s):\n${lines.join('\n')}\n${sizeLine}`;
     },
   },
 

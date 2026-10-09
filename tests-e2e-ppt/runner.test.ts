@@ -123,6 +123,7 @@ const testServer = new CustomTestServer(port);
 
 const pptTools = [
   'get_presentation_overview',
+  'get_presentation_overview:slide_size',
   'get_presentation_content',
   'get_presentation_content:single',
   'get_presentation_content:range',
@@ -135,6 +136,7 @@ const pptTools = [
   'duplicate_slide',
   'get_slide_image',
   'clear_slide',
+  'get_selected_shapes',
 ];
 
 // ─── Helper ───────────────────────────────────────────────────────
@@ -188,6 +190,10 @@ describe('PowerPoint AI E2E Tests', function () {
     if (userAgent) {
       console.log(`User Agent: ${String(userAgent.Value)}`);
     }
+    const slideSize = results.find(v => v.Name === 'SlideSizeFromHost');
+    if (slideSize) {
+      console.log(`Slide size from host: ${String(slideSize.Value)}`);
+    }
   });
 
   after('Teardown: stop server, close PowerPoint, unregister add-in', async () => {
@@ -217,7 +223,7 @@ describe('PowerPoint AI E2E Tests', function () {
 
   // ─── Tool Tests ────────────────────────────────────────────────
 
-  describe('PowerPoint Tools (13)', () => {
+  describe(`PowerPoint Tools (${pptTools.length})`, () => {
     for (const name of pptTools) {
       it(name, () => {
         assertToolResult(name);

@@ -6,7 +6,7 @@ Create the slide described below, then verify and fix it until it looks right.
 
 ## Workflow
 
-1. Call `get_presentation_overview` to inspect presentation content. It does not return dimensions; use confirmed page dimensions from the task context or ask the user before choosing layout coordinates.
+1. Call `get_presentation_overview` to get the actual slide width and height (if it reports the size as unavailable, do not guess — keep content well inside the slide and rely on the image checks below)
 2. Create the slide with `add_slide_from_code`
 3. Call `get_slide_image(region: "full")` — overview check
 4. Call `get_slide_image(region: "bottom-left")` and `get_slide_image(region: "bottom-right")` — zoomed check

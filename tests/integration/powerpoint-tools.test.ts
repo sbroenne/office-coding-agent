@@ -36,6 +36,7 @@ const EXPECTED_TOOL_NAMES = [
   'set_slide_notes',
   'duplicate_slide',
   'get_selected_slides',
+  'get_selected_shapes',
   'get_slide_shapes',
   'get_slide_layouts',
   'delete_slide',
@@ -117,6 +118,31 @@ describe('Integration: get_presentation_overview schema', () => {
     expect(paramDef).toBeDefined();
     expect(paramDef.type).toBe('number');
     expect(paramDef.required).toBeFalsy();
+  });
+
+  it('tells the agent it reports actual slide width and height', () => {
+    const description = toolsByName.get_presentation_overview.description ?? '';
+    expect(description).toMatch(/slide width and height in inches/);
+    expect(description).toMatch(/cannot report them/);
+  });
+});
+
+// ─── get_selected_shapes ──────────────────────────────────────────────────────
+
+describe('Integration: get_selected_shapes schema', () => {
+  const schema = toolsByName.get_selected_shapes.parameters;
+
+  it('takes no arguments', () => {
+    expect(validate(schema, {})).toBe(true);
+    expect(Object.keys(configsByName.get_selected_shapes.params)).toEqual([]);
+  });
+
+  it('describes the IDs, slide context, and bounds it returns', () => {
+    const description = toolsByName.get_selected_shapes.description ?? '';
+    for (const term of ['slide index', 'shape index', 'shape ID', 'inches', 'PowerPointApi 1.5']) {
+      expect(description).toContain(term);
+    }
+    expect(description).toContain('move_resize_shape');
   });
 });
 
