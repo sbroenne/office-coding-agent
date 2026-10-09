@@ -12,7 +12,7 @@ The local proxy exposes `/api/mcp-servers` by running:
 copilot mcp list --json
 ```
 
-`useOfficeChat` fetches the same `/api/mcp-servers` data and passes enabled servers into SDK session creation. The MCP picker shows the current CLI-configured servers, lets users enable/disable servers for the Office session, and surfaces sign-in/retry/switch-account actions for authenticated remote servers.
+`useOfficeChat` fetches these display summaries and sends server selection settings to the proxy. The proxy resolves full server configuration when creating the SDK session. The MCP picker shows CLI- and plugin-configured servers, lets users enable/disable servers for the Office session, and surfaces sign-in/retry/switch-account actions for authenticated remote servers.
 
 To change what appears in the add-in, update the Copilot CLI MCP config:
 
@@ -53,5 +53,5 @@ Remote HTTP/SSE servers that require authentication use SDK-owned OAuth recovery
 | `src/server.mjs`                      | Serves `/api/mcp-servers` from the CLI config               |
 | `src/services/mcp/mcpServerConfig.ts` | Browser helper for loading CLI MCP server config            |
 | `src/components/McpPicker.tsx`        | Enables/disables CLI MCP servers and starts OAuth recovery  |
-| `src/hooks/useOfficeChat.ts`          | Passes enabled CLI MCP servers to SDK session creation      |
+| `src/hooks/useOfficeChat.ts`          | Sends MCP server selection settings to the proxy            |
 | `src/copilotProxy.mjs`                | Forwards MCP lifecycle and OAuth notifications from the SDK |
