@@ -208,6 +208,18 @@ const tableTools = [
   'set_table_style',
   'set_table_header_totals_visibility',
   'reapply_table_filters',
+  'table_filter_numeric_comparison',
+  'table_filter_numeric_between',
+  'table_filter_numeric_or',
+  'table_filter_invalid_preserves_existing',
+  'table_filter_text_wildcard',
+  'table_filter_dynamic_quarter',
+  'slicer_create_table_and_list',
+  'slicer_select_filters_actual_table',
+  'slicer_invalid_keys_preserve_selection',
+  'slicer_configure_and_clear',
+  'slicer_delete',
+  'slicer_pivot_create_select_clear_delete',
 ];
 
 const chartTools = [

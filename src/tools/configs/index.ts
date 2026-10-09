@@ -8,3 +8,4 @@ export { commentConfigs } from './comment.config';
 export { conditionalFormatConfigs } from './conditionalFormat.config';
 export { dataValidationConfigs } from './dataValidation.config';
 export { pivotTableConfigs } from './pivotTable.config';
+export { slicerConfigs } from './slicer.config';

@@ -35,7 +35,7 @@ function expectArraySchemasDeclareItems(schema: unknown, path = 'parameters'): v
 /** Look up an Excel tool by name */
 const toolsByName = Object.fromEntries(excelTools.map(t => [t.name, t]));
 
-/** All 10 consolidated tool names */
+/** All consolidated tool names */
 const ALL_TOOL_NAMES = [
   'range',
   'range_format',
@@ -47,6 +47,7 @@ const ALL_TOOL_NAMES = [
   'conditional_format',
   'data_validation',
   'pivot',
+  'slicer',
 ] as const;
 
 describe('Integration: Excel tool configs — structural', () => {
@@ -57,6 +58,67 @@ describe('Integration: Excel tool configs — structural', () => {
       expect(t.parameters).toBeDefined();
       expect(typeof t.handler).toBe('function');
     }
+  });
+
+  describe('Integration: Excel filtering and slicer schemas', () => {
+    it('accepts custom comparisons and dynamic dates while rejecting invalid modes', () => {
+      const schema = toolsByName.table.parameters;
+      expect(
+        validate(schema, {
+          action: 'filter',
+          tableName: 'Sales',
+          column: 1,
+          filterType: 'custom',
+          criteria1: '>10000',
+          criteria2: '<=20000',
+          filterOperator: 'And',
+        }).success
+      ).toBe(true);
+      expect(
+        validate(schema, {
+          action: 'filter',
+          tableName: 'Sales',
+          column: 2,
+          filterType: 'dynamic',
+          dynamicCriteria: 'ThisQuarter',
+        }).success
+      ).toBe(true);
+      expect(validate(schema, { action: 'filter', filterType: 'unsupported' }).success).toBe(false);
+      expect(
+        validate(schema, {
+          action: 'filter',
+          filterType: 'dynamic',
+          dynamicCriteria: 'NotADateFilter',
+        }).success
+      ).toBe(false);
+    });
+    it('registers slicer lifecycle, field targets and explicit item selection', () => {
+      const schema = toolsByName.slicer.parameters;
+      expect(
+        validate(schema, {
+          action: 'create',
+          sourceType: 'table',
+          sourceName: 'Sales',
+          sourceField: 'Region',
+          sheetName: 'Dashboard',
+        }).success
+      ).toBe(true);
+      expect(
+        validate(schema, {
+          action: 'create',
+          sourceType: 'pivot',
+          sourceName: 'SalesPivot',
+          sourceField: 'Region',
+        }).success
+      ).toBe(true);
+      expect(
+        validate(schema, { action: 'select_items', slicerName: 'Regions', itemKeys: ['North'] })
+          .success
+      ).toBe(true);
+      expect(validate(schema, { action: 'select_items', itemKeys: [1] }).success).toBe(false);
+      expect(validate(schema, { action: 'create', sourceType: 'range' }).success).toBe(false);
+      expect(validate(schema, { action: 'execute_code' }).success).toBe(false);
+    });
   });
 
   it('excelTools contains exactly the expected tools', () => {
