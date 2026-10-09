@@ -1,9 +1,11 @@
 import type { WordToolConfig } from '../codegen';
 import { createWordTools } from '../codegen';
+import { headingSectionRange, targetedWordConfigs } from './targetedEditing';
 
 // ΓöÇΓöÇΓöÇ Tool Configs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 export const wordConfigs: readonly WordToolConfig[] = [
+  ...targetedWordConfigs,
   {
     name: 'get_document_overview',
     description:
@@ -14,11 +16,16 @@ export const wordConfigs: readonly WordToolConfig[] = [
       body.load('text');
 
       const paragraphs = body.paragraphs;
+      const hasBuiltInStyles = Office.context.requirements.isSetSupported('WordApi', '1.3');
       paragraphs.load('items');
       await context.sync();
 
       for (const para of paragraphs.items) {
-        para.load(['text', 'style', 'isListItem']);
+        para.load(
+          hasBuiltInStyles
+            ? ['text', 'style', 'styleBuiltIn', 'isListItem']
+            : ['text', 'style', 'isListItem']
+        );
       }
       await context.sync();
 
@@ -27,10 +34,11 @@ export const wordConfigs: readonly WordToolConfig[] = [
 
       for (const para of paragraphs.items) {
         paragraphCount++;
-        const style = para.style ?? '';
-        if (style.startsWith('Heading')) {
-          const level = style.replace('Heading ', 'H');
-          headings.push(`${level}: ${para.text.trim()}`);
+        const heading = hasBuiltInStyles
+          ? /^Heading([1-9])$/.exec(para.styleBuiltIn)
+          : /^Heading ([1-9])$/.exec(para.style ?? '');
+        if (heading) {
+          headings.push(`H${heading[1]}: ${para.text.trim()}`);
         }
       }
 
@@ -66,7 +74,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
   {
     name: 'get_document_section',
     description:
-      'Get the HTML content of a specific section identified by a heading. Finds the heading by partial text match and returns the content until the next heading of the same or higher level.',
+      'Get HTML of a heading section including its heading until the next same/higher-level heading. Case-insensitive partial text must match exactly one built-in heading; ambiguous/missing headings fail. Requires WordApi 1.3.',
     params: {
       headingText: {
         type: 'string',
@@ -76,52 +84,7 @@ export const wordConfigs: readonly WordToolConfig[] = [
     execute: async (context, args) => {
       const { headingText } = args as { headingText: string };
 
-      const body = context.document.body;
-      const paragraphs = body.paragraphs;
-      paragraphs.load('items');
-      await context.sync();
-
-      for (const para of paragraphs.items) {
-        para.load(['text', 'style']);
-      }
-      await context.sync();
-
-      const headingPara = paragraphs.items.find(
-        p =>
-          p.style?.startsWith('Heading') && p.text.toLowerCase().includes(headingText.toLowerCase())
-      );
-
-      if (!headingPara) {
-        return `No heading found containing "${headingText}".`;
-      }
-
-      const headingLevel = parseInt(headingPara.style.replace('Heading ', ''), 10) || 1;
-      const range = headingPara.getRange();
-
-      const allParas = paragraphs.items;
-      const startIdx = allParas.indexOf(headingPara);
-
-      let endPara: Word.Paragraph | undefined;
-      for (let i = startIdx + 1; i < allParas.length; i++) {
-        const p = allParas[i];
-        if (p.style?.startsWith('Heading')) {
-          const level = parseInt(p.style.replace('Heading ', ''), 10) || 1;
-          if (level <= headingLevel) {
-            endPara = p;
-            break;
-          }
-        }
-      }
-
-      let sectionRange: Word.Range;
-      if (endPara) {
-        const endRange = endPara.getRange(Word.RangeLocation.start);
-        sectionRange = range.expandTo(endRange);
-      } else {
-        const bodyEnd = body.getRange(Word.RangeLocation.end);
-        sectionRange = range.expandTo(bodyEnd);
-      }
-
+      const sectionRange = await headingSectionRange(context, headingText, true, true);
       const htmlResult = sectionRange.getHtml();
       await context.sync();
       return htmlResult.value;

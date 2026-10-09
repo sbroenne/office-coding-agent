@@ -57,6 +57,13 @@ const EXPECTED_TOOL_NAMES = [
   'insert_content_control',
   'format_found_text',
   'get_sections',
+  'get_section_content',
+  'insert_content_in_section',
+  'replace_section_content',
+  'get_tracked_changes',
+  'manage_tracked_changes',
+  'get_change_tracking_mode',
+  'set_change_tracking_mode',
 ] as const;
 
 // ─── Structural ───────────────────────────────────────────────────────────────
@@ -66,6 +73,73 @@ describe('Integration: Word tool configs — structural', () => {
     const actual = wordConfigs.map(c => c.name).sort();
     const expected = [...EXPECTED_TOOL_NAMES].sort();
     expect(actual).toEqual(expected);
+  });
+
+  describe('Integration: targeted Word editing schemas', () => {
+    it('exposes heading and physical section targets on all section tools', () => {
+      for (const name of [
+        'get_section_content',
+        'insert_content_in_section',
+        'replace_section_content',
+      ]) {
+        const schema = toolsByName[name].parameters;
+        const fields =
+          name === 'get_section_content'
+            ? {}
+            : {
+                html: '<p>x</p>',
+                expectedText: 'old',
+                ...(name === 'insert_content_in_section' ? { location: 'End' } : {}),
+              };
+        expect(validate(schema, { ...fields, headingText: 'Introduction' })).toBe(true);
+        expect(validate(schema, { ...fields, sectionIndex: 0 })).toBe(true);
+        expect(validate(schema, { ...fields, sectionIndex: '0' })).toBe(false);
+        expect(validate(schema, { ...fields, headingText: 1 })).toBe(false);
+      }
+    });
+
+    it('requires content and a read-before-edit text guard for mutations', () => {
+      for (const name of ['insert_content_in_section', 'replace_section_content']) {
+        const schema = toolsByName[name].parameters;
+        expect(validate(schema, { headingText: 'Introduction', html: '<p>x</p>' })).toBe(false);
+        expect(validate(schema, { headingText: 'Introduction', expectedText: 'old' })).toBe(false);
+      }
+      const schema = toolsByName.insert_content_in_section.parameters;
+      expect(validate(schema, { headingText: 'Introduction', html: 'x', expectedText: '' })).toBe(
+        false
+      );
+      expect(
+        validate(schema, {
+          headingText: 'Introduction',
+          html: 'x',
+          expectedText: '',
+          location: 'Replace',
+        })
+      ).toBe(false);
+    });
+
+    it('requires explicit tracked-change targets, action and snapshot', () => {
+      const schema = toolsByName.manage_tracked_changes.parameters;
+      const args = { action: 'Accept', changeIndices: [0, 2], snapshot: 'snapshot' };
+      expect(validate(schema, args)).toBe(true);
+      expect(validate(schema, { ...args, action: 'Reject' })).toBe(true);
+      expect(validate(schema, { ...args, action: 'AcceptAll' })).toBe(false);
+      expect(validate(schema, { ...args, changeIndices: ['0'] })).toBe(false);
+      expect(validate(schema, { action: 'Accept', snapshot: 'snapshot' })).toBe(false);
+      expect(validate(schema, { action: 'Accept', changeIndices: [0] })).toBe(false);
+      expect(validate(schema, {})).toBe(false);
+    });
+
+    it('allows only the documented tracking modes', () => {
+      const schema = toolsByName.set_change_tracking_mode.parameters;
+      for (const mode of ['Off', 'TrackAll', 'TrackMineOnly']) {
+        expect(validate(schema, { mode })).toBe(true);
+      }
+      expect(validate(schema, {})).toBe(false);
+      expect(validate(schema, { mode: 'On' })).toBe(false);
+      expect(validate(toolsByName.get_change_tracking_mode.parameters, {})).toBe(true);
+      expect(validate(toolsByName.get_tracked_changes.parameters, {})).toBe(true);
+    });
   });
 
   it('every config has a non-empty name, description, and execute function', () => {

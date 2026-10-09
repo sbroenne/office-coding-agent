@@ -38,10 +38,11 @@ export function addTestResult(
 }
 
 /**
- * Signal close of the current Word document without saving.
- * The test runner closes Word via process kill after collecting results.
+ * Close only the test document without saving; leave other Word windows alone.
  */
 export async function closeDocument(): Promise<void> {
-  await sleep(3000);
-  // no-op: runner kills WINWORD process in the after() hook
+  await Word.run(async context => {
+    context.document.close(Word.CloseBehavior.skipSave);
+    await context.sync();
+  });
 }

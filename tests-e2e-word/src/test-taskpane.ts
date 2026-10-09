@@ -15,6 +15,7 @@
 import { sleep, addTestResult, TestResult, closeDocument } from './test-helpers';
 import { wordConfigs } from '@/tools/word/index';
 import type { WordToolConfig } from '@/tools/codegen';
+import { testTargetedEditing } from './targeted-editing-tests';
 
 /* global Office, document, Word, navigator, console, window */
 
@@ -129,7 +130,7 @@ function pass(name: string): void {
 
 function fail(name: string, error: string): void {
   log(`  ✗ ${name}: ${error}`);
-  addTestResult(testValues, name, null, 'fail', { error: error.substring(0, 200) });
+  addTestResult(testValues, name, null, 'fail', { error: error.substring(0, 2000) });
 }
 
 // ─── Tool helpers ─────────────────────────────────────────────────
@@ -454,6 +455,14 @@ if (typeof Office === 'undefined' || typeof Office.onReady !== 'function') {
 
       await setup();
       await testWordTools();
+      await testTargetedEditing(async (name, test) => {
+        try {
+          await test();
+          pass(name);
+        } catch (error) {
+          fail(name, String(error));
+        }
+      });
 
       clearTimeout(safetyTimer);
       await finishAndSend();
