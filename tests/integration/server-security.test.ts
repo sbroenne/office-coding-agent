@@ -12,6 +12,21 @@ describe('serverSecurity origin checks', () => {
   });
 
   it('trusts websocket requests from the deployed GitHub Pages origin', () => {
-    expect(isTrustedRequestOrigin('https://sbroenne.github.io', '203.0.113.10')).toBe(true);
+    expect(isTrustedRequestOrigin('https://sbroenne.github.io', '127.0.0.1')).toBe(true);
+  });
+
+  it('rejects requests from non-loopback addresses even with an allowed origin', () => {
+    expect(isTrustedRequestOrigin('https://localhost:3000', '203.0.113.10')).toBe(false);
+    expect(isTrustedRequestOrigin('https://sbroenne.github.io', '203.0.113.10')).toBe(false);
+    expect(isTrustedRequestOrigin(undefined, '203.0.113.10')).toBe(false);
+  });
+
+  it('rejects untrusted origins from loopback addresses', () => {
+    expect(isTrustedRequestOrigin('https://example.com', '127.0.0.1')).toBe(false);
+  });
+
+  it('allows local clients without an Origin header', () => {
+    expect(isTrustedRequestOrigin(undefined, '127.0.0.1')).toBe(true);
+    expect(isTrustedRequestOrigin(undefined, '::ffff:127.0.0.1')).toBe(true);
   });
 });

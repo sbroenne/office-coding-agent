@@ -19,8 +19,8 @@
 
 import * as assert from 'assert';
 import { AppType, startDebugging, stopDebugging } from 'office-addin-debugging';
-import { toOfficeApp } from 'office-addin-manifest';
-import { closeDesktopApplication } from './src/node-helpers';
+import { OfficeAddinManifest, toOfficeApp } from 'office-addin-manifest';
+import { closeDesktopApplication, maximizeTestWindow } from './src/node-helpers';
 import * as path from 'path';
 import * as https from 'https';
 import express from 'express';
@@ -241,6 +241,8 @@ const sheetTools = [
   'copy_sheet',
   'move_sheet',
   'freeze_panes',
+  'freeze_panes:inactive_sheet',
+  'freeze_panes:unfreeze',
   'protect_sheet',
   'unprotect_sheet',
   'set_sheet_visibility',
@@ -430,7 +432,7 @@ describe('Excel AI E2E Tests', function () {
     console.log(`Test server started on port ${port}`);
 
     // Build test add-in and sideload into Excel
-    const devServerCmd = 'npx vite --config ./tests-e2e/vite.config.ts';
+    const devServerCmd = 'npx vite --config ./tests-e2e/vite.config.mts';
     const options = {
       appType: AppType.Desktop,
       app: toOfficeApp(host),
@@ -441,6 +443,10 @@ describe('Excel AI E2E Tests', function () {
 
     console.log('Starting dev server and sideloading add-in...');
     await startDebugging(manifestPath, options);
+    const manifest = await OfficeAddinManifest.readManifestFile(manifestPath);
+    assert.ok(manifest.id, 'Test manifest must have an ID');
+    // Freeze panes require the boundary to fit inside the visible worksheet area.
+    await maximizeTestWindow(manifest.id);
     console.log('Add-in sideloaded');
 
     // Wait for results from the add-in running inside Excel

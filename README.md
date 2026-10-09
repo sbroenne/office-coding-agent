@@ -78,7 +78,7 @@ Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is r
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 20
+- [Node.js](https://nodejs.org/) 24.15+ (recommended), 22.22.2+, or 26+
 - Microsoft Office (Excel, PowerPoint, Word, or Outlook — desktop or Microsoft 365 web)
 - An active **GitHub Copilot** subscription (individual, business, or enterprise)
 - The `@github/copilot` CLI authenticated (`gh auth login` or equivalent)
@@ -87,7 +87,7 @@ Remote authenticated MCP servers use SDK-owned OAuth recovery. When sign-in is r
 
 **👉 See [GETTING_STARTED.md](./GETTING_STARTED.md) for full setup instructions** — including authentication, starting the proxy server, registering the add-in, and sideloading into Office.
 
-**Quick start** (requires [Node.js 20+](https://nodejs.org/), [GitHub CLI](https://cli.github.com/), and an active [GitHub Copilot](https://github.com/features/copilot) subscription):
+**Quick start** (requires [Node.js 24.15+](https://nodejs.org/) (recommended), 22.22.2+, or 26+, [GitHub CLI](https://cli.github.com/), and an active [GitHub Copilot](https://github.com/features/copilot) subscription):
 
 ```bash
 # 1. Install dependencies
@@ -178,6 +178,8 @@ Run it from the Actions tab in one step:
 | `npm run validate`                  | Validate `manifests/manifest.dev.xml`                                 |
 | `npm run validate:outlook`          | Validate `manifests/manifest.outlook.dev.xml`                         |
 
+Desktop installers unpack the local server, web assets, and dependencies alongside the Electron ASAR archive so Office certificate setup scripts and Copilot command-line helpers run from real filesystem paths.
+
 ## Testing
 
 This project uses three active test layers:
@@ -227,6 +229,7 @@ The project includes end-to-end tests across all four Office hosts: ~233 Excel t
 1. **Mocha runner** (`tests-e2e/runner.test.ts`) starts a local test server on port 4201.
 2. A separate **test add-in** is built and served on `https://localhost:3001`.
 3. The test add-in is **sideloaded into Excel Desktop** using `office-addin-debugging`.
+   On Windows, the runner maximizes only the dedicated test workbook so freeze-pane boundaries fit inside Excel's visible worksheet area.
 4. Inside Excel, `test-taskpane.ts` runs the Excel command tests and **sends results back** to the test server.
 5. The Mocha runner **receives the results** and asserts on them.
 
@@ -347,7 +350,11 @@ See GitHub's current docs for plugin structure, local plugin creation, and marke
 
 #### MCP Servers
 
-MCP servers are also CLI-owned. The add-in does not ship or merge a separate MCP registry. The local proxy serves `/api/mcp-servers` from `copilot mcp list --json`, and `useOfficeChat` uses the same data for SDK session creation. To change what appears in the MCP picker, change the CLI config:
+MCP servers are also CLI-owned. The add-in does not ship or merge a separate MCP registry. The local proxy serves `/api/mcp-servers` from `copilot mcp list --json`, and `useOfficeChat` uses the same data for SDK session creation.
+
+The proxy completes Office plugin setup and loads MCP settings before announcing that it is ready. This keeps plugin updates from competing with new chats and ensures newly installed agents are available to the SDK. Concurrent requests share one CLI lookup, and successful results are reused for up to 30 seconds to avoid launching duplicate CLI processes during chat startup. Terminal configuration changes appear after that cache expires.
+
+To change what appears in the MCP picker, change the CLI config:
 
 ```bash
 copilot mcp list
@@ -390,8 +397,8 @@ Authentication is handled entirely by the **GitHub Copilot CLI** (`@github/copil
 - **WebSocket + JSON-RPC** (`vscode-jsonrpc`, `ws`) — browser-to-proxy transport
 - **Express + HTTPS** — local proxy server with Vite dev middleware
 - **Zustand 5** — lightweight state management with `OfficeRuntime.storage` persistence
-- **Vite 7** — bundling with HMR
-- **TypeScript 5** — type safety
+- **Vite 8** — bundling with HMR
+- **TypeScript 7** — type safety
 - **Vitest** — integration testing
 - **Playwright** — browser UI testing for task pane flows
 - **Mocha** — E2E testing inside Excel Desktop (~233 tests)
@@ -424,8 +431,6 @@ The proxy server architecture (`server.mjs` → `copilotProxy.mjs` → `@github/
 - **[Vercel AI SDK](https://ai-sdk.dev/)** — Original AI runtime used in Phase 1.
 
 ## Development
-
-This project is developed with a [Squad AI team](https://github.com/bradygaster/squad) running on the Copilot CLI. Squad orchestrates collaborative development through named agents, each with specialized responsibilities. The team composition and agent configuration are stored in `.squad/` — team members include: Harmony (Lead), Ellis (PM), Dylan (Frontend), Irving (Backend), Mark (Tester), Parker (QA), Scribe, and Ralph. Contributors can review `.squad/team.md` to understand the current team structure and responsibilities.
 
 ## Community & Security
 

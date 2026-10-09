@@ -4,11 +4,100 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   getCliMcpServers,
+  getSelectedCliMcpServers,
+  getMcpServerSummaries,
   parseCopilotMcpListJson,
   parseMcpServerDocument,
 } from '@/../src/plugins/cliMcpServers.mjs';
 
 describe('CLI MCP servers', () => {
+  it('loads MCP execution settings from the local CLI by selected server name', async () => {
+    const selected = await getSelectedCliMcpServers(['workiq'], {
+      installedPluginsDir: await fs.mkdtemp(path.join(os.tmpdir(), 'oca-mcp-selection-')),
+      runCommand: async () => ({
+        success: true,
+        stdout: JSON.stringify({
+          mcpServers: {
+            workiq: {
+              type: 'stdio',
+              command: 'npx',
+              args: ['--token', 'local-secret'],
+              env: { API_KEY: 'local-secret' },
+            },
+            unused: { type: 'stdio', command: 'node', args: ['unused.js'] },
+          },
+        }),
+        stderr: '',
+        message: '',
+      }),
+    });
+
+    expect(selected.names).toEqual(['workiq']);
+    expect(selected.servers).toEqual({
+      workiq: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['--token', 'local-secret'],
+        env: { API_KEY: 'local-secret' },
+        tools: ['*'],
+      },
+    });
+  });
+
+  it('rejects names that are not present in the local CLI configuration', async () => {
+    await expect(
+      getSelectedCliMcpServers(['client-supplied'], {
+        installedPluginsDir: await fs.mkdtemp(path.join(os.tmpdir(), 'oca-mcp-selection-')),
+        runCommand: async () => ({
+          success: true,
+          stdout: JSON.stringify({ mcpServers: {} }),
+          stderr: '',
+          message: '',
+        }),
+      })
+    ).rejects.toThrow('Selected MCP server configuration is unavailable: client-supplied.');
+  });
+
+  it('returns only safe display fields in MCP server summaries', () => {
+    const summaries = getMcpServerSummaries([
+      {
+        name: 'private-local',
+        transport: 'stdio',
+        command: 'private-executable',
+        args: ['--token', 'secret'],
+        env: { API_KEY: 'secret' },
+      },
+      {
+        name: 'private-remote',
+        transport: 'http',
+        url: 'https://user:password@mcp.example.com/private/path?token=secret',
+        headers: { Authorization: 'Bearer secret' },
+      },
+    ]);
+
+    expect(summaries).toEqual([
+      {
+        name: 'private-local',
+        description: undefined,
+        transport: 'stdio',
+        oauthAlias: undefined,
+        requiresOAuth: false,
+        command: 'Local process',
+      },
+      {
+        name: 'private-remote',
+        description: undefined,
+        transport: 'http',
+        oauthAlias: undefined,
+        requiresOAuth: false,
+        url: 'https://mcp.example.com',
+      },
+    ]);
+    expect(JSON.stringify(summaries)).not.toContain('secret');
+    expect(JSON.stringify(summaries)).not.toContain('private-executable');
+    expect(JSON.stringify(summaries)).not.toContain('private/path');
+  });
+
   it('parses Copilot CLI MCP list JSON into task pane server configs', () => {
     const servers = parseCopilotMcpListJson(
       JSON.stringify({

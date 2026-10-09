@@ -12,7 +12,7 @@ import { ModelPicker } from '@/components/ModelPicker';
 import type { CopilotModel } from '@/types';
 
 const TEST_MODELS: CopilotModel[] = [
-  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+  { id: 'claude-sonnet-5.5', name: 'Claude Sonnet 5.5', provider: 'Anthropic' },
   { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
 ];
 
@@ -45,7 +45,7 @@ describe('Stale state scenarios', () => {
     it('reset restores activeModel to default', () => {
       useSettingsStore.getState().setActiveModel('gpt-4.1');
       useSettingsStore.getState().reset();
-      expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+      expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-5.5');
     });
   });
 
@@ -70,7 +70,7 @@ describe('Stale state scenarios', () => {
       useSettingsStore.getState().reset();
       renderWithProviders(<ModelPicker />);
       // Before models load, displays formatted model ID
-      expect(screen.getByText('Claude Sonnet 4.6')).toBeInTheDocument();
+      expect(screen.getByText('Claude Sonnet 5.5')).toBeInTheDocument();
     });
   });
 });

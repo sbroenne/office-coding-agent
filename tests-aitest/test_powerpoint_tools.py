@@ -92,7 +92,7 @@ class TestPowerPointToolSelection:
 
         result = await eval_run(
             agent,
-            "First call get_presentation_overview. Then use add_slide_from_code to add a new slide containing an image with this data URI: data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==. Use a simple PptxGenJS slide.addImage call with the data URI and a small image box near the top-left of the slide.",
+            "First call get_presentation_overview. Then use add_slide_from_code to add a new slide containing an image with this data URI: data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==. Send a JSON slide description with a small image element near the top-left of the slide.",
             max_turns=8,
         )
 
@@ -229,7 +229,7 @@ class TestSlideContentWriting:
         result = await eval_run(
             agent,
             "First call get_presentation_overview. Then use add_slide_from_code to add a new slide containing a "
-            "table with columns (Month, Revenue) and three rows of data, using a PptxGenJS slide.addTable call.",
+            "table with columns (Month, Revenue) and three rows of data, using a JSON table element.",
             max_turns=8,
         )
 

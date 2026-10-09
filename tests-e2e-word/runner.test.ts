@@ -165,7 +165,7 @@ describe('Word AI E2E Tests', function () {
     );
     console.log(`Test server started on port ${port}`);
 
-    const devServerCmd = 'npx vite --config ./tests-e2e-word/vite.config.ts';
+    const devServerCmd = 'npx vite --config ./tests-e2e-word/vite.config.mts';
     const options = {
       appType: AppType.Desktop,
       app: toOfficeApp(host),

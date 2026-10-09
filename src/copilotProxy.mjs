@@ -11,6 +11,7 @@
 import { WebSocketServer } from 'ws';
 import { CopilotClient } from '@github/copilot-sdk';
 import { randomUUID } from 'node:crypto';
+import { getSelectedCliMcpServers } from './plugins/cliMcpServers.mjs';
 import { isTrustedRequestOrigin } from './serverSecurity.mjs';
 import { getInstalledOfficePluginDirectories } from './plugins/cliPluginBootstrap.mjs';
 
@@ -389,21 +390,32 @@ async function handleConnection(ws) {
           sessionId,
           systemMessage: systemMessageParam,
           tools: toolDefs,
-          mcpServers,
+          mcpServerNames: requestedNamesParam,
           availableTools,
           agent,
         } = params || {};
         const systemMessage = systemMessageParam;
+        const requestedMcpServerNames = Array.isArray(requestedNamesParam)
+          ? [...new Set(requestedNamesParam)]
+          : [];
+        if (
+          requestedMcpServerNames.length > 100 ||
+          requestedMcpServerNames.some(
+            name => typeof name !== 'string' || name.length === 0 || name.length > 200
+          )
+        ) {
+          throw new Error('MCP server selection must contain up to 100 valid server names.');
+        }
         console.log(
-          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${Object.keys(mcpServers || {}).length})`
+          `[proxy] session.create requested (host=${host}, model=${model}, sessionId=${sessionId}, tools=${(toolDefs || []).length}, mcpServers=${requestedMcpServerNames.length})`
         );
         // Build SDK Tool[] with handlers that forward tool calls to the browser
-          const tools = (toolDefs || []).map(t => ({
-            name: t.name,
-            description: t.description,
-            parameters: t.parameters,
-            skipPermission: t.skipPermission !== false,
-            handler: async (args, invocation) => {
+        const tools = (toolDefs || []).map(t => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+          skipPermission: t.skipPermission !== false,
+          handler: async (args, invocation) => {
             const response = await sendRequest('tool.call', {
               sessionId: invocation.sessionId,
               toolCallId: invocation.toolCallId,
@@ -413,24 +425,23 @@ async function handleConnection(ws) {
             return response.result;
           },
         }));
-        // Emit 'starting' status for each configured MCP server
-        const mcpServerNames = Object.keys(mcpServers || {});
-        for (const name of mcpServerNames) {
-          sendNotification('mcp.status', { server: name, status: 'starting' });
-          sendNotification('mcp.log', {
-            server: name,
-            timestamp: new Date().toISOString(),
-            level: 'info',
-            message: `Connecting to MCP server '${name}'...`,
-          });
-        }
-
+        let mcpServerNames = [];
         let session;
         try {
           await ensureStarted();
+          const selectedMcp = await getSelectedCliMcpServers(requestedMcpServerNames);
+          mcpServerNames = selectedMcp.names;
+          for (const name of mcpServerNames) {
+            sendNotification('mcp.status', { server: name, status: 'starting' });
+            sendNotification('mcp.log', {
+              server: name,
+              timestamp: new Date().toISOString(),
+              level: 'info',
+              message: `Connecting to MCP server '${name}'...`,
+            });
+          }
           const pluginDirectories = officePluginDirectories();
-          const requestedAgent =
-            typeof agent === 'string' && agent.length > 0 ? agent : undefined;
+          const requestedAgent = typeof agent === 'string' && agent.length > 0 ? agent : undefined;
           // SDK >=1.0 only loads plugin-owned agents (office-excel:excel, …)
           // from explicit pluginDirectories. If an agent is requested but no
           // plugin directories were found, createSession fails with a cryptic
@@ -449,17 +460,27 @@ async function handleConnection(ws) {
             sessionId,
             systemMessage,
             tools,
-            mcpServers,
+            mcpServers: selectedMcp.servers,
             availableTools,
             pluginDirectories,
-            agent: requestedAgent,
             onPermissionRequest: async request => {
               console.log(`[proxy] permission.request received: ${request.kind}`);
               const decision = await requestPermissionDecision(session.sessionId, request);
-              console.log(`[proxy] permission.request resolved: ${request.kind} => ${decision.kind}`);
+              console.log(
+                `[proxy] permission.request resolved: ${request.kind} => ${decision.kind}`
+              );
               return decision;
             },
           });
+          if (requestedAgent) {
+            // Plugin agents are available only after the session has loaded its plugins.
+            try {
+              await session.rpc.agent.select({ name: requestedAgent });
+            } catch (error) {
+              await session.disconnect();
+              throw error;
+            }
+          }
         } catch (err) {
           // Emit error status for all MCP servers
           for (const name of mcpServerNames) {
@@ -480,6 +501,10 @@ async function handleConnection(ws) {
           break;
         }
 
+        if (ws.readyState !== ws.OPEN) {
+          await session.disconnect();
+          return;
+        }
         sessions.set(session.sessionId, session);
         currentSessionId = session.sessionId;
         if (mcpServerNames.length > 0) {
@@ -805,7 +830,10 @@ async function handleConnection(ws) {
           return;
         }
         try {
-          sendResponse(id, await session.rpc.permissions.setApproveAll({ enabled: enabled === true }));
+          sendResponse(
+            id,
+            await session.rpc.permissions.setApproveAll({ enabled: enabled === true })
+          );
         } catch (err) {
           console.error(`[proxy] permissions.setApproveAll failed:`, err);
           sendError(id, -32603, err.message || 'Failed to update approve-all setting');

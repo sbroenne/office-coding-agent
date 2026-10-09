@@ -41,7 +41,7 @@ export interface UserSettings {
 
 /** Default settings applied on first run */
 export const DEFAULT_SETTINGS: UserSettings = {
-  activeModel: 'claude-sonnet-4.6',
+  activeModel: 'claude-sonnet-5.5',
   activeAgentName: null,
   disabledMcpServerNames: [],
 };

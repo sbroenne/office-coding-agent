@@ -7,6 +7,36 @@ import * as childProcess from 'child_process';
 
 /* global process */
 
+export async function maximizeTestWindow(manifestId: string): Promise<void> {
+  if (process.platform !== 'win32') return;
+  if (!/^[0-9a-f-]{36}$/i.test(manifestId)) throw new Error('Invalid test manifest ID.');
+
+  const script = `
+    Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class TestExcelWindow { [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hwnd, int command); }'
+    for ($i = 0; $i -lt 20; $i++) {
+      $window = Get-Process EXCEL -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowTitle -like '*${manifestId}*' -and $_.MainWindowHandle -ne 0 } |
+        Select-Object -First 1
+      if ($window) {
+        if (-not [TestExcelWindow]::ShowWindowAsync($window.MainWindowHandle, 3)) {
+          throw 'Unable to maximize the Excel test workbook.'
+        }
+        exit 0
+      }
+      Start-Sleep -Seconds 1
+    }
+    throw 'The Excel test workbook window did not appear.'
+  `;
+  await new Promise<void>((resolve, reject) => {
+    childProcess.execFile(
+      'powershell',
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { timeout: 30_000 },
+      error => (error ? reject(error) : resolve())
+    );
+  });
+}
+
 /**
  * Close the Excel desktop application.
  */

@@ -333,11 +333,21 @@ async function testPptTools(): Promise<void> {
     }
   );
 
-  // 10. add_slide_from_code (hardcoded positions)
-  const simpleSlideCode = [
-    'slide.addText("E2E Test Slide", { x: 1, y: 1, w: 8, h: 1.5, fontSize: 36, bold: true });',
-    'slide.addText("Created by e2e automated tests", { x: 1, y: 3, w: 8, h: 1, fontSize: 18 });',
-  ].join('\n');
+  // 10. add_slide_from_code with a validated JSON description.
+  const simpleSlideCode = JSON.stringify({
+    elements: [
+      { type: 'text', text: 'E2E Test Slide', x: 1, y: 1, w: 8, h: 1.5, fontSize: 36, bold: true },
+      {
+        type: 'text',
+        text: 'Created by e2e automated tests',
+        x: 1,
+        y: 3,
+        w: 8,
+        h: 1,
+        fontSize: 18,
+      },
+    ],
+  });
 
   await runTool(powerPointConfigs, 'add_slide_from_code', { code: simpleSlideCode }, r => {
     const s = safeString(r);
@@ -346,13 +356,30 @@ async function testPptTools(): Promise<void> {
       : `Expected success message from add_slide_from_code, got: ${s.substring(0, 100)}`;
   });
 
-  // 10b. add_slide_from_code with W and H (tests that slide dimensions are injected)
-  const dynamicSlideCode = [
-    'if (typeof W !== "number" || W <= 0) throw new Error("W not injected or invalid: " + W);',
-    'if (typeof H !== "number" || H <= 0) throw new Error("H not injected or invalid: " + H);',
-    'slide.addText("Dynamic Layout Test", { x: 0.5, y: 0.5, w: W-1, h: 1, fontSize: 28, bold: true, shrinkText: true });',
-    'slide.addText("W=" + W.toFixed(2) + " H=" + H.toFixed(2), { x: 0.5, y: 2, w: W-1, h: H-3, fontSize: 16, shrinkText: true });',
-  ].join('\n');
+  // 10b. Add a second slide using safe in-bounds coordinates for common layouts.
+  const dynamicSlideCode = JSON.stringify({
+    elements: [
+      {
+        type: 'text',
+        text: 'Validated JSON Layout',
+        x: 0.5,
+        y: 0.5,
+        w: 8.5,
+        h: 1,
+        fontSize: 28,
+        bold: true,
+      },
+      {
+        type: 'text',
+        text: 'All content stays inside the slide.',
+        x: 0.5,
+        y: 2,
+        w: 8.5,
+        h: 3,
+        fontSize: 16,
+      },
+    ],
+  });
 
   await runTool(powerPointConfigs, 'add_slide_from_code', { code: dynamicSlideCode }, r => {
     const s = safeString(r);
@@ -381,26 +408,21 @@ async function testPptTools(): Promise<void> {
   });
 
   // 12. get_slide_image
-  await runTool(
-    powerPointConfigs,
-    'get_slide_image',
-    { slideIndex: 0, width: 400 },
-    r => {
-      const s = safeString(r);
-      // Detect the "not available" fallback message — this means the API call
-      // is broken (e.g. wrong argument shape), not that the version is old.
-      if (s.includes('not available in this version')) {
-        return (
-          'get_slide_image returned "not available" error — ' +
-          'getImageAsBase64 may be called with wrong arguments (number instead of options object)'
-        );
-      }
-      if (s.includes('data:image') || s.includes('base64')) {
-        return null;
-      }
-      return `Expected base64 image data, got: ${s.substring(0, 100)}`;
+  await runTool(powerPointConfigs, 'get_slide_image', { slideIndex: 0, width: 400 }, r => {
+    const s = safeString(r);
+    // Detect the "not available" fallback message — this means the API call
+    // is broken (e.g. wrong argument shape), not that the version is old.
+    if (s.includes('not available in this version')) {
+      return (
+        'get_slide_image returned "not available" error — ' +
+        'getImageAsBase64 may be called with wrong arguments (number instead of options object)'
+      );
     }
-  );
+    if (s.includes('data:image') || s.includes('base64')) {
+      return null;
+    }
+    return `Expected base64 image data, got: ${s.substring(0, 100)}`;
+  });
 
   // 13. clear_slide (clear the last slide added by add_slide_from_code/duplicate)
   let currentSlideCount = 0;
@@ -460,14 +482,36 @@ async function testPptTools(): Promise<void> {
   await runTool(
     powerPointConfigs,
     'add_geometric_shape',
-    { slideIndex: 0, shapeType: 'rectangle', left: 1, top: 4, width: 1.5, height: 1, name: 'GroupTestA' },
-    r => (safeString(r).includes('slide') ? null : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`)
+    {
+      slideIndex: 0,
+      shapeType: 'rectangle',
+      left: 1,
+      top: 4,
+      width: 1.5,
+      height: 1,
+      name: 'GroupTestA',
+    },
+    r =>
+      safeString(r).includes('slide')
+        ? null
+        : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`
   );
   await runTool(
     powerPointConfigs,
     'add_geometric_shape',
-    { slideIndex: 0, shapeType: 'ellipse', left: 3, top: 4, width: 1.5, height: 1, name: 'GroupTestB' },
-    r => (safeString(r).includes('slide') ? null : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`)
+    {
+      slideIndex: 0,
+      shapeType: 'ellipse',
+      left: 3,
+      top: 4,
+      width: 1.5,
+      height: 1,
+      name: 'GroupTestB',
+    },
+    r =>
+      safeString(r).includes('slide')
+        ? null
+        : `Expected success from add_geometric_shape: ${safeString(r).substring(0, 80)}`
   );
 
   // Get shape indices for the two new shapes

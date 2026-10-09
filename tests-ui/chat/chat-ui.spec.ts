@@ -53,7 +53,9 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'MCP servers' })).toBeVisible();
   });
 
-  test('MCP servers popover matches the Copilot CLI config', async ({ configuredTaskpane: page }) => {
+  test('MCP servers popover matches the Copilot CLI config', async ({
+    configuredTaskpane: page,
+  }) => {
     const cliServerNames = getCliMcpServerNames();
 
     await page.getByRole('button', { name: 'MCP servers' }).click();
@@ -72,8 +74,7 @@ test.describe('Chat UI (configured state)', () => {
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
-    // The model picker shows the active model name (default: Claude Sonnet 4)
-    await expect(page.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Claude Sonnet 5.5')).toBeVisible({ timeout: 5000 });
   });
 
   test('displays the CLI-backed agent picker', async ({ configuredTaskpane: page }) => {
@@ -111,7 +112,12 @@ test.describe('Chat UI (configured state)', () => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
     await composer.fill('/exc');
     await expect(page.getByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
-    await expect(page.getByRole('option').filter({ hasText: /\/excel/i }).first()).toBeVisible();
+    await expect(
+      page
+        .getByRole('option')
+        .filter({ hasText: /\/excel/i })
+        .first()
+    ).toBeVisible();
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({

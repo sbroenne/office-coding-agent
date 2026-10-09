@@ -34,12 +34,13 @@ function getRuntimeState(
 
 function needsOAuthAction(server: McpServerConfig, state?: McpServerState): boolean {
   if (server.transport !== 'http' && server.transport !== 'sse') return false;
+  if (server.requiresOAuth === false) return false;
   if (server.headers?.Authorization) return false;
   const isRemoteHttpServer =
     typeof server.url === 'string' &&
     !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::|\/|$)/i.test(server.url);
   return (
-    isRemoteHttpServer ||
+    (server.requiresOAuth ?? isRemoteHttpServer) ||
     state?.status === 'needs-auth' ||
     state?.status === 'failed' ||
     state?.status === 'error' ||
@@ -85,7 +86,7 @@ function getStatusText(state?: McpServerState, server?: McpServerConfig): string
   if (
     server &&
     (server.transport === 'http' || server.transport === 'sse') &&
-    !server.headers?.Authorization &&
+    server.requiresOAuth !== false &&
     typeof server.url === 'string' &&
     !/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::|\/|$)/i.test(server.url)
   ) {

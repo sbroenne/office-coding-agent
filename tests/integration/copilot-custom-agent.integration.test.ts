@@ -10,9 +10,6 @@
 
 import { describe, it, expect } from 'vitest';
 import WS from 'ws';
-import { writeFile, unlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { SystemMessageConfig } from '@github/copilot-sdk';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { buildSessionSystemPrompt, buildSystemPrompt } from '@/services/ai/systemPrompt';
@@ -28,8 +25,6 @@ global.WebSocket = class PatchedWebSocket extends WS {
     });
   }
 } as unknown as typeof WebSocket;
-
-
 
 describe('Copilot custom agent integration', () => {
   it(
@@ -129,7 +124,11 @@ describe('Copilot custom agent integration', () => {
 
       const client = await createWebSocketClient(SERVER_URL);
       try {
-        const session = await client.createSession({ host: 'excel', systemMessage });
+        const session = await client.createSession({
+          host: 'excel',
+          systemMessage,
+          agent: 'office-excel:excel',
+        });
 
         let fullText = '';
         for await (const event of session.query({
@@ -224,15 +223,15 @@ describe('Copilot custom agent integration', () => {
   );
 
   it(
-    'report_intent events are emitted during tool-calling turns',
+    'tool progress and any intent events are forwarded during tool-calling turns',
     async () => {
       const client = await createWebSocketClient(SERVER_URL);
       try {
         const session = await client.createSession({
           systemMessage: {
-            mode: 'replace',
+            mode: 'append',
             content:
-              'You must call the echo tool with the text "hello". Always report your intent before acting.',
+              'You must report your intent before acting, then call the echo tool with the text "hello".',
           },
           tools: [
             {
@@ -256,148 +255,45 @@ describe('Copilot custom agent integration', () => {
 
         const intentTexts: string[] = [];
         const eventTypes: string[] = [];
+        const echoCallIds: string[] = [];
+        const completedCallIds: string[] = [];
 
         for await (const event of session.query({
           prompt: 'Please call the echo tool with "hello".',
         })) {
           eventTypes.push(event.type);
-          // Capture report_intent tool calls (before they're filtered by the hook)
-          if (event.type === 'tool.execution_start') {
+          if (event.type === 'assistant.intent') {
+            intentTexts.push(event.data.intent);
+          } else if (event.type === 'tool.execution_start') {
+            if (event.data.toolName === 'echo') {
+              expect(event.data.arguments).toEqual({ text: 'hello' });
+              expect(event.data.toolCallId).not.toBe('');
+              echoCallIds.push(event.data.toolCallId);
+            }
             const data = event.data as { toolName: string; arguments?: Record<string, unknown> };
             if (data.toolName === 'report_intent' && typeof data.arguments?.intent === 'string') {
               intentTexts.push(data.arguments.intent);
             }
+          } else if (event.type === 'tool.execution_complete') {
+            completedCallIds.push(event.data.toolCallId);
           }
           if (event.type === 'session.idle') break;
         }
 
-        // report_intent should fire at least once during a tool-calling turn
-        expect(intentTexts.length).toBeGreaterThanOrEqual(1);
-        // Intent text should be a non-empty descriptive string
-        expect(intentTexts[0].length).toBeGreaterThan(0);
+        expect(eventTypes).toContain('tool.execution_start');
+        expect(eventTypes).toContain('session.idle');
+        expect(echoCallIds.length).toBeGreaterThanOrEqual(1);
+        for (const callId of echoCallIds) {
+          expect(completedCallIds).toContain(callId);
+        }
+        // Intent narration is optional in newer CLI versions.
+        for (const intent of intentTexts) {
+          expect(intent.trim().length).toBeGreaterThan(0);
+        }
       } finally {
         await client.stop();
       }
     },
     TIMEOUT_MS
   );
-
-  it(
-    'mcpServers: stdio MCP server tools are callable and results reach the model',
-    async () => {
-      // This test verifies the full stdio MCP pipeline end-to-end:
-      //   1. We write a minimal stdio MCP server script to a temp file
-      //   2. Pass it as mcpServers to createSession (command: 'node', args: [script])
-      //   3. The proxy forwards it to the SDK which spawns the stdio process
-      //   4. The model discovers and calls the `get_secret_word` tool
-      //   5. The tool returns a unique sentinel value — we verify it appears in the response
-      //
-      // The MCP server uses the MCP stdio protocol (JSON-RPC over stdin/stdout).
-      // It implements the minimal subset: initialize + tools/list + tools/call.
-      const SECRET_WORD = 'XYZZY_COPILOT_MCP_SENTINEL_42';
-
-      // Minimal stdio MCP server: responds to initialize, tools/list, and tools/call
-      const mcpServerScript = `
-const readline = require('readline');
-const rl = readline.createInterface({ input: process.stdin, terminal: false });
-
-function send(obj) {
-  const msg = JSON.stringify(obj);
-  process.stdout.write('Content-Length: ' + Buffer.byteLength(msg) + '\\r\\n\\r\\n' + msg);
-}
-
-function sendPlain(obj) {
-  process.stdout.write(JSON.stringify(obj) + '\\n');
-}
-
-// Buffer partial input
-let buffer = '';
-rl.on('line', (line) => {
-  buffer += line;
-  // Try to parse accumulated buffer as JSON
-  try {
-    const req = JSON.parse(buffer);
-    buffer = '';
-    handleRequest(req);
-  } catch {
-    // Not complete yet — keep buffering
-  }
-});
-
-function handleRequest(req) {
-  if (req.method === 'initialize') {
-    sendPlain({ jsonrpc: '2.0', id: req.id, result: {
-      protocolVersion: '2024-11-05',
-      capabilities: { tools: {} },
-      serverInfo: { name: 'test-mcp-server', version: '1.0.0' }
-    }});
-  } else if (req.method === 'notifications/initialized') {
-    // no-op notification
-  } else if (req.method === 'tools/list') {
-    sendPlain({ jsonrpc: '2.0', id: req.id, result: { tools: [{
-      name: 'get_secret_word',
-      description: 'Returns the secret word for this session.',
-      inputSchema: { type: 'object', properties: {}, required: [] }
-    }]}});
-  } else if (req.method === 'tools/call' && req.params && req.params.name === 'get_secret_word') {
-    sendPlain({ jsonrpc: '2.0', id: req.id, result: {
-      content: [{ type: 'text', text: '${SECRET_WORD}' }],
-      isError: false
-    }});
-  } else if (req.id !== undefined) {
-    sendPlain({ jsonrpc: '2.0', id: req.id, error: { code: -32601, message: 'Method not found' }});
-  }
-}
-`;
-
-      const scriptPath = join(tmpdir(), `test-mcp-server-${Date.now()}.js`);
-      await writeFile(scriptPath, mcpServerScript, 'utf8');
-
-      const client = await createWebSocketClient(SERVER_URL);
-      try {
-        const session = await client.createSession({
-          systemMessage: {
-            mode: 'replace',
-            content:
-              'You are a helpful assistant. When asked for the secret word, ' +
-              'you MUST call the get_secret_word tool and report its exact return value.',
-          },
-          mcpServers: {
-            'test-secret-server': {
-              command: 'node',
-              args: [scriptPath],
-              tools: ['*'],
-            },
-          },
-        });
-
-        // MCP tool calls require permission approval. Auto-approve all requests
-        // so the model can call get_secret_word without waiting for a human decision.
-        session.onPermissionRequest(async payload => {
-          await session.respondPermission(payload.requestId, { kind: 'approve-once' });
-        });
-
-        let fullText = '';
-        for await (const event of session.query({
-          prompt: 'Please call the get_secret_word tool and tell me the exact word it returns.',
-        })) {
-          if (event.type === 'assistant.message_delta') {
-            fullText += event.data.deltaContent;
-          }
-          if (event.type === 'assistant.message') {
-            fullText = event.data.content;
-          }
-          if (event.type === 'session.idle') break;
-        }
-
-        // The model should have called the tool and reported the sentinel value
-        expect(fullText).toContain(SECRET_WORD);
-      } finally {
-        await client.stop();
-        await unlink(scriptPath).catch(() => {});
-      }
-    },
-    TIMEOUT_MS
-  );
-
 });

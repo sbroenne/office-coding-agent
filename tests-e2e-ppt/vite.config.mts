@@ -1,9 +1,9 @@
 /**
- * Vite configuration for Word E2E Tests
+ * Vite configuration for PowerPoint E2E Tests
  *
- * Builds a standalone test taskpane that runs Word tool tests
- * inside a real Word instance and reports results to a test server.
- * Served on port 3003 to avoid conflicts with other test add-ins.
+ * Builds a standalone test taskpane that runs PowerPoint tool tests
+ * inside a real PowerPoint instance and reports results to a test server.
+ * Served on port 3002 to avoid conflicts with other test add-ins.
  */
 
 import { defineConfig } from 'vite';
@@ -11,6 +11,8 @@ import path from 'path';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import fs from 'fs';
 import { getHttpsServerOptions } from 'office-addin-dev-certs';
+
+const __dirname = import.meta.dirname;
 
 function mdRawPlugin() {
   return {
@@ -49,12 +51,12 @@ export default defineConfig(async () => {
       },
     },
     server: {
-      port: 3003,
+      port: 3002,
       https: httpsOptions,
       headers: { 'Access-Control-Allow-Origin': '*' },
     },
     preview: {
-      port: 3003,
+      port: 3002,
       https: httpsOptions,
       headers: { 'Access-Control-Allow-Origin': '*' },
     },

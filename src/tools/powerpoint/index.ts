@@ -1,6 +1,6 @@
 import type { PptToolConfig } from '../codegen';
 import { createPptTools } from '../codegen';
-import pptxgen from 'pptxgenjs';
+import { renderSlideSpecToBase64 } from './slideSpec';
 
 /* global PowerPoint */
 
@@ -393,21 +393,20 @@ export const powerPointConfigs: readonly PptToolConfig[] = [
 
   {
     name: 'add_slide_from_code',
-    description: `Add a richly formatted slide to the presentation using PptxGenJS code.
-Provide a JavaScript function body that receives a 'slide' parameter (PptxGenJS Slide object).
-
-PptxGenJS API reference:
-- Text:   slide.addText("Hello", { x:1, y:1, w:8, h:1, fontSize:24, bold:true, color:"363636" })
-- Bullets: slide.addText([{text:"Point 1",options:{bullet:true}},{text:"Point 2",options:{bullet:true}}], { x:0.5, y:1.5, w:9, h:3, fontSize:18 })
-- Image (base64): slide.addImage({ data:"data:image/png;base64,...", x:1, y:1, w:4, h:3 })
-- Table:  slide.addTable([["H1","H2"],["R1","R2"]], { x:0.5, y:2, w:9, fontSize:14 })
-- Shape:  slide.addShape("rect", { x:1, y:1, w:3, h:1, fill:{ color:"FF0000" } })
-- All positions (x, y, w, h) are in inches.`,
+    description: `Add a rich slide using a JSON description. The legacy tool name and "code" argument accept JSON only; JavaScript is rejected and never executed.
+Provide an object with optional backgroundColor and an elements array. Each element has a type and inch-based x, y, w, h:
+- Text: { "type":"text", "text":"Title" } or use a string array for bullet points; optional fontSize, fontFace, color, bold, italic, align, valign, fillColor.
+- Shape: { "type":"shape", "shape":"rect", "fillColor":"4472C4" }; supported: rect, roundRect, ellipse, triangle, diamond, hexagon, star5, chevron, arrowRight, line. Optional lineColor and lineWidth.
+- Image: { "type":"image", "data":"data:image/png;base64,...", "altText":"..." }; PNG and JPEG only.
+- Table: { "type":"table", "rows":[["Header","Value"],["Q1","12"]] }; optional fontSize, color, borderColor.
+- Chart: { "type":"chart", "chartType":"bar", "title":"Revenue", "series":[{"name":"Sales","labels":["Q1","Q2"],"values":[12,18]}] }; chartType may be bar, line, pie, or doughnut. Optional colors is an array of hex colors.
+Example: {"elements":[{"type":"text","text":"Quarterly Revenue","x":0.5,"y":0.5,"w":9,"h":1,"fontSize":28,"bold":true},{"type":"chart","chartType":"bar","title":"Sales","series":[{"name":"Sales","labels":["Q1","Q2"],"values":[12,18]}],"x":0.5,"y":2,"w":9,"h":4}]}
+All colors are 6-digit hex without '#'. Elements are validated, limited in size, and must fit within the slide.`,
     params: {
       code: {
         type: 'string',
         description:
-          "JavaScript code (function body) receiving a 'slide' parameter. Call PptxGenJS methods on it to build slide content.",
+          'JSON slide description with an elements array. Do not send or execute JavaScript.',
       },
       replaceSlideIndex: {
         type: 'number',
@@ -440,20 +439,7 @@ PptxGenJS API reference:
         // slideWidth/slideHeight not available on this Office version — use defaults
       }
 
-      // Build the pptxgenjs slide matching the target presentation dimensions.
-      // PptxGenJS defaults to 13.33"×7.5" (16:9). If the target is different
-      // (e.g. 10"×7.5" for 4:3), content positioned for 13.33" would overflow.
-      const pptx = new pptxgen();
-      pptx.defineLayout({ name: 'CUSTOM', width: W, height: H });
-      pptx.layout = 'CUSTOM';
-      const slide = pptx.addSlide();
-
-      /* eslint-disable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
-      const buildSlide = new Function('slide', 'W', 'H', code);
-      buildSlide(slide, W, H);
-      /* eslint-enable @typescript-eslint/no-implied-eval, @typescript-eslint/no-unsafe-call */
-
-      const base64 = (await pptx.write({ outputType: 'base64' })) as string;
+      const base64 = await renderSlideSpecToBase64(code, W, H);
 
       // Insert into presentation using the PowerPoint context
       const slides = context.presentation.slides;
@@ -1586,7 +1572,7 @@ PptxGenJS API reference:
     description:
       'List all SmartArt and diagram shapes on a slide with their index, name, position, and size. ' +
       'Use this to inspect existing SmartArt graphics. Note: SmartArt content cannot be modified via the Office.js API — ' +
-      'use add_slide_from_code with PptxGenJS to create SmartArt-like visuals programmatically.',
+      'use add_slide_from_code with JSON shapes to create SmartArt-like visuals.',
     params: {
       slideIndex: { type: 'number', description: '0-based slide index.' },
     },
@@ -1623,7 +1609,7 @@ PptxGenJS API reference:
         );
 
       if (smartArtShapes.length === 0) {
-        return `Slide ${String(slideIndex + 1)} has no SmartArt or diagram shapes.\n\nTip: To create SmartArt-like visuals, use add_slide_from_code with PptxGenJS shapes and connectors.`;
+        return `Slide ${String(slideIndex + 1)} has no SmartArt or diagram shapes.\n\nTip: To create SmartArt-like visuals, use add_slide_from_code with JSON shape elements.`;
       }
 
       const lines = smartArtShapes.map(({ shape, i }) => {
@@ -1997,7 +1983,7 @@ PptxGenJS API reference:
   {
     name: 'fetch_image_as_base64',
     description:
-      'Fetch an image from a URL and return it as a base64 data URI. Use the returned data URI with add_slide_from_code\'s slide.addImage({data: "..."}) to place the image on a slide.',
+      'Fetch an image from a URL and return a base64 data URI. Use it in the data field of an image element in the JSON passed to add_slide_from_code.',
     params: {
       url: { type: 'string', description: 'The image URL to fetch (must be HTTPS).' },
     },

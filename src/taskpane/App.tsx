@@ -306,7 +306,7 @@ const ReadyAssistant: React.FC<{ host: OfficeHostApp }> = ({ host }) => {
             activePanel ? '-translate-x-full' : 'translate-x-0'
           }`}
           aria-hidden={!!activePanel}
-          inert={activePanel ? ('' as unknown as boolean) : undefined}
+          inert={Boolean(activePanel)}
         >
           <ChatHeader
             host={host}

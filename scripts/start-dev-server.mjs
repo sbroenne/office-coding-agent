@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PORT = 3000;
 const PID_FILE = path.join(os.tmpdir(), 'office-coding-agent-dev-server.json');
-const MAX_RETRIES = 30;
+const MAX_RETRIES = 120;
 const RETRY_DELAY_MS = 1000;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

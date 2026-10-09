@@ -41,11 +41,8 @@ export function isLoopbackAddress(address) {
 }
 
 export function isTrustedRequestOrigin(origin, remoteAddress) {
-  if (origin) {
-    return isAllowedOrigin(origin);
-  }
-
-  return isLoopbackAddress(remoteAddress);
+  if (!isLoopbackAddress(remoteAddress)) return false;
+  return !origin || isAllowedOrigin(origin);
 }
 
 export async function getBrowseRoots() {

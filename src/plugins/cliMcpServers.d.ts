@@ -14,6 +14,16 @@ declare module '*/cliMcpServers.mjs' {
     error?: string;
   }
 
+  export interface SelectedCliMcpServers {
+    names: string[];
+    servers: Record<string, object> | undefined;
+  }
+
+  export type McpServerSummary = Omit<
+    McpServerConfig,
+    'args' | 'env' | 'headers' | 'source'
+  > & { requiresOAuth: boolean };
+
   export interface CopilotMcpServerOptions {
     command?: string;
     timeoutMs?: number;
@@ -36,4 +46,11 @@ declare module '*/cliMcpServers.mjs' {
   export function getCliMcpServers(
     options?: CopilotMcpServerOptions
   ): Promise<CopilotMcpServerListResult>;
+  export function getSelectedCliMcpServers(
+    names: string[],
+    options?: CopilotMcpServerOptions
+  ): Promise<SelectedCliMcpServers>;
+  export function getMcpServerSummaries(
+    servers: McpServerConfig[]
+  ): McpServerSummary[];
 }

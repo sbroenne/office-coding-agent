@@ -191,6 +191,9 @@ async function runTool(
     }
     return result;
   } catch (error) {
+    if (error instanceof OfficeExtension.Error) {
+      heartbeat(`Office error details (${label}): ${JSON.stringify(error.debugInfo)}`);
+    }
     fail(label, String(error));
     return null;
   }
@@ -2006,6 +2009,7 @@ async function testSheetTools(): Promise<void> {
   );
 
   // 7. freeze_panes — freeze at B2
+  await callTool(sheetConfigs, 'sheet', { action: 'activate', name: COPY_SHEET });
   await runTool(
     sheetConfigs,
     'sheet',
@@ -2016,11 +2020,37 @@ async function testSheetTools(): Promise<void> {
     },
     'freeze_panes'
   );
-  // Unfreeze cleanup
+  try {
+    await Excel.run(async context => {
+      const active = context.workbook.worksheets.getActiveWorksheet();
+      const frozen = context.workbook.worksheets.getItem(renamedName).freezePanes.getLocation();
+      active.load('name');
+      frozen.load('address');
+      await context.sync();
+      if (active.name !== COPY_SHEET) throw new Error('Freeze changed the active worksheet');
+      if (!frozen.address.endsWith('!B2')) {
+        throw new Error(`Unexpected frozen range: ${frozen.address}`);
+      }
+    });
+    pass('freeze_panes:inactive_sheet', undefined);
+  } catch (error) {
+    fail('freeze_panes:inactive_sheet', String(error));
+  }
   try {
     await callTool(sheetConfigs, 'sheet', { action: 'freeze', name: renamedName });
-  } catch {
-    /* non-critical */
+    await Excel.run(async context => {
+      const active = context.workbook.worksheets.getActiveWorksheet();
+      const frozen = context.workbook.worksheets
+        .getItem(renamedName)
+        .freezePanes.getLocationOrNullObject();
+      active.load('name');
+      await context.sync();
+      if (active.name !== COPY_SHEET) throw new Error('Unfreeze changed the active worksheet');
+      if (!frozen.isNullObject) throw new Error('Worksheet panes are still frozen');
+    });
+    pass('freeze_panes:unfreeze', undefined);
+  } catch (error) {
+    fail('freeze_panes:unfreeze', String(error));
   }
 
   // 8. protect_sheet

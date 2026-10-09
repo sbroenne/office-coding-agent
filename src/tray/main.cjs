@@ -60,7 +60,9 @@ function startServer() {
   lastServerError = null;
   updateMenu();
 
-  const serverPath = path.resolve(__dirname, '../server-prod.mjs');
+  const serverPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'src', 'server-prod.mjs')
+    : path.resolve(__dirname, '../server-prod.mjs');
   const preferredNode = process.env.ORIGINAL_NODE_EXE;
   const useRealNode = Boolean(preferredNode && fs.existsSync(preferredNode));
   const runtime = useRealNode ? preferredNode : process.execPath;
@@ -76,7 +78,7 @@ function startServer() {
   }
 
   serverProcess = spawn(runtime, [serverPath], {
-    cwd: path.resolve(__dirname, '../..'),
+    cwd: path.resolve(serverPath, '../..'),
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });

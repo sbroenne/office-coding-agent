@@ -162,7 +162,7 @@ describe('Outlook AI E2E Tests', function () {
     );
     console.log(`Test server started on port ${port}`);
 
-    const devServerCmd = 'npx vite --config ./tests-e2e-outlook/vite.config.ts';
+    const devServerCmd = 'npx vite --config ./tests-e2e-outlook/vite.config.mts';
     const options = {
       appType: AppType.Desktop,
       app: toOfficeApp(host),
