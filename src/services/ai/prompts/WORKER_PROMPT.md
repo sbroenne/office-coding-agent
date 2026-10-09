@@ -17,19 +17,17 @@ Create the slide described below, then verify and fix it until it looks right.
 
 - All positions in inches. Check slide width from `get_presentation_overview`.
 - Content width = slideWidth − 1.0" (0.5" margin each side)
-- `shrinkText: true` on all `addText()` calls
 - Colors: 6-digit hex without # (`"4472C4"`)
-- Label + description: ALWAYS single string with colon: `"Label: Description"`
-- Never separate bold + normal text runs (merges without spacing)
-- Never nested text arrays (renders `[object Object]`)
-- `{ bullet: true }` — never unicode bullets
+- Pass a JSON object in `add_slide_from_code`'s `code` argument; do not generate JavaScript.
+- Use `{"type":"text","text":"..."}` for text and a string array for bullet points.
+- Use supported JSON elements: `text`, `shape`, `image`, `table`, and `chart`.
 - Minimum font size: 13pt. If text doesn't fit, reduce content.
 
 ## Common Fixes
 
-| Problem | Fix |
-|---------|-----|
-| Text cut off | Shorten text or remove a bullet |
+| Problem        | Fix                               |
+| -------------- | --------------------------------- |
+| Text cut off   | Shorten text or remove a bullet   |
 | Text too small | Increase fontSize, reduce content |
-| Word breaking | Use shorter synonym |
-| Too cramped | Fewer columns or less content |
+| Word breaking  | Use shorter synonym               |
+| Too cramped    | Fewer columns or less content     |

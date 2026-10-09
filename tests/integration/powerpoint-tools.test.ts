@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import Ajv from 'ajv';
 import { powerPointConfigs, powerPointTools } from '@/tools/powerpoint';
+import { renderSlideSpecToBase64 } from '@/tools/powerpoint/slideSpec';
 
 const ajv = new Ajv({ allErrors: true });
 
@@ -171,20 +172,105 @@ describe('Integration: content tool schemas', () => {
     expect(validate(schema, { slideIndex: 0 })).toBe(false);
   });
 
-  it('add_slide_from_code requires code string', () => {
+  it('add_slide_from_code requires a JSON description string', () => {
     const schema = toolsByName.add_slide_from_code.parameters;
-    expect(validate(schema, { code: 'slide.addText("Hi", {x:1,y:1,w:8,h:1})' })).toBe(true);
+    expect(validate(schema, { code: '{"elements":[]}' })).toBe(true);
     expect(validate(schema, {})).toBe(false);
   });
 
   it('add_slide_from_code accepts optional replaceSlideIndex', () => {
     const schema = toolsByName.add_slide_from_code.parameters;
-    expect(validate(schema, { code: 'slide.addText("X")', replaceSlideIndex: 0 })).toBe(true);
+    expect(validate(schema, { code: '{"elements":[]}', replaceSlideIndex: 0 })).toBe(true);
   });
 
   it('get_presentation_content accepts no args (read all slides)', () => {
     const schema = toolsByName.get_presentation_content.parameters;
     expect(validate(schema, {})).toBe(true);
+  });
+
+  describe('Integration: JSON slide rendering', () => {
+    it('renders a valid JSON slide description into a PowerPoint package', async () => {
+      const result = await renderSlideSpecToBase64(
+        JSON.stringify({
+          backgroundColor: 'FFFFFF',
+          elements: [
+            { type: 'text', text: 'Quarterly Results', x: 0.5, y: 0.5, w: 9, h: 1 },
+            { type: 'shape', shape: 'arrowRight', x: 0.5, y: 1.5, w: 1, h: 0.5 },
+            {
+              type: 'image',
+              data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC',
+              x: 1.75,
+              y: 1.5,
+              w: 1,
+              h: 1,
+            },
+            {
+              type: 'table',
+              rows: [
+                ['Quarter', 'Revenue'],
+                ['Q1', '10'],
+              ],
+              x: 3,
+              y: 1.5,
+              w: 3,
+              h: 2,
+            },
+            {
+              type: 'chart',
+              chartType: 'bar',
+              series: [{ name: 'Revenue', labels: ['Q1', 'Q2'], values: [10, 15] }],
+              x: 0.5,
+              y: 2,
+              w: 9,
+              h: 4,
+            },
+          ],
+        }),
+        10,
+        7.5
+      );
+
+      expect(result.startsWith('UEsDB')).toBe(true);
+    });
+
+    it('rejects executable JavaScript instead of evaluating it', async () => {
+      await expect(
+        renderSlideSpecToBase64('slide.addText("not JSON")', 13.33, 7.5)
+      ).rejects.toThrow('Slide description must be valid JSON.');
+    });
+
+    it('rejects slide elements outside the supplied dimensions', async () => {
+      await expect(
+        renderSlideSpecToBase64(
+          JSON.stringify({
+            elements: [{ type: 'text', text: 'Outside', x: 9, y: 0, w: 2, h: 1 }],
+          }),
+          10,
+          7.5
+        )
+      ).rejects.toThrow('must fit within');
+    });
+
+    it('rejects unsupported image bytes even when labeled as JPEG', async () => {
+      await expect(
+        renderSlideSpecToBase64(
+          JSON.stringify({
+            elements: [
+              {
+                type: 'image',
+                data: 'data:image/jpeg;base64,AAAA',
+                x: 0,
+                y: 0,
+                w: 1,
+                h: 1,
+              },
+            ],
+          }),
+          10,
+          7.5
+        )
+      ).rejects.toThrow('must contain a valid base64 PNG or JPEG image');
+    });
   });
 
   it('get_presentation_content accepts slideIndex or startIndex/endIndex', () => {

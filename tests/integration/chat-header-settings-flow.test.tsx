@@ -36,7 +36,10 @@ describe('Integration: ChatHeader', () => {
     );
 
     expect(screen.getByLabelText('New conversation')).toBeInTheDocument();
-    expect(screen.getByLabelText('Copilot CLI plugin help')).toBeInTheDocument();
+    expect(screen.getByLabelText('Manage plugins in Copilot CLI')).toHaveAttribute(
+      'title',
+      'Install, update, and remove plugins in the terminal with Copilot CLI'
+    );
   });
 
   it('calls onClearMessages when New conversation is clicked', async () => {

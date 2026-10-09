@@ -12,9 +12,11 @@ function getCliMcpServerNames(): string[] {
 
 test.describe('Chat UI (fresh launch)', () => {
   test('renders header controls with no pre-seeded settings', async ({ taskpane }) => {
-    await expect(taskpane.getByRole('link', { name: 'Copilot CLI plugin help' })).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(taskpane.getByRole('link', { name: 'Manage plugins in Copilot CLI' })).toBeVisible(
+      {
+        timeout: 10_000,
+      }
+    );
     await expect(taskpane.getByRole('button', { name: 'New conversation' })).toBeVisible({
       timeout: 10_000,
     });
@@ -28,12 +30,44 @@ test.describe('Chat UI (fresh launch)', () => {
     await expect(taskpane.getByRole('button', { name: 'Select agent' })).toBeVisible({
       timeout: 10_000,
     });
+    await expect(taskpane.getByRole('button', { name: 'Select agent' })).toHaveText(/excel/i);
+  });
+
+  test('keeps every composer control inside a narrow task pane', async ({ taskpane: page }) => {
+    const toolbar = page.locator('.aui-composer-action');
+    const labels = [
+      'Select agent',
+      'Select model',
+      'Select conversation mode',
+      'Open plan',
+      'MCP servers',
+      'Send',
+    ];
+    for (const width of [240, 300, 375]) {
+      await page.setViewportSize({ width, height: 720 });
+      await expect(toolbar).toBeVisible();
+      const bounds = await toolbar.boundingBox();
+      expect(bounds).not.toBeNull();
+      for (const name of labels) {
+        const control = page.getByRole('button', { name, exact: true });
+        await expect(control).toBeVisible();
+        const box = await control.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x, `${name} left edge at ${width}px`).toBeGreaterThanOrEqual(bounds!.x - 1);
+        expect(box!.x + box!.width, `${name} right edge at ${width}px`).toBeLessThanOrEqual(
+          bounds!.x + bounds!.width + 1
+        );
+        expect(box!.y + box!.height, `${name} bottom edge at ${width}px`).toBeLessThanOrEqual(
+          bounds!.y + bounds!.height + 1
+        );
+      }
+    }
   });
 });
 
 test.describe('Chat UI (configured state)', () => {
   test('renders the chat header controls', async ({ configuredTaskpane: page }) => {
-    await expect(page.getByRole('link', { name: 'Copilot CLI plugin help' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Manage plugins in Copilot CLI' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New conversation' })).toBeVisible();
   });
 
@@ -53,7 +87,9 @@ test.describe('Chat UI (configured state)', () => {
     await expect(page.getByRole('button', { name: 'MCP servers' })).toBeVisible();
   });
 
-  test('MCP servers popover matches the Copilot CLI config', async ({ configuredTaskpane: page }) => {
+  test('MCP servers popover matches the Copilot CLI config', async ({
+    configuredTaskpane: page,
+  }) => {
     const cliServerNames = getCliMcpServerNames();
 
     await page.getByRole('button', { name: 'MCP servers' }).click();
@@ -72,8 +108,7 @@ test.describe('Chat UI (configured state)', () => {
   });
 
   test('displays the model picker in the toolbar', async ({ configuredTaskpane: page }) => {
-    // The model picker shows the active model name (default: Claude Sonnet 4)
-    await expect(page.getByText('Claude Sonnet 4')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Claude Sonnet 5.5')).toBeVisible({ timeout: 5000 });
   });
 
   test('displays the CLI-backed agent picker', async ({ configuredTaskpane: page }) => {
@@ -111,7 +146,12 @@ test.describe('Chat UI (configured state)', () => {
     const composer = page.getByRole('textbox', { name: 'Message input' });
     await composer.fill('/exc');
     await expect(page.getByRole('listbox', { name: 'slash suggestions' })).toBeVisible();
-    await expect(page.getByRole('option').filter({ hasText: /\/excel/i }).first()).toBeVisible();
+    await expect(
+      page
+        .getByRole('option')
+        .filter({ hasText: /\/excel/i })
+        .first()
+    ).toBeVisible();
   });
 
   test('auto-scroll keeps thread pinned to newest content', async ({

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-import re
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -131,7 +131,10 @@ class PowerPointSimulator:
         return self._ok(f'Added {shapeType} shape to slide {index + 1}.')
 
     def add_slide_from_code(self, code: str, replaceSlideIndex: float | None = None) -> ToolResult:  # noqa: N803
-        shapes = self._parse_slide_code(code)
+        try:
+            shapes = self._parse_slide_code(code)
+        except (json.JSONDecodeError, ValueError) as error:
+            return self._error(str(error))
         slide = Slide(shapes=shapes)
 
         if replaceSlideIndex is None:
@@ -150,25 +153,29 @@ class PowerPointSimulator:
 
     def _parse_slide_code(self, code: str) -> list[SlideShape]:
         shapes: list[SlideShape] = []
+        spec = json.loads(code)
+        if not isinstance(spec, dict) or not isinstance(spec.get("elements"), list):
+            raise ValueError("Slide description must be a JSON object with an elements array.")
 
-        for text in re.findall(r"addText\(\s*['\"]([^'\"]+)['\"]", code):
-            shapes.append(SlideShape(kind="text", text=text))
-
-        for shape_type in re.findall(r"addShape\(\s*['\"]([^'\"]+)['\"]", code):
-            shapes.append(SlideShape(kind="shape", text=shape_type, name=shape_type))
-
-        if "addImage(" in code:
-            shapes.append(SlideShape(kind="image", text="Image"))
-
-        if "addChart(" in code:
-            title_match = re.search(r"title\s*:\s*['\"]([^'\"]+)['\"]", code)
-            chart_title = title_match.group(1) if title_match else "Chart"
-            shapes.append(SlideShape(kind="chart", text=chart_title))
-
-        if "addTable(" in code:
-            shapes.append(SlideShape(kind="table", text="Table"))
-
-        if not shapes:
-            shapes.append(SlideShape(kind="code", text="Generated slide"))
+        for element in spec["elements"]:
+            if not isinstance(element, dict):
+                raise ValueError("Slide elements must be JSON objects.")
+            kind = element.get("type")
+            if kind == "text":
+                text = element.get("text", "")
+                if isinstance(text, list):
+                    text = " | ".join(str(line) for line in text)
+                shapes.append(SlideShape(kind="text", text=str(text)))
+            elif kind == "shape":
+                shape_type = str(element.get("shape", "shape"))
+                shapes.append(SlideShape(kind="shape", text=shape_type, name=shape_type))
+            elif kind == "image":
+                shapes.append(SlideShape(kind="image", text="Image"))
+            elif kind == "chart":
+                shapes.append(SlideShape(kind="chart", text=str(element.get("title", "Chart"))))
+            elif kind == "table":
+                shapes.append(SlideShape(kind="table", text="Table"))
+            else:
+                raise ValueError(f"Unsupported slide element type: {kind}")
 
         return shapes

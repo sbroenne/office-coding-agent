@@ -3,14 +3,13 @@ import cors from 'cors';
 import https from 'node:https';
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { setupCopilotProxy, checkCopilotHealth } from './copilotProxy.mjs';
 import { ensureOfficeCliPlugins } from './plugins/cliPluginBootstrap.mjs';
 import { getCliSlashItems } from './plugins/cliSlashItems.mjs';
-import { getCliMcpServers } from './plugins/cliMcpServers.mjs';
+import { getCliMcpServers, getMcpServerSummaries } from './plugins/cliMcpServers.mjs';
 import {
   getBrowseRoots,
   isAllowedOrigin,
@@ -34,7 +33,7 @@ async function checkPort(port) {
         )
       )
       .once('listening', () => tester.close(() => resolve()));
-    tester.listen(port);
+    tester.listen(port, 'localhost');
   });
 }
 
@@ -65,9 +64,6 @@ export async function createServer() {
     })
   );
 
-  const apiRouter = express.Router();
-  apiRouter.use(express.json({ limit: '50mb' }));
-
   const requireTrustedLocalAccess = (req, res, next) => {
     const remoteAddress = req.socket?.remoteAddress;
     if (isTrustedRequestOrigin(req.headers.origin, remoteAddress)) {
@@ -77,6 +73,9 @@ export async function createServer() {
 
     res.status(403).json({ error: 'This endpoint is only available to the local add-in.' });
   };
+
+  const apiRouter = express.Router();
+  apiRouter.use(express.json({ limit: '50mb' }));
 
   apiRouter.get('/hello', (_req, res) => {
     res.json({ message: 'Copilot proxy running', timestamp: new Date().toISOString() });
@@ -112,7 +111,8 @@ export async function createServer() {
         .map(entry => entry.name)
         .sort((a, b) => a.localeCompare(b));
       const parent = path.dirname(absolutePath);
-      const parentAllowed = parent !== absolutePath && browseRoots.some(root => isPathWithinRoot(root, parent));
+      const parentAllowed =
+        parent !== absolutePath && browseRoots.some(root => isPathWithinRoot(root, parent));
       res.json({
         path: absolutePath,
         parent: parentAllowed ? parent : null,
@@ -141,39 +141,16 @@ export async function createServer() {
     res.json(health);
   });
 
-  apiRouter.post('/upload-image', (req, res) => {
-    try {
-      const { dataUrl, name } = req.body;
-      if (!dataUrl || !dataUrl.startsWith('data:image/')) {
-        res.status(400).json({ error: 'Invalid image data' });
-        return;
-      }
-      const matches = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
-        res.status(400).json({ error: 'Invalid data URL format' });
-        return;
-      }
-      const extension = matches[1] === 'svg+xml' ? 'svg' : matches[1];
-      const base64Data = matches[2];
-      const buffer = Buffer.from(base64Data, 'base64');
-      const tempDir = path.join(os.tmpdir(), 'copilot-office-images');
-      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-      const filename = path.basename(name || `image-${Date.now()}.${extension}`);
-      const filepath = path.join(tempDir, filename);
-      fs.writeFileSync(filepath, buffer);
-      res.json({ path: filepath, name: filename });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
-    }
-  });
-
   // GET /api/mcp-servers — MCP server configs from the user's Copilot CLI config.
-  apiRouter.get('/mcp-servers', async (_req, res) => {
+  apiRouter.get('/mcp-servers', requireTrustedLocalAccess, async (_req, res) => {
     const result = await getCliMcpServers();
     if (result.error) {
       console.warn(`[mcp] Failed to load Copilot CLI MCP servers: ${result.error}`);
     }
-    res.json(result);
+    res.json({
+      servers: getMcpServerSummaries(result.servers),
+      ...(result.error ? { error: 'Some MCP server settings could not be loaded.' } : {}),
+    });
   });
 
   app.use('/api', apiRouter);
@@ -183,7 +160,12 @@ export async function createServer() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
   const httpsServer = https.createServer(httpsOptions, app);
 
+  await ensureOfficeCliPlugins();
   setupCopilotProxy(httpsServer);
+  const mcpStartup = await getCliMcpServers();
+  if (mcpStartup.error) {
+    console.warn(`[mcp] Failed to load Copilot CLI MCP servers: ${mcpStartup.error}`);
+  }
 
   const distDir = path.resolve(__dirname, '..', 'dist');
   app.use(express.static(distDir));
@@ -192,7 +174,7 @@ export async function createServer() {
   });
 
   await new Promise(resolve => {
-    httpsServer.listen(PORT, () => {
+    httpsServer.listen(PORT, 'localhost', () => {
       console.log(
         `\n  Copilot Office Add-in production server running on https://localhost:${PORT}`
       );
@@ -200,9 +182,6 @@ export async function createServer() {
       resolve(undefined);
     });
   });
-
-  // Ensure required Office Coding Agent CLI plugins in the user's normal CLI config.
-  setTimeout(() => void ensureOfficeCliPlugins(), 500);
 
   return httpsServer;
 }

@@ -3,7 +3,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import type { CopilotAgent, CopilotModel } from '@/types';
 
 const TEST_MODELS: CopilotModel[] = [
-  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+  { id: 'claude-sonnet-5.5', name: 'Claude Sonnet 5.5', provider: 'Anthropic' },
   { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
 ];
 
@@ -19,8 +19,8 @@ beforeEach(() => {
 // ─── Model management ───
 
 describe('settingsStore — model', () => {
-  it('starts with the default model (claude-sonnet-4.6)', () => {
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+  it('starts with the default model (claude-sonnet-5.5)', () => {
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-5.5');
   });
 
   it('setActiveModel accepts any model when availableModels is null', () => {
@@ -31,7 +31,7 @@ describe('settingsStore — model', () => {
   it('setActiveModel validates against availableModels when set', () => {
     useSettingsStore.getState().setAvailableModels(TEST_MODELS);
     useSettingsStore.getState().setActiveModel('unknown-model-xyz');
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-5.5');
   });
 
   it('setActiveModel accepts a valid model ID from availableModels', () => {
@@ -44,7 +44,7 @@ describe('settingsStore — model', () => {
   it('reset restores the default model', () => {
     useSettingsStore.getState().setActiveModel('gpt-4.1');
     useSettingsStore.getState().reset();
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-5.5');
   });
 });
 

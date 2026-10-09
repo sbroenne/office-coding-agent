@@ -201,7 +201,28 @@ function mergeServers(cliServers, pluginServers) {
   return merged;
 }
 
-export async function getCliMcpServers(options = {}) {
+let pendingServerList;
+let serverListExpiresAt = 0;
+
+export function getCliMcpServers(options = {}) {
+  if (Object.keys(options).length > 0) return loadCliMcpServers(options);
+  if (!pendingServerList || Date.now() >= serverListExpiresAt) {
+    serverListExpiresAt = Infinity;
+    pendingServerList = loadCliMcpServers(options).then(
+      result => {
+        serverListExpiresAt = result.error ? 0 : Date.now() + 30_000;
+        return result;
+      },
+      error => {
+        serverListExpiresAt = 0;
+        throw error;
+      }
+    );
+  }
+  return pendingServerList;
+}
+
+async function loadCliMcpServers(options) {
   const result = await (options.runCommand ?? runCopilotMcpListCommand)(options);
   if (!result.success) {
     return {
@@ -226,4 +247,73 @@ export async function getCliMcpServers(options = {}) {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export async function getSelectedCliMcpServers(names, options = {}) {
+  if (!Array.isArray(names) || names.some(name => typeof name !== 'string')) {
+    throw new Error('MCP server selection must be an array of server names.');
+  }
+  const selectedNames = [...new Set(names)];
+  if (selectedNames.length === 0) return { names: [], servers: undefined };
+
+  const result = await getCliMcpServers(options);
+  const configured = new Map(result.servers.map(server => [server.name, server]));
+  const missing = selectedNames.filter(name => !configured.has(name));
+  if (missing.length > 0) {
+    throw new Error(`Selected MCP server configuration is unavailable: ${missing.join(', ')}.`);
+  }
+
+  const servers = Object.fromEntries(
+    selectedNames.map(name => {
+      const config = configured.get(name);
+      if (!config) throw new Error(`Selected MCP server configuration is unavailable: ${name}.`);
+      if (config.transport === 'stdio') {
+        return [
+          name,
+          {
+            type: 'stdio',
+            command: config.command ?? '',
+            args: config.args ?? [],
+            ...(config.env !== undefined ? { env: config.env } : {}),
+            tools: ['*'],
+          },
+        ];
+      }
+      return [
+        name,
+        {
+          type: config.transport,
+          url: config.url ?? '',
+          ...(config.headers !== undefined ? { headers: config.headers } : {}),
+          tools: ['*'],
+        },
+      ];
+    })
+  );
+  return { names: selectedNames, servers };
+}
+
+export function getMcpServerSummaries(servers) {
+  return servers.map(server => {
+    const summary = {
+      name: server.name,
+      description: server.description,
+      transport: server.transport,
+      oauthAlias: server.oauthAlias,
+      requiresOAuth:
+        (server.transport === 'http' || server.transport === 'sse') &&
+        !Object.keys(server.headers ?? {}).some(key => key.toLowerCase() === 'authorization'),
+    };
+
+    if (server.transport === 'stdio') {
+      return { ...summary, command: 'Local process' };
+    }
+
+    try {
+      const url = new URL(server.url ?? '');
+      return { ...summary, url: `${url.protocol}//${url.host}` };
+    } catch {
+      return summary;
+    }
+  });
 }

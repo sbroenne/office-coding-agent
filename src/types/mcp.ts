@@ -44,6 +44,8 @@ export interface McpServerConfig {
   headers?: Record<string, string>;
   /** Optional last OAuth account alias for UI recovery actions */
   oauthAlias?: string;
+  /** Whether a remote server should offer OAuth actions (returned without secrets). */
+  requiresOAuth?: boolean;
   /** Executable command (required for stdio transport, e.g. "npx") */
   command?: string;
   /** Command arguments (for stdio transport) */

@@ -47,10 +47,10 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           rel="noreferrer"
           className="inline-flex items-center justify-center rounded-[var(--vscode-cornerRadius-small)] transition-colors hover:bg-accent"
           style={{ width: 22, height: 22, color: 'var(--vscode-icon-foreground)' }}
-          aria-label="Copilot CLI plugin help"
-          title="Copilot CLI plugin help"
+          aria-label="Manage plugins in Copilot CLI"
+          title="Install, update, and remove plugins in the terminal with Copilot CLI"
         >
-          <Codicon name="question" className="text-[14px]" />
+          <Codicon name="extensions" className="text-[14px]" />
         </a>
         <button
           onClick={() => onOpenPanel?.('permissions')}

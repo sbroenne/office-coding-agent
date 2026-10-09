@@ -48,10 +48,7 @@ function makeFakeSession(events: SessionEvent[]) {
   };
 }
 
-function makeFakeClient(
-  session: unknown,
-  models: { id: string; name: string }[] = []
-) {
+function makeFakeClient(session: unknown, models: { id: string; name: string }[] = []) {
   return {
     start: vi.fn().mockResolvedValue(undefined),
     createSession: vi.fn().mockResolvedValue(session),
@@ -88,7 +85,6 @@ function makeEvent<T extends SessionEvent['type']>(
 
 const IDLE_EVENT = makeEvent('session.idle', {});
 
-
 function wrapper({ children }: { children: React.ReactNode }) {
   return React.createElement(React.Fragment, null, children);
 }
@@ -121,6 +117,63 @@ describe('useOfficeChat', () => {
     expect(result.current.sessionError).toBeNull();
     expect(result.current.messages).toBeDefined();
   });
+
+  it.each(['connected', 'unmounted'] as const)(
+    'handles a prompt queued during slow session creation (%s)',
+    async outcome => {
+      vi.useFakeTimers();
+      const session = makeFakeSession([
+        makeEvent('assistant.message', { messageId: 'ready-response', content: 'READY' }),
+        IDLE_EVENT,
+      ]);
+      const client = makeFakeClient(session);
+      let finishSession!: (value: typeof session) => void;
+      client.createSession.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finishSession = resolve;
+          })
+      );
+      mockCreate.mockResolvedValue(client as never);
+      const { result, unmount } = renderHook(() => useOfficeChat('excel'), { wrapper });
+      try {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(client.createSession).toHaveBeenCalledOnce();
+        let sent!: Promise<void>;
+        act(() => {
+          sent = result.current.send('Reply READY');
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(16_000);
+        });
+        expect(result.current.messages).toHaveLength(0);
+        if (outcome === 'unmounted') {
+          unmount();
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(100);
+            await sent;
+            finishSession(session);
+            await vi.advanceTimersByTimeAsync(0);
+          });
+          expect(client.stop).toHaveBeenCalledTimes(2);
+          return;
+        }
+        await act(async () => {
+          finishSession(session);
+          await vi.advanceTimersByTimeAsync(100);
+          await sent;
+        });
+        expect(result.current.sessionError).toBeNull();
+        expect(result.current.messages).toHaveLength(2);
+        expect(JSON.stringify(result.current.messages)).not.toContain('Not connected to Copilot');
+      } finally {
+        unmount();
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('deleting an inactive saved session removes it without changing the active one', async () => {
     useSessionHistoryStore.setState({
@@ -400,7 +453,9 @@ describe('useOfficeChat', () => {
     });
 
     // thinkingText should stay as "Thinking…" (not change to tool name)
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Thinking…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe(
+      'Thinking…'
+    );
 
     // Release the stream to complete
     await act(async () => {
@@ -412,61 +467,70 @@ describe('useOfficeChat', () => {
     expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
   });
 
-  it('report_intent overrides tool name in thinkingText', async () => {
-    let resolveIdle: () => void;
-    const idlePromise = new Promise<void>(r => {
-      resolveIdle = r;
-    });
+  it.each(['report_intent', 'assistant.intent'] as const)(
+    '%s overrides tool name in thinkingText',
+    async intentEvent => {
+      let resolveIdle: () => void;
+      const idlePromise = new Promise<void>(r => {
+        resolveIdle = r;
+      });
 
-    const session = {
-      sessionId: 'test-session-id',
-      async *query() {
-        yield makeEvent('tool.execution_start', {
-          toolCallId: 'ri1',
-          toolName: 'report_intent',
-          arguments: { intent: 'Reading the spreadsheet' },
-        });
-        // Pause so the test can observe thinkingText
-        await idlePromise;
-        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Here you go' });
-        yield IDLE_EVENT;
-      },
-      on: vi.fn(),
-      onPermissionRequest: vi.fn(() => () => undefined),
-      destroy: vi.fn().mockResolvedValue(undefined),
-      send: vi.fn().mockResolvedValue('msg-id'),
-      registerTools: vi.fn(),
-      getToolHandler: vi.fn(),
-      respondPermission: vi.fn().mockResolvedValue(undefined),
-      setModel: vi.fn().mockResolvedValue(undefined),
-      compact: vi.fn().mockResolvedValue(undefined),
-      _dispatchEvent: vi.fn() as EventEmitter,
-    };
-    const client = makeFakeClient(session);
-    mockCreate.mockResolvedValue(client as never);
+      const session = {
+        sessionId: 'test-session-id',
+        async *query() {
+          yield intentEvent === 'assistant.intent'
+            ? makeEvent('assistant.intent', { intent: 'Reading the spreadsheet' })
+            : makeEvent('tool.execution_start', {
+                toolCallId: 'ri1',
+                toolName: 'report_intent',
+                arguments: { intent: 'Reading the spreadsheet' },
+              });
+          // Pause so the test can observe thinkingText
+          await idlePromise;
+          yield makeEvent('assistant.message', { messageId: 'msg1', content: 'Here you go' });
+          yield IDLE_EVENT;
+        },
+        on: vi.fn(),
+        onPermissionRequest: vi.fn(() => () => undefined),
+        destroy: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue('msg-id'),
+        registerTools: vi.fn(),
+        getToolHandler: vi.fn(),
+        respondPermission: vi.fn().mockResolvedValue(undefined),
+        setModel: vi.fn().mockResolvedValue(undefined),
+        compact: vi.fn().mockResolvedValue(undefined),
+        _dispatchEvent: vi.fn() as EventEmitter,
+      };
+      const client = makeFakeClient(session);
+      mockCreate.mockResolvedValue(client as never);
 
-    const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
+      const { result } = renderHook(() => useOfficeChat('excel'), { wrapper });
 
-    await act(async () => {
-      await new Promise(r => setTimeout(r, 50));
-    });
+      await act(async () => {
+        await new Promise(r => setTimeout(r, 50));
+      });
 
-    await act(async () => {
-      void result.current.send('Read');
-      await new Promise(r => setTimeout(r, 50));
-    });
+      await act(async () => {
+        void result.current.send('Read');
+        await new Promise(r => setTimeout(r, 50));
+      });
 
-    // report_intent should surface the raw intent text
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Reading the spreadsheet');
+      // report_intent should surface the raw intent text
+      expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe(
+        'Reading the spreadsheet'
+      );
 
-    // Release the stream to complete
-    await act(async () => {
-      resolveIdle!();
-      await new Promise(r => setTimeout(r, 100));
-    });
+      // Release the stream to complete
+      await act(async () => {
+        resolveIdle!();
+        await new Promise(r => setTimeout(r, 100));
+      });
 
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBeNull();
-  });
+      expect(
+        result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText
+      ).toBeNull();
+    }
+  );
 
   it('shows Asking [AgentName] in thinkingText when subagent.started fires', async () => {
     let resolveIdle: () => void;
@@ -519,7 +583,9 @@ describe('useOfficeChat', () => {
     });
 
     // thinkingText should show the sub-agent display name
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Asking Specialist Agent…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe(
+      'Asking Specialist Agent…'
+    );
 
     // Release the stream to complete
     await act(async () => {
@@ -582,7 +648,9 @@ describe('useOfficeChat', () => {
     });
 
     // After subagent.completed, thinkingText should be reset to 'Thinking…'
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Thinking…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe(
+      'Thinking…'
+    );
 
     await act(async () => {
       resolveAfterCompleted!();
@@ -615,7 +683,10 @@ describe('useOfficeChat', () => {
         });
         // Pause after failure so we can observe the reset text
         await afterFailedPromise;
-        yield makeEvent('assistant.message', { messageId: 'msg1', content: 'I could not delegate' });
+        yield makeEvent('assistant.message', {
+          messageId: 'msg1',
+          content: 'I could not delegate',
+        });
         yield IDLE_EVENT;
       },
       on: vi.fn(),
@@ -644,7 +715,9 @@ describe('useOfficeChat', () => {
     });
 
     // After subagent.failed, thinkingText should be reset to 'Thinking…'
-    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe('Thinking…');
+    expect(result.current.messages.findLast(m => m.role === 'assistant')?.thinkingText).toBe(
+      'Thinking…'
+    );
 
     await act(async () => {
       resolveAfterFailed!();
@@ -777,7 +850,7 @@ describe('useOfficeChat', () => {
 
   // ─── MCP wiring ────────────────────────────────────────────────────────────
 
-  it('passes Copilot CLI MCP servers into session creation', async () => {
+  it('sends selected MCP server names without exposing their configuration', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -785,8 +858,9 @@ describe('useOfficeChat', () => {
           {
             name: 's360-breeze',
             transport: 'stdio',
-            command: 'C:\\Users\\me\\agency.exe',
-            args: ['mcp', 'remote', '--url', 'https://mcp.example.com'],
+            command: 'private-executable',
+            args: ['--token', 'secret'],
+            env: { API_KEY: 'secret' },
           },
         ],
       }),
@@ -802,14 +876,10 @@ describe('useOfficeChat', () => {
     });
 
     const config = client.createSession.mock.calls[0][0] as Record<string, unknown>;
-    expect(config.mcpServers).toEqual({
-      's360-breeze': {
-        type: 'stdio',
-        command: 'C:\\Users\\me\\agency.exe',
-        args: ['mcp', 'remote', '--url', 'https://mcp.example.com'],
-        tools: ['*'],
-      },
-    });
+    expect(config.mcpServerNames).toEqual(['s360-breeze']);
+    expect(config).not.toHaveProperty('mcpServers');
+    expect(JSON.stringify(config)).not.toContain('secret');
+    expect(JSON.stringify(config)).not.toContain('private-executable');
   });
 
   // ─── Per-agent tool scoping ─────────────────────────────────────────────────

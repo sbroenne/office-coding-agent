@@ -1,5 +1,9 @@
 export type OfficeHostApp = 'excel' | 'powerpoint' | 'word' | 'outlook' | 'unknown';
 
+export function getDefaultAgentForHost(host: OfficeHostApp): string | undefined {
+  return host === 'unknown' ? undefined : `office-${host}:${host}`;
+}
+
 function normalizeHost(value: string | undefined): OfficeHostApp {
   const host = value?.toLowerCase();
   if (host === 'excel') return 'excel';

@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
+
+const __dirname = import.meta.dirname;
 
 export default defineConfig({
   root: '.',
@@ -21,8 +24,7 @@ export default defineConfig({
       name: 'md-raw',
       transform(_code, id) {
         if (id.endsWith('.md')) {
-          const fs = require('node:fs');
-          const raw = fs.readFileSync(id, 'utf-8');
+          const raw = readFileSync(id, 'utf-8');
           return { code: `export default ${JSON.stringify(raw)};`, map: null };
         }
       },
@@ -38,9 +40,24 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         taskpane: path.resolve(__dirname, 'taskpane.html'),
+      },
+      output: {
+        strictExecutionOrder: true,
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: 'document-export', test: /node_modules[\\/](pptxgenjs|jszip)[\\/]/ },
+            {
+              name: 'vendor',
+              test: /node_modules/,
+              maxSize: 500_000,
+              includeDependenciesRecursively: false,
+            },
+          ],
+        },
       },
     },
   },
@@ -49,5 +66,8 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
+    watch: {
+      ignored: ['**/build/**'],
+    },
   },
 });

@@ -4,7 +4,7 @@
  *  Source: https://github.com/patniko/github-copilot-office
  *--------------------------------------------------------------------------------------------*/
 
-import { createMessageConnection, type MessageConnection } from 'vscode-jsonrpc';
+import { createMessageConnection, type MessageConnection } from 'vscode-jsonrpc/browser';
 import { WebSocketMessageReader, WebSocketMessageWriter } from './websocket-transport';
 import type {
   SessionConfig,
@@ -67,8 +67,13 @@ export interface ExitPlanModeRequestPayload {
 }
 
 /** Extended session config for browser → proxy communication. */
-export interface BrowserSessionConfig extends Omit<SessionConfig, 'tools' | 'onPermissionRequest'> {
+export interface BrowserSessionConfig extends Omit<
+  SessionConfig,
+  'tools' | 'onPermissionRequest' | 'mcpServers'
+> {
   tools?: Tool[];
+  /** Names of CLI-configured MCP servers to enable in the local proxy. */
+  mcpServerNames?: string[];
   /** Office host identifier (e.g. 'excel', 'powerpoint'). Used by proxy for per-host skill loading. */
   host?: string;
 }
@@ -417,7 +422,7 @@ export class WebSocketCopilotClient {
         parameters: tool.parameters,
         skipPermission: tool.skipPermission,
       })),
-      mcpServers: config.mcpServers,
+      mcpServerNames: config.mcpServerNames,
       availableTools: config.availableTools,
       host: config.host,
       agent: config.agent,

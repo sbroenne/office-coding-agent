@@ -85,15 +85,13 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         value => value?.toLowerCase().includes(slashQuery) ?? false
       );
     })
-    .map(
-      (item): SlashSuggestion => ({
-        type: 'skill',
-        value: `/${item.name} `,
-        name: `/${item.name}`,
-        description: item.description,
-        plugin: item.plugin,
-      })
-    );
+    .map((item): SlashSuggestion => ({
+      type: 'skill',
+      value: `/${item.name} `,
+      name: `/${item.name}`,
+      description: item.description,
+      plugin: item.plugin,
+    }));
   const promptSuggestions = (slashItems.prompts ?? [])
     .filter(item => {
       if (!slashQuery) return true;
@@ -101,15 +99,13 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         value => value?.toLowerCase().includes(slashQuery) ?? false
       );
     })
-    .map(
-      (item): SlashSuggestion => ({
-        type: 'prompt',
-        value: `/${item.name} `,
-        name: `/${item.name}`,
-        description: item.description,
-        source: item.source,
-      })
-    );
+    .map((item): SlashSuggestion => ({
+      type: 'prompt',
+      value: `/${item.name} `,
+      name: `/${item.name}`,
+      description: item.description,
+      source: item.source,
+    }));
   const visibleSlashSuggestions = [...skillSuggestions, ...promptSuggestions].slice(0, 8);
 
   const applySlashSuggestion = useCallback((suggestion: SlashSuggestion) => {
@@ -272,8 +268,8 @@ export const ChatComposer: FC<ChatComposerProps> = ({
         )}
         style={{ overflow: 'hidden' }}
       />
-      <div className="aui-composer-action flex items-center justify-between px-1.5 pb-1">
-        <div className="flex items-center gap-0.5">
+      <div className="aui-composer-action flex flex-wrap items-center justify-between gap-x-1 gap-y-0.5 px-1.5 pb-1">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-0.5">
           {leftToolbar}
           {/* Queue badge — shows number of enqueued prompts */}
           {queuedCount > 0 && (
@@ -291,7 +287,7 @@ export const ChatComposer: FC<ChatComposerProps> = ({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-0.5">
           {rightToolbar}
 
           {/* Shortcut hint — shown when running, no text, and no queued items */}

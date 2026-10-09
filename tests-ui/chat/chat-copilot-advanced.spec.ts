@@ -12,9 +12,7 @@ import { test, expect } from '../fixtures';
 const AI_TIMEOUT = 60_000;
 
 test.describe('Chat E2E — host prompt behaviour (requires server)', () => {
-  test('assistant responds to a simple prompt', async ({
-    configuredTaskpane: page,
-  }) => {
+  test('assistant responds to a simple prompt', async ({ configuredTaskpane: page }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
 
     // Type a prompt
@@ -40,14 +38,12 @@ test.describe('Chat E2E — host prompt behaviour (requires server)', () => {
     await composer.press('Enter');
 
     // The model should respond with something about the cell
-    await expect(
-      page.getByText(/cell|A1|empty|value|contains|data|workbook/i).first()
-    ).toBeVisible({ timeout: AI_TIMEOUT });
+    await expect(page.getByText(/cell|A1|empty|value|contains|data|workbook/i).first()).toBeVisible(
+      { timeout: AI_TIMEOUT }
+    );
   });
 
-  test('tool execution progress appears in the thread', async ({
-    configuredTaskpane: page,
-  }) => {
+  test('tool execution progress appears in the thread', async ({ configuredTaskpane: page }) => {
     test.setTimeout(AI_TIMEOUT + 30_000);
 
     const composer = page.getByPlaceholder('Send a message...');
@@ -70,29 +66,29 @@ test.describe('Chat E2E — host prompt behaviour (requires server)', () => {
     }) => {
       test.setTimeout(AI_TIMEOUT * 2 + 30_000);
 
-    const composer = page.getByRole('textbox', { name: 'Message input' });
-    await expect(composer).toBeVisible({ timeout: 5000 });
+      const composer = page.getByRole('textbox', { name: 'Message input' });
+      await expect(composer).toBeVisible({ timeout: 5000 });
 
-    // Turn 1: send a prompt
-    await composer.fill('Reply with exactly one word: ALPHA');
-    await composer.press('Enter');
-    const messages = page.locator('[data-role="assistant"]');
-    await expect(messages.first()).toContainText(/alpha/i, { timeout: AI_TIMEOUT });
-    await expect(page.getByRole('button', { name: /^(Stop|Cancel)$/ })).not.toBeVisible({
-      timeout: AI_TIMEOUT,
-    });
+      // Turn 1: send a prompt
+      await composer.fill('Reply with exactly one word: ALPHA');
+      await composer.press('Enter');
+      const messages = page.locator('[data-role="assistant"]');
+      await expect(messages.first()).toContainText(/alpha/i, { timeout: AI_TIMEOUT });
+      await expect(page.getByRole('button', { name: /^(Stop|Cancel)$/ })).not.toBeVisible({
+        timeout: AI_TIMEOUT,
+      });
 
-    // Wait for the composer to be ready for turn 2
-    await expect(composer).toBeVisible({ timeout: 5000 });
-    await expect(composer).toBeEmpty({ timeout: 5000 });
+      // Wait for the composer to be ready for turn 2
+      await expect(composer).toBeVisible({ timeout: 5000 });
+      await expect(composer).toBeEmpty({ timeout: 5000 });
 
-    // Turn 2: send another prompt
-    await composer.fill('Reply with exactly one word: BRAVO');
-    await page.getByRole('button', { name: 'Send' }).click();
+      // Turn 2: send another prompt
+      await composer.fill('Reply with exactly one word: BRAVO');
+      await page.getByRole('button', { name: 'Send' }).click();
 
-    // Both assistant responses should be present in the thread
-    await expect(messages).toHaveCount(2, { timeout: AI_TIMEOUT });
-    await expect(messages.nth(1)).toContainText(/bravo/i, { timeout: AI_TIMEOUT });
+      // Both assistant responses should be present in the thread
+      await expect(messages).toHaveCount(2, { timeout: AI_TIMEOUT });
+      await expect(messages.nth(1)).toContainText(/bravo/i, { timeout: AI_TIMEOUT });
     });
   }); // end multi-turn describe
 
@@ -132,14 +128,16 @@ test.describe('Chat E2E — host prompt behaviour (requires server)', () => {
     test.setTimeout(AI_TIMEOUT + 30_000);
 
     // Wait for the model picker to be populated from the live API
-    // The configuredTaskpane pre-seeds with Claude Sonnet 4, but the live
+    // The configuredTaskpane pre-seeds with Claude Sonnet 5.5, but the live
     // connection should also load models
     const modelButton = page.getByRole('button', { name: 'Select model' });
     await expect(modelButton).toBeVisible({ timeout: 10_000 });
     await modelButton.click();
 
     // At least one model should be listed in the dropdown
-    const modelOptions = page.getByRole('button').filter({ hasText: /(Claude|GPT|Gemini|o[0-9])/i });
+    const modelOptions = page
+      .getByRole('button')
+      .filter({ hasText: /(Claude|GPT|Gemini|o[0-9])/i });
     await expect(modelOptions.first()).toBeVisible({ timeout: 10_000 });
   });
 });

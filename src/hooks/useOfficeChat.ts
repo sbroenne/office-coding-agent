@@ -11,14 +11,15 @@ import type {
 import type { PermissionRequestPayload } from '@/lib/websocket-client';
 import { createWebSocketClient } from '@/lib/websocket-client';
 import { getToolsForHost } from '@/tools';
-import { fetchConfiguredMcpServers, toSdkMcpServers } from '@/services/mcp';
+import { fetchConfiguredMcpServers } from '@/services/mcp';
 import { useSettingsStore } from '@/stores';
 import { useSessionHistoryStore } from '@/stores';
 import { useMcpStatusStore } from '@/stores';
+import { useMemoryStore } from '@/stores';
 import { buildSessionSystemPrompt } from '@/services/ai/systemPrompt';
 import { inferProvider } from '@/types';
 import type { ChatMessage, ToolCallPart } from '@/types';
-import type { OfficeHostApp } from '@/services/office/host';
+import { getDefaultAgentForHost, type OfficeHostApp } from '@/services/office/host';
 import { generateId } from '@/utils/id';
 import type { McpOAuthPromptRequest } from '@/components/McpOAuthPrompt';
 import type { PermissionRequestResult, SessionEvent } from '@github/copilot-sdk';
@@ -92,21 +93,6 @@ async function loadAvailableAgents(session: BrowserCopilotSession): Promise<void
   } catch (err) {
     console.warn('[useOfficeChat] Failed to load available agents:', err);
     useSettingsStore.getState().setAvailableAgents([]);
-  }
-}
-
-function getDefaultAgentForHost(host: OfficeHostApp): string | undefined {
-  switch (host) {
-    case 'excel':
-      return 'office-excel:excel';
-    case 'powerpoint':
-      return 'office-powerpoint:powerpoint';
-    case 'word':
-      return 'office-word:word';
-    case 'outlook':
-      return 'office-outlook:outlook';
-    default:
-      return undefined;
   }
 }
 
@@ -384,31 +370,27 @@ export function useOfficeChat(host: OfficeHostApp) {
         console.log('[chat] MCP OAuth completed:', payload.requestId);
       });
 
-      let memoryContext = '';
-
-      // Inject persistent user memories if any exist
-      try {
-        const { useMemoryStore } = await import('@/stores/memoryStore');
-        memoryContext = useMemoryStore.getState().buildMemoryContext().trim();
-      } catch {
-        // Memory store not available — continue without memories
-      }
+      const memoryContext = useMemoryStore.getState().buildMemoryContext().trim();
 
       const systemContent = buildSessionSystemPrompt(host, { memoryContext });
 
       // Resolve active MCP servers from the Copilot CLI config, then apply user disable filters.
-      let activeServers = await fetchConfiguredMcpServers();
+      let activeServers = await withTimeout(
+        fetchConfiguredMcpServers(),
+        30_000,
+        'MCP configuration'
+      );
       activeServers = activeServers.filter(
         s => !disabledMcpServerNamesRef.current.includes(s.name)
       );
-      const mcpServers = activeServers.length > 0 ? toSdkMcpServers(activeServers) : undefined;
+      const mcpServerNames = activeServers.map(server => server.name);
 
       const session = await withTimeout(
         client.createSession({
           model: activeModelRef.current,
           systemMessage: { mode: 'customize', content: systemContent },
           tools: getToolsForHost(host),
-          mcpServers,
+          mcpServerNames,
           host,
           agent: activeAgentNameRef.current ?? getDefaultAgentForHost(host),
         }),
@@ -545,6 +527,8 @@ export function useOfficeChat(host: OfficeHostApp) {
   useEffect(() => {
     void initSession();
     return () => {
+      initCounterRef.current++;
+      isConnectingRef.current = false;
       const client = clientRef.current;
       if (client) {
         void client.stop().catch(_err => undefined);
@@ -555,10 +539,8 @@ export function useOfficeChat(host: OfficeHostApp) {
   }, [initSession]);
 
   const waitForActiveSession = useCallback(async () => {
-    const deadline = Date.now() + 15_000;
-    while (Date.now() < deadline) {
+    while (isConnectingRef.current && !sessionErrorRef.current) {
       if (sessionRef.current && clientRef.current) return true;
-      if (sessionErrorRef.current || !isConnectingRef.current) return false;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     return Boolean(sessionRef.current && clientRef.current);
@@ -869,22 +851,26 @@ export function useOfficeChat(host: OfficeHostApp) {
             // First streaming delta clears the thinking indicator
             streamText += event.data.deltaContent;
             updateAssistant({ thinkingText: null });
+          } else if (
+            event.type === 'assistant.intent' ||
+            (event.type === 'tool.execution_start' && event.data.toolName === 'report_intent')
+          ) {
+            const args = event.type === 'tool.execution_start' ? event.data.arguments : undefined;
+            const intent =
+              event.type === 'assistant.intent'
+                ? event.data.intent
+                : args && typeof args === 'object' && !Array.isArray(args)
+                  ? args.intent
+                  : undefined;
+            if (typeof intent === 'string' && intent) {
+              if (toolParts.size > 0) {
+                currentPhase++;
+              }
+              currentPhaseLabel = intent;
+              flushSync(() => setThinkingForAssistant(intent));
+            }
           } else if (event.type === 'tool.execution_start') {
             const { toolCallId, toolName, arguments: args } = event.data;
-            // report_intent is an internal SDK tool — surface intent as thinking text
-            if (toolName === 'report_intent') {
-              const intent = args?.intent;
-              if (typeof intent === 'string' && intent) {
-                // If tools have already been added, this intent starts a NEW phase
-                if (toolParts.size > 0) {
-                  currentPhase++;
-                }
-                // The intent text labels the Working box (VS Code: IChatTask.content)
-                currentPhaseLabel = intent;
-                flushSync(() => setThinkingForAssistant(intent));
-              }
-              continue;
-            }
             toolParts.set(toolCallId, {
               type: 'tool-call',
               toolCallId,

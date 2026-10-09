@@ -2,6 +2,9 @@ import { defineConfig, defaultExclude } from 'vitest/config';
 import path from 'path';
 import { readFileSync } from 'fs';
 import type { Plugin } from 'vite';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = import.meta.dirname;
 
 /**
  * Vite plugin that imports .md files as raw strings.
@@ -24,6 +27,9 @@ const sharedViteConfig = {
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      'vscode-jsonrpc/browser': fileURLToPath(
+        new URL('../browser/main.js', import.meta.resolve('vscode-jsonrpc'))
+      ),
     },
   },
 };

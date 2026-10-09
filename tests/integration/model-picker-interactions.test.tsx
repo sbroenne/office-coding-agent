@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test-utils';
 import { ModelPicker } from '@/components/ModelPicker';
@@ -26,7 +26,7 @@ vi.mock('@/services/ai', () => ({
 const mockSwitchModel = vi.fn();
 
 const TEST_MODELS: CopilotModel[] = [
-  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6', provider: 'Anthropic' },
+  { id: 'claude-sonnet-5.5', name: 'Claude Sonnet 5.5', provider: 'Anthropic' },
   { id: 'claude-opus-4', name: 'Claude Opus 4', provider: 'Anthropic' },
   { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI' },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'Google' },
@@ -43,8 +43,7 @@ describe('ModelPicker — interactions', () => {
 
   it('shows default model name as trigger label', () => {
     renderWithProviders(<ModelPicker onSwitchModel={mockSwitchModel} />);
-    // Default is 'claude-sonnet-4.6' → 'Claude Sonnet 4.6'
-    expect(screen.getByText('Claude Sonnet 4.6')).toBeInTheDocument();
+    expect(screen.getByText('Claude Sonnet 5.5')).toBeInTheDocument();
   });
 
   it('opens popover and shows models grouped by provider', async () => {
@@ -105,20 +104,27 @@ describe('ModelPicker — interactions', () => {
 
   it('shows (switching…) label while switching model mid-session', async () => {
     const user = userEvent.setup();
-    // Make switchModel slow to capture loading state
-    mockSwitchModel.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+    let finishSwitch!: () => void;
+    mockSwitchModel.mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          finishSwitch = resolve;
+        })
+    );
 
     renderWithProviders(<ModelPicker hasActiveSession onSwitchModel={mockSwitchModel} />);
 
     await user.click(screen.getByLabelText('Select model'));
     await waitFor(() => expect(screen.getByText('GPT-4.1')).toBeInTheDocument());
-    
+
     await user.click(screen.getByText('GPT-4.1'));
-    
+
     // Should show switching label
     await waitFor(() => {
       expect(screen.getByText('(switching…)')).toBeInTheDocument();
     });
+    await act(async () => finishSwitch());
+    expect(screen.queryByText('(switching…)')).not.toBeInTheDocument();
   });
 
   it('shows error message and keeps popover open when switchModel fails', async () => {
@@ -129,7 +135,7 @@ describe('ModelPicker — interactions', () => {
 
     await user.click(screen.getByLabelText('Select model'));
     await waitFor(() => expect(screen.getByText('GPT-4.1')).toBeInTheDocument());
-    
+
     await user.click(screen.getByText('GPT-4.1'));
 
     await waitFor(() => {
@@ -138,9 +144,9 @@ describe('ModelPicker — interactions', () => {
 
     // Popover should still be open
     expect(screen.getByText('Anthropic')).toBeInTheDocument();
-    
+
     // Store should NOT be updated on failure
-    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-4.6');
+    expect(useSettingsStore.getState().activeModel).toBe('claude-sonnet-5.5');
   });
 
   it('shows formatted model ID when activeModel does not match any available model', () => {

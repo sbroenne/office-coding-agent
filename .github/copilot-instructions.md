@@ -303,7 +303,7 @@ The task pane is split into three areas:
 
 - `officeStorage.ts` throws if `OfficeRuntime.storage` is unavailable (no localStorage fallback)
 - Unit and integration tests rely on the `OfficeRuntime` mock in `tests/setup.ts`
-- Both the `unit` and `integration` projects in `vitest.config.ts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`
+- Both the `unit` and `integration` projects in `vitest.config.mts` must include `setupFiles: ['tests/setup.ts']` and `globals: true`
 
 ## Build & Run
 
@@ -351,8 +351,8 @@ npm run validate          # Validate manifests/manifest.dev.xml
 - `src/tools/management.ts` — general management tools (`manage_memory`)
 - `src/types/settings.ts` — `CopilotModel`, `inferProvider()`, `UserSettings`, `ChatMessage` (stores `thinkingText` per message)
 - `src/utils/toolResultSummary.ts` — human-readable one-liner summaries for tool results
-- `vite.config.ts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
+- `vite.config.mts` — Vite build config (React plugin, md-raw plugin, static copy, `@/` alias)
 - `src/styles/vscode-theme.css` — VS Code design tokens (`--vscode-*` CSS custom properties for dark/light themes)
 - `taskpane.html` — Vite HTML entry point (root level, references `src/taskpane/index.tsx`)
-- `vitest.config.ts` — unified vitest config with two named projects: `unit` (30s) and `integration` (60s, live Copilot tests)
+- `vitest.config.mts` — unified vitest config with two named projects: `unit` (30s) and `integration` (60s, live Copilot tests)
 - `tests/setup.ts` — `OfficeRuntime.storage` mock + polyfills (ResizeObserver, matchMedia, etc.)

@@ -200,13 +200,29 @@ export const sheetConfigs: readonly ToolConfig[] = [
 
       if (action === 'freeze') {
         const sheet = context.workbook.worksheets.getItem(args.name as string);
-        const freezeAt = args.freezeAt as string | undefined;
-        if (freezeAt) {
-          sheet.freezePanes.freezeAt(sheet.getRange(freezeAt));
-        } else {
-          sheet.freezePanes.unfreeze();
-        }
+        const previousSheet = context.workbook.worksheets.getActiveWorksheet();
+        previousSheet.load('name');
+        sheet.load('name');
         await context.sync();
+        const needsActivation = previousSheet.name !== sheet.name;
+        if (needsActivation) {
+          sheet.activate();
+          await context.sync();
+        }
+        const freezeAt = args.freezeAt as string | undefined;
+        try {
+          if (freezeAt) {
+            sheet.freezePanes.freezeAt(sheet.getRange(freezeAt));
+          } else {
+            sheet.freezePanes.unfreeze();
+          }
+          await context.sync();
+        } finally {
+          if (needsActivation) {
+            previousSheet.activate();
+            await context.sync();
+          }
+        }
         return { sheet: args.name, frozenAt: freezeAt ?? null, unfrozen: !freezeAt };
       }
 

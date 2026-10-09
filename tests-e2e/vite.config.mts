@@ -12,6 +12,8 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import fs from 'fs';
 import { getHttpsServerOptions } from 'office-addin-dev-certs';
 
+const __dirname = import.meta.dirname;
+
 // Custom plugin: import .md files as raw strings
 function mdRawPlugin() {
   return {

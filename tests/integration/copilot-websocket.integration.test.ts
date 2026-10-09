@@ -29,14 +29,41 @@ global.WebSocket = class PatchedWebSocket extends WS {
   }
 } as unknown as typeof WebSocket;
 
-
-
 const SYSTEM: SystemMessageConfig = {
   mode: 'append',
   content: 'You are a helpful assistant. Answer briefly.',
 };
 
 describe('Copilot WebSocket integration', () => {
+  it(
+    'creates independent Office-agent sessions on concurrent connections',
+    async () => {
+      const clients = await Promise.all([
+        createWebSocketClient(SERVER_URL),
+        createWebSocketClient(SERVER_URL),
+      ]);
+      try {
+        const sessions = await Promise.all(
+          clients.map(client =>
+            client.createSession({
+              host: 'excel',
+              agent: 'office-excel:excel',
+              systemMessage: SYSTEM,
+            })
+          )
+        );
+        expect(sessions[0].sessionId).not.toBe(sessions[1].sessionId);
+        const agents = await Promise.all(sessions.map(session => session.listAgents()));
+        for (const list of agents) {
+          expect(list.some(agent => agent.name === 'office-excel:excel')).toBe(true);
+        }
+      } finally {
+        await Promise.all(clients.map(client => client.stop()));
+      }
+    },
+    TIMEOUT_MS
+  );
+
   it(
     'connects to the proxy server',
     async () => {
